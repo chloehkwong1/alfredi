@@ -17,7 +17,6 @@ import type {
 	ThemeColors,
 	Shortcut,
 	CustomAICommand,
-	GlobalStats,
 	AutoRunStats,
 	MaestroUsageStats,
 	OnboardingStats,
@@ -33,6 +32,7 @@ import {
 	loadAllSettings,
 	selectIsLeaderboardRegistered,
 } from '../../stores/settingsStore';
+import type { DocumentGraphLayoutType } from '../../stores/settingsStore';
 
 export interface UseSettingsReturn {
 	// Loading state
@@ -146,10 +146,10 @@ export interface UseSettingsReturn {
 	customAICommands: CustomAICommand[];
 	setCustomAICommands: (value: CustomAICommand[]) => void;
 
-	// Global Stats (persistent across restarts)
-	globalStats: GlobalStats;
-	setGlobalStats: (value: GlobalStats) => void;
-	updateGlobalStats: (delta: Partial<GlobalStats>) => void;
+	// Standalone active time (migrated from globalStats.totalActiveTimeMs)
+	totalActiveTimeMs: number;
+	setTotalActiveTimeMs: (value: number) => void;
+	addTotalActiveTimeMs: (delta: number) => void;
 
 	// Auto-run Stats (persistent across restarts)
 	autoRunStats: AutoRunStats;
@@ -236,6 +236,8 @@ export interface UseSettingsReturn {
 	setDocumentGraphMaxNodes: (value: number) => void;
 	documentGraphPreviewCharLimit: number;
 	setDocumentGraphPreviewCharLimit: (value: number) => void;
+	documentGraphLayoutType: DocumentGraphLayoutType;
+	setDocumentGraphLayoutType: (value: DocumentGraphLayoutType) => void;
 
 	// Stats settings
 	statsCollectionEnabled: boolean;
@@ -252,6 +254,12 @@ export interface UseSettingsReturn {
 	setDisableGpuAcceleration: (value: boolean) => void;
 	disableConfetti: boolean;
 	setDisableConfetti: (value: boolean) => void;
+
+	// Local file indexing ignore patterns
+	localIgnorePatterns: string[];
+	setLocalIgnorePatterns: (value: string[]) => void;
+	localHonorGitignore: boolean;
+	setLocalHonorGitignore: (value: boolean) => void;
 
 	// SSH Remote file indexing settings
 	sshRemoteIgnorePatterns: string[];
@@ -271,6 +279,14 @@ export interface UseSettingsReturn {
 	suppressWindowsWarning: boolean;
 	setSuppressWindowsWarning: (value: boolean) => void;
 
+	// Auto-scroll in AI mode
+	autoScrollAiMode: boolean;
+	setAutoScrollAiMode: (value: boolean) => void;
+
+	// Message alignment
+	userMessageAlignment: 'left' | 'right';
+	setUserMessageAlignment: (value: 'left' | 'right') => void;
+
 	// Encore Features - optional features disabled by default
 	encoreFeatures: EncoreFeatureFlags;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
@@ -288,6 +304,14 @@ export interface UseSettingsReturn {
 	setWakatimeApiKey: (value: string) => void;
 	wakatimeEnabled: boolean;
 	setWakatimeEnabled: (value: boolean) => void;
+	wakatimeDetailedTracking: boolean;
+	setWakatimeDetailedTracking: (value: boolean) => void;
+
+	// Window chrome settings
+	useNativeTitleBar: boolean;
+	setUseNativeTitleBar: (value: boolean) => void;
+	autoHideMenuBar: boolean;
+	setAutoHideMenuBar: (value: boolean) => void;
 }
 
 export function useSettings(): UseSettingsReturn {

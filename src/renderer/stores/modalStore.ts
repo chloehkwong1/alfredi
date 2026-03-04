@@ -15,7 +15,7 @@
  */
 
 import { create } from 'zustand';
-import type { Session, SettingsTab } from '../types';
+import type { Session, SettingsTab, AgentError } from '../types';
 import type { SerializableWizardState } from '../components/Wizard';
 import type { ConductorBadge } from '../constants/conductorBadges';
 
@@ -106,6 +106,13 @@ export interface WizardResumeModalData {
 /** Agent error modal data */
 export interface AgentErrorModalData {
 	sessionId: string;
+	/** Direct error for displaying historical errors from chat log entries */
+	historicalError?: AgentError;
+}
+
+/** Delete agent modal data */
+export interface DeleteAgentModalData {
+	session: Session;
 }
 
 /** Worktree modal data (create/delete/PR) */
@@ -153,6 +160,7 @@ export type ModalId =
 	// Instance Management
 	| 'newInstance'
 	| 'editAgent'
+	| 'deleteAgent'
 	| 'renameInstance'
 	| 'agentError'
 	// Quick Actions
@@ -230,6 +238,7 @@ export interface ModalDataMap {
 	agentSessions: AgentSessionsModalData;
 	wizardResume: WizardResumeModalData;
 	agentError: AgentErrorModalData;
+	deleteAgent: DeleteAgentModalData;
 	createWorktree: WorktreeModalData;
 	createPR: WorktreeModalData;
 	deleteWorktree: WorktreeModalData;
@@ -457,6 +466,12 @@ export function getModalActions() {
 		setEditAgentSession: (session: Session | null) =>
 			session ? openModal('editAgent', { session }) : closeModal('editAgent'),
 
+		// Delete Agent Modal
+		setDeleteAgentModalOpen: (open: boolean) =>
+			open ? openModal('deleteAgent') : closeModal('deleteAgent'),
+		setDeleteAgentSession: (session: Session | null) =>
+			session ? openModal('deleteAgent', { session }) : closeModal('deleteAgent'),
+
 		// Shortcuts Help Modal
 		setShortcutsHelpOpen: (open: boolean) =>
 			open ? openModal('shortcutsHelp') : closeModal('shortcutsHelp'),
@@ -671,6 +686,8 @@ export function getModalActions() {
 		// Agent Error Modal
 		setAgentErrorModalSessionId: (sessionId: string | null) =>
 			sessionId ? openModal('agentError', { sessionId }) : closeModal('agentError'),
+		showHistoricalAgentError: (sessionId: string, error: AgentError) =>
+			openModal('agentError', { sessionId, historicalError: error }),
 
 		// Worktree Modals
 		setWorktreeConfigModalOpen: (open: boolean) =>
@@ -773,6 +790,8 @@ export function useModalActions() {
 	const newInstanceData = useModalStore(selectModalData('newInstance'));
 	const editAgentModalOpen = useModalStore(selectModalOpen('editAgent'));
 	const editAgentData = useModalStore(selectModalData('editAgent'));
+	const deleteAgentModalOpen = useModalStore(selectModalOpen('deleteAgent'));
+	const deleteAgentData = useModalStore(selectModalData('deleteAgent'));
 	const shortcutsHelpOpen = useModalStore(selectModalOpen('shortcutsHelp'));
 	const quickActionOpen = useModalStore(selectModalOpen('quickAction'));
 	const quickActionData = useModalStore(selectModalData('quickAction'));
@@ -848,6 +867,10 @@ export function useModalActions() {
 		// Edit Agent Modal
 		editAgentModalOpen,
 		editAgentSession: editAgentData?.session ?? null,
+
+		// Delete Agent Modal
+		deleteAgentModalOpen,
+		deleteAgentSession: deleteAgentData?.session ?? null,
 
 		// Shortcuts Help Modal
 		shortcutsHelpOpen,
