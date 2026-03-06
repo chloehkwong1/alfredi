@@ -54,7 +54,7 @@
 							"document-graph",
 							"git-worktrees",
 							"group-chat",
-							"remote-access",
+							"remote-control",
 							"ssh-remote-execution",
 							"configuration"
 						]

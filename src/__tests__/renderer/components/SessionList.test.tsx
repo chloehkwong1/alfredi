@@ -2087,10 +2087,10 @@ describe('SessionList', () => {
 	});
 
 	// ============================================================================
-	// Tunnel/Remote Access Tests
+	// Tunnel/Remote Control Tests
 	// ============================================================================
 
-	describe('Tunnel and Remote Access', () => {
+	describe('Tunnel and Remote Control', () => {
 		it('checks cloudflared installation when live overlay opens', async () => {
 			const mockIsInstalled = vi.fn().mockResolvedValue(true);
 			(window.maestro as Record<string, unknown>).tunnel = {
@@ -2157,12 +2157,12 @@ describe('SessionList', () => {
 
 			// Wait for cloudflared check to complete
 			await waitFor(() => {
-				const toggleButton = screen.getByTitle('Enable remote access');
+				const toggleButton = screen.getByTitle('Enable remote control');
 				expect(toggleButton).toBeInTheDocument();
 			});
 
 			// Click the toggle to start tunnel
-			const toggleButton = screen.getByTitle('Enable remote access');
+			const toggleButton = screen.getByTitle('Enable remote control');
 			fireEvent.click(toggleButton);
 
 			await waitFor(() => {
@@ -2191,19 +2191,19 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				const toggleButton = screen.getByTitle('Enable remote access');
+				const toggleButton = screen.getByTitle('Enable remote control');
 				expect(toggleButton).toBeInTheDocument();
 			});
 
 			// Start tunnel first
-			fireEvent.click(screen.getByTitle('Enable remote access'));
+			fireEvent.click(screen.getByTitle('Enable remote control'));
 
 			await waitFor(() => {
-				expect(screen.getByTitle('Disable remote access')).toBeInTheDocument();
+				expect(screen.getByTitle('Disable remote control')).toBeInTheDocument();
 			});
 
 			// Now stop tunnel
-			fireEvent.click(screen.getByTitle('Disable remote access'));
+			fireEvent.click(screen.getByTitle('Disable remote control'));
 
 			await waitFor(() => {
 				expect(mockStop).toHaveBeenCalled();
@@ -2228,7 +2228,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				const toggleButton = screen.getByTitle('Enable remote access');
+				const toggleButton = screen.getByTitle('Enable remote control');
 				fireEvent.click(toggleButton);
 			});
 
@@ -2255,7 +2255,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				const toggleButton = screen.getByTitle('Enable remote access');
+				const toggleButton = screen.getByTitle('Enable remote control');
 				fireEvent.click(toggleButton);
 			});
 
@@ -2284,7 +2284,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				fireEvent.click(screen.getByTitle('Enable remote access'));
+				fireEvent.click(screen.getByTitle('Enable remote control'));
 			});
 
 			await waitFor(() => {
@@ -2313,7 +2313,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				fireEvent.click(screen.getByTitle('Enable remote access'));
+				fireEvent.click(screen.getByTitle('Enable remote control'));
 			});
 
 			await waitFor(() => {
@@ -2350,7 +2350,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				fireEvent.click(screen.getByTitle('Enable remote access'));
+				fireEvent.click(screen.getByTitle('Enable remote control'));
 			});
 
 			await waitFor(() => {
@@ -2384,7 +2384,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				fireEvent.click(screen.getByTitle('Enable remote access'));
+				fireEvent.click(screen.getByTitle('Enable remote control'));
 			});
 
 			await waitFor(() => {
@@ -3062,7 +3062,7 @@ describe('SessionList', () => {
 			fireEvent.click(screen.getByText('LIVE'));
 
 			await waitFor(() => {
-				fireEvent.click(screen.getByTitle('Enable remote access'));
+				fireEvent.click(screen.getByTitle('Enable remote control'));
 			});
 
 			await waitFor(() => {

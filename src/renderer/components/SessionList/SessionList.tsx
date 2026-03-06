@@ -707,7 +707,7 @@ function SessionListInner(props: SessionListProps) {
 								</button>
 							)}
 							{/* Global LIVE Toggle */}
-							<div className="ml-2 relative" ref={liveOverlayRef} data-tour="remote-control">
+							<div className="ml-2 relative z-10" ref={liveOverlayRef} data-tour="remote-control">
 								<button
 									onClick={() => {
 										if (!isLiveMode) {
@@ -761,7 +761,7 @@ function SessionListInner(props: SessionListProps) {
 							</div>
 						</div>
 						{/* Hamburger Menu */}
-						<div className="relative" ref={menuRef} data-tour="hamburger-menu">
+						<div className="relative z-10" ref={menuRef} data-tour="hamburger-menu">
 							<button
 								onClick={() => setMenuOpen(!menuOpen)}
 								className="p-2 rounded hover:bg-white/10 transition-colors"
@@ -778,7 +778,7 @@ function SessionListInner(props: SessionListProps) {
 									style={{
 										backgroundColor: theme.colors.bgSidebar,
 										border: `1px solid ${theme.colors.border}`,
-										maxHeight: 'calc(100vh - 90px)',
+										maxHeight: 'calc(100vh - 120px)',
 									}}
 								>
 									<HamburgerMenuContent
@@ -811,7 +811,7 @@ function SessionListInner(props: SessionListProps) {
 								style={{
 									backgroundColor: theme.colors.bgSidebar,
 									border: `1px solid ${theme.colors.border}`,
-									maxHeight: 'calc(100vh - 90px)',
+									maxHeight: 'calc(100vh - 120px)',
 								}}
 							>
 								<HamburgerMenuContent
