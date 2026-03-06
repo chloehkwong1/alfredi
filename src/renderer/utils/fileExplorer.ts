@@ -350,8 +350,8 @@ async function loadFileTreeRecursive(
 			}
 			seen.add(entry.name);
 
-			// Skip entries that match ignore patterns
-			if (shouldIgnore(entry.name, state.ignorePatterns)) {
+			// Skip entries that match ignore patterns (but always show .maestro)
+			if (entry.name !== '.maestro' && shouldIgnore(entry.name, state.ignorePatterns)) {
 				continue;
 			}
 
