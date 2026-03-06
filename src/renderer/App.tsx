@@ -415,6 +415,15 @@ function MaestroConsoleInner() {
 		encoreFeatures,
 	} = settings;
 
+	// Reset modal-open flags when their Encore Feature toggle is disabled
+	useEffect(() => {
+		if (!encoreFeatures.symphony) setSymphonyModalOpen(false);
+	}, [encoreFeatures.symphony, setSymphonyModalOpen]);
+
+	useEffect(() => {
+		if (!encoreFeatures.usageStats) setUsageDashboardOpen(false);
+	}, [encoreFeatures.usageStats, setUsageDashboardOpen]);
+
 	// --- KEYBOARD SHORTCUT HELPERS ---
 	const { isShortcut, isTabShortcut } = useKeyboardShortcutHelpers({
 		shortcuts,
@@ -2587,7 +2596,7 @@ function MaestroConsoleInner() {
 					setAboutModalOpen={setAboutModalOpen}
 					setLogViewerOpen={setLogViewerOpen}
 					setProcessMonitorOpen={setProcessMonitorOpen}
-					setUsageDashboardOpen={setUsageDashboardOpen}
+					setUsageDashboardOpen={encoreFeatures.usageStats ? setUsageDashboardOpen : undefined}
 					setActiveRightTab={setActiveRightTab}
 					setAgentSessionsOpen={setAgentSessionsOpen}
 					setActiveAgentSessionId={setActiveAgentSessionId}
@@ -2662,7 +2671,7 @@ function MaestroConsoleInner() {
 					getDocumentTaskCount={getDocumentTaskCount}
 					onAutoRunRefresh={handleAutoRunRefresh}
 					onOpenMarketplace={handleOpenMarketplace}
-					onOpenSymphony={() => setSymphonyModalOpen(true)}
+					onOpenSymphony={encoreFeatures.symphony ? () => setSymphonyModalOpen(true) : undefined}
 					onOpenDirectorNotes={
 						encoreFeatures.directorNotes ? () => setDirectorNotesOpen(true) : undefined
 					}
@@ -2826,7 +2835,7 @@ function MaestroConsoleInner() {
 				)}
 
 				{/* --- SYMPHONY MODAL (lazy-loaded) --- */}
-				{symphonyModalOpen && (
+				{encoreFeatures.symphony && symphonyModalOpen && (
 					<Suspense fallback={null}>
 						<SymphonyModal
 							theme={theme}
