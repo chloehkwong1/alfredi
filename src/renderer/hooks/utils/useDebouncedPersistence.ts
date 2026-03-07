@@ -36,9 +36,24 @@ const MAX_PERSISTED_LOGS_PER_TAB = 100;
  * This is a local copy to avoid circular imports in session persistence logic.
  */
 const prepareSessionForPersistence = (session: Session): Session => {
-	// If no aiTabs, return as-is (shouldn't happen after migration)
+	// Strip terminal tab runtime state - PTY processes don't survive app restart.
+	// Run unconditionally so terminal-only sessions (no aiTabs) are also cleaned up.
+	const cleanedTerminalTabs = (session.terminalTabs || []).map((tab) => ({
+		...tab,
+		pid: 0,
+		state: 'idle' as const,
+		exitCode: undefined,
+	}));
+	const activeTerminalTabExists = cleanedTerminalTabs.some(
+		(tab) => tab.id === session.activeTerminalTabId
+	);
+	const newActiveTerminalTabId = activeTerminalTabExists
+		? session.activeTerminalTabId
+		: cleanedTerminalTabs[0]?.id ?? null;
+
+	// If no aiTabs, return with cleaned terminal state (shouldn't happen after migration)
 	if (!session.aiTabs || session.aiTabs.length === 0) {
-		return session;
+		return { ...session, terminalTabs: cleanedTerminalTabs, activeTerminalTabId: newActiveTerminalTabId };
 	}
 
 	// Filter out tabs with active wizard state - incomplete wizards should not persist
@@ -95,22 +110,6 @@ const prepareSessionForPersistence = (session: Session): Session => {
 	// Ensure activeTabId points to a valid tab (it might have been a wizard tab that got filtered)
 	const activeTabExists = truncatedTabs.some((tab) => tab.id === session.activeTabId);
 	const newActiveTabId = activeTabExists ? session.activeTabId : truncatedTabs[0]?.id;
-
-	// Strip terminal tab runtime state - PTY processes don't survive app restart
-	const cleanedTerminalTabs = (session.terminalTabs || []).map((tab) => ({
-		...tab,
-		pid: 0,
-		state: 'idle' as const,
-		exitCode: undefined,
-	}));
-
-	// Validate activeTerminalTabId against the cleaned terminal tabs list
-	const activeTerminalTabExists = cleanedTerminalTabs.some(
-		(tab) => tab.id === session.activeTerminalTabId
-	);
-	const newActiveTerminalTabId = activeTerminalTabExists
-		? session.activeTerminalTabId
-		: cleanedTerminalTabs[0]?.id ?? null;
 
 	return {
 		...sessionWithoutRuntimeFields,

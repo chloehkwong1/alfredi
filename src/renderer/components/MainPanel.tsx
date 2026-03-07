@@ -473,6 +473,26 @@ export const MainPanel = React.memo(
 		const mountedTerminalSessionsRef = useRef<Map<string, Session>>(new Map());
 		const [mountedTerminalSessionIds, setMountedTerminalSessionIds] = useState<string[]>([]);
 
+		// Memoize per-session tab handler callbacks so TerminalView's React.memo() wrapper
+		// sees stable references across MainPanel re-renders. Without this, new function
+		// instances are created on every render, defeating memo() and triggering cascade
+		// re-renders (plus unnecessary re-subscriptions to PTY exit events).
+		const tabStateHandlers = useMemo(() => {
+			const map = new Map<string, ReturnType<typeof createTabStateChangeHandler>>();
+			for (const id of mountedTerminalSessionIds) {
+				map.set(id, createTabStateChangeHandler(id));
+			}
+			return map;
+		}, [mountedTerminalSessionIds]);
+
+		const tabPidHandlers = useMemo(() => {
+			const map = new Map<string, ReturnType<typeof createTabPidChangeHandler>>();
+			for (const id of mountedTerminalSessionIds) {
+				map.set(id, createTabPidChangeHandler(id));
+			}
+			return map;
+		}, [mountedTerminalSessionIds]);
+
 		const [terminalSearchOpen, setTerminalSearchOpen] = useState(false);
 		const [configuredContextWindow, setConfiguredContextWindow] = useState(0);
 
@@ -1963,8 +1983,8 @@ export const MainPanel = React.memo(
 										fontFamily={fontFamily}
 										fontSize={fontSize}
 										defaultShell={defaultShell}
-										onTabStateChange={createTabStateChangeHandler(sessionId)}
-										onTabPidChange={createTabPidChangeHandler(sessionId)}
+										onTabStateChange={tabStateHandlers.get(sessionId) ?? createTabStateChangeHandler(sessionId)}
+										onTabPidChange={tabPidHandlers.get(sessionId) ?? createTabPidChangeHandler(sessionId)}
 										searchOpen={isCurrentSession ? terminalSearchOpen : false}
 										onSearchClose={isCurrentSession ? () => setTerminalSearchOpen(false) : undefined}
 										isVisible={isTerminalVisible}

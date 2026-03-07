@@ -503,6 +503,7 @@ describe('useSessionCrud', () => {
 			expect(aiRef!.id).toBe(session.activeTabId);
 			expect(termRef).toBeUndefined();
 			expect(session.terminalTabs).toHaveLength(0);
+			expect(session.activeTerminalTabId).toBeNull();
 		});
 	});
 

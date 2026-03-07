@@ -245,7 +245,11 @@ export class ProcessManager extends EventEmitter {
 		cols?: number;
 		rows?: number;
 	}): SpawnResult {
-		const shell = config.shell || (process.platform === 'win32' ? 'powershell.exe' : 'zsh');
+		const shell =
+			config.shell ??
+			(process.platform === 'win32'
+				? process.env.ComSpec ?? 'powershell.exe'
+				: process.env.SHELL ?? '/bin/bash');
 		logger.info('[ProcessManager] Spawning terminal tab PTY', 'ProcessManager', {
 			sessionId: config.sessionId,
 			cwd: config.cwd,

@@ -146,7 +146,7 @@ export const TerminalView = memo(
 						spawnInFlightRef.current.delete(tabId);
 					});
 			},
-			[session.id, session.cwd, session.sessionSshRemoteConfig, session.sshRemoteId, defaultShell, shellArgs, shellEnvVars, onTabPidChange, onTabStateChange]
+			[session.id, session.cwd, session.projectRoot, session.sessionSshRemoteConfig, session.sshRemoteId, defaultShell, shellArgs, shellEnvVars, onTabPidChange, onTabStateChange]
 		);
 
 		// Spawn PTY when active tab changes and has no PID yet

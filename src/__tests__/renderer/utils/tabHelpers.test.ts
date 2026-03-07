@@ -1403,6 +1403,7 @@ describe('tabHelpers', () => {
 				activeFileTabId: null,
 				inputMode: 'terminal',
 				activeTerminalTabId: 'term-1',
+				terminalTabs: [{ id: 'term-1', name: null, shellType: 'zsh', pid: 1234, cwd: '/tmp', createdAt: 0, state: 'idle' }],
 				unifiedTabOrder: [
 					{ type: 'terminal', id: 'term-1' },
 					{ type: 'ai', id: 'ai-1' },
@@ -1424,6 +1425,7 @@ describe('tabHelpers', () => {
 				activeFileTabId: null,
 				inputMode: 'terminal',
 				activeTerminalTabId: 'term-1',
+				terminalTabs: [{ id: 'term-1', name: null, shellType: 'zsh', pid: 1234, cwd: '/tmp', createdAt: 0, state: 'idle' }],
 				unifiedTabOrder: [
 					{ type: 'terminal', id: 'term-1' },
 					{ type: 'file', id: 'file-1' },

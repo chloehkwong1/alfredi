@@ -50,8 +50,12 @@ export function useInputMode(deps: UseInputModeDeps): UseInputModeReturn {
 				if (newMode === 'terminal') {
 					// Switching to terminal mode: save current file tab (if any) and clear it.
 					// Also ensure activeTerminalTabId points to a valid tab (first one if unset).
-					useUIStore.getState().setPreTerminalFileTabId(s.activeFileTabId);
 					const terminalTabs = s.terminalTabs || [];
+					// Guard: if there are no terminal tabs yet, don't switch to terminal mode.
+					// Doing so would leave the session in an unrenderable state (inputMode='terminal'
+					// with activeTerminalTabId=null and no tabs to display).
+					if (terminalTabs.length === 0) return s;
+					useUIStore.getState().setPreTerminalFileTabId(s.activeFileTabId);
 					const resolvedTerminalTabId =
 						s.activeTerminalTabId && terminalTabs.some((t) => t.id === s.activeTerminalTabId)
 							? s.activeTerminalTabId
