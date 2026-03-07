@@ -613,10 +613,7 @@ export class WebSocketMessageHandler {
 	 */
 	private handleToggleBookmark(client: WebClient, message: WebClientMessage): void {
 		const sessionId = message.sessionId as string;
-		logger.info(
-			`[Web] Received toggle_bookmark message: session=${sessionId}`,
-			LOG_CONTEXT
-		);
+		logger.info(`[Web] Received toggle_bookmark message: session=${sessionId}`, LOG_CONTEXT);
 
 		if (!sessionId) {
 			this.sendError(client, 'Missing sessionId');

@@ -34,7 +34,13 @@ vi.mock('../../../web/components/ThemeProvider', () => ({
 let capturedOnLongPress: ((rect: DOMRect) => void) | undefined;
 let capturedOnTap: (() => void) | undefined;
 vi.mock('../../../web/hooks/useLongPress', () => ({
-	useLongPress: ({ onLongPress, onTap }: { onLongPress: (rect: DOMRect) => void; onTap?: () => void }) => {
+	useLongPress: ({
+		onLongPress,
+		onTap,
+	}: {
+		onLongPress: (rect: DOMRect) => void;
+		onTap?: () => void;
+	}) => {
 		capturedOnLongPress = onLongPress;
 		capturedOnTap = onTap;
 		const elementRef = { current: null };

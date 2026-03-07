@@ -35,7 +35,16 @@ interface TabProps {
 	onLongPress: (tab: AITabData, tabIndex: number, rect: DOMRect) => void;
 }
 
-function Tab({ tab, tabIndex, isActive, canClose, colors, onSelect, onClose, onLongPress }: TabProps) {
+function Tab({
+	tab,
+	tabIndex,
+	isActive,
+	canClose,
+	colors,
+	onSelect,
+	onClose,
+	onLongPress,
+}: TabProps) {
 	const [isHovered, setIsHovered] = useState(false);
 	const [isCloseHovered, setIsCloseHovered] = useState(false);
 
@@ -238,7 +247,8 @@ function TabActionsPopover({
 
 		let left = anchorRect.left + anchorRect.width / 2 - popoverWidth / 2;
 		if (left < padding) left = padding;
-		if (left + popoverWidth > viewportWidth - padding) left = viewportWidth - popoverWidth - padding;
+		if (left + popoverWidth > viewportWidth - padding)
+			left = viewportWidth - popoverWidth - padding;
 
 		return {
 			position: 'fixed',
@@ -538,12 +548,10 @@ export function TabBar({
 	const colors = useThemeColors();
 	const [popoverState, setPopoverState] = useState<TabPopoverState | null>(null);
 
-	const handleTabLongPress = useCallback(
-		(tab: AITabData, tabIdx: number, rect: DOMRect) => {
-			setPopoverState({ tab, tabIndex: tabIdx, anchorRect: rect });
-		},
-		[]
-	);
+	const handleTabLongPress = useCallback((tab: AITabData, tabIdx: number, rect: DOMRect) => {
+		setPopoverState({ tab, tabIndex: tabIdx, anchorRect: rect });
+	}, []);
+
 	const handleClosePopover = useCallback(() => {
 		setPopoverState(null);
 	}, []);

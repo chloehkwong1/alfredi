@@ -450,8 +450,7 @@ export class WebServer {
 				this.callbackRegistry.starTab(sessionId, tabId, starred),
 			reorderTab: async (sessionId: string, fromIndex: number, toIndex: number) =>
 				this.callbackRegistry.reorderTab(sessionId, fromIndex, toIndex),
-			toggleBookmark: async (sessionId: string) =>
-				this.callbackRegistry.toggleBookmark(sessionId),
+			toggleBookmark: async (sessionId: string) => this.callbackRegistry.toggleBookmark(sessionId),
 			getSessions: () => this.callbackRegistry.getSessions(),
 			getLiveSessionInfo: (sessionId: string) =>
 				this.liveSessionManager.getLiveSessionInfo(sessionId),

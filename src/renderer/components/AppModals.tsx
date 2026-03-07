@@ -818,7 +818,7 @@ export interface AppUtilityModalsProps {
 	setAboutModalOpen: (open: boolean) => void;
 	setLogViewerOpen: (open: boolean) => void;
 	setProcessMonitorOpen: (open: boolean) => void;
-	setUsageDashboardOpen: (open: boolean) => void;
+	setUsageDashboardOpen?: (open: boolean) => void;
 	setActiveRightTab: (tab: RightPanelTab) => void;
 	setAgentSessionsOpen: (open: boolean) => void;
 	setActiveAgentSessionId: (id: string | null) => void;
@@ -862,6 +862,7 @@ export interface AppUtilityModalsProps {
 	) => boolean;
 	onOpenMergeSession: () => void;
 	onOpenSendToAgent: () => void;
+	onQuickCreateWorktree: (session: Session) => void;
 	onOpenCreatePR: (session: Session) => void;
 	onSummarizeAndContinue: () => void;
 	canSummarizeActiveTab: boolean;
@@ -884,6 +885,10 @@ export interface AppUtilityModalsProps {
 
 	// Director's Notes
 	onOpenDirectorNotes?: () => void;
+
+	// Maestro Cue
+	onOpenMaestroCue?: () => void;
+	onConfigureCue?: (session: Session) => void;
 
 	// Auto-scroll
 	autoScrollAiMode?: boolean;
@@ -1069,6 +1074,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	hasActiveSessionCapability,
 	onOpenMergeSession,
 	onOpenSendToAgent,
+	onQuickCreateWorktree,
 	onOpenCreatePR,
 	onSummarizeAndContinue,
 	canSummarizeActiveTab,
@@ -1087,6 +1093,9 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	onOpenSymphony,
 	// Director's Notes
 	onOpenDirectorNotes,
+	// Maestro Cue
+	onOpenMaestroCue,
+	onConfigureCue,
 	// Auto-scroll
 	autoScrollAiMode,
 	setAutoScrollAiMode,
@@ -1231,6 +1240,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					hasActiveSessionCapability={hasActiveSessionCapability}
 					onOpenMergeSession={onOpenMergeSession}
 					onOpenSendToAgent={onOpenSendToAgent}
+					onQuickCreateWorktree={onQuickCreateWorktree}
 					onOpenCreatePR={onOpenCreatePR}
 					onSummarizeAndContinue={onSummarizeAndContinue}
 					canSummarizeActiveTab={canSummarizeActiveTab}
@@ -1246,6 +1256,8 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					onOpenLastDocumentGraph={onOpenLastDocumentGraph}
 					onOpenSymphony={onOpenSymphony}
 					onOpenDirectorNotes={onOpenDirectorNotes}
+					onOpenMaestroCue={onOpenMaestroCue}
+					onConfigureCue={onConfigureCue}
 					autoScrollAiMode={autoScrollAiMode}
 					setAutoScrollAiMode={setAutoScrollAiMode}
 				/>
@@ -1939,7 +1951,7 @@ export interface AppModalsProps {
 	setAboutModalOpen: (open: boolean) => void;
 	setLogViewerOpen: (open: boolean) => void;
 	setProcessMonitorOpen: (open: boolean) => void;
-	setUsageDashboardOpen: (open: boolean) => void;
+	setUsageDashboardOpen?: (open: boolean) => void;
 	setActiveRightTab: (tab: RightPanelTab) => void;
 	setAgentSessionsOpen: (open: boolean) => void;
 	setActiveAgentSessionId: (id: string | null) => void;
@@ -1981,6 +1993,7 @@ export interface AppModalsProps {
 	) => boolean;
 	onOpenMergeSession: () => void;
 	onOpenSendToAgent: () => void;
+	onQuickCreateWorktree: (session: Session) => void;
 	onOpenCreatePR: (session: Session) => void;
 	onSummarizeAndContinue: () => void;
 	canSummarizeActiveTab: boolean;
@@ -2025,6 +2038,9 @@ export interface AppModalsProps {
 	onOpenSymphony?: () => void;
 	// Director's Notes
 	onOpenDirectorNotes?: () => void;
+	// Maestro Cue
+	onOpenMaestroCue?: () => void;
+	onConfigureCue?: (session: Session) => void;
 	// Auto-scroll
 	autoScrollAiMode?: boolean;
 	setAutoScrollAiMode?: (value: boolean) => void;
@@ -2354,6 +2370,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		hasActiveSessionCapability,
 		onOpenMergeSession,
 		onOpenSendToAgent,
+		onQuickCreateWorktree,
 		onOpenCreatePR,
 		onSummarizeAndContinue,
 		canSummarizeActiveTab,
@@ -2393,6 +2410,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		onOpenSymphony,
 		// Director's Notes
 		onOpenDirectorNotes,
+		// Maestro Cue
+		onOpenMaestroCue,
+		onConfigureCue,
 		// Auto-scroll
 		autoScrollAiMode,
 		setAutoScrollAiMode,
@@ -2662,6 +2682,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				hasActiveSessionCapability={hasActiveSessionCapability}
 				onOpenMergeSession={onOpenMergeSession}
 				onOpenSendToAgent={onOpenSendToAgent}
+				onQuickCreateWorktree={onQuickCreateWorktree}
 				onOpenCreatePR={onOpenCreatePR}
 				onSummarizeAndContinue={onSummarizeAndContinue}
 				canSummarizeActiveTab={canSummarizeActiveTab}
@@ -2700,6 +2721,8 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onOpenMarketplace={onOpenMarketplace}
 				onOpenSymphony={onOpenSymphony}
 				onOpenDirectorNotes={onOpenDirectorNotes}
+				onOpenMaestroCue={onOpenMaestroCue}
+				onConfigureCue={onConfigureCue}
 				autoScrollAiMode={autoScrollAiMode}
 				setAutoScrollAiMode={setAutoScrollAiMode}
 				tabSwitcherOpen={tabSwitcherOpen}

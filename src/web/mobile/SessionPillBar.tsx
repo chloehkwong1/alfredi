@@ -246,7 +246,12 @@ interface SessionInfoPopoverProps {
 /**
  * Popover component displaying detailed session information
  */
-function SessionInfoPopover({ session, anchorRect, onClose, onToggleBookmark }: SessionInfoPopoverProps) {
+function SessionInfoPopover({
+	session,
+	anchorRect,
+	onClose,
+	onToggleBookmark,
+}: SessionInfoPopoverProps) {
 	const colors = useThemeColors();
 	const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -553,9 +558,7 @@ function SessionInfoPopover({ session, anchorRect, onClose, onToggleBookmark }: 
 								transition: 'background-color 0.15s ease',
 							}}
 						>
-							<span style={{ fontSize: '16px' }}>
-								{session.bookmarked ? '★' : '☆'}
-							</span>
+							<span style={{ fontSize: '16px' }}>{session.bookmarked ? '★' : '☆'}</span>
 							{session.bookmarked ? 'Remove Bookmark' : 'Bookmark'}
 						</button>
 					)}

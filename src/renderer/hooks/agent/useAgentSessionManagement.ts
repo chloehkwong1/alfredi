@@ -8,7 +8,7 @@ import type { RightPanelHandle } from '../../components/RightPanel';
  * History entry for the addHistoryEntry function.
  */
 export interface HistoryEntryInput {
-	type: 'AUTO' | 'USER';
+	type: 'AUTO' | 'USER' | 'CUE';
 	summary: string;
 	fullResponse?: string;
 	agentSessionId?: string;
@@ -177,7 +177,9 @@ export function useAgentSessionManagement(
 				// Switch to the existing tab instead of creating a duplicate
 				setSessions((prev) =>
 					prev.map((s) =>
-						s.id === activeSession.id ? { ...s, activeTabId: existingTab.id, activeFileTabId: null, inputMode: 'ai' } : s
+						s.id === activeSession.id
+							? { ...s, activeTabId: existingTab.id, activeFileTabId: null, inputMode: 'ai' }
+							: s
 					)
 				);
 				setActiveAgentSessionId(agentSessionId);

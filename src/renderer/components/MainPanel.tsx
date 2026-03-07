@@ -956,9 +956,7 @@ const chatRawTextMode = useSettingsStore((s) => s.chatRawTextMode);
 								<div className="flex items-center gap-4 min-w-0 overflow-hidden">
 									<div className="flex items-center gap-2 text-sm font-medium min-w-0 overflow-hidden">
 										{/* Session name - hidden at narrow widths via CSS container query */}
-										<span className="header-session-name truncate max-w-[150px]">
-											{activeSession.name}
-										</span>
+										<span className="header-session-name truncate">{activeSession.name}</span>
 										<div
 											className="relative shrink-0"
 											onMouseEnter={
@@ -1554,6 +1552,7 @@ const chatRawTextMode = useSettingsStore((s) => s.chatRawTextMode);
 									tabs={activeSession.aiTabs}
 									activeTabId={activeSession.activeTabId}
 									theme={theme}
+									sessionId={activeSession.id}
 									onTabSelect={onTabSelect}
 									onTabClose={onTabClose}
 									onNewTab={onNewTab}
