@@ -39,7 +39,12 @@ export async function ensureForkSetup(
 
 	// 3. Check push access
 	logger.info(`Checking push access to ${repoSlug}`, LOG_CONTEXT);
-	const accessResult = await execFileNoThrow('gh', ['api', `repos/${repoSlug}`, '--jq', '.permissions.push'], undefined, env);
+	const accessResult = await execFileNoThrow(
+		'gh',
+		['api', `repos/${repoSlug}`, '--jq', '.permissions.push'],
+		undefined,
+		env
+	);
 	if (accessResult.exitCode === 0 && accessResult.stdout.trim() === 'true') {
 		logger.info('User has push access, no fork needed', LOG_CONTEXT);
 		return { isFork: false };
@@ -47,7 +52,12 @@ export async function ensureForkSetup(
 
 	// 4. Fork the repo (idempotent)
 	logger.info(`Forking ${repoSlug}`, LOG_CONTEXT);
-	const forkResult = await execFileNoThrow('gh', ['repo', 'fork', repoSlug, '--clone=false'], undefined, env);
+	const forkResult = await execFileNoThrow(
+		'gh',
+		['repo', 'fork', repoSlug, '--clone=false'],
+		undefined,
+		env
+	);
 	if (forkResult.exitCode !== 0) {
 		// gh repo fork returns non-zero if fork already exists but prints to stderr — check for that
 		const alreadyExists = forkResult.stderr.includes('already exists');
@@ -61,7 +71,12 @@ export async function ensureForkSetup(
 	// 5. Get fork clone URL
 	const forkSlug = `${ghUser}/${repoName}`;
 	logger.info(`Getting clone URL for ${forkSlug}`, LOG_CONTEXT);
-	const urlResult = await execFileNoThrow('gh', ['api', `repos/${forkSlug}`, '--jq', '.clone_url'], undefined, env);
+	const urlResult = await execFileNoThrow(
+		'gh',
+		['api', `repos/${forkSlug}`, '--jq', '.clone_url'],
+		undefined,
+		env
+	);
 	if (urlResult.exitCode !== 0) {
 		logger.error('Failed to get fork clone URL', LOG_CONTEXT, { stderr: urlResult.stderr });
 		return { isFork: false, error: `Failed to get fork clone URL: ${urlResult.stderr}` };
@@ -70,17 +85,31 @@ export async function ensureForkSetup(
 
 	// 6. Reconfigure remotes
 	logger.info('Reconfiguring git remotes', LOG_CONTEXT);
-	const renameResult = await execFileNoThrow('git', ['remote', 'rename', 'origin', 'upstream'], repoPath);
+	const renameResult = await execFileNoThrow(
+		'git',
+		['remote', 'rename', 'origin', 'upstream'],
+		repoPath
+	);
 	if (renameResult.exitCode !== 0) {
 		// Fallback: upstream already exists, just set origin URL
-		logger.warn('Could not rename origin to upstream, trying set-url fallback', LOG_CONTEXT, { stderr: renameResult.stderr });
-		const setUrlResult = await execFileNoThrow('git', ['remote', 'set-url', 'origin', forkCloneUrl], repoPath);
+		logger.warn('Could not rename origin to upstream, trying set-url fallback', LOG_CONTEXT, {
+			stderr: renameResult.stderr,
+		});
+		const setUrlResult = await execFileNoThrow(
+			'git',
+			['remote', 'set-url', 'origin', forkCloneUrl],
+			repoPath
+		);
 		if (setUrlResult.exitCode !== 0) {
 			logger.error('Failed to set origin URL', LOG_CONTEXT, { stderr: setUrlResult.stderr });
 			return { isFork: false, error: `Failed to reconfigure remotes: ${setUrlResult.stderr}` };
 		}
 	} else {
-		const addResult = await execFileNoThrow('git', ['remote', 'add', 'origin', forkCloneUrl], repoPath);
+		const addResult = await execFileNoThrow(
+			'git',
+			['remote', 'add', 'origin', forkCloneUrl],
+			repoPath
+		);
 		if (addResult.exitCode !== 0) {
 			logger.error('Failed to add origin remote', LOG_CONTEXT, { stderr: addResult.stderr });
 			return { isFork: false, error: `Failed to add origin remote: ${addResult.stderr}` };

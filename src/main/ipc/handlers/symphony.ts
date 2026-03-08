@@ -792,12 +792,7 @@ async function createDraftPR(
 		prArgs.push('--repo', upstreamSlug);
 	}
 
-	const prResult = await execFileNoThrow(
-		'gh',
-		prArgs,
-		repoPath,
-		getExpandedEnv()
-	);
+	const prResult = await execFileNoThrow('gh', prArgs, repoPath, getExpandedEnv());
 
 	if (prResult.exitCode !== 0) {
 		// If PR creation failed after push, try to delete the remote branch.
@@ -828,12 +823,7 @@ async function markPRReady(
 	if (upstreamSlug) {
 		args.push('--repo', upstreamSlug);
 	}
-	const result = await execFileNoThrow(
-		'gh',
-		args,
-		repoPath,
-		getExpandedEnv()
-	);
+	const result = await execFileNoThrow('gh', args, repoPath, getExpandedEnv());
 
 	if (result.exitCode !== 0) {
 		return { success: false, error: result.stderr };
@@ -958,12 +948,7 @@ This pull request was created using [Maestro Symphony](https://runmaestro.ai/sym
 	if (upstreamSlug) {
 		commentArgs.push('--repo', upstreamSlug);
 	}
-	const result = await execFileNoThrow(
-		'gh',
-		commentArgs,
-		repoPath,
-		getExpandedEnv()
-	);
+	const result = await execFileNoThrow('gh', commentArgs, repoPath, getExpandedEnv());
 
 	if (result.exitCode !== 0) {
 		return { success: false, error: result.stderr };

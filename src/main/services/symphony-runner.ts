@@ -135,11 +135,7 @@ Closes #${issueNumber}
 		args.push('--head', `${forkOwner}:${branchName}`);
 	}
 
-	const result = await execFileNoThrow(
-		'gh',
-		args,
-		localPath
-	);
+	const result = await execFileNoThrow('gh', args, localPath);
 
 	if (result.exitCode !== 0) {
 		return { success: false, error: `PR creation failed: ${result.stderr}` };
@@ -233,8 +229,16 @@ export async function startContribution(options: SymphonyRunnerOptions): Promise
 	forkSlug?: string;
 	error?: string;
 }> {
-	const { repoSlug, repoUrl, localPath, branchName, issueNumber, issueTitle, documentPaths, onStatusChange } =
-		options;
+	const {
+		repoSlug,
+		repoUrl,
+		localPath,
+		branchName,
+		issueNumber,
+		issueTitle,
+		documentPaths,
+		onStatusChange,
+	} = options;
 
 	try {
 		// 1. Clone
@@ -283,9 +287,8 @@ export async function startContribution(options: SymphonyRunnerOptions): Promise
 		}
 
 		// 5. Create draft PR (cross-fork if needed)
-		const forkOwner = forkResult.isFork && forkResult.forkSlug
-			? forkResult.forkSlug.split('/')[0]
-			: undefined;
+		const forkOwner =
+			forkResult.isFork && forkResult.forkSlug ? forkResult.forkSlug.split('/')[0] : undefined;
 		if (forkResult.isFork) {
 			logger.info('Creating cross-fork draft PR', LOG_CONTEXT, {
 				upstreamSlug: repoSlug,
@@ -387,11 +390,7 @@ Closes #${issueNumber}
 	// Get final PR URL
 	const viewArgs = ['pr', 'view', prNumber.toString(), '--json', 'url', '-q', '.url'];
 	if (upstreamSlug) viewArgs.push('--repo', upstreamSlug);
-	const prInfoResult = await execFileNoThrow(
-		'gh',
-		viewArgs,
-		localPath
-	);
+	const prInfoResult = await execFileNoThrow('gh', viewArgs, localPath);
 
 	return {
 		success: true,
@@ -411,11 +410,7 @@ export async function cancelContribution(
 	// Close the draft PR
 	const closeArgs = ['pr', 'close', prNumber.toString(), '--delete-branch'];
 	if (upstreamSlug) closeArgs.push('--repo', upstreamSlug);
-	const closeResult = await execFileNoThrow(
-		'gh',
-		closeArgs,
-		localPath
-	);
+	const closeResult = await execFileNoThrow('gh', closeArgs, localPath);
 	if (closeResult.exitCode !== 0) {
 		logger.warn('Failed to close PR', LOG_CONTEXT, { prNumber, error: closeResult.stderr });
 	}
