@@ -10,9 +10,8 @@ export type BaseLogLevel = 'debug' | 'info' | 'warn' | 'error';
 /**
  * Extended log levels available in the main process logger.
  * - 'toast': User-facing toast notifications (always logged)
- * - 'autorun': Auto Run workflow tracking logs (always logged)
  */
-export type MainLogLevel = BaseLogLevel | 'toast' | 'autorun';
+export type MainLogLevel = BaseLogLevel | 'toast';
 
 /**
  * Log level type alias for backwards compatibility.
@@ -30,7 +29,6 @@ export const LOG_LEVEL_PRIORITY: Record<MainLogLevel, number> = {
 	warn: 2,
 	error: 3,
 	toast: 1, // Toast notifications always logged at info priority (always visible)
-	autorun: 1, // Auto Run logs always logged at info priority (always visible)
 };
 
 /**

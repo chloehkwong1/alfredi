@@ -2,18 +2,16 @@
  * useCycleSession — extracted from App.tsx
  *
  * Provides session cycling functionality (Cmd+Shift+[/]):
- *   - Cycles through sessions and group chats in visual sidebar order
+ *   - Cycles through sessions in visual sidebar order
  *   - Handles bookmarks (sessions appearing in both locations)
  *   - Handles worktree children, collapsed groups, collapsed sidebar
- *   - Handles group chat cycling
  *
- * Reads from: sessionStore, groupChatStore, uiStore, settingsStore
+ * Reads from: sessionStore, uiStore, settingsStore
  */
 
 import { useCallback } from 'react';
 import type { Session } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { compareNamesIgnoringEmojis } from '../session/useSortedSessions';
@@ -25,8 +23,6 @@ import { compareNamesIgnoringEmojis } from '../session/useSortedSessions';
 export interface UseCycleSessionDeps {
 	/** Sorted sessions array (used when sidebar is collapsed) */
 	sortedSessions: Session[];
-	/** Open a group chat (loads messages etc.) */
-	handleOpenGroupChat: (groupChatId: string) => void;
 }
 
 // ============================================================================
@@ -34,7 +30,7 @@ export interface UseCycleSessionDeps {
 // ============================================================================
 
 export interface UseCycleSessionReturn {
-	/** Cycle to next or previous session/group chat in visual order */
+	/** Cycle to next or previous session in visual order */
 	cycleSession: (dir: 'next' | 'prev') => void;
 }
 
@@ -43,22 +39,17 @@ export interface UseCycleSessionReturn {
 // ============================================================================
 
 export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionReturn {
-	const { sortedSessions, handleOpenGroupChat } = deps;
+	const { sortedSessions } = deps;
 
 	// --- Reactive subscriptions ---
 	const sessions = useSessionStore((s) => s.sessions);
 	const groups = useSessionStore((s) => s.groups);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
-	// cyclePosition tracks where we are in the visual order for cycling
-	const groupChats = useGroupChatStore((s) => s.groupChats);
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
 	const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
-	const groupChatsExpanded = useUIStore((s) => s.groupChatsExpanded);
 
 	// --- Store actions (stable via getState) ---
 	const { setActiveSessionIdInternal, setCyclePosition } = useSessionStore.getState();
-	const { setActiveGroupChatId } = useGroupChatStore.getState();
 
 	// --- Settings ---
 	const ungroupedCollapsed = useSettingsStore((s) => s.ungroupedCollapsed);
@@ -70,17 +61,13 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 			// 1. Bookmarks section (if open) - sorted alphabetically
 			// 2. Groups (sorted alphabetically) - each with sessions sorted alphabetically
 			// 3. Ungrouped sessions - sorted alphabetically
-			// 4. Group Chats section (if expanded) - sorted alphabetically
 			//
 			// A bookmarked session visually appears in BOTH the bookmarks section AND its
 			// regular location (group or ungrouped). The same session can appear twice in
 			// the visual order. We track the current position with cyclePosition to
 			// allow cycling through duplicate occurrences correctly.
 
-			// Visual order item can be either a session or a group chat
-			type VisualOrderItem =
-				| { type: 'session'; id: string; name: string }
-				| { type: 'groupChat'; id: string; name: string };
+			type VisualOrderItem = { type: 'session'; id: string; name: string };
 
 			const visualOrder: VisualOrderItem[] = [];
 
@@ -143,21 +130,6 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 						.sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
 					ungroupedSessions.forEach(addSessionWithWorktrees);
 				}
-
-				// Group Chats section (if expanded and has non-archived group chats)
-				const activeGroupChats = groupChats.filter((gc) => !gc.archived);
-				if (groupChatsExpanded && activeGroupChats.length > 0) {
-					const sortedGroupChats = [...activeGroupChats].sort((a, b) =>
-						compareNamesIgnoringEmojis(a.name, b.name)
-					);
-					visualOrder.push(
-						...sortedGroupChats.map((gc) => ({
-							type: 'groupChat' as const,
-							id: gc.id,
-							name: gc.name,
-						}))
-					);
-				}
 			} else {
 				// Sidebar collapsed: cycle through all sessions in their sorted order
 				visualOrder.push(
@@ -171,10 +143,6 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 
 			if (visualOrder.length === 0) return;
 
-			// Determine what is currently active (session or group chat)
-			const currentActiveId = activeGroupChatId || activeSessionId;
-			const currentIsGroupChat = activeGroupChatId !== null;
-
 			// Determine current position in visual order
 			// If cyclePosition is valid and points to our current item, use it
 			// Otherwise, find the first occurrence of our current item
@@ -182,27 +150,17 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 			if (
 				currentIndex < 0 ||
 				currentIndex >= visualOrder.length ||
-				visualOrder[currentIndex].id !== currentActiveId
+				visualOrder[currentIndex].id !== activeSessionId
 			) {
 				// Position is invalid or doesn't match current item - find first occurrence
-				currentIndex = visualOrder.findIndex(
-					(item) =>
-						item.id === currentActiveId &&
-						(currentIsGroupChat ? item.type === 'groupChat' : item.type === 'session')
-				);
+				currentIndex = visualOrder.findIndex((item) => item.id === activeSessionId);
 			}
 
 			if (currentIndex === -1) {
 				// Current item not visible, select first visible item
 				setCyclePosition(0);
 				const firstItem = visualOrder[0];
-				if (firstItem.type === 'session') {
-					setActiveGroupChatId(null);
-					setActiveSessionIdInternal(firstItem.id);
-				} else {
-					// When switching to a group chat via cycling, use handleOpenGroupChat to load messages
-					handleOpenGroupChat(firstItem.id);
-				}
+				setActiveSessionIdInternal(firstItem.id);
 				return;
 			}
 
@@ -216,26 +174,16 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 
 			setCyclePosition(nextIndex);
 			const nextItem = visualOrder[nextIndex];
-			if (nextItem.type === 'session') {
-				setActiveGroupChatId(null);
-				setActiveSessionIdInternal(nextItem.id);
-			} else {
-				// When switching to a group chat via cycling, use handleOpenGroupChat to load messages
-				handleOpenGroupChat(nextItem.id);
-			}
+			setActiveSessionIdInternal(nextItem.id);
 		},
 		[
 			sessions,
 			groups,
 			activeSessionId,
-			activeGroupChatId,
 			leftSidebarOpen,
 			bookmarksCollapsed,
-			groupChatsExpanded,
 			ungroupedCollapsed,
-			groupChats,
 			sortedSessions,
-			handleOpenGroupChat,
 		]
 	);
 

@@ -4,7 +4,6 @@
  * Provides the window.maestro.stats namespace for:
  * - Usage tracking and analytics
  * - Query event recording
- * - Auto Run session tracking
  */
 
 import { ipcRenderer } from 'electron';
@@ -21,32 +20,6 @@ export interface QueryEvent {
 	projectPath?: string;
 	tabId?: string;
 	isRemote?: boolean;
-}
-
-/**
- * Auto Run session for recording
- */
-export interface AutoRunSession {
-	sessionId: string;
-	agentType: string;
-	documentPath?: string;
-	startTime: number;
-	tasksTotal?: number;
-	projectPath?: string;
-}
-
-/**
- * Auto Run task for recording
- */
-export interface AutoRunTask {
-	autoRunSessionId: string;
-	sessionId: string;
-	agentType: string;
-	taskIndex: number;
-	taskContent?: string;
-	startTime: number;
-	duration: number;
-	success: boolean;
 }
 
 /**
@@ -80,18 +53,6 @@ export function createStatsApi() {
 		// Record a query event (interactive conversation turn)
 		recordQuery: (event: QueryEvent): Promise<string> =>
 			ipcRenderer.invoke('stats:record-query', event),
-
-		// Start an Auto Run session (returns session ID)
-		startAutoRun: (session: AutoRunSession): Promise<string> =>
-			ipcRenderer.invoke('stats:start-autorun', session),
-
-		// End an Auto Run session (update duration and completed count)
-		endAutoRun: (id: string, duration: number, tasksCompleted: number): Promise<boolean> =>
-			ipcRenderer.invoke('stats:end-autorun', id, duration, tasksCompleted),
-
-		// Record an Auto Run task completion
-		recordAutoTask: (task: AutoRunTask): Promise<string> =>
-			ipcRenderer.invoke('stats:record-task', task),
 
 		// Get query events with time range and optional filters
 		getStats: (

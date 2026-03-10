@@ -1,26 +1,10 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import {
-	X,
-	Key,
-	Keyboard,
-	Bell,
-	Cpu,
-	Settings,
-	Palette,
-	FlaskConical,
-	Server,
-	Monitor,
-} from 'lucide-react';
+import { X, Key, Keyboard, Bell, Settings, Palette, FlaskConical, Monitor } from 'lucide-react';
 import { useSettings } from '../../hooks';
 import type { Theme, LLMProvider } from '../../types';
 import { useLayerStack } from '../../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
-import { AICommandsPanel } from '../AICommandsPanel';
-import { SpecKitCommandsPanel } from '../SpecKitCommandsPanel';
-import { OpenSpecCommandsPanel } from '../OpenSpecCommandsPanel';
 import { NotificationsPanel } from '../NotificationsPanel';
-import { SshRemotesSection } from './SshRemotesSection';
-import { SshRemoteIgnoreSection } from './SshRemoteIgnoreSection';
 import { GeneralTab } from './tabs/GeneralTab';
 import { DisplayTab } from './tabs/DisplayTab';
 import { EncoreTab } from './tabs/EncoreTab';
@@ -37,16 +21,7 @@ interface SettingsModalProps {
 	onClose: () => void;
 	theme: Theme;
 	themes: Record<string, Theme>;
-	initialTab?:
-		| 'general'
-		| 'display'
-		| 'llm'
-		| 'shortcuts'
-		| 'theme'
-		| 'notifications'
-		| 'aicommands'
-		| 'ssh'
-		| 'encore';
+	initialTab?: 'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'encore';
 	hasNoAgents?: boolean;
 	onThemeImportError?: (message: string) => void;
 	onThemeImportSuccess?: (message: string) => void;
@@ -84,26 +59,10 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 		setAudioFeedbackCommand,
 		toastDuration,
 		setToastDuration,
-		// AI Commands
-		customAICommands,
-		setCustomAICommands,
-		// SSH Remote file indexing settings
-		sshRemoteIgnorePatterns,
-		setSshRemoteIgnorePatterns,
-		sshRemoteHonorGitignore,
-		setSshRemoteHonorGitignore,
 	} = useSettings();
 
 	const [activeTab, setActiveTab] = useState<
-		| 'general'
-		| 'display'
-		| 'llm'
-		| 'shortcuts'
-		| 'theme'
-		| 'notifications'
-		| 'aicommands'
-		| 'ssh'
-		| 'encore'
+		'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'encore'
 	>('general');
 	const [testingLLM, setTestingLLM] = useState(false);
 	const [testResult, setTestResult] = useState<{
@@ -159,37 +118,10 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
 		const handleTabNavigation = (e: KeyboardEvent) => {
 			const tabs: Array<
-				| 'general'
-				| 'display'
-				| 'llm'
-				| 'shortcuts'
-				| 'theme'
-				| 'notifications'
-				| 'aicommands'
-				| 'ssh'
-				| 'encore'
+				'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'encore'
 			> = FEATURE_FLAGS.LLM_SETTINGS
-				? [
-						'general',
-						'display',
-						'llm',
-						'shortcuts',
-						'theme',
-						'notifications',
-						'aicommands',
-						'ssh',
-						'encore',
-					]
-				: [
-						'general',
-						'display',
-						'shortcuts',
-						'theme',
-						'notifications',
-						'aicommands',
-						'ssh',
-						'encore',
-					];
+				? ['general', 'display', 'llm', 'shortcuts', 'theme', 'notifications', 'encore']
+				: ['general', 'display', 'shortcuts', 'theme', 'notifications', 'encore'];
 			const currentIndex = tabs.indexOf(activeTab);
 
 			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === '[') {
@@ -384,22 +316,6 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 						{activeTab === 'notifications' && <span>Notify</span>}
 					</button>
 					<button
-						onClick={() => setActiveTab('aicommands')}
-						className={`px-4 py-4 text-sm font-bold border-b-2 cursor-pointer ${activeTab === 'aicommands' ? 'border-indigo-500' : 'border-transparent'} flex items-center gap-2`}
-						title="AI Commands"
-					>
-						<Cpu className="w-4 h-4" />
-						{activeTab === 'aicommands' && <span>AI Commands</span>}
-					</button>
-					<button
-						onClick={() => setActiveTab('ssh')}
-						className={`px-4 py-4 text-sm font-bold border-b-2 cursor-pointer ${activeTab === 'ssh' ? 'border-indigo-500' : 'border-transparent'} flex items-center gap-2`}
-						title="SSH Hosts"
-					>
-						<Server className="w-4 h-4" />
-						{activeTab === 'ssh' && <span>SSH Hosts</span>}
-					</button>
-					<button
 						onClick={() => setActiveTab('encore')}
 						className={`px-4 py-4 text-sm font-bold border-b-2 cursor-pointer ${activeTab === 'encore' ? 'border-indigo-500' : 'border-transparent'} flex items-center gap-2`}
 						style={{
@@ -547,41 +463,6 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 							setToastDuration={setToastDuration}
 							theme={theme}
 						/>
-					)}
-
-					{activeTab === 'aicommands' && (
-						<div className="space-y-8">
-							<AICommandsPanel
-								theme={theme}
-								customAICommands={customAICommands}
-								setCustomAICommands={setCustomAICommands}
-							/>
-
-							{/* Divider */}
-							<div className="border-t" style={{ borderColor: theme.colors.border }} />
-
-							{/* Spec Kit Commands Section */}
-							<SpecKitCommandsPanel theme={theme} />
-
-							{/* Divider */}
-							<div className="border-t" style={{ borderColor: theme.colors.border }} />
-
-							{/* OpenSpec Commands Section */}
-							<OpenSpecCommandsPanel theme={theme} />
-						</div>
-					)}
-
-					{activeTab === 'ssh' && (
-						<div className="space-y-5">
-							<SshRemotesSection theme={theme} />
-							<SshRemoteIgnoreSection
-								theme={theme}
-								ignorePatterns={sshRemoteIgnorePatterns}
-								onIgnorePatternsChange={setSshRemoteIgnorePatterns}
-								honorGitignore={sshRemoteHonorGitignore}
-								onHonorGitignoreChange={setSshRemoteHonorGitignore}
-							/>
-						</div>
 					)}
 
 					{activeTab === 'encore' && <EncoreTab theme={theme} isOpen={isOpen} />}

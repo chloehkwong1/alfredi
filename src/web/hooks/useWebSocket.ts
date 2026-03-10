@@ -88,22 +88,6 @@ export interface SessionData {
 }
 
 /**
- * AutoRun state for batch processing
- */
-export interface AutoRunState {
-	isRunning: boolean;
-	totalTasks: number;
-	completedTasks: number;
-	currentTaskIndex: number;
-	isStopping?: boolean;
-	// Multi-document progress fields
-	totalDocuments?: number; // Total number of documents in the run
-	currentDocumentIndex?: number; // Current document being processed (0-based)
-	totalTasksAcrossAllDocs?: number; // Total tasks across all documents
-	completedTasksAcrossAllDocs?: number; // Completed tasks across all documents
-}
-
-/**
  * Message types sent by the server
  */
 export type ServerMessageType =
@@ -121,7 +105,6 @@ export type ServerMessageType =
 	| 'user_input'
 	| 'theme'
 	| 'custom_commands'
-	| 'autorun_state'
 	| 'tabs_changed'
 	| 'pong'
 	| 'subscribed'
@@ -277,16 +260,6 @@ export interface CustomCommandsMessage extends ServerMessage {
 }
 
 /**
- * AutoRun state message from server
- * Indicates when batch processing is active on the desktop app
- */
-export interface AutoRunStateMessage extends ServerMessage {
-	type: 'autorun_state';
-	sessionId: string;
-	state: AutoRunState | null;
-}
-
-/**
  * Tabs changed message from server
  * Sent when tabs are added, removed, or active tab changes in a session
  */
@@ -323,7 +296,6 @@ export type TypedServerMessage =
 	| UserInputMessage
 	| ThemeMessage
 	| CustomCommandsMessage
-	| AutoRunStateMessage
 	| TabsChangedMessage
 	| ErrorMessage
 	| ServerMessage;
@@ -361,8 +333,6 @@ export interface WebSocketEventHandlers {
 	onThemeUpdate?: (theme: Theme) => void;
 	/** Called when custom commands are received */
 	onCustomCommands?: (commands: CustomCommand[]) => void;
-	/** Called when AutoRun state changes (batch processing on desktop) */
-	onAutoRunStateChange?: (sessionId: string, state: AutoRunState | null) => void;
 	/** Called when tabs change in a session */
 	onTabsChanged?: (sessionId: string, aiTabs: AITabData[], activeTabId: string) => void;
 	/** Called when connection state changes */
@@ -684,16 +654,6 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
 					case 'custom_commands': {
 						const commandsMsg = message as CustomCommandsMessage;
 						handlersRef.current?.onCustomCommands?.(commandsMsg.commands);
-						break;
-					}
-
-					case 'autorun_state': {
-						const autoRunMsg = message as AutoRunStateMessage;
-						webLogger.info(
-							`[WS] AutoRun state received: session=${autoRunMsg.sessionId}, isRunning=${autoRunMsg.state?.isRunning}, tasks=${autoRunMsg.state?.completedTasks}/${autoRunMsg.state?.totalTasks}`,
-							'WebSocket'
-						);
-						handlersRef.current?.onAutoRunStateChange?.(autoRunMsg.sessionId, autoRunMsg.state);
 						break;
 					}
 

@@ -23,7 +23,6 @@ import type {
 	QueuedItem,
 	BatchRunState,
 	AgentError,
-	GroupChatMessage,
 	UsageStats,
 } from '../../types';
 import { notifyToast } from '../../stores/notificationStore';
@@ -32,12 +31,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
 import { gitService } from '../../services/git';
 import { generateId } from '../../utils/ids';
-import {
-	parseSessionId,
-	parseGroupChatSessionId,
-	isSynopsisSession,
-	isBatchSession,
-} from '../../utils/sessionIdParser';
+import { parseSessionId, isSynopsisSession, isBatchSession } from '../../utils/sessionIdParser';
 import {
 	estimateContextUsage,
 	estimateAccumulatedGrowth,
@@ -47,9 +41,9 @@ import { isLikelyConcatenatedToolNames, getSlashCommandDescription } from '../..
 import { getActiveTab, getWriteModeTab } from '../../utils/tabHelpers';
 import { formatRelativeTime } from '../../../shared/formatters';
 import { parseSynopsis } from '../../../shared/synopsis';
-import { autorunSynopsisPrompt } from '../../../prompts';
+// autorunSynopsisPrompt removed (Auto Run stripped)
+const autorunSynopsisPrompt = '';
 import type { RightPanelHandle } from '../../components/RightPanel';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 
 // ============================================================================
 // Types
@@ -877,10 +871,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									tabName: synopsisData!.tabName,
 									skipCustomNotification: true,
 								});
-
-								if (deps.rightPanelRef.current) {
-									deps.rightPanelRef.current.refreshHistoryPanel();
-								}
 							} else if (!result.success) {
 								console.warn(
 									'[onProcessExit] Synopsis generation failed - no history entry created',
@@ -1110,60 +1100,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					raw: error.raw,
 					parsedJson: error.parsedJson,
 				};
-
-				// Check if this is a group chat error
-				const groupChatParsed = parseGroupChatSessionId(sessionId);
-				if (groupChatParsed.isGroupChat) {
-					const groupChatId = groupChatParsed.groupChatId!;
-					const isModeratorError = groupChatParsed.isModerator ?? false;
-					const participantOrModerator = isModeratorError
-						? 'moderator'
-						: groupChatParsed.participantName!;
-
-					console.log('[onAgentError] Group chat error received:', {
-						rawSessionId: sessionId,
-						groupChatId,
-						participantName: isModeratorError ? 'Moderator' : participantOrModerator,
-						errorType: error.type,
-						message: error.message,
-						recoverable: error.recoverable,
-					});
-
-					if (agentError.type === 'session_not_found') {
-						console.log(
-							'[onAgentError] Suppressing session_not_found for group chat - exit-listener will handle recovery:',
-							{
-								groupChatId,
-								participantName: isModeratorError ? 'Moderator' : participantOrModerator,
-							}
-						);
-						return;
-					}
-
-					const gcStore = useGroupChatStore.getState();
-					gcStore.setGroupChatError({
-						groupChatId,
-						error: agentError,
-						participantName: isModeratorError ? 'Moderator' : participantOrModerator,
-					});
-
-					const errorMessage: GroupChatMessage = {
-						timestamp: new Date(agentError.timestamp).toISOString(),
-						from: 'system',
-						content: `⚠️ ${
-							isModeratorError ? 'Moderator' : participantOrModerator
-						} error: ${agentError.message}`,
-					};
-					gcStore.setGroupChatMessages((prev) => [...prev, errorMessage]);
-
-					gcStore.setGroupChatState('idle');
-					gcStore.setGroupChatStates((prev) => {
-						const next = new Map(prev);
-						next.set(groupChatId, 'idle');
-						return next;
-					});
-					return;
-				}
 
 				// Synopsis processes — ignore errors
 				if (isSynopsisSession(sessionId)) {

@@ -10,7 +10,7 @@
  */
 
 import type { ToolType } from '../types';
-import type { InlineWizardMessage, InlineGeneratedDocument } from '../hooks/batch/useInlineWizard';
+import type { InlineWizardMessage, InlineGeneratedDocument } from '../contexts/InlineWizardContext';
 import type { ExistingDocument } from '../utils/existingDocsDetector';
 import { logger } from '../utils/logger';
 import { wizardDocumentGenerationPrompt, wizardInlineIterateGenerationPrompt } from '../../prompts';
@@ -124,10 +124,8 @@ export interface DocumentGenerationConfig {
 	mode: 'new' | 'iterate';
 	/** Goal for iterate mode */
 	goal?: string;
-	/** Auto Run folder path (base path, subfolder will be created) */
+	/** Output folder path (base path, subfolder will be created) */
 	autoRunFolderPath: string;
-	/** Session ID for playbook creation */
-	sessionId?: string;
 	/** SSH remote configuration (for remote execution) */
 	sessionSshRemoteConfig?: {
 		enabled: boolean;
@@ -160,15 +158,10 @@ export interface DocumentGenerationResult {
 	error?: string;
 	/** Raw agent output (for debugging) */
 	rawOutput?: string;
-	/** Subfolder path where documents were saved (relative to Auto Run Docs) */
+	/** Subfolder path where documents were saved */
 	subfolderName?: string;
 	/** Full path to the subfolder */
 	subfolderPath?: string;
-	/** Created playbook (if sessionId was provided) */
-	playbook?: {
-		id: string;
-		name: string;
-	};
 }
 
 /**
@@ -251,48 +244,42 @@ export function generateWizardFolderBaseName(projectName?: string): string {
 }
 
 /**
- * Generate a unique subfolder name within Auto Run Docs.
+ * Generate a unique subfolder name within the output folder.
  * If the base folder name already exists, appends a numeric suffix (e.g., "-2", "-3").
  *
- * @param autoRunFolderPath - The Auto Run Docs folder path
+ * @param folderPath - The parent folder path
  * @param baseName - The sanitized base folder name
  * @returns A unique folder name that doesn't conflict with existing folders
  */
-async function generateUniqueSubfolderName(
-	autoRunFolderPath: string,
-	baseName: string
-): Promise<string> {
-	// List existing folders in the Auto Run Docs directory
-	const listResult = await window.maestro.autorun.listDocs(autoRunFolderPath);
+async function generateUniqueSubfolderName(folderPath: string, baseName: string): Promise<string> {
+	try {
+		// Try to list existing entries in the folder
+		const entries = await window.maestro.fs.readDir(folderPath);
 
-	if (!listResult.success || !listResult.tree) {
+		if (!entries || entries.length === 0) {
+			return baseName;
+		}
+
+		const existingNames = new Set(entries.map((e: { name: string }) => e.name));
+
+		// If base name doesn't conflict, use it
+		if (!existingNames.has(baseName)) {
+			return baseName;
+		}
+
+		// Find an available name with numeric suffix
+		let suffix = 2;
+		let candidateName = `${baseName}-${suffix}`;
+		while (existingNames.has(candidateName) && suffix < 1000) {
+			suffix++;
+			candidateName = `${baseName}-${suffix}`;
+		}
+
+		return candidateName;
+	} catch {
 		// If we can't list, just use the base name (folder may not exist yet)
 		return baseName;
 	}
-
-	// Extract folder names from the tree structure (top-level items that are directories)
-	const existingFolders = new Set<string>();
-	for (const item of listResult.tree) {
-		// Tree items with children are directories
-		if (item && typeof item === 'object' && 'name' in item) {
-			existingFolders.add((item as { name: string }).name);
-		}
-	}
-
-	// If base name doesn't conflict, use it
-	if (!existingFolders.has(baseName)) {
-		return baseName;
-	}
-
-	// Find an available name with numeric suffix
-	let suffix = 2;
-	let candidateName = `${baseName}-${suffix}`;
-	while (existingFolders.has(candidateName) && suffix < 1000) {
-		suffix++;
-		candidateName = `${baseName}-${suffix}`;
-	}
-
-	return candidateName;
 }
 
 /**
@@ -644,20 +631,20 @@ function buildArgsForAgent(agent: { id: string; args?: string[] }): string[] {
 }
 
 /**
- * Save a single document to the Auto Run folder.
+ * Save a single document to the output folder.
  *
  * Handles both creating new files and updating existing ones.
  * The isUpdate flag is used for logging purposes - both operations
- * use writeDoc which will create or overwrite as needed.
+ * write the file which will create or overwrite as needed.
  *
- * @param autoRunFolderPath - The Auto Run folder path
+ * @param folderPath - The output folder path
  * @param doc - The parsed document to save
  * @returns The saved document with path information
  */
 async function saveDocument(
-	autoRunFolderPath: string,
+	folderPath: string,
 	doc: ParsedDocument,
-	sshRemoteId?: string
+	_sshRemoteId?: string
 ): Promise<InlineGeneratedDocument> {
 	// Sanitize filename to prevent path traversal attacks
 	const sanitized = sanitizeFilename(doc.filename);
@@ -668,24 +655,13 @@ async function saveDocument(
 	logger.info(`${action} document: ${filename}`, '[InlineWizardDocGen]', {
 		filename,
 		action,
-		autoRunFolderPath,
-		isRemote: !!sshRemoteId,
+		folderPath,
 	});
 
-	// Write the document (creates or overwrites as needed)
-	// Pass sshRemoteId to support remote file writing
-	const result = await window.maestro.autorun.writeDoc(
-		autoRunFolderPath,
-		filename,
-		doc.content,
-		sshRemoteId || undefined
-	);
+	const fullPath = `${folderPath}/${filename}`;
 
-	if (!result.success) {
-		throw new Error(result.error || `Failed to ${action.toLowerCase()} ${filename}`);
-	}
-
-	const fullPath = `${autoRunFolderPath}/${filename}`;
+	// Write the document using filesystem API
+	await window.maestro.fs.writeFile(fullPath, doc.content);
 
 	return {
 		filename,
@@ -716,7 +692,7 @@ export async function generateInlineDocuments(
 	const { agentType, directoryPath, autoRunFolderPath, projectName, callbacks } = config;
 
 	callbacks?.onStart?.();
-	callbacks?.onProgress?.('Preparing to generate your Playbook...');
+	callbacks?.onProgress?.('Preparing to generate documents...');
 
 	// Create a date-prefixed subfolder name: "YYYY-MM-DD-Feature-Name" (with -2, -3, etc. if needed)
 	const baseFolderName = generateWizardFolderBaseName(projectName);
@@ -777,7 +753,7 @@ export async function generateInlineDocuments(
 		// Generate the prompt (include subfolder so agent writes to correct location)
 		const prompt = generateDocumentPrompt(config, subfolderName);
 
-		callbacks?.onProgress?.('Generating Auto Run Documents...');
+		callbacks?.onProgress?.('Generating documents...');
 
 		// Spawn agent and collect output
 		const sessionId = `inline-wizard-gen-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -791,7 +767,6 @@ export async function generateInlineDocuments(
 				let outputBuffer = '';
 				let dataListenerCleanup: (() => void) | undefined;
 				let exitListenerCleanup: (() => void) | undefined;
-				let fileWatcherCleanup: (() => void) | undefined;
 
 				/**
 				 * Reset the inactivity timeout - called on any activity
@@ -832,106 +807,7 @@ export async function generateInlineDocuments(
 						exitListenerCleanup();
 						exitListenerCleanup = undefined;
 					}
-					if (fileWatcherCleanup) {
-						fileWatcherCleanup();
-						fileWatcherCleanup = undefined;
-					}
-					// Stop watching the subfolder
-					window.maestro.autorun.unwatchFolder(subfolderPath).catch(() => {});
 				}
-
-				// Set up file watcher for real-time document streaming
-				// The agent writes files directly, and we detect them here
-				window.maestro.autorun
-					.watchFolder(subfolderPath)
-					.then((watchResult) => {
-						if (watchResult.success) {
-							console.log('[InlineWizardDocGen] Started watching folder:', subfolderPath);
-
-							// Set up file change listener
-							fileWatcherCleanup = window.maestro.autorun.onFileChanged((data) => {
-								if (data.folderPath === subfolderPath) {
-									console.log('[InlineWizardDocGen] File activity:', data.filename, data.eventType);
-
-									// Reset timeout on file activity
-									resetTimeout();
-
-									// If a file was created/changed, read it and notify
-									if (
-										data.filename &&
-										(data.eventType === 'rename' || data.eventType === 'change')
-									) {
-										// Re-add the .md extension since main process may strip it
-										const filenameWithExt = data.filename.endsWith('.md')
-											? data.filename
-											: `${data.filename}.md`;
-										const fullPath = `${subfolderPath}/${filenameWithExt}`;
-
-										// Use retry logic since file might still be being written
-										const readWithRetry = async (retries = 3, delayMs = 200): Promise<void> => {
-											for (let attempt = 1; attempt <= retries; attempt++) {
-												try {
-													const content = await window.maestro.fs.readFile(fullPath);
-													if (content && typeof content === 'string' && content.length > 0) {
-														console.log(
-															'[InlineWizardDocGen] File read successful:',
-															filenameWithExt,
-															'size:',
-															content.length
-														);
-
-														// Check if we've already processed this document
-														const alreadyProcessed = documentsFromWatcher.some(
-															(d) => d.filename === filenameWithExt
-														);
-														if (alreadyProcessed) {
-															console.log(
-																'[InlineWizardDocGen] Document already processed:',
-																filenameWithExt
-															);
-															return;
-														}
-
-														const doc: InlineGeneratedDocument = {
-															filename: filenameWithExt,
-															content,
-															taskCount: countTasks(content),
-															savedPath: fullPath,
-														};
-
-														documentsFromWatcher.push(doc);
-														callbacks?.onDocumentComplete?.(doc);
-														return;
-													}
-												} catch (err) {
-													console.log(
-														`[InlineWizardDocGen] File read attempt ${attempt}/${retries} failed for ${filenameWithExt}:`,
-														err
-													);
-												}
-												if (attempt < retries) {
-													await new Promise((r) => setTimeout(r, delayMs));
-												}
-											}
-
-											// Even if we couldn't read content, note that file exists
-											console.log(
-												'[InlineWizardDocGen] Could not read file content:',
-												filenameWithExt
-											);
-										};
-
-										readWithRetry();
-									}
-								}
-							});
-						} else {
-							console.warn('[InlineWizardDocGen] Could not watch folder:', watchResult.error);
-						}
-					})
-					.catch((err) => {
-						console.warn('[InlineWizardDocGen] Error setting up folder watcher:', err);
-					});
 
 				// Set up data listener
 				dataListenerCleanup = window.maestro.process.onData(
@@ -1041,28 +917,7 @@ export async function generateInlineDocuments(
 				return parseInt(phaseA, 10) - parseInt(phaseB, 10);
 			});
 
-			// Create a playbook for the generated documents (if sessionId provided)
-			let playbookInfo: { id: string; name: string } | undefined;
-			if (config.sessionId && sortedDocs.length > 0) {
-				callbacks?.onProgress?.('Creating playbook configuration...');
-				try {
-					playbookInfo = await createPlaybookForDocuments(
-						config.sessionId,
-						projectName,
-						subfolderName,
-						sortedDocs
-					);
-					logger.info(
-						`Created playbook for ${sortedDocs.length} document(s)`,
-						'[InlineWizardDocGen]',
-						{ playbookId: playbookInfo?.id, playbookName: playbookInfo?.name, subfolderName }
-					);
-				} catch (error) {
-					console.error('[InlineWizardDocGen] Failed to create playbook:', error);
-				}
-			}
-
-			callbacks?.onProgress?.(`Generated ${sortedDocs.length} Auto Run document(s)`);
+			callbacks?.onProgress?.(`Generated ${sortedDocs.length} document(s)`);
 			callbacks?.onComplete?.(sortedDocs);
 
 			return {
@@ -1071,7 +926,6 @@ export async function generateInlineDocuments(
 				rawOutput,
 				subfolderName,
 				subfolderPath,
-				playbook: playbookInfo,
 			};
 		}
 
@@ -1126,29 +980,7 @@ export async function generateInlineDocuments(
 			throw new Error('Failed to save any documents. Please check permissions and try again.');
 		}
 
-		// Create a playbook for the generated documents (if sessionId provided)
-		let playbookInfo: { id: string; name: string } | undefined;
-		if (config.sessionId && savedDocuments.length > 0) {
-			callbacks?.onProgress?.('Creating playbook configuration...');
-			try {
-				playbookInfo = await createPlaybookForDocuments(
-					config.sessionId,
-					projectName,
-					subfolderName,
-					savedDocuments
-				);
-				logger.info(
-					`Created playbook for ${savedDocuments.length} document(s)`,
-					'[InlineWizardDocGen]',
-					{ playbookId: playbookInfo?.id, playbookName: playbookInfo?.name, subfolderName }
-				);
-			} catch (error) {
-				console.error('[InlineWizardDocGen] Failed to create playbook:', error);
-				// Don't fail the overall operation if playbook creation fails
-			}
-		}
-
-		callbacks?.onProgress?.(`Generated ${savedDocuments.length} Auto Run document(s)`);
+		callbacks?.onProgress?.(`Generated ${savedDocuments.length} document(s)`);
 		callbacks?.onComplete?.(savedDocuments);
 
 		return {
@@ -1157,7 +989,6 @@ export async function generateInlineDocuments(
 			rawOutput,
 			subfolderName,
 			subfolderPath,
-			playbook: playbookInfo,
 		};
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -1171,67 +1002,7 @@ export async function generateInlineDocuments(
 }
 
 /**
- * Default prompt for wizard-generated playbooks.
- * This provides sensible defaults that can be customized by the user later.
- */
-const DEFAULT_PLAYBOOK_PROMPT = `Complete the tasks in this document thoroughly and carefully.
-
-Guidelines:
-- Work through tasks in order from top to bottom
-- Check off each task as you complete it (mark [ ] as [x])
-- If a task requires clarification, make a reasonable decision and proceed
-- Focus on quality over speed
-- Test your changes when appropriate`;
-
-/**
- * Create a playbook configuration for the generated documents.
- *
- * This creates a fully-featured playbook that the user can customize:
- * - Documents ordered by phase number
- * - Sensible default prompt
- * - Looping disabled by default
- * - Reset on completion disabled by default
- *
- * @param sessionId - The session ID for playbook storage
- * @param projectName - Name of the project/playbook
- * @param subfolderName - Subfolder within Auto Run Docs where documents are stored
- * @param documents - The generated documents in order
- * @returns Created playbook info (id and name)
- */
-async function createPlaybookForDocuments(
-	sessionId: string,
-	projectName: string,
-	subfolderName: string,
-	documents: InlineGeneratedDocument[]
-): Promise<{ id: string; name: string }> {
-	// Build document entries for the playbook
-	// Documents are already sorted by phase from generation
-	const documentEntries = documents.map((doc) => ({
-		// Include subfolder in the filename path so playbook can find them
-		filename: `${subfolderName}/${doc.filename}`,
-		resetOnCompletion: false,
-	}));
-
-	// Create the playbook via IPC
-	const result = await window.maestro.playbooks.create(sessionId, {
-		name: projectName,
-		documents: documentEntries,
-		loopEnabled: false,
-		prompt: DEFAULT_PLAYBOOK_PROMPT,
-	});
-
-	if (!result.success || !result.playbook) {
-		throw new Error('Failed to create playbook');
-	}
-
-	return {
-		id: result.playbook.id,
-		name: result.playbook.name,
-	};
-}
-
-/**
- * Read documents from the Auto Run folder on disk.
+ * Read documents from a folder on disk.
  *
  * This is a fallback for when the agent writes files directly
  * instead of outputting them with markers.
@@ -1239,33 +1010,37 @@ async function createPlaybookForDocuments(
  * Note: Documents read from disk are treated as new (isUpdate: false)
  * since they were written directly by the agent.
  */
-async function readDocumentsFromDisk(autoRunFolderPath: string): Promise<ParsedDocument[]> {
+async function readDocumentsFromDisk(folderPath: string): Promise<ParsedDocument[]> {
 	const documents: ParsedDocument[] = [];
 
 	try {
-		// List files in the Auto Run folder
-		const listResult = await window.maestro.autorun.listDocs(autoRunFolderPath);
-		if (!listResult.success || !listResult.files) {
+		// List files in the folder
+		const entries = await window.maestro.fs.readDir(folderPath);
+		if (!entries || entries.length === 0) {
 			return [];
 		}
 
 		// Read each .md file
-		// Note: listDocs returns filenames WITHOUT the .md extension
-		for (const fileBaseName of listResult.files) {
-			const filename = fileBaseName.endsWith('.md') ? fileBaseName : `${fileBaseName}.md`;
+		for (const entry of entries) {
+			const name = typeof entry === 'string' ? entry : entry.name;
+			if (!name.endsWith('.md')) continue;
 
-			const readResult = await window.maestro.autorun.readDoc(autoRunFolderPath, fileBaseName);
-			if (readResult.success && readResult.content) {
-				// Extract phase number from filename
-				const phaseMatch = filename.match(/Phase-(\d+)/i);
-				const phase = phaseMatch ? parseInt(phaseMatch[1], 10) : 0;
+			try {
+				const fullPath = `${folderPath}/${name}`;
+				const content = await window.maestro.fs.readFile(fullPath);
+				if (content && typeof content === 'string') {
+					const phaseMatch = name.match(/Phase-(\d+)/i);
+					const phase = phaseMatch ? parseInt(phaseMatch[1], 10) : 0;
 
-				documents.push({
-					filename,
-					content: readResult.content,
-					phase,
-					isUpdate: false,
-				});
+					documents.push({
+						filename: name,
+						content,
+						phase,
+						isUpdate: false,
+					});
+				}
+			} catch {
+				// Skip files that can't be read
 			}
 		}
 

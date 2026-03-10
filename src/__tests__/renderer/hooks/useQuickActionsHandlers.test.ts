@@ -91,7 +91,7 @@ function createDeps(
 	return {
 		refreshGitFileState: vi.fn().mockResolvedValue(undefined),
 		mainPanelRef: { current: { refreshGitInfo: vi.fn().mockResolvedValue(undefined) } as any },
-		rightPanelRef: { current: { openAutoRunResetTasksModal: vi.fn() } as any },
+		rightPanelRef: { current: {} as any },
 		handleSummarizeAndContinue: vi.fn(),
 		processQueuedItem: vi.fn().mockResolvedValue(undefined),
 		...overrides,
@@ -1024,15 +1024,16 @@ describe('useQuickActionsHandlers', () => {
 	// handleQuickActionsAutoRunResetTasks
 	// ========================================================================
 	describe('handleQuickActionsAutoRunResetTasks', () => {
-		it('calls openAutoRunResetTasksModal on the rightPanelRef', () => {
+		it('is a no-op (Auto Run reset tasks removed from Right Panel)', () => {
 			const deps = createDeps();
 			const { result } = renderHook(() => useQuickActionsHandlers(deps));
 
-			act(() => {
-				result.current.handleQuickActionsAutoRunResetTasks();
-			});
-
-			expect(deps.rightPanelRef.current?.openAutoRunResetTasksModal).toHaveBeenCalledTimes(1);
+			// Should not throw - handler is now a no-op
+			expect(() => {
+				act(() => {
+					result.current.handleQuickActionsAutoRunResetTasks();
+				});
+			}).not.toThrow();
 		});
 
 		it('does not throw when rightPanelRef.current is null', () => {

@@ -10,8 +10,6 @@
  * - Legacy AI: `{sessionId}-ai`
  * - Synopsis: `{sessionId}-synopsis-{timestamp}`
  * - Batch: `{sessionId}-batch-{timestamp}`
- * - Group chat moderator: `group-chat-{groupChatId}-moderator-{timestamp}`
- * - Group chat participant: `group-chat-{groupChatId}-{participantName}-{timestamp}`
  *
  * @module sessionIdParser
  */
@@ -28,14 +26,6 @@ export const REGEX_SYNOPSIS = /^(.+)-synopsis-\d+$/;
 
 /** Match batch session IDs: `{sessionId}-batch-{timestamp}` */
 export const REGEX_BATCH = /^(.+)-batch-\d+$/;
-
-/** Match group chat moderator: `group-chat-{id}-moderator-{timestamp}` */
-export const REGEX_GROUP_CHAT_MODERATOR =
-	/^group-chat-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-moderator-(\d+)$/;
-
-/** Match group chat participant: `group-chat-{id}-{name}-{timestamp}` */
-export const REGEX_GROUP_CHAT_PARTICIPANT =
-	/^group-chat-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})-(.+)-(\d+)$/;
 
 /** Legacy AI suffix check */
 const AI_SUFFIX = '-ai';
@@ -56,22 +46,6 @@ export interface ParsedSessionId {
 	baseSessionId: string;
 	/** Session type classification */
 	type: 'ai-tab' | 'legacy-ai' | 'synopsis' | 'batch' | 'regular';
-}
-
-/**
- * Result of parsing a group chat session ID.
- */
-export interface ParsedGroupChatSessionId {
-	/** Whether this is a group chat session */
-	isGroupChat: boolean;
-	/** Group chat ID (if group chat) */
-	groupChatId?: string;
-	/** Whether this is a moderator session */
-	isModerator?: boolean;
-	/** Participant name (if participant session) */
-	participantName?: string;
-	/** Timestamp from the session ID */
-	timestamp?: string;
 }
 
 // ============================================================================
@@ -150,43 +124,6 @@ export function parseSessionId(sessionId: string): ParsedSessionId {
 		baseSessionId: sessionId,
 		type: 'regular',
 	};
-}
-
-/**
- * Parse a session ID to check if it's a group chat session.
- *
- * @param sessionId - The raw session ID from an IPC event
- * @returns Group chat information if applicable
- *
- * @example
- * parseGroupChatSessionId('group-chat-abc-123-moderator-1234567890')
- * // → { isGroupChat: true, groupChatId: 'abc-123', isModerator: true, timestamp: '1234567890' }
- */
-export function parseGroupChatSessionId(sessionId: string): ParsedGroupChatSessionId {
-	// Check moderator pattern
-	const moderatorMatch = sessionId.match(REGEX_GROUP_CHAT_MODERATOR);
-	if (moderatorMatch) {
-		return {
-			isGroupChat: true,
-			groupChatId: moderatorMatch[1],
-			isModerator: true,
-			timestamp: moderatorMatch[2],
-		};
-	}
-
-	// Check participant pattern
-	const participantMatch = sessionId.match(REGEX_GROUP_CHAT_PARTICIPANT);
-	if (participantMatch) {
-		return {
-			isGroupChat: true,
-			groupChatId: participantMatch[1],
-			isModerator: false,
-			participantName: participantMatch[2],
-			timestamp: participantMatch[3],
-		};
-	}
-
-	return { isGroupChat: false };
 }
 
 /**

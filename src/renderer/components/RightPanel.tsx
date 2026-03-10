@@ -1,12 +1,4 @@
-import React, {
-	useRef,
-	useEffect,
-	useImperativeHandle,
-	forwardRef,
-	useState,
-	useCallback,
-	memo,
-} from 'react';
+import React, { useRef, useImperativeHandle, forwardRef, useState, useCallback, memo } from 'react';
 import {
 	PanelRightClose,
 	PanelRightOpen,
@@ -18,25 +10,15 @@ import {
 import type { Session, Theme, RightPanelTab, BatchRunState } from '../types';
 import type { FileTreeChanges } from '../utils/fileExplorer';
 import { FileExplorerPanel } from './FileExplorerPanel';
-import { HistoryPanel, HistoryPanelHandle } from './HistoryPanel';
-import { AutoRun, AutoRunHandle } from './AutoRun';
-import { AutoRunExpandedModal } from './AutoRunExpandedModal';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { ConfirmModal } from './ConfirmModal';
 import { useResizablePanel } from '../hooks';
 import { useUIStore } from '../stores/uiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
-import { useBatchStore } from '../stores/batchStore';
 import { useSessionStore } from '../stores/sessionStore';
 
-export interface RightPanelHandle {
-	refreshHistoryPanel: () => void;
-	focusAutoRun: () => void;
-	toggleAutoRunExpanded: () => void;
-	openAutoRunResetTasksModal: () => void;
-	getAutoRunCompletedTaskCount: () => number;
-}
+export interface RightPanelHandle {}
 
 interface RightPanelProps {
 	// Theme (computed from settingsStore by App.tsx)
@@ -139,11 +121,6 @@ export const RightPanel = memo(
 		const setFileTreeFilterOpen = useFileExplorerStore((s) => s.setFileTreeFilterOpen);
 		const setSelectedFileIndex = useFileExplorerStore((s) => s.setSelectedFileIndex);
 
-		const autoRunDocumentList = useBatchStore((s) => s.documentList);
-		const autoRunDocumentTree = useBatchStore((s) => s.documentTree);
-		const autoRunIsLoadingDocuments = useBatchStore((s) => s.isLoadingDocuments);
-		const autoRunDocumentTaskCounts = useBatchStore((s) => s.documentTaskCounts);
-
 		// === Props (domain-hook handlers + theme + batch state + refs) ===
 		const {
 			theme,
@@ -158,37 +135,12 @@ export const RightPanel = memo(
 			refreshFileTree,
 			onAutoRefreshChange,
 			onShowFlash,
-			onAutoRunContentChange,
-			onAutoRunModeChange,
-			onAutoRunStateChange,
-			onAutoRunSelectDocument,
-			onAutoRunCreateDocument,
-			onAutoRunRefresh,
-			onAutoRunOpenSetup,
 			currentSessionBatchState,
-			onOpenBatchRunner,
-			onStopBatchRun,
 			onKillBatchRun,
-			onSkipCurrentDocument,
-			onAbortBatchOnError,
-			onResumeAfterError,
-			onJumpToAgentSession,
-			onResumeSession,
-			onOpenSessionAsTab,
-			onOpenAboutModal,
-			onFileClick,
-			onOpenMarketplace,
-			onLaunchWizard,
 			onFocusFileInGraph,
 			onOpenLastDocumentGraph,
 		} = props;
 
-		// === Values derived from session ===
-		const autoRunContent = session?.autoRunContent ?? '';
-		const autoRunContentVersion = session?.autoRunContentVersion ?? 0;
-
-		const historyPanelRef = useRef<HistoryPanelHandle>(null);
-		const autoRunRef = useRef<AutoRunHandle>(null);
 		const {
 			panelRef,
 			onResizeStart: onRightPanelResizeStart,
@@ -202,180 +154,13 @@ export const RightPanel = memo(
 			side: 'right',
 		});
 
-		// Elapsed time for Auto Run display - tracks wall clock time from startTime
-		const [elapsedTime, setElapsedTime] = useState<string>('');
-
 		// Kill confirmation modal for force-killing during Auto Run stop
 		const [showKillConfirm, setShowKillConfirm] = useState(false);
 
-		// Shared draft state for Auto Run (shared between panel and expanded modal)
-		// This ensures edits in one view are immediately visible in the other
-		const [sharedLocalContent, setSharedLocalContent] = useState(autoRunContent);
-		const [sharedSavedContent, setSharedSavedContent] = useState(autoRunContent);
-
-		// Sync shared state when the source content changes (e.g., document switch, external file change)
-		const prevAutoRunContentRef = useRef(autoRunContent);
-		const prevAutoRunContentVersionRef = useRef(autoRunContentVersion);
-		const prevSessionIdRef = useRef(session?.id);
-		const prevSelectedFileRef = useRef(session?.autoRunSelectedFile);
-
-		useEffect(() => {
-			const contentChanged = autoRunContent !== prevAutoRunContentRef.current;
-			const versionChanged = autoRunContentVersion !== prevAutoRunContentVersionRef.current;
-			const sessionChanged = session?.id !== prevSessionIdRef.current;
-			const fileChanged = session?.autoRunSelectedFile !== prevSelectedFileRef.current;
-
-			if (contentChanged || versionChanged || sessionChanged || fileChanged) {
-				setSharedLocalContent(autoRunContent);
-				setSharedSavedContent(autoRunContent);
-				prevAutoRunContentRef.current = autoRunContent;
-				prevAutoRunContentVersionRef.current = autoRunContentVersion;
-				prevSessionIdRef.current = session?.id;
-				prevSelectedFileRef.current = session?.autoRunSelectedFile;
-			}
-		}, [autoRunContent, autoRunContentVersion, session?.id, session?.autoRunSelectedFile]);
-
-		// Expanded modal state for Auto Run
-		const [autoRunExpanded, setAutoRunExpanded] = useState(false);
-		const handleExpandAutoRun = useCallback(() => setAutoRunExpanded(true), []);
-		const handleCollapseAutoRun = useCallback(() => {
-			setAutoRunExpanded(false);
-			// Refocus the AutoRun panel after modal closes
-			requestAnimationFrame(() => {
-				autoRunRef.current?.focus();
-			});
-		}, []);
-		const toggleAutoRunExpanded = useCallback(() => {
-			setAutoRunExpanded((prev) => {
-				const newValue = !prev;
-				// If collapsing, refocus the AutoRun panel
-				if (!newValue) {
-					requestAnimationFrame(() => {
-						autoRunRef.current?.focus();
-					});
-				}
-				return newValue;
-			});
-		}, []);
-
-		// Format elapsed time from milliseconds
-		const formatElapsed = useCallback((ms: number) => {
-			const seconds = Math.floor(ms / 1000);
-			const minutes = Math.floor(seconds / 60);
-			const hours = Math.floor(minutes / 60);
-
-			if (hours > 0) {
-				return `${hours}h ${minutes % 60}m`;
-			} else if (minutes > 0) {
-				return `${minutes}m ${seconds % 60}s`;
-			} else {
-				return `${seconds}s`;
-			}
-		}, []);
-
-		// Update elapsed time display using wall clock time from startTime
-		// Uses an interval to update every second while running
-		useEffect(() => {
-			if (!currentSessionBatchState?.isRunning || !currentSessionBatchState?.startTime) {
-				setElapsedTime('');
-				return;
-			}
-
-			// Calculate elapsed immediately
-			const updateElapsed = () => {
-				const elapsed = Date.now() - currentSessionBatchState.startTime!;
-				setElapsedTime(formatElapsed(elapsed));
-			};
-
-			updateElapsed();
-			const interval = setInterval(updateElapsed, 1000);
-
-			return () => clearInterval(interval);
-		}, [currentSessionBatchState?.isRunning, currentSessionBatchState?.startTime, formatElapsed]);
-
 		// Expose methods to parent
-		useImperativeHandle(
-			ref,
-			() => ({
-				refreshHistoryPanel: () => {
-					historyPanelRef.current?.refreshHistory();
-				},
-				focusAutoRun: () => {
-					autoRunRef.current?.focus();
-				},
-				toggleAutoRunExpanded,
-				openAutoRunResetTasksModal: () => {
-					autoRunRef.current?.openResetTasksModal();
-				},
-				getAutoRunCompletedTaskCount: () => {
-					return autoRunRef.current?.getCompletedTaskCount() ?? 0;
-				},
-			}),
-			[toggleAutoRunExpanded]
-		);
-
-		// Focus the history panel when switching to history tab
-		useEffect(() => {
-			if (activeRightTab === 'history' && rightPanelOpen && activeFocus === 'right') {
-				// Small delay to ensure the panel is rendered
-				requestAnimationFrame(() => {
-					historyPanelRef.current?.focus();
-				});
-			}
-		}, [activeRightTab, rightPanelOpen, activeFocus]);
-
-		// Focus the auto run panel when switching to autorun tab
-		useEffect(() => {
-			if (activeRightTab === 'autorun' && rightPanelOpen && activeFocus === 'right') {
-				// Small delay to ensure the panel is rendered
-				requestAnimationFrame(() => {
-					autoRunRef.current?.focus();
-				});
-			}
-		}, [activeRightTab, rightPanelOpen, activeFocus]);
+		useImperativeHandle(ref, () => ({}), []);
 
 		if (!session) return null;
-
-		// Shared props for AutoRun and AutoRunExpandedModal to avoid duplication
-		const autoRunSharedProps = {
-			theme,
-			sessionId: session.id,
-			sshRemoteId: session.sshRemoteId || session.sessionSshRemoteConfig?.remoteId || undefined,
-			folderPath: session.autoRunFolderPath || null,
-			selectedFile: session.autoRunSelectedFile || null,
-			documentList: autoRunDocumentList,
-			documentTree: autoRunDocumentTree,
-			content: autoRunContent,
-			contentVersion: autoRunContentVersion,
-			onContentChange: onAutoRunContentChange,
-			externalLocalContent: sharedLocalContent,
-			onExternalLocalContentChange: setSharedLocalContent,
-			externalSavedContent: sharedSavedContent,
-			onExternalSavedContentChange: setSharedSavedContent,
-			mode: session.autoRunMode || ('edit' as const),
-			onModeChange: onAutoRunModeChange,
-			initialCursorPosition: session.autoRunCursorPosition || 0,
-			initialEditScrollPos: session.autoRunEditScrollPos || 0,
-			initialPreviewScrollPos: session.autoRunPreviewScrollPos || 0,
-			onStateChange: onAutoRunStateChange,
-			onOpenSetup: onAutoRunOpenSetup,
-			onRefresh: onAutoRunRefresh,
-			onSelectDocument: onAutoRunSelectDocument,
-			onCreateDocument: onAutoRunCreateDocument,
-			isLoadingDocuments: autoRunIsLoadingDocuments,
-			documentTaskCounts: autoRunDocumentTaskCounts,
-			batchRunState: currentSessionBatchState || undefined,
-			onOpenBatchRunner,
-			onStopBatchRun,
-			onSkipCurrentDocument,
-			onAbortBatchOnError,
-			onResumeAfterError,
-			sessionState: session.state,
-			shortcuts,
-			onOpenMarketplace,
-			onLaunchWizard,
-			onShowFlash,
-		};
 
 		return (
 			<div
@@ -403,10 +188,10 @@ export const RightPanel = memo(
 
 				{/* Tab Header */}
 				<div className="flex border-b h-16" style={{ borderColor: theme.colors.border }}>
-					{['files', 'history', 'autorun'].map((tab) => (
+					{(['files'] as const).map((tab) => (
 						<button
 							key={tab}
-							onClick={() => setActiveRightTab(tab as RightPanelTab)}
+							onClick={() => setActiveRightTab(tab)}
 							className="flex-1 text-xs font-bold border-b-2 transition-colors"
 							style={{
 								borderColor: activeRightTab === tab ? theme.colors.accent : 'transparent',
@@ -414,7 +199,7 @@ export const RightPanel = memo(
 							}}
 							data-tour={`${tab}-tab`}
 						>
-							{tab === 'autorun' ? 'Auto Run' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+							{tab.charAt(0).toUpperCase() + tab.slice(1)}
 						</button>
 					))}
 
@@ -438,7 +223,6 @@ export const RightPanel = memo(
 					tabIndex={-1}
 					onClick={(e) => {
 						setActiveFocus('right');
-						// Only focus the container for file explorer, not for autorun (which has its own focus management)
 						// Skip when the filter input is focused — otherwise the container steals focus from it
 						if (activeRightTab === 'files' && e.target !== fileTreeFilterInputRef.current) {
 							fileTreeContainerRef.current?.focus();
@@ -456,12 +240,7 @@ export const RightPanel = memo(
 						}
 					}}
 				>
-					{/* FileExplorerPanel stays mounted so auto-refresh timer persists across tab switches */}
-					<div
-						data-tour="files-panel"
-						className="h-full"
-						style={{ display: activeRightTab === 'files' ? undefined : 'none' }}
-					>
+					<div data-tour="files-panel" className="h-full">
 						<FileExplorerPanel
 							session={session}
 							theme={theme}
@@ -492,248 +271,15 @@ export const RightPanel = memo(
 							onOpenLastDocumentGraph={onOpenLastDocumentGraph}
 						/>
 					</div>
-
-					{activeRightTab === 'history' && (
-						<div data-tour="history-panel" className="h-full">
-							<HistoryPanel
-								ref={historyPanelRef}
-								session={session}
-								theme={theme}
-								onJumpToAgentSession={onJumpToAgentSession}
-								onResumeSession={onResumeSession}
-								onOpenSessionAsTab={onOpenSessionAsTab}
-								onOpenAboutModal={onOpenAboutModal}
-								fileTree={filteredFileTree}
-								onFileClick={onFileClick}
-							/>
-						</div>
-					)}
-
-					{activeRightTab === 'autorun' && (
-						<div data-tour="autorun-panel" className="h-full">
-							<AutoRun ref={autoRunRef} {...autoRunSharedProps} onExpand={handleExpandAutoRun} />
-						</div>
-					)}
 				</div>
-
-				{/* Auto Run Expanded Modal */}
-				{autoRunExpanded && session && (
-					<AutoRunExpandedModal {...autoRunSharedProps} onClose={handleCollapseAutoRun} />
-				)}
 
 				{/* Batch Run Progress - shown at bottom of all tabs (only for current session) */}
 				{currentSessionBatchState && currentSessionBatchState.isRunning && (
-					<div
-						className="mx-4 mb-4 px-4 py-3 rounded border flex-shrink-0"
-						style={{
-							backgroundColor: currentSessionBatchState.errorPaused
-								? `${theme.colors.error}15`
-								: theme.colors.bgActivity,
-							borderColor: currentSessionBatchState.errorPaused
-								? theme.colors.error
-								: theme.colors.warning,
-						}}
-					>
-						{/* Header with status and elapsed time */}
-						<div className="flex items-center justify-between mb-2">
-							<div className="flex items-center gap-2">
-								{currentSessionBatchState.errorPaused ? (
-									<AlertTriangle className="w-4 h-4" style={{ color: theme.colors.error }} />
-								) : (
-									<Loader2
-										className="w-4 h-4 animate-spin"
-										style={{ color: theme.colors.warning }}
-									/>
-								)}
-								{currentSessionBatchState.errorPaused ? (
-									<button
-										onClick={() => setActiveRightTab('autorun')}
-										className="text-xs font-bold uppercase cursor-pointer hover:underline"
-										style={{ color: theme.colors.error }}
-										title="View error details in Auto Run tab"
-									>
-										Auto Run Paused
-									</button>
-								) : (
-									<span
-										className="text-xs font-bold uppercase"
-										style={{ color: theme.colors.textMain }}
-									>
-										{currentSessionBatchState.isStopping ? 'Stopping...' : 'Auto Run Active'}
-									</span>
-								)}
-								{currentSessionBatchState.worktreeActive && (
-									<span title={`Worktree: ${currentSessionBatchState.worktreeBranch || 'active'}`}>
-										<GitBranch className="w-4 h-4" style={{ color: theme.colors.warning }} />
-									</span>
-								)}
-								{currentSessionBatchState.isStopping && (
-									<button
-										onClick={() => setShowKillConfirm(true)}
-										className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors hover:opacity-90"
-										style={{
-											backgroundColor: theme.colors.error,
-											color: 'white',
-										}}
-										title="Force kill the running process"
-									>
-										<Skull className="w-3 h-3" />
-										Kill
-									</button>
-								)}
-							</div>
-							{/* Elapsed time - wall clock time since run started */}
-							{elapsedTime && (
-								<span
-									className="text-xs font-mono"
-									style={{ color: theme.colors.textDim }}
-									title="Total elapsed time"
-								>
-									{elapsedTime}
-								</span>
-							)}
-						</div>
-
-						{/* Current document name - for single document runs */}
-						{currentSessionBatchState.documents &&
-							currentSessionBatchState.documents.length === 1 && (
-								<div className="mb-2">
-									<span
-										className="text-xs overflow-hidden text-ellipsis whitespace-nowrap block"
-										style={{
-											color: theme.colors.textDim,
-											direction: 'rtl',
-											textAlign: 'left',
-										}}
-										title={`${currentSessionBatchState.documents[0]}.md`}
-									>
-										<bdi>{currentSessionBatchState.documents[0]}.md</bdi>
-									</span>
-								</div>
-							)}
-
-						{/* Document progress with inline progress bar - only for multi-document runs */}
-						{currentSessionBatchState.documents &&
-							currentSessionBatchState.documents.length > 1 && (
-								<div className="mb-2">
-									{/* Document name with progress bar */}
-									<div className="flex items-center gap-2 min-w-0">
-										<span
-											className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap min-w-0"
-											style={{
-												color: theme.colors.textMain,
-												direction: 'rtl',
-												textAlign: 'left',
-											}}
-											title={`Document ${currentSessionBatchState.currentDocumentIndex + 1}/${currentSessionBatchState.documents.length}: ${currentSessionBatchState.documents[currentSessionBatchState.currentDocumentIndex]}.md`}
-										>
-											<bdi>
-												Document {currentSessionBatchState.currentDocumentIndex + 1}/
-												{currentSessionBatchState.documents.length}:{' '}
-												{
-													currentSessionBatchState.documents[
-														currentSessionBatchState.currentDocumentIndex
-													]
-												}
-											</bdi>
-										</span>
-										<div
-											className="flex-1 h-1 rounded-full overflow-hidden shrink-0"
-											style={{ backgroundColor: theme.colors.border, minWidth: '60px' }}
-										>
-											<div
-												className="h-full transition-all duration-300 ease-out"
-												style={{
-													width: `${
-														currentSessionBatchState.currentDocTasksTotal > 0
-															? (currentSessionBatchState.currentDocTasksCompleted /
-																	currentSessionBatchState.currentDocTasksTotal) *
-																100
-															: 0
-													}%`,
-													backgroundColor: theme.colors.accent,
-												}}
-											/>
-										</div>
-									</div>
-								</div>
-							)}
-
-						{/* Overall progress bar */}
-						<div
-							className="h-1.5 rounded-full overflow-hidden"
-							style={{ backgroundColor: theme.colors.border }}
-						>
-							<div
-								className="h-full transition-all duration-500 ease-out"
-								style={{
-									width: `${
-										currentSessionBatchState.totalTasksAcrossAllDocs > 0
-											? (currentSessionBatchState.completedTasksAcrossAllDocs /
-													currentSessionBatchState.totalTasksAcrossAllDocs) *
-												100
-											: currentSessionBatchState.totalTasks > 0
-												? (currentSessionBatchState.completedTasks /
-														currentSessionBatchState.totalTasks) *
-													100
-												: 0
-									}%`,
-									backgroundColor:
-										currentSessionBatchState.isStopping || currentSessionBatchState.errorPaused
-											? theme.colors.error
-											: theme.colors.warning,
-								}}
-							/>
-						</div>
-
-						{/* Overall completed count with loop info */}
-						<div className="mt-2 flex items-start justify-between gap-2">
-							<span
-								className="text-[10px]"
-								style={{
-									color: currentSessionBatchState.errorPaused
-										? theme.colors.error
-										: theme.colors.textDim,
-								}}
-							>
-								{currentSessionBatchState.errorPaused
-									? currentSessionBatchState.error?.message || 'Paused due to error'
-									: currentSessionBatchState.isStopping
-										? 'Waiting for current task to complete before stopping...'
-										: currentSessionBatchState.totalTasksAcrossAllDocs > 0
-											? `${currentSessionBatchState.completedTasksAcrossAllDocs} of ${currentSessionBatchState.totalTasksAcrossAllDocs} tasks completed`
-											: `${currentSessionBatchState.completedTasks} of ${currentSessionBatchState.totalTasks} tasks completed`}
-							</span>
-							<div className="flex items-center gap-2 shrink-0">
-								{/* Loop iteration indicator */}
-								{currentSessionBatchState.loopEnabled && (
-									<span
-										className="text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap"
-										style={{
-											backgroundColor: theme.colors.accent + '20',
-											color: theme.colors.accent,
-										}}
-									>
-										Loop {currentSessionBatchState.loopIteration + 1} of{' '}
-										{currentSessionBatchState.maxLoops ?? '∞'}
-									</span>
-								)}
-								{/* View history link - only shown on auto-run tab */}
-								{activeRightTab === 'autorun' && (
-									<button
-										className="text-[10px] whitespace-nowrap bg-transparent border-none p-0 cursor-pointer"
-										style={{
-											color: theme.colors.textDim,
-											textDecoration: 'underline',
-										}}
-										onClick={() => setActiveRightTab('history')}
-									>
-										View history
-									</button>
-								)}
-							</div>
-						</div>
-					</div>
+					<BatchRunProgress
+						theme={theme}
+						currentSessionBatchState={currentSessionBatchState}
+						setShowKillConfirm={setShowKillConfirm}
+					/>
 				)}
 
 				{/* Kill confirmation modal */}
@@ -758,3 +304,237 @@ export const RightPanel = memo(
 		);
 	})
 );
+
+/**
+ * Batch Run Progress indicator extracted for clarity.
+ * Shows Auto Run progress at the bottom of the right panel.
+ */
+function BatchRunProgress({
+	theme,
+	currentSessionBatchState,
+	setShowKillConfirm,
+}: {
+	theme: Theme;
+	currentSessionBatchState: BatchRunState;
+	setShowKillConfirm: (v: boolean) => void;
+}) {
+	// Elapsed time for Auto Run display - tracks wall clock time from startTime
+	const [elapsedTime, setElapsedTime] = useState<string>('');
+
+	// Format elapsed time from milliseconds
+	const formatElapsed = useCallback((ms: number) => {
+		const seconds = Math.floor(ms / 1000);
+		const minutes = Math.floor(seconds / 60);
+		const hours = Math.floor(minutes / 60);
+
+		if (hours > 0) {
+			return `${hours}h ${minutes % 60}m`;
+		} else if (minutes > 0) {
+			return `${minutes}m ${seconds % 60}s`;
+		} else {
+			return `${seconds}s`;
+		}
+	}, []);
+
+	// Update elapsed time display using wall clock time from startTime
+	const elapsedRef = useRef(elapsedTime);
+	elapsedRef.current = elapsedTime;
+	React.useEffect(() => {
+		if (!currentSessionBatchState?.isRunning || !currentSessionBatchState?.startTime) {
+			setElapsedTime('');
+			return;
+		}
+
+		const updateElapsed = () => {
+			const elapsed = Date.now() - currentSessionBatchState.startTime!;
+			setElapsedTime(formatElapsed(elapsed));
+		};
+
+		updateElapsed();
+		const interval = setInterval(updateElapsed, 1000);
+
+		return () => clearInterval(interval);
+	}, [currentSessionBatchState?.isRunning, currentSessionBatchState?.startTime, formatElapsed]);
+
+	return (
+		<div
+			className="mx-4 mb-4 px-4 py-3 rounded border flex-shrink-0"
+			style={{
+				backgroundColor: currentSessionBatchState.errorPaused
+					? `${theme.colors.error}15`
+					: theme.colors.bgActivity,
+				borderColor: currentSessionBatchState.errorPaused
+					? theme.colors.error
+					: theme.colors.warning,
+			}}
+		>
+			{/* Header with status and elapsed time */}
+			<div className="flex items-center justify-between mb-2">
+				<div className="flex items-center gap-2">
+					{currentSessionBatchState.errorPaused ? (
+						<AlertTriangle className="w-4 h-4" style={{ color: theme.colors.error }} />
+					) : (
+						<Loader2 className="w-4 h-4 animate-spin" style={{ color: theme.colors.warning }} />
+					)}
+					{currentSessionBatchState.errorPaused ? (
+						<span className="text-xs font-bold uppercase" style={{ color: theme.colors.error }}>
+							Auto Run Paused
+						</span>
+					) : (
+						<span className="text-xs font-bold uppercase" style={{ color: theme.colors.textMain }}>
+							{currentSessionBatchState.isStopping ? 'Stopping...' : 'Auto Run Active'}
+						</span>
+					)}
+					{currentSessionBatchState.worktreeActive && (
+						<span title={`Worktree: ${currentSessionBatchState.worktreeBranch || 'active'}`}>
+							<GitBranch className="w-4 h-4" style={{ color: theme.colors.warning }} />
+						</span>
+					)}
+					{currentSessionBatchState.isStopping && (
+						<button
+							onClick={() => setShowKillConfirm(true)}
+							className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase transition-colors hover:opacity-90"
+							style={{
+								backgroundColor: theme.colors.error,
+								color: 'white',
+							}}
+							title="Force kill the running process"
+						>
+							<Skull className="w-3 h-3" />
+							Kill
+						</button>
+					)}
+				</div>
+				{/* Elapsed time - wall clock time since run started */}
+				{elapsedTime && (
+					<span
+						className="text-xs font-mono"
+						style={{ color: theme.colors.textDim }}
+						title="Total elapsed time"
+					>
+						{elapsedTime}
+					</span>
+				)}
+			</div>
+
+			{/* Current document name - for single document runs */}
+			{currentSessionBatchState.documents && currentSessionBatchState.documents.length === 1 && (
+				<div className="mb-2">
+					<span
+						className="text-xs overflow-hidden text-ellipsis whitespace-nowrap block"
+						style={{
+							color: theme.colors.textDim,
+							direction: 'rtl',
+							textAlign: 'left',
+						}}
+						title={`${currentSessionBatchState.documents[0]}.md`}
+					>
+						<bdi>{currentSessionBatchState.documents[0]}.md</bdi>
+					</span>
+				</div>
+			)}
+
+			{/* Document progress with inline progress bar - only for multi-document runs */}
+			{currentSessionBatchState.documents && currentSessionBatchState.documents.length > 1 && (
+				<div className="mb-2">
+					{/* Document name with progress bar */}
+					<div className="flex items-center gap-2 min-w-0">
+						<span
+							className="text-xs font-medium overflow-hidden text-ellipsis whitespace-nowrap min-w-0"
+							style={{
+								color: theme.colors.textMain,
+								direction: 'rtl',
+								textAlign: 'left',
+							}}
+							title={`Document ${currentSessionBatchState.currentDocumentIndex + 1}/${currentSessionBatchState.documents.length}: ${currentSessionBatchState.documents[currentSessionBatchState.currentDocumentIndex]}.md`}
+						>
+							<bdi>
+								Document {currentSessionBatchState.currentDocumentIndex + 1}/
+								{currentSessionBatchState.documents.length}:{' '}
+								{currentSessionBatchState.documents[currentSessionBatchState.currentDocumentIndex]}
+							</bdi>
+						</span>
+						<div
+							className="flex-1 h-1 rounded-full overflow-hidden shrink-0"
+							style={{ backgroundColor: theme.colors.border, minWidth: '60px' }}
+						>
+							<div
+								className="h-full transition-all duration-300 ease-out"
+								style={{
+									width: `${
+										currentSessionBatchState.currentDocTasksTotal > 0
+											? (currentSessionBatchState.currentDocTasksCompleted /
+													currentSessionBatchState.currentDocTasksTotal) *
+												100
+											: 0
+									}%`,
+									backgroundColor: theme.colors.accent,
+								}}
+							/>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Overall progress bar */}
+			<div
+				className="h-1.5 rounded-full overflow-hidden"
+				style={{ backgroundColor: theme.colors.border }}
+			>
+				<div
+					className="h-full transition-all duration-500 ease-out"
+					style={{
+						width: `${
+							currentSessionBatchState.totalTasksAcrossAllDocs > 0
+								? (currentSessionBatchState.completedTasksAcrossAllDocs /
+										currentSessionBatchState.totalTasksAcrossAllDocs) *
+									100
+								: currentSessionBatchState.totalTasks > 0
+									? (currentSessionBatchState.completedTasks /
+											currentSessionBatchState.totalTasks) *
+										100
+									: 0
+						}%`,
+						backgroundColor:
+							currentSessionBatchState.isStopping || currentSessionBatchState.errorPaused
+								? theme.colors.error
+								: theme.colors.warning,
+					}}
+				/>
+			</div>
+
+			{/* Overall completed count with loop info */}
+			<div className="mt-2 flex items-start justify-between gap-2">
+				<span
+					className="text-[10px]"
+					style={{
+						color: currentSessionBatchState.errorPaused ? theme.colors.error : theme.colors.textDim,
+					}}
+				>
+					{currentSessionBatchState.errorPaused
+						? currentSessionBatchState.error?.message || 'Paused due to error'
+						: currentSessionBatchState.isStopping
+							? 'Waiting for current task to complete before stopping...'
+							: currentSessionBatchState.totalTasksAcrossAllDocs > 0
+								? `${currentSessionBatchState.completedTasksAcrossAllDocs} of ${currentSessionBatchState.totalTasksAcrossAllDocs} tasks completed`
+								: `${currentSessionBatchState.completedTasks} of ${currentSessionBatchState.totalTasks} tasks completed`}
+				</span>
+				<div className="flex items-center gap-2 shrink-0">
+					{/* Loop iteration indicator */}
+					{currentSessionBatchState.loopEnabled && (
+						<span
+							className="text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap"
+							style={{
+								backgroundColor: theme.colors.accent + '20',
+								color: theme.colors.accent,
+							}}
+						>
+							Loop {currentSessionBatchState.loopIteration + 1} of{' '}
+							{currentSessionBatchState.maxLoops ?? '∞'}
+						</span>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}

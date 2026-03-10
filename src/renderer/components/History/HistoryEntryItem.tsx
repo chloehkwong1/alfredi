@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { Bot, User, ExternalLink, Check, X, Clock, Award } from 'lucide-react';
+import { Bot, User, ExternalLink, Check, X, Clock } from 'lucide-react';
 import type { Theme, HistoryEntry, HistoryEntryType } from '../../types';
 import { formatElapsedTime } from '../../utils/formatters';
 import { stripMarkdown } from '../../utils/textProcessing';
@@ -205,10 +205,9 @@ export const HistoryEntryItem = memo(function HistoryEntryItem({
 				{entry.summary ? stripMarkdown(entry.summary) : 'No summary available'}
 			</p>
 
-			{/* Footer Row - Time, Cost, and Achievement Action */}
+			{/* Footer Row - Time and Cost */}
 			{(entry.elapsedTimeMs !== undefined ||
-				(entry.usageStats && entry.usageStats.totalCostUsd > 0) ||
-				entry.achievementAction) && (
+				(entry.usageStats && entry.usageStats.totalCostUsd > 0)) && (
 				<div
 					className="flex items-center gap-3 mt-2 pt-2 border-t"
 					style={{ borderColor: theme.colors.border }}
@@ -234,25 +233,6 @@ export const HistoryEntryItem = memo(function HistoryEntryItem({
 						>
 							${entry.usageStats.totalCostUsd.toFixed(2)}
 						</span>
-					)}
-					{/* Achievement Action Button */}
-					{entry.achievementAction === 'openAbout' && onOpenAboutModal && (
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								onOpenAboutModal();
-							}}
-							className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors hover:opacity-80 ml-auto"
-							style={{
-								backgroundColor: theme.colors.warning + '20',
-								color: theme.colors.warning,
-								border: `1px solid ${theme.colors.warning}40`,
-							}}
-							title="View achievements"
-						>
-							<Award className="w-3 h-3" />
-							View Achievements
-						</button>
 					)}
 				</div>
 			)}

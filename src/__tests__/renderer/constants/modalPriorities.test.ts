@@ -75,11 +75,6 @@ describe('modalPriorities', () => {
 			expect(MODAL_PRIORITIES.WIZARD_RESUME).toBeGreaterThan(MODAL_PRIORITIES.WIZARD);
 		});
 
-		it('EXISTING_AUTORUN_DOCS should have higher priority than WIZARD (opens from within)', () => {
-			// Existing docs modal opens from WizardModal
-			expect(MODAL_PRIORITIES.EXISTING_AUTORUN_DOCS).toBeGreaterThan(MODAL_PRIORITIES.WIZARD);
-		});
-
 		it('INLINE_WIZARD_EXIT_CONFIRM should have higher priority than WIZARD_MODE_PROMPT', () => {
 			// Inline wizard exit confirm should close before mode prompt
 			expect(MODAL_PRIORITIES.INLINE_WIZARD_EXIT_CONFIRM).toBeGreaterThan(

@@ -1,14 +1,13 @@
 /**
  * GenerationCompleteOverlay.tsx
  *
- * Overlay shown when document generation finishes. Displays a celebratory
- * header ("Your Playbook is ready!"), task count summary, and a prominent
- * "Done" button. On click, triggers confetti animation and calls onComplete().
+ * Overlay shown when document generation finishes. Displays a header
+ * ("Your Playbook is ready!"), task count summary, and a prominent
+ * "Done" button. On click, calls onComplete().
  */
 
 import { useState, useCallback } from 'react';
 import type { Theme } from '../../types';
-import { triggerCelebration } from '../../utils/confetti';
 
 /**
  * Props for GenerationCompleteOverlay
@@ -18,27 +17,22 @@ export interface GenerationCompleteOverlayProps {
 	theme: Theme;
 	/** Total number of tasks in generated documents */
 	taskCount: number;
-	/** Called when user clicks Done - triggers confetti and completes wizard */
+	/** Called when user clicks Done */
 	onDone: () => void;
-	/** Whether confetti animations are disabled by user preference */
-	disableConfetti?: boolean;
 }
 
 /**
  * GenerationCompleteOverlay - Shown when document generation finishes
  *
  * Contains:
- * - Celebratory header ("Your Playbook is ready!")
+ * - Header ("Your Playbook is ready!")
  * - Task count summary
  * - Prominent "Done" button with accent color
- *
- * On click: triggers confetti animation, waits 500ms, then calls onComplete() callback
  */
 export function GenerationCompleteOverlay({
 	theme,
 	taskCount,
 	onDone,
-	disableConfetti = false,
 }: GenerationCompleteOverlayProps): JSX.Element {
 	const [isClosing, setIsClosing] = useState(false);
 
@@ -46,14 +40,11 @@ export function GenerationCompleteOverlay({
 		if (isClosing) return; // Prevent double-clicks
 		setIsClosing(true);
 
-		// Trigger celebratory confetti burst (if not disabled)
-		triggerCelebration(disableConfetti);
-
-		// Wait 500ms for confetti to be visible, then call completion callback
+		// Small delay for visual feedback, then call completion callback
 		setTimeout(() => {
 			onDone();
-		}, 500);
-	}, [isClosing, onDone, disableConfetti]);
+		}, 200);
+	}, [isClosing, onDone]);
 
 	return (
 		<div
@@ -63,7 +54,7 @@ export function GenerationCompleteOverlay({
 				backdropFilter: 'blur(4px)',
 			}}
 		>
-			{/* Celebratory header */}
+			{/* Header */}
 			<div className="text-center mb-6">
 				<h2 className="text-2xl font-bold mb-2" style={{ color: theme.colors.textMain }}>
 					Your Playbook is ready!

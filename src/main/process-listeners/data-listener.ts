@@ -1,16 +1,10 @@
 /**
  * Data output listener.
- * Handles process output data, including group chat buffering and web broadcasting.
+ * Handles process output data and web broadcasting.
  */
 
 import type { ProcessManager } from '../process-manager';
-import { GROUP_CHAT_PREFIX, type ProcessListenerDependencies } from './types';
-
-/**
- * Maximum buffer size per session (10MB).
- * Prevents unbounded memory growth from long-running or misbehaving processes.
- */
-const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+import type { ProcessListenerDependencies } from './types';
 
 /**
  * Length of random suffix in message IDs (9 characters of base36).
@@ -21,79 +15,18 @@ const MSG_ID_RANDOM_LENGTH = 9;
 /**
  * Sets up the data listener for process output.
  * Handles:
- * - Group chat moderator/participant output buffering
  * - Regular process data forwarding to renderer
  * - Web broadcast to connected clients
  */
 export function setupDataListener(
 	processManager: ProcessManager,
-	deps: Pick<
-		ProcessListenerDependencies,
-		'safeSend' | 'getWebServer' | 'outputBuffer' | 'outputParser' | 'debugLog' | 'patterns'
-	>
+	deps: Pick<ProcessListenerDependencies, 'safeSend' | 'getWebServer' | 'debugLog' | 'patterns'>
 ): void {
-	const { safeSend, getWebServer, outputBuffer, outputParser, debugLog, patterns } = deps;
-	const {
-		REGEX_MODERATOR_SESSION,
-		REGEX_AI_SUFFIX,
-		REGEX_AI_TAB_ID,
-		REGEX_BATCH_SESSION,
-		REGEX_SYNOPSIS_SESSION,
-	} = patterns;
+	const { safeSend, getWebServer, debugLog, patterns } = deps;
+	const { REGEX_AI_SUFFIX, REGEX_AI_TAB_ID, REGEX_BATCH_SESSION, REGEX_SYNOPSIS_SESSION } =
+		patterns;
 
 	processManager.on('data', (sessionId: string, data: string) => {
-		// Fast path: skip regex for non-group-chat sessions (performance optimization)
-		// Most sessions don't start with 'group-chat-', so this avoids expensive regex matching
-		const isGroupChatSession = sessionId.startsWith(GROUP_CHAT_PREFIX);
-
-		// Handle group chat moderator output - buffer it
-		// Session ID format: group-chat-{groupChatId}-moderator-{uuid} or group-chat-{groupChatId}-moderator-synthesis-{uuid}
-		const moderatorMatch = isGroupChatSession ? sessionId.match(REGEX_MODERATOR_SESSION) : null;
-		if (moderatorMatch) {
-			const groupChatId = moderatorMatch[1];
-			debugLog('GroupChat:Debug', `MODERATOR DATA received for chat ${groupChatId}`);
-			debugLog('GroupChat:Debug', `Session ID: ${sessionId}`);
-			debugLog('GroupChat:Debug', `Data length: ${data.length}`);
-			// Buffer the output - will be routed on process exit
-			const totalLength = outputBuffer.appendToGroupChatBuffer(sessionId, data);
-			debugLog('GroupChat:Debug', `Buffered total: ${totalLength} chars`);
-			// Warn if buffer is growing too large (potential memory leak)
-			if (totalLength > MAX_BUFFER_SIZE) {
-				debugLog(
-					'GroupChat:Debug',
-					`WARNING: Buffer size ${totalLength} exceeds ${MAX_BUFFER_SIZE} bytes for moderator session ${sessionId}`
-				);
-			}
-			return; // Don't send to regular process:data handler
-		}
-
-		// Handle group chat participant output - buffer it
-		// Session ID format: group-chat-{groupChatId}-participant-{name}-{uuid|timestamp}
-		// Only parse if it's a group chat session (performance optimization)
-		const participantInfo = isGroupChatSession
-			? outputParser.parseParticipantSessionId(sessionId)
-			: null;
-		if (participantInfo) {
-			debugLog('GroupChat:Debug', 'PARTICIPANT DATA received');
-			debugLog(
-				'GroupChat:Debug',
-				`Chat: ${participantInfo.groupChatId}, Participant: ${participantInfo.participantName}`
-			);
-			debugLog('GroupChat:Debug', `Session ID: ${sessionId}`);
-			debugLog('GroupChat:Debug', `Data length: ${data.length}`);
-			// Buffer the output - will be routed on process exit
-			const totalLength = outputBuffer.appendToGroupChatBuffer(sessionId, data);
-			debugLog('GroupChat:Debug', `Buffered total: ${totalLength} chars`);
-			// Warn if buffer is growing too large (potential memory leak)
-			if (totalLength > MAX_BUFFER_SIZE) {
-				debugLog(
-					'GroupChat:Debug',
-					`WARNING: Buffer size ${totalLength} exceeds ${MAX_BUFFER_SIZE} bytes for participant ${participantInfo.participantName}`
-				);
-			}
-			return; // Don't send to regular process:data handler
-		}
-
 		safeSend('process:data', sessionId, data);
 
 		// Broadcast to web clients - extract base session ID (remove -ai or -terminal suffix)

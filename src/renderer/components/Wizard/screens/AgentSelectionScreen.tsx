@@ -481,6 +481,7 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
 
 		async function loadSshRemotes() {
 			try {
+				if (!window.maestro.sshRemote) return;
 				const configsResult = await window.maestro.sshRemote.getConfigs();
 				if (mounted && configsResult.success && configsResult.configs) {
 					setSshRemotes(configsResult.configs);

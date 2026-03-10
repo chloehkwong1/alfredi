@@ -15,7 +15,7 @@ import { useState, useCallback } from 'react';
 import type { Session, ToolType, LogEntry, AITab } from '../../types';
 import type { GroomingProgress } from '../../types/contextMerge';
 import type { MergeOptions } from '../../components/MergeSessionModal';
-import type { SendToAgentOptions } from '../../components/SendToAgentModal';
+import type { SendToAgentOptions } from '../../types';
 import type { MergeState } from '../../stores/operationStore';
 import type { TransferState } from '../../stores/operationStore';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
@@ -38,7 +38,7 @@ export interface UseMergeTransferHandlersDeps {
 	sessionsRef: React.MutableRefObject<Session[]>;
 	/** Active session ID ref for non-reactive access in callbacks */
 	activeSessionIdRef: React.MutableRefObject<string>;
-	/** Navigate to a session (dismisses group chat, flushes batched updates) */
+	/** Navigate to a session (flushes batched updates) */
 	setActiveSessionId: (id: string) => void;
 }
 

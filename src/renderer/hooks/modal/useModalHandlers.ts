@@ -2,11 +2,11 @@
  * useModalHandlers — Extracted from App.tsx (Phase 2C)
  *
  * Handles all modal open/close lifecycle callbacks, agent error recovery,
- * lightbox navigation, celebration modals, leaderboard, quit confirmation,
+ * lightbox navigation, quit confirmation,
  * and quick-action modal openers.
  *
  * Reads from: useModalStore, useSettingsStore, useSessionStore,
- *             useGroupChatStore, useAgentStore
+ *             useAgentStore
  *
  * NOTE: getModalActions() calls are a legacy shim that wraps modalStore methods
  * for backward compatibility. New code should prefer useModalStore.getState()
@@ -14,16 +14,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { Session, LeaderboardRegistration, AgentError } from '../../types';
+import type { Session, AgentError } from '../../types';
 import type { RecoveryAction } from '../../components/AgentErrorModal';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useAgentStore } from '../../stores/agentStore';
 import { useAgentErrorRecovery } from '../agent/useAgentErrorRecovery';
 import { getInitialRenameValue } from '../../utils/tabHelpers';
-import { CONDUCTOR_BADGES } from '../../constants/conductorBadges';
 import { gitService } from '../../services/git';
 
 // ---------------------------------------------------------------------------
@@ -41,8 +39,6 @@ export interface ModalHandlersReturn {
 	handleCloseGitDiff: () => void;
 	handleCloseGitLog: () => void;
 	handleCloseSettings: () => void;
-	handleCloseDebugPackage: () => void;
-	handleCloseShortcutsHelp: () => void;
 	handleCloseAboutModal: () => void;
 	handleCloseUpdateCheckModal: () => void;
 	handleCloseProcessMonitor: () => void;
@@ -60,19 +56,6 @@ export interface ModalHandlersReturn {
 	handleConfirmQuit: () => void;
 	handleCancelQuit: () => void;
 
-	// Celebration handlers
-	onKeyboardMasteryLevelUp: (level: number) => void;
-	handleKeyboardMasteryCelebrationClose: () => void;
-	handleStandingOvationClose: () => void;
-	handleFirstRunCelebrationClose: () => void;
-
-	// Leaderboard handlers
-	handleOpenLeaderboardRegistration: () => void;
-	handleOpenLeaderboardRegistrationFromAbout: () => void;
-	handleCloseLeaderboardRegistration: () => void;
-	handleSaveLeaderboardRegistration: (registration: LeaderboardRegistration) => void;
-	handleLeaderboardOptOut: () => void;
-
 	// Agent error handlers
 	handleCloseAgentErrorModal: () => void;
 	handleShowAgentErrorModal: (error?: AgentError) => void;
@@ -89,8 +72,6 @@ export interface ModalHandlersReturn {
 	handleOpenFuzzySearch: () => void;
 	handleOpenCreatePR: () => void;
 	handleOpenAboutModal: () => void;
-	handleOpenBatchRunner: () => void;
-	handleOpenMarketplace: () => void;
 
 	// Session list openers
 	handleEditAgent: (session: Session) => void;
@@ -110,8 +91,6 @@ export interface ModalHandlersReturn {
 	handleDeleteLightboxImage: (img: string) => void;
 
 	// Utility close handlers
-	handleCloseAutoRunSetup: () => void;
-	handleCloseBatchRunner: () => void;
 	handleCloseTabSwitcher: () => void;
 	handleCloseFileSearch: () => void;
 	handleClosePromptComposer: () => void;
@@ -134,9 +113,6 @@ export interface ModalHandlersReturn {
 
 	// Git diff opener (Tier 3C)
 	handleViewGitDiff: () => Promise<void>;
-
-	// Director's Notes session navigation (Tier 3C)
-	handleDirectorNotesResumeSession: (sourceSessionId: string, agentSessionId: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -148,9 +124,6 @@ const selectAgentErrorSessionId = (s: ReturnType<typeof useModalStore.getState>)
 const selectAgentErrorHistorical = (s: ReturnType<typeof useModalStore.getState>) =>
 	s.getData('agentError')?.historicalError ?? null;
 const selectLogViewerOpen = (s: ReturnType<typeof useModalStore.getState>) => s.isOpen('logViewer');
-const selectShortcutsHelpOpen = (s: ReturnType<typeof useModalStore.getState>) =>
-	s.isOpen('shortcutsHelp');
-
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -165,10 +138,6 @@ export function useModalHandlers(
 	const historicalAgentError = useModalStore(selectAgentErrorHistorical);
 	const sessions = useSessionStore((s) => s.sessions);
 	const logViewerOpen = useModalStore(selectLogViewerOpen);
-	const shortcutsHelpOpen = useModalStore(selectShortcutsHelpOpen);
-	const settingsLoaded = useSettingsStore((s) => s.settingsLoaded);
-	const sessionsLoaded = useSessionStore((s) => s.sessionsLoaded);
-
 	// ====================================================================
 	// Derived State
 	// ====================================================================
@@ -195,14 +164,6 @@ export function useModalHandlers(
 
 	const handleCloseSettings = useCallback(() => {
 		getModalActions().setSettingsModalOpen(false);
-	}, []);
-
-	const handleCloseDebugPackage = useCallback(() => {
-		getModalActions().setDebugPackageModalOpen(false);
-	}, []);
-
-	const handleCloseShortcutsHelp = useCallback(() => {
-		getModalActions().setShortcutsHelpOpen(false);
 	}, []);
 
 	const handleCloseAboutModal = useCallback(() => {
@@ -270,67 +231,8 @@ export function useModalHandlers(
 		window.maestro.app.cancelQuit();
 	}, []);
 
-	// ====================================================================
-	// Group D: Celebration Handlers
-	// ====================================================================
-
-	const onKeyboardMasteryLevelUp = useCallback((level: number) => {
-		getModalActions().setPendingKeyboardMasteryLevel(level);
-	}, []);
-
-	const handleKeyboardMasteryCelebrationClose = useCallback(() => {
-		const pendingLevel = useModalStore.getState().getData('keyboardMastery')?.level ?? null;
-		if (pendingLevel !== null) {
-			useSettingsStore.getState().acknowledgeKeyboardMasteryLevel(pendingLevel);
-		}
-		getModalActions().setPendingKeyboardMasteryLevel(null);
-	}, []);
-
-	const handleStandingOvationClose = useCallback(() => {
-		const data = useModalStore.getState().getData('standingOvation');
-		if (data) {
-			useSettingsStore.getState().acknowledgeBadge(data.badge.level);
-		}
-		getModalActions().setStandingOvationData(null);
-	}, []);
-
-	const handleFirstRunCelebrationClose = useCallback(() => {
-		getModalActions().setFirstRunCelebrationData(null);
-	}, []);
-
-	const handleLogViewerShortcutUsed = useCallback(
-		(shortcutId: string) => {
-			const result = useSettingsStore.getState().recordShortcutUsage(shortcutId);
-			if (result.newLevel !== null) {
-				onKeyboardMasteryLevelUp(result.newLevel);
-			}
-		},
-		[onKeyboardMasteryLevelUp]
-	);
-
-	// ====================================================================
-	// Group E: Leaderboard Handlers
-	// ====================================================================
-
-	const handleOpenLeaderboardRegistration = useCallback(() => {
-		getModalActions().setLeaderboardRegistrationOpen(true);
-	}, []);
-
-	const handleOpenLeaderboardRegistrationFromAbout = useCallback(() => {
-		getModalActions().setAboutModalOpen(false);
-		getModalActions().setLeaderboardRegistrationOpen(true);
-	}, []);
-
-	const handleCloseLeaderboardRegistration = useCallback(() => {
-		getModalActions().setLeaderboardRegistrationOpen(false);
-	}, []);
-
-	const handleSaveLeaderboardRegistration = useCallback((registration: LeaderboardRegistration) => {
-		useSettingsStore.getState().setLeaderboardRegistration(registration);
-	}, []);
-
-	const handleLeaderboardOptOut = useCallback(() => {
-		useSettingsStore.getState().setLeaderboardRegistration(null);
+	const handleLogViewerShortcutUsed = useCallback((shortcutId: string) => {
+		useSettingsStore.getState().recordShortcutUsage(shortcutId);
 	}, []);
 
 	// ====================================================================
@@ -461,14 +363,6 @@ export function useModalHandlers(
 		getModalActions().setAboutModalOpen(true);
 	}, []);
 
-	const handleOpenBatchRunner = useCallback(() => {
-		getModalActions().setBatchRunnerModalOpen(true);
-	}, []);
-
-	const handleOpenMarketplace = useCallback(() => {
-		getModalActions().setMarketplaceModalOpen(true);
-	}, []);
-
 	// ====================================================================
 	// Group H: Session List Modal Openers
 	// ====================================================================
@@ -496,12 +390,10 @@ export function useModalHandlers(
 
 	const handleSetLightboxImage = useCallback(
 		(image: string | null, contextImages?: string[], source: 'staged' | 'history' = 'history') => {
-			const { activeGroupChatId } = useGroupChatStore.getState();
 			const actions = getModalActions();
 			// setLightboxImage opens the modal — must be called first so that
-			// subsequent updateModalData calls (isGroupChat, allowDelete) find an active modal.
+			// subsequent updateModalData calls (allowDelete) find an active modal.
 			actions.setLightboxImage(image);
-			actions.setLightboxIsGroupChat(activeGroupChatId !== null);
 			actions.setLightboxAllowDelete(source === 'staged');
 			actions.setLightboxImages(contextImages || []);
 			actions.setLightboxSource(source);
@@ -514,7 +406,6 @@ export function useModalHandlers(
 		actions.setLightboxImage(null);
 		actions.setLightboxImages([]);
 		actions.setLightboxSource('history');
-		actions.setLightboxIsGroupChat(false);
 		actions.setLightboxAllowDelete(false);
 		setTimeout(() => inputRef.current?.focus(), 0);
 	}, [inputRef]);
@@ -524,14 +415,7 @@ export function useModalHandlers(
 	}, []);
 
 	const handleDeleteLightboxImage = useCallback((img: string) => {
-		const lightboxData = useModalStore.getState().getData('lightbox');
-		const isGroupChat = lightboxData?.isGroupChat ?? false;
-
-		if (isGroupChat) {
-			useGroupChatStore
-				.getState()
-				.setGroupChatStagedImages((prev) => prev.filter((i) => i !== img));
-		} else {
+		{
 			// Update staged images for active tab in session store
 			const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
 			const session = currentSessions.find((s) => s.id === activeSessionId);
@@ -555,21 +439,14 @@ export function useModalHandlers(
 		}
 
 		// Update lightbox images so navigation stays in sync
-		const currentImages = lightboxData?.images ?? [];
-		getModalActions().setLightboxImages(currentImages.filter((i) => i !== img));
+		const currentLightboxData = useModalStore.getState().getData('lightbox');
+		const currentImages = currentLightboxData?.images ?? [];
+		getModalActions().setLightboxImages(currentImages.filter((i: string) => i !== img));
 	}, []);
 
 	// ====================================================================
 	// Group K: Utility Close Handlers
 	// ====================================================================
-
-	const handleCloseAutoRunSetup = useCallback(() => {
-		getModalActions().setAutoRunSetupModalOpen(false);
-	}, []);
-
-	const handleCloseBatchRunner = useCallback(() => {
-		getModalActions().setBatchRunnerModalOpen(false);
-	}, []);
 
 	const handleCloseTabSwitcher = useCallback(() => {
 		getModalActions().setTabSwitcherOpen(false);
@@ -668,125 +545,6 @@ export function useModalHandlers(
 		}
 	}, [logViewerOpen, inputRef, terminalOutputRef]);
 
-	// Reset shortcuts search when modal closes
-	useEffect(() => {
-		if (!shortcutsHelpOpen) {
-			getModalActions().setShortcutsSearchQuery('');
-		}
-	}, [shortcutsHelpOpen]);
-
-	// Check for unacknowledged badges on startup (show missed standing ovations)
-	useEffect(() => {
-		if (settingsLoaded && sessionsLoaded) {
-			const { getUnacknowledgedBadgeLevel, autoRunStats } = useSettingsStore.getState();
-			const unacknowledgedLevel = getUnacknowledgedBadgeLevel();
-			if (unacknowledgedLevel !== null) {
-				const badge = CONDUCTOR_BADGES.find((b) => b.level === unacknowledgedLevel);
-				if (badge) {
-					// Show the standing ovation overlay for the missed badge
-					// Small delay to ensure UI is fully rendered
-					setTimeout(() => {
-						getModalActions().setStandingOvationData({
-							badge,
-							isNewRecord: false, // We don't know if it was a record, so default to false
-							recordTimeMs: autoRunStats.longestRunMs,
-						});
-					}, 1000);
-				}
-			}
-		}
-		// autoRunStats.longestRunMs and getUnacknowledgedBadgeLevel intentionally omitted -
-		// this effect runs once on startup to check for missed badges, not on every stats update
-	}, [settingsLoaded, sessionsLoaded]);
-
-	// Check for unacknowledged badges when user returns to the app
-	// Uses multiple triggers: visibility change, window focus, and mouse activity
-	// This catches badges earned during overnight Auto Runs when display was off
-	useEffect(() => {
-		if (!settingsLoaded || !sessionsLoaded) return;
-
-		// Debounce to avoid showing multiple times
-		let checkPending = false;
-
-		const checkForUnacknowledgedBadge = () => {
-			// Don't show if there's already an ovation displayed
-			const currentOvation = useModalStore.getState().getData('standingOvation');
-			if (currentOvation) return;
-			if (checkPending) return;
-
-			const { getUnacknowledgedBadgeLevel, autoRunStats } = useSettingsStore.getState();
-			const unacknowledgedLevel = getUnacknowledgedBadgeLevel();
-			if (unacknowledgedLevel !== null) {
-				const badge = CONDUCTOR_BADGES.find((b) => b.level === unacknowledgedLevel);
-				if (badge) {
-					checkPending = true;
-					// Small delay to let the UI stabilize
-					setTimeout(() => {
-						// Double-check in case it was acknowledged in the meantime
-						if (!useModalStore.getState().getData('standingOvation')) {
-							getModalActions().setStandingOvationData({
-								badge,
-								isNewRecord: false,
-								recordTimeMs: autoRunStats.longestRunMs,
-							});
-						}
-						checkPending = false;
-					}, 500);
-				}
-			}
-		};
-
-		const handleVisibilityChange = () => {
-			// Only check when becoming visible
-			if (!document.hidden) {
-				checkForUnacknowledgedBadge();
-			}
-		};
-
-		const handleWindowFocus = () => {
-			// Window gained focus - user is actively looking at the app
-			checkForUnacknowledgedBadge();
-		};
-
-		// Mouse move handler with heavy debounce - only triggers once per 30 seconds
-		let lastMouseCheck = 0;
-		const handleMouseMove = () => {
-			const now = Date.now();
-			if (now - lastMouseCheck > 30000) {
-				// 30 second debounce
-				lastMouseCheck = now;
-				checkForUnacknowledgedBadge();
-			}
-		};
-
-		document.addEventListener('visibilitychange', handleVisibilityChange);
-		window.addEventListener('focus', handleWindowFocus);
-		document.addEventListener('mousemove', handleMouseMove, { passive: true });
-
-		return () => {
-			document.removeEventListener('visibilitychange', handleVisibilityChange);
-			window.removeEventListener('focus', handleWindowFocus);
-			document.removeEventListener('mousemove', handleMouseMove);
-		};
-	}, [settingsLoaded, sessionsLoaded]);
-
-	// Check for unacknowledged keyboard mastery levels on startup
-	useEffect(() => {
-		if (settingsLoaded && sessionsLoaded) {
-			const unacknowledgedLevel = useSettingsStore
-				.getState()
-				.getUnacknowledgedKeyboardMasteryLevel();
-			if (unacknowledgedLevel !== null) {
-				// Show the keyboard mastery level-up celebration after a short delay
-				setTimeout(() => {
-					getModalActions().setPendingKeyboardMasteryLevel(unacknowledgedLevel);
-				}, 1200); // Slightly longer delay than badge to avoid overlap
-			}
-		}
-		// getUnacknowledgedKeyboardMasteryLevel intentionally omitted -
-		// this effect runs once on startup to check for unacknowledged levels, not on function changes
-	}, [settingsLoaded, sessionsLoaded]);
-
 	// ====================================================================
 	// Git Diff Opener (Tier 3C)
 	// ====================================================================
@@ -814,41 +572,6 @@ export function useModalHandlers(
 	}, [activeSession]);
 
 	// ====================================================================
-	// Director's Notes Session Navigation (Tier 3C)
-	// ====================================================================
-
-	const pendingResumeRef = useRef<{ agentSessionId: string; targetSessionId: string } | null>(null);
-
-	const handleDirectorNotesResumeSession = useCallback(
-		(sourceSessionId: string, agentSessionId: string) => {
-			// Close the Director's Notes modal
-			getModalActions().setDirectorNotesOpen(false);
-
-			// If already on the right agent, resume directly
-			if (activeSession?.id === sourceSessionId) {
-				handleResumeSessionRef?.current?.(agentSessionId);
-				return;
-			}
-
-			// Switch to the target agent and defer resume until activeSession updates
-			pendingResumeRef.current = { agentSessionId, targetSessionId: sourceSessionId };
-			useSessionStore.getState().setActiveSessionId(sourceSessionId);
-		},
-		[activeSession?.id, handleResumeSessionRef]
-	);
-
-	// Effect: process pending resume after agent switch completes
-	useEffect(() => {
-		if (
-			pendingResumeRef.current &&
-			activeSession?.id === pendingResumeRef.current.targetSessionId
-		) {
-			const { agentSessionId } = pendingResumeRef.current;
-			pendingResumeRef.current = null;
-			handleResumeSessionRef?.current?.(agentSessionId);
-		}
-	}, [activeSession?.id, handleResumeSessionRef]);
-
 	// ====================================================================
 	// Return
 	// ====================================================================
@@ -863,8 +586,6 @@ export function useModalHandlers(
 		handleCloseGitDiff,
 		handleCloseGitLog,
 		handleCloseSettings,
-		handleCloseDebugPackage,
-		handleCloseShortcutsHelp,
 		handleCloseAboutModal,
 		handleCloseUpdateCheckModal,
 		handleCloseProcessMonitor,
@@ -882,19 +603,6 @@ export function useModalHandlers(
 		handleConfirmQuit,
 		handleCancelQuit,
 
-		// Celebration handlers
-		onKeyboardMasteryLevelUp,
-		handleKeyboardMasteryCelebrationClose,
-		handleStandingOvationClose,
-		handleFirstRunCelebrationClose,
-
-		// Leaderboard handlers
-		handleOpenLeaderboardRegistration,
-		handleOpenLeaderboardRegistrationFromAbout,
-		handleCloseLeaderboardRegistration,
-		handleSaveLeaderboardRegistration,
-		handleLeaderboardOptOut,
-
 		// Agent error handlers
 		handleCloseAgentErrorModal,
 		handleShowAgentErrorModal,
@@ -911,8 +619,6 @@ export function useModalHandlers(
 		handleOpenFuzzySearch,
 		handleOpenCreatePR,
 		handleOpenAboutModal,
-		handleOpenBatchRunner,
-		handleOpenMarketplace,
 
 		// Session list openers
 		handleEditAgent,
@@ -928,8 +634,6 @@ export function useModalHandlers(
 		handleDeleteLightboxImage,
 
 		// Utility close handlers
-		handleCloseAutoRunSetup,
-		handleCloseBatchRunner,
 		handleCloseTabSwitcher,
 		handleCloseFileSearch,
 		handleClosePromptComposer,
@@ -952,8 +656,5 @@ export function useModalHandlers(
 
 		// Git diff opener (Tier 3C)
 		handleViewGitDiff,
-
-		// Director's Notes session navigation (Tier 3C)
-		handleDirectorNotesResumeSession,
 	};
 }

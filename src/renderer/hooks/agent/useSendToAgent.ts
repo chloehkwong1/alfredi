@@ -23,7 +23,7 @@
 import { useCallback, useRef } from 'react';
 import type { Session, AITab, LogEntry, ToolType } from '../../types';
 import type { MergeResult, GroomingProgress, MergeRequest } from '../../types/contextMerge';
-import type { SendToAgentOptions } from '../../components/SendToAgentModal';
+import type { SendToAgentOptions } from '../../types';
 import type { TransferError } from '../../components/TransferErrorModal';
 import {
 	ContextGroomingService,

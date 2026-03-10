@@ -11,21 +11,20 @@ import {
 	GitBranch,
 	Menu,
 	Bookmark,
-	Trophy,
 	Trash2,
 } from 'lucide-react';
 import type { Session, Group, Theme } from '../../types';
-import { getBadgeForTime } from '../../constants/conductorBadges';
+
 import { SessionItem } from '../SessionItem';
-import { GroupChatList } from '../GroupChatList';
 import { useLiveOverlay, useResizablePanel } from '../../hooks';
 import { useGitFileStatus } from '../../contexts/GitStatusContext';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useBatchStore, selectActiveBatchSessionIds } from '../../stores/batchStore';
+// batchStore removed (Auto Run stripped)
+const useBatchStore = (selector: any) => selector({ activeBatchSessionIds: [] });
+const selectActiveBatchSessionIds = (s: any) => s.activeBatchSessionIds ?? [];
 import { useShallow } from 'zustand/react/shallow';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { getModalActions } from '../../stores/modalStore';
 import { SessionContextMenu } from './SessionContextMenu';
 import { HamburgerMenuContent } from './HamburgerMenuContent';
@@ -89,14 +88,6 @@ interface SessionListProps {
 
 	// Tour props
 	startTour?: () => void;
-
-	// Group Chat handlers
-	onOpenGroupChat?: (id: string) => void;
-	onNewGroupChat?: () => void;
-	onEditGroupChat?: (id: string) => void;
-	onRenameGroupChat?: (id: string) => void;
-	onDeleteGroupChat?: (id: string) => void;
-	onArchiveGroupChat?: (id: string, archived: boolean) => void;
 }
 
 function SessionListInner(props: SessionListProps) {
@@ -111,7 +102,6 @@ function SessionListInner(props: SessionListProps) {
 	const editingSessionId = useUIStore((s) => s.editingSessionId);
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
-	const groupChatsExpanded = useUIStore((s) => s.groupChatsExpanded);
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const leftSidebarWidthState = useSettingsStore((s) => s.leftSidebarWidth);
 	const webInterfaceUseCustomPort = useSettingsStore((s) => s.webInterfaceUseCustomPort);
@@ -125,27 +115,12 @@ function SessionListInner(props: SessionListProps) {
 		(s) => s.contextManagementSettings.contextWarningRedThreshold
 	);
 	const activeBatchSessionIds = useBatchStore(useShallow(selectActiveBatchSessionIds));
-	const groupChats = useGroupChatStore((s) => s.groupChats);
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
-	const groupChatState = useGroupChatStore((s) => s.groupChatState);
-	const participantStates = useGroupChatStore((s) => s.participantStates);
-	const groupChatStates = useGroupChatStore((s) => s.groupChatStates);
-	const allGroupChatParticipantStates = useGroupChatStore((s) => s.allGroupChatParticipantStates);
 
 	// Stable store actions
 	const setActiveFocus = useUIStore.getState().setActiveFocus;
 	const setLeftSidebarOpen = useUIStore.getState().setLeftSidebarOpen;
 	const setBookmarksCollapsed = useUIStore.getState().setBookmarksCollapsed;
-	const setGroupChatsExpanded = useUIStore.getState().setGroupChatsExpanded;
-	const setActiveSessionIdRaw = useSessionStore.getState().setActiveSessionId;
-	const setActiveGroupChatId = useGroupChatStore.getState().setActiveGroupChatId;
-	const setActiveSessionId = useCallback(
-		(id: string) => {
-			setActiveGroupChatId(null);
-			setActiveSessionIdRaw(id);
-		},
-		[setActiveSessionIdRaw, setActiveGroupChatId]
-	);
+	const setActiveSessionId = useSessionStore.getState().setActiveSessionId;
 	const setSessions = useSessionStore.getState().setSessions;
 	const setGroups = useSessionStore.getState().setGroups;
 	const setWebInterfaceUseCustomPort = useSettingsStore.getState().setWebInterfaceUseCustomPort;
@@ -196,12 +171,6 @@ function SessionListInner(props: SessionListProps) {
 		openWizard,
 		startTour,
 		sidebarContainerRef,
-		onOpenGroupChat,
-		onNewGroupChat,
-		onEditGroupChat,
-		onRenameGroupChat,
-		onDeleteGroupChat,
-		onArchiveGroupChat,
 	} = props;
 
 	// Derive whether any session is busy or in auto-run (for wand sparkle animation)
@@ -453,7 +422,7 @@ function SessionListInner(props: SessionListProps) {
 					session={session}
 					variant={effectiveVariant}
 					theme={theme}
-					isActive={activeSessionId === session.id && !activeGroupChatId}
+					isActive={activeSessionId === session.id}
 					isKeyboardSelected={isKeyboardSelected}
 					isDragging={draggingSessionId === session.id}
 					isEditing={editingSessionId === `${options.keyPrefix}-${session.id}`}
@@ -517,7 +486,7 @@ function SessionListInner(props: SessionListProps) {
 										session={child}
 										variant="worktree"
 										theme={theme}
-										isActive={activeSessionId === child.id && !activeGroupChatId}
+										isActive={activeSessionId === child.id}
 										isKeyboardSelected={isChildKeyboardSelected}
 										isDragging={draggingSessionId === child.id}
 										isEditing={editingSessionId === `worktree-${session.id}-${child.id}`}
@@ -594,7 +563,7 @@ function SessionListInner(props: SessionListProps) {
 		<div
 			ref={sidebarContainerRef}
 			tabIndex={0}
-			className={`border-r flex flex-col shrink-0 ${sidebarTransitionClass} outline-none relative z-20 ${activeFocus === 'sidebar' && !activeGroupChatId ? 'ring-1 ring-inset' : ''}`}
+			className={`border-r flex flex-col shrink-0 ${sidebarTransitionClass} outline-none relative z-20 ${activeFocus === 'sidebar' ? 'ring-1 ring-inset' : ''}`}
 			style={
 				{
 					width: leftSidebarOpen ? `${leftSidebarWidthState}px` : '64px',
@@ -643,22 +612,8 @@ function SessionListInner(props: SessionListProps) {
 								className="font-bold tracking-widest text-lg"
 								style={{ color: theme.colors.textMain }}
 							>
-								MAESTRO
+								ALFREDI
 							</h1>
-							{/* Badge Level Indicator */}
-							{autoRunStats && autoRunStats.currentBadgeLevel > 0 && (
-								<button
-									onClick={() => setAboutModalOpen(true)}
-									className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors hover:bg-white/10"
-									title={`${getBadgeForTime(autoRunStats.cumulativeTimeMs)?.name || 'Apprentice'} - Click to view achievements`}
-									style={{
-										color: autoRunStats.currentBadgeLevel >= 8 ? '#FFD700' : theme.colors.accent,
-									}}
-								>
-									<Trophy className="w-3 h-3" />
-									<span>{autoRunStats.currentBadgeLevel}</span>
-								</button>
-							)}
 							{/* Global LIVE Toggle */}
 							<div className="ml-2 relative z-10" ref={liveOverlayRef} data-tour="remote-control">
 								<button
@@ -1130,34 +1085,8 @@ function SessionListInner(props: SessionListProps) {
 						</div>
 					) : null}
 
-					{/* Flexible spacer to push group chats to bottom */}
+					{/* Flexible spacer */}
 					<div className="flex-grow min-h-4" />
-
-					{/* GROUP CHATS SECTION - Only show when at least 2 AI agents exist */}
-					{onNewGroupChat &&
-						onOpenGroupChat &&
-						onEditGroupChat &&
-						onRenameGroupChat &&
-						onDeleteGroupChat &&
-						sessions.filter((s) => s.toolType !== 'terminal').length >= 2 && (
-							<GroupChatList
-								theme={theme}
-								groupChats={groupChats}
-								activeGroupChatId={activeGroupChatId}
-								onOpenGroupChat={onOpenGroupChat}
-								onNewGroupChat={onNewGroupChat}
-								onEditGroupChat={onEditGroupChat}
-								onRenameGroupChat={onRenameGroupChat}
-								onDeleteGroupChat={onDeleteGroupChat}
-								onArchiveGroupChat={onArchiveGroupChat}
-								isExpanded={groupChatsExpanded}
-								onExpandedChange={setGroupChatsExpanded}
-								groupChatState={groupChatState}
-								participantStates={participantStates}
-								groupChatStates={groupChatStates}
-								allGroupChatParticipantStates={allGroupChatParticipantStates}
-							/>
-						)}
 				</div>
 			) : (
 				/* SIDEBAR CONTENT: SKINNY MODE */

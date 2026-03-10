@@ -8,7 +8,7 @@
  * - Update handlers without re-registration (performance optimization)
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Layer, LayerInput } from '../../types/layer';
 
 /**
@@ -286,15 +286,28 @@ export function useLayerStack(): LayerStackAPI {
 		}
 	}, [layers]);
 
-	return {
-		registerLayer,
-		unregisterLayer,
-		updateLayerHandler,
-		getTopLayer,
-		closeTopLayer,
-		getLayers,
-		hasOpenLayers,
-		hasOpenModal,
-		layerCount: layers.length,
-	};
+	return useMemo(
+		() => ({
+			registerLayer,
+			unregisterLayer,
+			updateLayerHandler,
+			getTopLayer,
+			closeTopLayer,
+			getLayers,
+			hasOpenLayers,
+			hasOpenModal,
+			layerCount: layers.length,
+		}),
+		[
+			registerLayer,
+			unregisterLayer,
+			updateLayerHandler,
+			getTopLayer,
+			closeTopLayer,
+			getLayers,
+			hasOpenLayers,
+			hasOpenModal,
+			layers.length,
+		]
+	);
 }

@@ -9,7 +9,7 @@
  *   - Owning tab/session switching effects for input persistence
  *   - Providing paste, drop, blur, and replay handlers
  *
- * Reads from: sessionStore, settingsStore, groupChatStore, uiStore,
+ * Reads from: sessionStore, settingsStore, uiStore,
  *             fileExplorerStore, InputContext
  */
 
@@ -17,7 +17,6 @@ import { useState, useCallback, useEffect, useRef, useMemo, useDeferredValue } f
 import type { Session, BatchRunState, QueuedItem, CustomAICommand } from '../../types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useFileExplorerStore } from '../../stores/fileExplorerStore';
 import { useInputContext } from '../../contexts/InputContext';
@@ -48,9 +47,9 @@ export interface UseInputHandlersDeps {
 
 	// From useBatchHandlers
 	/** Get batch state for a specific session */
-	getBatchState: (sessionId: string) => BatchRunState;
+	getBatchState: (sessionId: string) => BatchRunState | null;
 	/** Active batch run state (prioritizes running batch session) */
-	activeBatchRunState: BatchRunState;
+	activeBatchRunState: BatchRunState | null;
 
 	// From other hooks/App.tsx
 	/** Ref to processQueuedItem function */
@@ -157,11 +156,6 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 	const activeSession = useSessionStore(selectActiveSession);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const setSessions = useMemo(() => useSessionStore.getState().setSessions, []);
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
-	const setGroupChatStagedImages = useMemo(
-		() => useGroupChatStore.getState().setGroupChatStagedImages,
-		[]
-	);
 	const activeRightTab = useUIStore(selectActiveRightTab);
 	const setActiveRightTab = useMemo(() => useUIStore.getState().setActiveRightTab, []);
 	const setSuccessFlashNotification = useMemo(
@@ -483,14 +477,13 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 
 	const handlePaste = useCallback(
 		(e: React.ClipboardEvent) => {
-			const isGroupChatActive = !!activeGroupChatId;
 			const isDirectAIMode = activeSession && activeSession.inputMode === 'ai';
 
 			const items = e.clipboardData.items;
 			const hasImage = Array.from(items).some((item) => item.type.startsWith('image/'));
 
 			// Handle text paste with whitespace trimming
-			if (!hasImage && !isGroupChatActive) {
+			if (!hasImage) {
 				const text = e.clipboardData.getData('text/plain');
 				if (text) {
 					const trimmedText = text.trim();
@@ -510,8 +503,8 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 				return;
 			}
 
-			// Image handling requires AI mode or group chat
-			if (!isGroupChatActive && !isDirectAIMode) return;
+			// Image handling requires AI mode
+			if (!isDirectAIMode) return;
 
 			for (let i = 0; i < items.length; i++) {
 				if (items[i].type.indexOf('image') !== -1) {
@@ -522,64 +515,6 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 						reader.onload = (event) => {
 							if (event.target?.result) {
 								const imageData = event.target!.result as string;
-								if (isGroupChatActive) {
-									setGroupChatStagedImages((prev: string[]) => {
-										if (prev.includes(imageData)) {
-											setSuccessFlashNotification('Duplicate image ignored');
-											setTimeout(() => setSuccessFlashNotification(null), 2000);
-											return prev;
-										}
-										return [...prev, imageData];
-									});
-								} else {
-									setStagedImages((prev) => {
-										if (prev.includes(imageData)) {
-											setSuccessFlashNotification('Duplicate image ignored');
-											setTimeout(() => setSuccessFlashNotification(null), 2000);
-											return prev;
-										}
-										return [...prev, imageData];
-									});
-								}
-							}
-						};
-						reader.readAsDataURL(blob);
-					}
-				}
-			}
-		},
-		[activeGroupChatId, activeSession, setInputValue, setStagedImages]
-	);
-
-	const handleDrop = useCallback(
-		(e: React.DragEvent) => {
-			e.preventDefault();
-			dragCounterRef.current = 0;
-			setIsDraggingImage(false);
-
-			const isGroupChatActive = !!activeGroupChatId;
-			const isDirectAIMode = activeSession && activeSession.inputMode === 'ai';
-
-			if (!isGroupChatActive && !isDirectAIMode) return;
-
-			const files = e.dataTransfer.files;
-
-			for (let i = 0; i < files.length; i++) {
-				if (files[i].type.startsWith('image/')) {
-					const reader = new FileReader();
-					reader.onload = (event) => {
-						if (event.target?.result) {
-							const imageData = event.target!.result as string;
-							if (isGroupChatActive) {
-								setGroupChatStagedImages((prev: string[]) => {
-									if (prev.includes(imageData)) {
-										setSuccessFlashNotification('Duplicate image ignored');
-										setTimeout(() => setSuccessFlashNotification(null), 2000);
-										return prev;
-									}
-									return [...prev, imageData];
-								});
-							} else {
 								setStagedImages((prev) => {
 									if (prev.includes(imageData)) {
 										setSuccessFlashNotification('Duplicate image ignored');
@@ -589,13 +524,48 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 									return [...prev, imageData];
 								});
 							}
+						};
+						reader.readAsDataURL(blob);
+					}
+				}
+			}
+		},
+		[activeSession, setInputValue, setStagedImages]
+	);
+
+	const handleDrop = useCallback(
+		(e: React.DragEvent) => {
+			e.preventDefault();
+			dragCounterRef.current = 0;
+			setIsDraggingImage(false);
+
+			const isDirectAIMode = activeSession && activeSession.inputMode === 'ai';
+
+			if (!isDirectAIMode) return;
+
+			const files = e.dataTransfer.files;
+
+			for (let i = 0; i < files.length; i++) {
+				if (files[i].type.startsWith('image/')) {
+					const reader = new FileReader();
+					reader.onload = (event) => {
+						if (event.target?.result) {
+							const imageData = event.target!.result as string;
+							setStagedImages((prev) => {
+								if (prev.includes(imageData)) {
+									setSuccessFlashNotification('Duplicate image ignored');
+									setTimeout(() => setSuccessFlashNotification(null), 2000);
+									return prev;
+								}
+								return [...prev, imageData];
+							});
 						}
 					};
 					reader.readAsDataURL(files[i]);
 				}
 			}
 		},
-		[activeGroupChatId, activeSession, setStagedImages]
+		[activeSession, setStagedImages]
 	);
 
 	// ====================================================================

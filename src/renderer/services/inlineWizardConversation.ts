@@ -10,7 +10,7 @@
  */
 
 import type { ToolType, ProcessConfig } from '../types';
-import type { InlineWizardMessage } from '../hooks/batch/useInlineWizard';
+import type { InlineWizardMessage } from '../contexts/InlineWizardContext';
 import type { ExistingDocument as BaseExistingDocument } from '../utils/existingDocsDetector';
 import { logger } from '../utils/logger';
 import { getStdinFlags } from '../utils/spawnHelpers';
@@ -87,10 +87,8 @@ export interface InlineWizardConversationConfig {
 	projectName: string;
 	/** Goal for iterate mode (what the user wants to add/change) */
 	goal?: string;
-	/** Existing Auto Run documents (for iterate mode context) */
+	/** Existing documents (for iterate mode context) */
 	existingDocs?: ExistingDocument[];
-	/** Auto Run folder path */
-	autoRunFolderPath?: string;
 	/** SSH remote configuration (for remote execution) */
 	sessionSshRemoteConfig?: {
 		enabled: boolean;
@@ -196,7 +194,7 @@ function generateWizardSessionId(): string {
  * @returns The complete system prompt for the agent
  */
 export function generateInlineWizardPrompt(config: InlineWizardConversationConfig): string {
-	const { mode, projectName, directoryPath, goal, existingDocs, autoRunFolderPath } = config;
+	const { mode, projectName, directoryPath, goal, existingDocs } = config;
 
 	// Select the base prompt based on mode
 	let basePrompt: string;
@@ -242,9 +240,7 @@ export function generateInlineWizardPrompt(config: InlineWizardConversationConfi
 			toolType: config.agentType,
 			cwd: directoryPath,
 			fullPath: directoryPath,
-			autoRunFolderPath: autoRunFolderPath,
 		},
-		autoRunFolder: autoRunFolderPath,
 		conductorProfile: config.conductorProfile,
 		historyFilePath: config.historyFilePath,
 	};

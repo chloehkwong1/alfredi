@@ -2,11 +2,10 @@
  * Tests for usePromptComposerHandlers hook (extracted from App.tsx)
  *
  * Tests cover:
- * - handlePromptComposerSubmit: sets inputValue in AI mode, sets draft in group chat mode
- * - handlePromptComposerSend: calls processInput via setTimeout in AI mode, calls
- *   handleSendGroupChatMessage with images/readOnly and clears staged images + draft in group chat
+ * - handlePromptComposerSubmit: sets inputValue
+ * - handlePromptComposerSend: calls processInput via setTimeout
  * - handlePromptToggleTabSaveToHistory: toggles saveToHistory on active tab
- * - handlePromptToggleTabReadOnlyMode: toggles readOnlyMode on active tab (session) or group chat
+ * - handlePromptToggleTabReadOnlyMode: toggles readOnlyMode on active tab
  * - handlePromptToggleTabShowThinking: cycles thinking mode off -> on -> sticky -> off, clears
  *   thinking logs when turning off
  * - handlePromptToggleEnterToSend: toggles enterToSendAI setting
@@ -35,7 +34,6 @@ import {
 	type UsePromptComposerHandlersDeps,
 } from '../../../renderer/hooks/modal/usePromptComposerHandlers';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 
 // ============================================================================
@@ -116,7 +114,6 @@ function createDeps(
 	overrides: Partial<UsePromptComposerHandlersDeps> = {}
 ): UsePromptComposerHandlersDeps {
 	return {
-		handleSendGroupChatMessage: vi.fn(),
 		processInput: vi.fn(),
 		setInputValue: vi.fn(),
 		...overrides,
@@ -127,23 +124,6 @@ function createDeps(
 // Setup / Teardown
 // ============================================================================
 
-const initialGroupChatState = {
-	groupChats: [],
-	activeGroupChatId: null,
-	groupChatMessages: [],
-	groupChatState: 'idle' as const,
-	participantStates: new Map(),
-	moderatorUsage: null,
-	groupChatStates: new Map(),
-	allGroupChatParticipantStates: new Map(),
-	groupChatExecutionQueue: [],
-	groupChatReadOnlyMode: false,
-	groupChatRightTab: 'participants' as const,
-	groupChatParticipantColors: {},
-	groupChatStagedImages: [],
-	groupChatError: null,
-};
-
 beforeEach(() => {
 	vi.clearAllMocks();
 
@@ -152,8 +132,6 @@ beforeEach(() => {
 		groups: [],
 		activeSessionId: '',
 	});
-
-	useGroupChatStore.setState(initialGroupChatState);
 
 	useSettingsStore.setState({
 		enterToSendAI: true,
@@ -190,7 +168,7 @@ describe('usePromptComposerHandlers', () => {
 	// handlePromptComposerSubmit
 	// ========================================================================
 	describe('handlePromptComposerSubmit', () => {
-		it('calls setInputValue when not in group chat mode', () => {
+		it('calls setInputValue with the provided text', () => {
 			const deps = createDeps();
 			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
@@ -202,7 +180,7 @@ describe('usePromptComposerHandlers', () => {
 			expect(deps.setInputValue).toHaveBeenCalledTimes(1);
 		});
 
-		it('does not call processInput or handleSendGroupChatMessage on submit in AI mode', () => {
+		it('does not call processInput on submit', () => {
 			const deps = createDeps();
 			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
@@ -211,47 +189,6 @@ describe('usePromptComposerHandlers', () => {
 			});
 
 			expect(deps.processInput).not.toHaveBeenCalled();
-			expect(deps.handleSendGroupChatMessage).not.toHaveBeenCalled();
-		});
-
-		it('sets draft message on active group chat when activeGroupChatId is set', () => {
-			useGroupChatStore.setState({
-				activeGroupChatId: 'gc-1',
-				groupChats: [{ id: 'gc-1', name: 'Chat 1', draftMessage: '' } as any],
-			});
-
-			const deps = createDeps();
-			const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-			act(() => {
-				result.current.handlePromptComposerSubmit('group draft');
-			});
-
-			const chats = useGroupChatStore.getState().groupChats;
-			const chat = chats.find((c: any) => c.id === 'gc-1');
-			expect(chat?.draftMessage).toBe('group draft');
-			expect(deps.setInputValue).not.toHaveBeenCalled();
-		});
-
-		it('does not modify other group chats when setting draft', () => {
-			useGroupChatStore.setState({
-				activeGroupChatId: 'gc-1',
-				groupChats: [
-					{ id: 'gc-1', name: 'Chat 1', draftMessage: '' } as any,
-					{ id: 'gc-2', name: 'Chat 2', draftMessage: 'preserved' } as any,
-				],
-			});
-
-			const deps = createDeps();
-			const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-			act(() => {
-				result.current.handlePromptComposerSubmit('new draft');
-			});
-
-			const chats = useGroupChatStore.getState().groupChats;
-			const otherChat = chats.find((c: any) => c.id === 'gc-2');
-			expect(otherChat?.draftMessage).toBe('preserved');
 		});
 	});
 
@@ -259,245 +196,46 @@ describe('usePromptComposerHandlers', () => {
 	// handlePromptComposerSend
 	// ========================================================================
 	describe('handlePromptComposerSend', () => {
-		describe('AI mode (no active group chat)', () => {
-			it('calls setInputValue then processInput via setTimeout', async () => {
-				vi.useFakeTimers();
+		it('calls setInputValue then processInput via setTimeout', async () => {
+			vi.useFakeTimers();
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
-				act(() => {
-					result.current.handlePromptComposerSend('send this message');
-				});
-
-				// setInputValue is called synchronously
-				expect(deps.setInputValue).toHaveBeenCalledWith('send this message');
-				// processInput is scheduled via setTimeout — not called yet
-				expect(deps.processInput).not.toHaveBeenCalled();
-
-				// Advance timers to flush the setTimeout
-				act(() => {
-					vi.advanceTimersByTime(0);
-				});
-
-				expect(deps.processInput).toHaveBeenCalledWith('send this message');
-				vi.useRealTimers();
+			act(() => {
+				result.current.handlePromptComposerSend('send this message');
 			});
 
-			it('passes the message value to processInput', async () => {
-				vi.useFakeTimers();
+			// setInputValue is called synchronously
+			expect(deps.setInputValue).toHaveBeenCalledWith('send this message');
+			// processInput is scheduled via setTimeout — not called yet
+			expect(deps.processInput).not.toHaveBeenCalled();
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('specific value');
-				});
-
-				act(() => {
-					vi.advanceTimersByTime(0);
-				});
-
-				expect(deps.processInput).toHaveBeenCalledWith('specific value');
-				vi.useRealTimers();
+			// Advance timers to flush the setTimeout
+			act(() => {
+				vi.advanceTimersByTime(0);
 			});
 
-			it('does not call handleSendGroupChatMessage in AI mode', () => {
-				vi.useFakeTimers();
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('ai message');
-				});
-
-				act(() => {
-					vi.advanceTimersByTime(0);
-				});
-
-				expect(deps.handleSendGroupChatMessage).not.toHaveBeenCalled();
-				vi.useRealTimers();
-			});
+			expect(deps.processInput).toHaveBeenCalledWith('send this message');
+			vi.useRealTimers();
 		});
 
-		describe('group chat mode (activeGroupChatId is set)', () => {
-			it('calls handleSendGroupChatMessage with the message', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-send',
-					groupChats: [{ id: 'gc-send', name: 'Chat', draftMessage: 'hello' } as any],
-					groupChatStagedImages: [],
-					groupChatReadOnlyMode: false,
-				});
+		it('passes the message value to processInput', async () => {
+			vi.useFakeTimers();
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
-				act(() => {
-					result.current.handlePromptComposerSend('message to send');
-				});
-
-				expect(deps.handleSendGroupChatMessage).toHaveBeenCalledWith(
-					'message to send',
-					undefined,
-					false
-				);
+			act(() => {
+				result.current.handlePromptComposerSend('specific value');
 			});
 
-			it('includes staged images when present', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-img',
-					groupChats: [{ id: 'gc-img', name: 'Chat', draftMessage: '' } as any],
-					groupChatStagedImages: ['data:image/png;base64,abc', 'data:image/png;base64,def'],
-					groupChatReadOnlyMode: false,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('message with images');
-				});
-
-				expect(deps.handleSendGroupChatMessage).toHaveBeenCalledWith(
-					'message with images',
-					['data:image/png;base64,abc', 'data:image/png;base64,def'],
-					false
-				);
+			act(() => {
+				vi.advanceTimersByTime(0);
 			});
 
-			it('passes undefined for images when staged images array is empty', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-no-img',
-					groupChats: [{ id: 'gc-no-img', name: 'Chat', draftMessage: '' } as any],
-					groupChatStagedImages: [],
-					groupChatReadOnlyMode: false,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('message no images');
-				});
-
-				expect(deps.handleSendGroupChatMessage).toHaveBeenCalledWith(
-					'message no images',
-					undefined,
-					false
-				);
-			});
-
-			it('passes readOnlyMode flag to handleSendGroupChatMessage', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-ro',
-					groupChats: [{ id: 'gc-ro', name: 'Chat', draftMessage: '' } as any],
-					groupChatStagedImages: [],
-					groupChatReadOnlyMode: true,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('read-only message');
-				});
-
-				expect(deps.handleSendGroupChatMessage).toHaveBeenCalledWith(
-					'read-only message',
-					undefined,
-					true
-				);
-			});
-
-			it('clears staged images after sending', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-clear-img',
-					groupChats: [{ id: 'gc-clear-img', name: 'Chat', draftMessage: '' } as any],
-					groupChatStagedImages: ['data:image/png;base64,img1'],
-					groupChatReadOnlyMode: false,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('send and clear');
-				});
-
-				expect(useGroupChatStore.getState().groupChatStagedImages).toEqual([]);
-			});
-
-			it('clears the draft message on the active chat after sending', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-draft-clear',
-					groupChats: [
-						{ id: 'gc-draft-clear', name: 'Chat', draftMessage: 'pending draft' } as any,
-					],
-					groupChatStagedImages: [],
-					groupChatReadOnlyMode: false,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('send it');
-				});
-
-				const chats = useGroupChatStore.getState().groupChats;
-				const chat = chats.find((c: any) => c.id === 'gc-draft-clear');
-				expect(chat?.draftMessage).toBe('');
-			});
-
-			it('does not affect drafts of other chats after sending', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-active',
-					groupChats: [
-						{ id: 'gc-active', name: 'Active', draftMessage: 'will be cleared' } as any,
-						{ id: 'gc-other', name: 'Other', draftMessage: 'untouched' } as any,
-					],
-					groupChatStagedImages: [],
-					groupChatReadOnlyMode: false,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('send only to active');
-				});
-
-				const chats = useGroupChatStore.getState().groupChats;
-				const otherChat = chats.find((c: any) => c.id === 'gc-other');
-				expect(otherChat?.draftMessage).toBe('untouched');
-			});
-
-			it('does not call setInputValue or processInput in group chat mode', () => {
-				vi.useFakeTimers();
-
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-no-ai',
-					groupChats: [{ id: 'gc-no-ai', name: 'Chat', draftMessage: '' } as any],
-					groupChatStagedImages: [],
-					groupChatReadOnlyMode: false,
-				});
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptComposerSend('group only');
-				});
-
-				act(() => {
-					vi.advanceTimersByTime(0);
-				});
-
-				expect(deps.setInputValue).not.toHaveBeenCalled();
-				expect(deps.processInput).not.toHaveBeenCalled();
-				vi.useRealTimers();
-			});
+			expect(deps.processInput).toHaveBeenCalledWith('specific value');
+			vi.useRealTimers();
 		});
 	});
 
@@ -642,164 +380,103 @@ describe('usePromptComposerHandlers', () => {
 	// handlePromptToggleTabReadOnlyMode
 	// ========================================================================
 	describe('handlePromptToggleTabReadOnlyMode', () => {
-		describe('in session context (no active group chat)', () => {
-			it('toggles readOnlyMode from false to true on the active tab', () => {
-				const tab = createTab({ id: 'tab-ro', readOnlyMode: false });
-				const session = createSession({
-					id: 'sess-ro',
-					aiTabs: [tab],
-					activeTabId: 'tab-ro',
-				});
-				useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro' });
+		it('toggles readOnlyMode from false to true on the active tab', () => {
+			const tab = createTab({ id: 'tab-ro', readOnlyMode: false });
+			const session = createSession({
+				id: 'sess-ro',
+				aiTabs: [tab],
+				activeTabId: 'tab-ro',
+			});
+			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro' });
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
-
-				const updatedTab = useSessionStore
-					.getState()
-					.sessions[0].aiTabs.find((t: any) => t.id === 'tab-ro');
-				expect(updatedTab?.readOnlyMode).toBe(true);
+			act(() => {
+				result.current.handlePromptToggleTabReadOnlyMode();
 			});
 
-			it('toggles readOnlyMode from true to false on the active tab', () => {
-				const tab = createTab({ id: 'tab-ro-off', readOnlyMode: true });
-				const session = createSession({
-					id: 'sess-ro-off',
-					aiTabs: [tab],
-					activeTabId: 'tab-ro-off',
-				});
-				useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro-off' });
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
-
-				const updatedTab = useSessionStore
-					.getState()
-					.sessions[0].aiTabs.find((t: any) => t.id === 'tab-ro-off');
-				expect(updatedTab?.readOnlyMode).toBe(false);
-			});
-
-			it('only modifies the active tab in the session', () => {
-				const activeTab = createTab({ id: 'tab-ro-active', readOnlyMode: false });
-				const otherTab = createTab({ id: 'tab-ro-other', readOnlyMode: true });
-				const session = createSession({
-					id: 'sess-ro-multi',
-					aiTabs: [activeTab, otherTab],
-					activeTabId: 'tab-ro-active',
-					unifiedTabOrder: [
-						{ type: 'ai' as const, id: 'tab-ro-active' },
-						{ type: 'ai' as const, id: 'tab-ro-other' },
-					],
-				});
-				useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro-multi' });
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
-
-				const updatedTabs = useSessionStore.getState().sessions[0].aiTabs;
-				expect(updatedTabs.find((t: any) => t.id === 'tab-ro-active')?.readOnlyMode).toBe(true);
-				expect(updatedTabs.find((t: any) => t.id === 'tab-ro-other')?.readOnlyMode).toBe(true); // unchanged
-			});
-
-			it('is a no-op when there is no active session', () => {
-				useSessionStore.setState({ sessions: [], activeSessionId: '' });
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
-
-				expect(useSessionStore.getState().sessions).toHaveLength(0);
-			});
-
-			it('is a no-op when active session has no active tab', () => {
-				const session = createSession({
-					id: 'sess-ro-no-tab',
-					aiTabs: [],
-					activeTabId: 'nonexistent',
-					unifiedTabOrder: [],
-				});
-				useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro-no-tab' });
-
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
-
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
-			});
+			const updatedTab = useSessionStore
+				.getState()
+				.sessions[0].aiTabs.find((t: any) => t.id === 'tab-ro');
+			expect(updatedTab?.readOnlyMode).toBe(true);
 		});
 
-		describe('in group chat context (activeGroupChatId is set)', () => {
-			it('toggles groupChatReadOnlyMode from false to true', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-ro',
-					groupChatReadOnlyMode: false,
-				});
+		it('toggles readOnlyMode from true to false on the active tab', () => {
+			const tab = createTab({ id: 'tab-ro-off', readOnlyMode: true });
+			const session = createSession({
+				id: 'sess-ro-off',
+				aiTabs: [tab],
+				activeTabId: 'tab-ro-off',
+			});
+			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro-off' });
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
-
-				expect(useGroupChatStore.getState().groupChatReadOnlyMode).toBe(true);
+			act(() => {
+				result.current.handlePromptToggleTabReadOnlyMode();
 			});
 
-			it('toggles groupChatReadOnlyMode from true to false', () => {
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-ro-off',
-					groupChatReadOnlyMode: true,
-				});
+			const updatedTab = useSessionStore
+				.getState()
+				.sessions[0].aiTabs.find((t: any) => t.id === 'tab-ro-off');
+			expect(updatedTab?.readOnlyMode).toBe(false);
+		});
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
+		it('only modifies the active tab in the session', () => {
+			const activeTab = createTab({ id: 'tab-ro-active', readOnlyMode: false });
+			const otherTab = createTab({ id: 'tab-ro-other', readOnlyMode: true });
+			const session = createSession({
+				id: 'sess-ro-multi',
+				aiTabs: [activeTab, otherTab],
+				activeTabId: 'tab-ro-active',
+				unifiedTabOrder: [
+					{ type: 'ai' as const, id: 'tab-ro-active' },
+					{ type: 'ai' as const, id: 'tab-ro-other' },
+				],
+			});
+			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro-multi' });
 
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
-				expect(useGroupChatStore.getState().groupChatReadOnlyMode).toBe(false);
+			act(() => {
+				result.current.handlePromptToggleTabReadOnlyMode();
 			});
 
-			it('does not modify session tab readOnlyMode when in group chat mode', () => {
-				const tab = createTab({ id: 'tab-sess-ro', readOnlyMode: false });
-				const session = createSession({
-					id: 'sess-gc-ro',
-					aiTabs: [tab],
-					activeTabId: 'tab-sess-ro',
-				});
-				useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-gc-ro' });
-				useGroupChatStore.setState({
-					activeGroupChatId: 'gc-has-priority',
-					groupChatReadOnlyMode: false,
-				});
+			const updatedTabs = useSessionStore.getState().sessions[0].aiTabs;
+			expect(updatedTabs.find((t: any) => t.id === 'tab-ro-active')?.readOnlyMode).toBe(true);
+			expect(updatedTabs.find((t: any) => t.id === 'tab-ro-other')?.readOnlyMode).toBe(true); // unchanged
+		});
 
-				const deps = createDeps();
-				const { result } = renderHook(() => usePromptComposerHandlers(deps));
+		it('is a no-op when there is no active session', () => {
+			useSessionStore.setState({ sessions: [], activeSessionId: '' });
 
-				act(() => {
-					result.current.handlePromptToggleTabReadOnlyMode();
-				});
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
 
-				const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-				expect(updatedTab.readOnlyMode).toBe(false); // session tab unchanged
-				expect(useGroupChatStore.getState().groupChatReadOnlyMode).toBe(true); // group chat toggled
+			act(() => {
+				result.current.handlePromptToggleTabReadOnlyMode();
+			});
+
+			expect(useSessionStore.getState().sessions).toHaveLength(0);
+		});
+
+		it('is a no-op when active session has no active tab', () => {
+			const session = createSession({
+				id: 'sess-ro-no-tab',
+				aiTabs: [],
+				activeTabId: 'nonexistent',
+				unifiedTabOrder: [],
+			});
+			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-ro-no-tab' });
+
+			const deps = createDeps();
+			const { result } = renderHook(() => usePromptComposerHandlers(deps));
+
+			act(() => {
+				result.current.handlePromptToggleTabReadOnlyMode();
 			});
 		});
 	});

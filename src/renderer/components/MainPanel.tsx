@@ -283,7 +283,7 @@ interface MainPanelProps {
 	mergeTargetName?: string;
 	onCancelMerge?: () => void;
 
-	// Keyboard mastery tracking
+	// Shortcut tracking
 	onShortcutUsed?: (shortcutId: string) => void;
 
 	// Gist publishing

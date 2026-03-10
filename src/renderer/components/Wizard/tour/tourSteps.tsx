@@ -72,42 +72,17 @@ const tabSearchIconContent = (
  * All tour steps in order
  *
  * Tour sequence:
- * 1) Auto Run panel - explain what's running right now
- * 2) Auto Run document selector - show Auto Run documents
- * 3) Files tab - show file explorer
- * 4) History tab - explain auto vs manual entries
- * 5) Left panel hamburger menu - show menu options
- * 6) Remote control - LIVE/OFFLINE toggle, QR code, Cloudflare tunnel
- * 7) Left panel agent list - explain agents and groups
- * 8) Main terminal area + tabs - explain AI Terminal and tab usage
- * 9) Agent Sessions button - browse previous conversations
- * 10) Input area - explain messaging the AI
- * 11) Terminal mode - teach Cmd+J shortcut
- * 12) Keyboard shortcuts - mention Cmd+/ for all shortcuts, end tour
+ * 1) Files tab - show file explorer
+ * 2) Left panel hamburger menu - show menu options
+ * 3) Remote control - LIVE/OFFLINE toggle, QR code, Cloudflare tunnel
+ * 4) Left panel agent list - explain agents and groups
+ * 5) Main terminal area + tabs - explain AI Terminal and tab usage
+ * 6) Agent Sessions button - browse previous conversations
+ * 7) Input area - explain messaging the AI
+ * 8) Terminal mode - teach Cmd+J shortcut
+ * 9) Keyboard shortcuts - mention Cmd+/ for all shortcuts, end tour
  */
 export const tourSteps: TourStepConfig[] = [
-	{
-		id: 'autorun-panel',
-		title: 'Auto Run Panel',
-		description:
-			'This is the Auto Run panel where your Playbook is being executed right now. Each task from your Phase 1 document is being processed automatically by the AI agent. Watch as checkboxes get marked off! Press {{goToAutoRun}} to jump here anytime.',
-		descriptionGeneric:
-			'This is the Auto Run panel. Place markdown documents with task lists here to have the AI execute them automatically. Tasks are checked off as they complete. Press {{goToAutoRun}} to jump here anytime.',
-		selector: '[data-tour="autorun-tab"]',
-		position: 'left',
-		uiActions: [{ type: 'setRightTab', value: 'autorun' }, { type: 'openRightPanel' }],
-	},
-	{
-		id: 'autorun-documents',
-		title: 'Document Selector',
-		description:
-			'The document selector shows all the Auto Run documents we created together. After the first document completes, you can select the next one and continue building your project.',
-		descriptionGeneric:
-			'The document selector shows all documents in your Auto Run folder. Select different documents to view or run them. You can organize work into phases or any structure you prefer.',
-		selector: '[data-tour="autorun-document-selector"]',
-		position: 'left',
-		uiActions: [{ type: 'setRightTab', value: 'autorun' }, { type: 'openRightPanel' }],
-	},
 	{
 		id: 'files-tab',
 		title: 'File Explorer',
@@ -119,18 +94,6 @@ export const tourSteps: TourStepConfig[] = [
 		selector: '[data-tour="files-tab"]',
 		position: 'left',
 		uiActions: [{ type: 'setRightTab', value: 'files' }, { type: 'openRightPanel' }],
-	},
-	{
-		id: 'history-tab',
-		title: 'History & Tracking',
-		description:
-			'The History tab tracks all AI interactions in your session. Auto Run entries are tracked automatically, and separate from manual interactions. You can toggle history per-message using the "History" bubble (with the clock icon) in the input area. Configure the default value under Settings → General.\n\nSwitch between the list view and the details view to drill into any entry. From the details view you can also resume the session where that entry took place.\n\nHistory also serves as memory for all Maestro agents—they know how to locate and parse the history file, giving them context about prior work. Press {{goToHistory}} to jump here.',
-		descriptionGeneric:
-			'The History tab tracks all AI interactions in your session. Auto Run entries are tracked automatically, and separate from manual interactions. You can toggle history per-message using the "History" bubble (with the clock icon) in the input area. Configure the default value under Settings → General.\n\nSwitch between the list view and the details view to drill into any entry. From the details view you can also resume the session where that entry took place.\n\nHistory also serves as memory for all Maestro agents—they know how to locate and parse the history file, giving them context about prior work. Press {{goToHistory}} to jump here.',
-		wide: true,
-		selector: '[data-tour="history-tab"]',
-		position: 'left',
-		uiActions: [{ type: 'setRightTab', value: 'history' }, { type: 'openRightPanel' }],
 	},
 	{
 		id: 'hamburger-menu',
@@ -160,9 +123,9 @@ export const tourSteps: TourStepConfig[] = [
 		id: 'session-list',
 		title: 'Agents & Groups',
 		description:
-			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into groups, and with two or more agents you can start a group chat—even across different providers. Press {{focusSidebar}} to focus the agent list.',
+			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into groups for easy management. Press {{focusSidebar}} to focus the agent list.',
 		descriptionGeneric:
-			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into groups, and with two or more agents you can start a group chat—even across different providers. Press {{focusSidebar}} to focus the agent list.',
+			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into groups for easy management. Press {{focusSidebar}} to focus the agent list.',
 		wide: true,
 		selector: '[data-tour="session-list"]',
 		position: 'right',
@@ -197,7 +160,7 @@ export const tourSteps: TourStepConfig[] = [
 		id: 'input-area',
 		title: 'Input Area',
 		description:
-			'Type your messages here to communicate with the AI. During Auto Run, this area may be locked while tasks execute. You can queue messages to send after the current task completes. Press {{focusInput}} to quickly jump here.',
+			'Type your messages here to communicate with the AI. You can also use slash commands and @ mentions for files. Press {{focusInput}} to quickly jump here.',
 		descriptionGeneric:
 			'Type your messages here to communicate with the AI. You can also use slash commands and @ mentions for files. Press {{focusInput}} to quickly jump here.',
 		descriptionContent: inputAreaIconsContent,

@@ -16,8 +16,6 @@ export interface UseSessionNavigationDeps {
 	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Ref for tracking cycle position during session cycling */
 	cyclePositionRef: MutableRefObject<number>;
-	/** Navigate to a group chat (loads messages, starts moderator) */
-	onNavigateToGroupChat?: (id: string) => Promise<void>;
 }
 
 /**
@@ -54,24 +52,11 @@ export function useSessionNavigation(
 	sessions: Session[],
 	deps: UseSessionNavigationDeps
 ): UseSessionNavigationReturn {
-	const {
-		navigateBack,
-		navigateForward,
-		setActiveSessionId,
-		setSessions,
-		cyclePositionRef,
-		onNavigateToGroupChat,
-	} = deps;
+	const { navigateBack, navigateForward, setActiveSessionId, setSessions, cyclePositionRef } = deps;
 
 	// Shared logic for navigating to a history entry
 	const navigateToEntry = useCallback(
 		(entry: NavHistoryEntry) => {
-			// Group chat entry
-			if (entry.groupChatId) {
-				onNavigateToGroupChat?.(entry.groupChatId);
-				return;
-			}
-
 			// Session entry
 			if (!entry.sessionId) return;
 			const sessionExists = sessions.some((s) => s.id === entry.sessionId);
@@ -92,16 +77,16 @@ export function useSessionNavigation(
 				);
 			}
 		},
-		[sessions, setActiveSessionId, cyclePositionRef, setSessions, onNavigateToGroupChat]
+		[sessions, setActiveSessionId, cyclePositionRef, setSessions]
 	);
 
-	// Navigate back in history (through sessions, tabs, and group chats)
+	// Navigate back in history (through sessions and tabs)
 	const handleNavBack = useCallback(() => {
 		const entry = navigateBack();
 		if (entry) navigateToEntry(entry);
 	}, [navigateBack, navigateToEntry]);
 
-	// Navigate forward in history (through sessions, tabs, and group chats)
+	// Navigate forward in history (through sessions and tabs)
 	const handleNavForward = useCallback(() => {
 		const entry = navigateForward();
 		if (entry) navigateToEntry(entry);

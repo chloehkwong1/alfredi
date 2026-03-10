@@ -30,7 +30,6 @@ vi.mock('../../../renderer/components/Wizard', () => ({
 
 import { useSessionRestoration } from '../../../renderer/hooks/session/useSessionRestoration';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { gitService } from '../../../renderer/services/git';
 import type { Session } from '../../../renderer/types';
 
@@ -107,7 +106,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 // Mock IPC
 const mockGetAll = vi.fn();
 const mockGroupsGetAll = vi.fn();
-const mockGroupChatList = vi.fn();
 const mockAgentsGet = vi.fn();
 
 // ============================================================================
@@ -126,24 +124,18 @@ beforeEach(() => {
 		initialLoadComplete: false,
 	} as any);
 
-	useGroupChatStore.setState({
-		groupChats: [],
-	} as any);
-
 	// Setup IPC mocks
 	if (!(window as any).maestro) {
 		(window as any).maestro = {};
 	}
 	(window as any).maestro.sessions = { getAll: mockGetAll };
 	(window as any).maestro.groups = { getAll: mockGroupsGetAll };
-	(window as any).maestro.groupChat = { list: mockGroupChatList };
 	(window as any).maestro.agents = {
 		get: mockAgentsGet.mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
 	};
 
 	mockGetAll.mockResolvedValue([]);
 	mockGroupsGetAll.mockResolvedValue([]);
-	mockGroupChatList.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -805,22 +797,6 @@ describe('Session & Group loading effect', () => {
 		expect(groups).toHaveLength(1);
 	});
 
-	it('loads group chats from IPC on mount', async () => {
-		mockGetAll.mockResolvedValueOnce([]);
-		mockGroupsGetAll.mockResolvedValueOnce([]);
-		mockGroupChatList.mockResolvedValueOnce([{ id: 'gc1', name: 'Chat 1' }]);
-
-		renderHook(() => useSessionRestoration());
-
-		await act(async () => {
-			await new Promise((r) => setTimeout(r, 50));
-		});
-
-		expect(mockGroupChatList).toHaveBeenCalled();
-		const groupChats = useGroupChatStore.getState().groupChats;
-		expect(groupChats).toHaveLength(1);
-	});
-
 	it('sets sessionsLoaded to true after loading', async () => {
 		mockGetAll.mockResolvedValueOnce([]);
 
@@ -886,21 +862,6 @@ describe('Session & Group loading effect', () => {
 		expect(useSessionStore.getState().groups).toEqual([]);
 		expect(useSessionStore.getState().sessionsLoaded).toBe(true);
 		expect(useSessionStore.getState().initialLoadComplete).toBe(true);
-	});
-
-	it('handles group chat load failure gracefully', async () => {
-		mockGetAll.mockResolvedValueOnce([]);
-		mockGroupsGetAll.mockResolvedValueOnce([]);
-		mockGroupChatList.mockRejectedValueOnce(new Error('GC fail'));
-
-		renderHook(() => useSessionRestoration());
-
-		await act(async () => {
-			await new Promise((r) => setTimeout(r, 50));
-		});
-
-		expect(useGroupChatStore.getState().groupChats).toEqual([]);
-		expect(useSessionStore.getState().sessionsLoaded).toBe(true);
 	});
 
 	it('fires fetchGitInfoInBackground for SSH sessions after load', async () => {

@@ -7,7 +7,7 @@
  * - Document selector dropdown at top
  * - Main content area showing streaming preview or final document
  * - Austin facts rotating in corner during generation
- * - Completion overlay with confetti when generation finishes
+ * - Completion overlay when generation finishes
  *
  * This component is extracted/shared with PhaseReviewScreen.tsx to maintain consistency.
  */

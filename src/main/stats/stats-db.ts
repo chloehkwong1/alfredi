@@ -4,7 +4,7 @@
  * Manages the SQLite database lifecycle: initialization, integrity checks,
  * corruption recovery, VACUUM scheduling, and connection management.
  *
- * CRUD operations are delegated to focused modules (query-events, auto-run,
+ * CRUD operations are delegated to focused modules (query-events,
  * session-lifecycle, aggregations, data-management).
  */
 
@@ -15,8 +15,6 @@ import { app } from 'electron';
 import { logger } from '../utils/logger';
 import type {
 	QueryEvent,
-	AutoRunSession,
-	AutoRunTask,
 	SessionLifecycleEvent,
 	StatsTimeRange,
 	StatsFilters,
@@ -38,14 +36,6 @@ import {
 	hasPendingMigrations,
 } from './migrations';
 import { insertQueryEvent, getQueryEvents, clearQueryEventCache } from './query-events';
-import {
-	insertAutoRunSession,
-	updateAutoRunSession,
-	getAutoRunSessions,
-	insertAutoRunTask,
-	getAutoRunTasks,
-	clearAutoRunCache,
-} from './auto-run';
 import {
 	recordSessionCreated,
 	recordSessionClosed,
@@ -149,7 +139,6 @@ export class StatsDB {
 
 			// Clear all statement caches
 			clearQueryEventCache();
-			clearAutoRunCache();
 			clearSessionLifecycleCache();
 
 			logger.info('Stats database closed', LOG_CONTEXT);
@@ -718,30 +707,6 @@ export class StatsDB {
 	}
 
 	// ============================================================================
-	// Auto Run (delegated)
-	// ============================================================================
-
-	insertAutoRunSession(session: Omit<AutoRunSession, 'id'>): string {
-		return insertAutoRunSession(this.database, session);
-	}
-
-	updateAutoRunSession(id: string, updates: Partial<AutoRunSession>): boolean {
-		return updateAutoRunSession(this.database, id, updates);
-	}
-
-	getAutoRunSessions(range: StatsTimeRange): AutoRunSession[] {
-		return getAutoRunSessions(this.database, range);
-	}
-
-	insertAutoRunTask(task: Omit<AutoRunTask, 'id'>): string {
-		return insertAutoRunTask(this.database, task);
-	}
-
-	getAutoRunTasks(autoRunSessionId: string): AutoRunTask[] {
-		return getAutoRunTasks(this.database, autoRunSessionId);
-	}
-
-	// ============================================================================
 	// Session Lifecycle (delegated)
 	// ============================================================================
 
@@ -774,8 +739,6 @@ export class StatsDB {
 			return {
 				success: false,
 				deletedQueryEvents: 0,
-				deletedAutoRunSessions: 0,
-				deletedAutoRunTasks: 0,
 				deletedSessionLifecycle: 0,
 				error: 'Database not initialized',
 			};
@@ -802,22 +765,15 @@ export class StatsDB {
 				.prepare('SELECT MIN(startTime) as earliest FROM query_events')
 				.get() as { earliest: number | null } | undefined;
 
-			// Query the minimum startTime from auto_run_sessions table
-			const autoRunResult = this.database
-				.prepare('SELECT MIN(startTime) as earliest FROM auto_run_sessions')
-				.get() as { earliest: number | null } | undefined;
-
 			// Query the minimum createdAt from session_lifecycle table
 			const lifecycleResult = this.database
 				.prepare('SELECT MIN(createdAt) as earliest FROM session_lifecycle')
 				.get() as { earliest: number | null } | undefined;
 
 			// Find the minimum across all tables
-			const timestamps = [
-				queryResult?.earliest,
-				autoRunResult?.earliest,
-				lifecycleResult?.earliest,
-			].filter((t): t is number => t !== null && t !== undefined);
+			const timestamps = [queryResult?.earliest, lifecycleResult?.earliest].filter(
+				(t): t is number => t !== null && t !== undefined
+			);
 
 			if (timestamps.length === 0) {
 				return null;

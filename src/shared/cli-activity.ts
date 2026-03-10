@@ -11,7 +11,6 @@
  *
  * Duplicated implementations:
  * - cli/services/storage.ts → getConfigDir() uses "Maestro" (capitalized)
- * - main/group-chat/group-chat-storage.ts → getConfigDir() uses electron-store
  * - shared/cli-activity.ts → getConfigDir() uses "maestro" (lowercase)
  *
  * These are kept separate to avoid cross-module dependencies and maintain
@@ -24,8 +23,6 @@ import * as os from 'os';
 
 export interface CliActivityStatus {
 	sessionId: string;
-	playbookId: string;
-	playbookName: string;
 	startedAt: number;
 	pid: number;
 	currentTask?: string;

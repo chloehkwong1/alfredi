@@ -6,7 +6,6 @@ import type { Session, Theme, Shortcut, BatchRunState } from '../../../renderer/
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
-import { useBatchStore } from '../../../renderer/stores/batchStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 
 // Mock child components
@@ -14,14 +13,6 @@ vi.mock('../../../renderer/components/FileExplorerPanel', () => ({
 	FileExplorerPanel: vi.fn(({ session }) => (
 		<div data-testid="file-explorer-panel">FileExplorerPanel: {session?.name}</div>
 	)),
-}));
-
-vi.mock('../../../renderer/components/HistoryPanel', () => ({
-	HistoryPanel: vi.fn((props) => <div data-testid="history-panel">HistoryPanel</div>),
-}));
-
-vi.mock('../../../renderer/components/AutoRun', () => ({
-	AutoRun: vi.fn((props) => <div data-testid="auto-run">AutoRun</div>),
 }));
 
 vi.mock('../../../renderer/utils/shortcutFormatter', () => ({
@@ -189,12 +180,6 @@ describe('RightPanel', () => {
 			selectedFileIndex: 0,
 			lastGraphFocusFilePath: undefined,
 		});
-		useBatchStore.setState({
-			documentList: ['doc1', 'doc2'],
-			documentTree: [] as any,
-			isLoadingDocuments: false,
-			documentTaskCounts: undefined as any,
-		});
 	});
 
 	afterEach(() => {
@@ -273,13 +258,14 @@ describe('RightPanel', () => {
 	});
 
 	describe('Tab navigation', () => {
-		it('should render all three tabs', () => {
+		it('should render only the Files tab', () => {
 			const props = createDefaultProps();
 			render(<RightPanel {...props} />);
 
 			expect(screen.getByRole('button', { name: 'Files' })).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'History' })).toBeInTheDocument();
-			expect(screen.getByRole('button', { name: 'Auto Run' })).toBeInTheDocument();
+			// History and Auto Run tabs have been removed
+			expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument();
+			expect(screen.queryByRole('button', { name: 'Auto Run' })).not.toBeInTheDocument();
 		});
 
 		it('should highlight active tab with accent color', () => {
@@ -292,25 +278,10 @@ describe('RightPanel', () => {
 			expect(filesTab.style.borderColor).toBe('rgb(189, 147, 249)');
 		});
 
-		it('should show transparent border for inactive tabs', () => {
-			useUIStore.setState({ activeRightTab: 'files' });
-			const props = createDefaultProps();
-			render(<RightPanel {...props} />);
-
-			const historyTab = screen.getByRole('button', { name: 'History' });
-			expect(historyTab.style.borderColor).toBe('transparent');
-		});
-
 		it('should call setActiveRightTab when tab is clicked', () => {
 			const setActiveRightTab = vi.fn();
 			const props = createDefaultProps({ setActiveRightTab });
 			render(<RightPanel {...props} />);
-
-			fireEvent.click(screen.getByRole('button', { name: 'History' }));
-			expect(setActiveRightTab).toHaveBeenCalledWith('history');
-
-			fireEvent.click(screen.getByRole('button', { name: 'Auto Run' }));
-			expect(setActiveRightTab).toHaveBeenCalledWith('autorun');
 
 			fireEvent.click(screen.getByRole('button', { name: 'Files' }));
 			expect(setActiveRightTab).toHaveBeenCalledWith('files');
@@ -323,38 +294,8 @@ describe('RightPanel', () => {
 			const props = createDefaultProps();
 			render(<RightPanel {...props} />);
 
-			// FileExplorerPanel stays mounted (for auto-refresh timer) but is visible only on files tab
 			const fileExplorer = screen.getByTestId('file-explorer-panel');
 			expect(fileExplorer).toBeInTheDocument();
-			expect(fileExplorer.closest('[data-tour="files-panel"]')).not.toHaveStyle({
-				display: 'none',
-			});
-			expect(screen.queryByTestId('history-panel')).not.toBeInTheDocument();
-			expect(screen.queryByTestId('auto-run')).not.toBeInTheDocument();
-		});
-
-		it('should show HistoryPanel when history tab is active', () => {
-			useUIStore.setState({ activeRightTab: 'history' });
-			const props = createDefaultProps();
-			render(<RightPanel {...props} />);
-
-			// FileExplorerPanel stays mounted but hidden (for auto-refresh timer persistence)
-			const fileExplorer = screen.getByTestId('file-explorer-panel');
-			expect(fileExplorer.closest('[data-tour="files-panel"]')).toHaveStyle({ display: 'none' });
-			expect(screen.getByTestId('history-panel')).toBeInTheDocument();
-			expect(screen.queryByTestId('auto-run')).not.toBeInTheDocument();
-		});
-
-		it('should show AutoRun when autorun tab is active', () => {
-			useUIStore.setState({ activeRightTab: 'autorun' });
-			const props = createDefaultProps();
-			render(<RightPanel {...props} />);
-
-			// FileExplorerPanel stays mounted but hidden (for auto-refresh timer persistence)
-			const fileExplorer = screen.getByTestId('file-explorer-panel');
-			expect(fileExplorer.closest('[data-tour="files-panel"]')).toHaveStyle({ display: 'none' });
-			expect(screen.queryByTestId('history-panel')).not.toBeInTheDocument();
-			expect(screen.getByTestId('auto-run')).toBeInTheDocument();
 		});
 	});
 
@@ -499,21 +440,6 @@ describe('RightPanel', () => {
 			fireEvent.scroll(scrollContainer);
 
 			expect(spy).toHaveBeenCalled();
-		});
-
-		it('should not update scroll position for non-files tabs', () => {
-			useUIStore.setState({ activeRightTab: 'history' });
-			const spy = vi.spyOn(useSessionStore.getState(), 'setSessions');
-			const props = createDefaultProps();
-			const { container } = render(<RightPanel {...props} />);
-
-			const scrollContainer = container.querySelector('.overflow-y-auto') as HTMLElement;
-			Object.defineProperty(scrollContainer, 'scrollTop', { value: 150, writable: true });
-
-			fireEvent.scroll(scrollContainer);
-
-			// setSessions should not be called for scroll tracking on non-files tabs
-			expect(spy).not.toHaveBeenCalled();
 		});
 	});
 
@@ -937,141 +863,15 @@ describe('RightPanel', () => {
 			expect(screen.getByText('Prompt is too long')).toBeInTheDocument();
 			expect(screen.queryByText(/tasks completed/)).not.toBeInTheDocument();
 		});
-
-		it('should switch to Auto Run tab when paused badge is clicked', () => {
-			const setActiveRightTab = vi.fn();
-			const currentSessionBatchState: BatchRunState = {
-				isRunning: true,
-				isStopping: false,
-				documents: ['doc1'],
-				currentDocumentIndex: 0,
-				totalTasks: 10,
-				completedTasks: 9,
-				currentDocTasksTotal: 10,
-				currentDocTasksCompleted: 9,
-				totalTasksAcrossAllDocs: 10,
-				completedTasksAcrossAllDocs: 9,
-				loopEnabled: false,
-				loopIteration: 0,
-				errorPaused: true,
-				error: {
-					type: 'token_exhaustion',
-					message: 'Prompt is too long',
-					recoverable: true,
-					timestamp: Date.now(),
-					agentId: 'test',
-				},
-			};
-			const props = createDefaultProps({ currentSessionBatchState, setActiveRightTab });
-			render(<RightPanel {...props} />);
-
-			fireEvent.click(screen.getByText('Auto Run Paused'));
-			expect(setActiveRightTab).toHaveBeenCalledWith('autorun');
-		});
-
-		it('should show "View history" link when on autorun tab during batch run', () => {
-			useUIStore.setState({ activeRightTab: 'autorun' });
-			const setActiveRightTab = vi.fn();
-			const currentSessionBatchState: BatchRunState = {
-				isRunning: true,
-				isStopping: false,
-				documents: ['doc1'],
-				currentDocumentIndex: 0,
-				totalTasks: 10,
-				completedTasks: 5,
-				currentDocTasksTotal: 10,
-				currentDocTasksCompleted: 5,
-				totalTasksAcrossAllDocs: 10,
-				completedTasksAcrossAllDocs: 5,
-				loopEnabled: false,
-				loopIteration: 0,
-			};
-			const props = createDefaultProps({ currentSessionBatchState, setActiveRightTab });
-			render(<RightPanel {...props} />);
-
-			const link = screen.getByText('View history');
-			expect(link).toBeInTheDocument();
-			fireEvent.click(link);
-			expect(setActiveRightTab).toHaveBeenCalledWith('history');
-		});
-
-		it('should not show "View history" link when on history tab during batch run', () => {
-			useUIStore.setState({ activeRightTab: 'history' });
-			const currentSessionBatchState: BatchRunState = {
-				isRunning: true,
-				isStopping: false,
-				documents: ['doc1'],
-				currentDocumentIndex: 0,
-				totalTasks: 10,
-				completedTasks: 5,
-				currentDocTasksTotal: 10,
-				currentDocTasksCompleted: 5,
-				totalTasksAcrossAllDocs: 10,
-				completedTasksAcrossAllDocs: 5,
-				loopEnabled: false,
-				loopIteration: 0,
-			};
-			const props = createDefaultProps({ currentSessionBatchState });
-			render(<RightPanel {...props} />);
-
-			expect(screen.queryByText('View history')).not.toBeInTheDocument();
-		});
 	});
 
 	describe('Imperative handle', () => {
-		it('should expose refreshHistoryPanel method', () => {
+		it('should expose empty handle via ref', () => {
 			const ref = createRef<RightPanelHandle>();
 			const props = createDefaultProps();
 			render(<RightPanel {...props} ref={ref} />);
 
 			expect(ref.current).not.toBeNull();
-			expect(typeof ref.current?.refreshHistoryPanel).toBe('function');
-		});
-
-		it('should expose focusAutoRun method', () => {
-			const ref = createRef<RightPanelHandle>();
-			const props = createDefaultProps();
-			render(<RightPanel {...props} ref={ref} />);
-
-			expect(ref.current).not.toBeNull();
-			expect(typeof ref.current?.focusAutoRun).toBe('function');
-		});
-
-		it('should call refreshHistoryPanel without throwing', () => {
-			const ref = createRef<RightPanelHandle>();
-			const props = createDefaultProps();
-			render(<RightPanel {...props} ref={ref} />);
-
-			expect(() => ref.current?.refreshHistoryPanel()).not.toThrow();
-		});
-
-		it('should call focusAutoRun without throwing', () => {
-			const ref = createRef<RightPanelHandle>();
-			const props = createDefaultProps();
-			render(<RightPanel {...props} ref={ref} />);
-
-			expect(() => ref.current?.focusAutoRun()).not.toThrow();
-		});
-	});
-
-	describe('Focus effects', () => {
-		it('should not focus history panel when tab is not history', () => {
-			useUIStore.setState({ activeRightTab: 'files', rightPanelOpen: true, activeFocus: 'right' });
-			const props = createDefaultProps();
-			render(<RightPanel {...props} />);
-
-			// requestAnimationFrame should not trigger focus for non-history tab
-			// The history panel ref focus method shouldn't be called
-			// This is implicit - if files tab is active, history panel isn't rendered
-			expect(screen.queryByTestId('history-panel')).not.toBeInTheDocument();
-		});
-
-		it('should not focus autorun panel when tab is not autorun', () => {
-			useUIStore.setState({ activeRightTab: 'files', rightPanelOpen: true, activeFocus: 'right' });
-			const props = createDefaultProps();
-			render(<RightPanel {...props} />);
-
-			expect(screen.queryByTestId('auto-run')).not.toBeInTheDocument();
 		});
 	});
 
@@ -1102,14 +902,6 @@ describe('RightPanel', () => {
 			render(<RightPanel {...props} />);
 
 			expect(screen.getByTestId('file-explorer-panel')).toBeInTheDocument();
-		});
-
-		it('should render autorun content when autorun tab is active', () => {
-			useUIStore.setState({ activeRightTab: 'autorun' });
-			const props = createDefaultProps();
-			render(<RightPanel {...props} />);
-
-			expect(screen.getByTestId('auto-run')).toBeInTheDocument();
 		});
 	});
 
@@ -1153,43 +945,6 @@ describe('RightPanel', () => {
 	});
 
 	describe('Edge cases', () => {
-		it('should handle session with missing optional properties', () => {
-			const sessionWithoutOptional: Session = {
-				...mockSession,
-				autoRunFolderPath: undefined,
-				autoRunSelectedFile: undefined,
-				autoRunMode: undefined,
-				autoRunCursorPosition: undefined,
-				autoRunEditScrollPos: undefined,
-				autoRunPreviewScrollPos: undefined,
-			};
-			useSessionStore.setState({
-				sessions: [sessionWithoutOptional],
-				activeSessionId: 'session-1',
-			});
-			useUIStore.setState({ activeRightTab: 'autorun' });
-			const props = createDefaultProps();
-
-			expect(() => render(<RightPanel {...props} />)).not.toThrow();
-		});
-
-		it('should handle empty autoRunDocumentList', () => {
-			useBatchStore.setState({ documentList: [] });
-			useUIStore.setState({ activeRightTab: 'autorun' });
-			const props = createDefaultProps();
-
-			expect(() => render(<RightPanel {...props} />)).not.toThrow();
-			expect(screen.getByTestId('auto-run')).toBeInTheDocument();
-		});
-
-		it('should handle undefined autoRunDocumentTree', () => {
-			useBatchStore.setState({ documentTree: undefined as any });
-			useUIStore.setState({ activeRightTab: 'autorun' });
-			const props = createDefaultProps();
-
-			expect(() => render(<RightPanel {...props} />)).not.toThrow();
-		});
-
 		it('should handle currentSessionBatchState with zero tasks', () => {
 			const currentSessionBatchState: BatchRunState = {
 				isRunning: true,
@@ -1235,18 +990,14 @@ describe('RightPanel', () => {
 			const props = createDefaultProps({ setActiveRightTab });
 			render(<RightPanel {...props} />);
 
-			const historyTab = screen.getByRole('button', { name: 'History' });
 			const filesTab = screen.getByRole('button', { name: 'Files' });
-			const autoRunTab = screen.getByRole('button', { name: 'Auto Run' });
 
-			// Rapid clicks
+			// Rapid clicks on the only tab
 			for (let i = 0; i < 10; i++) {
-				fireEvent.click(historyTab);
 				fireEvent.click(filesTab);
-				fireEvent.click(autoRunTab);
 			}
 
-			expect(setActiveRightTab).toHaveBeenCalledTimes(30);
+			expect(setActiveRightTab).toHaveBeenCalledTimes(10);
 		});
 	});
 
@@ -1342,7 +1093,7 @@ describe('RightPanel', () => {
 			const props = createDefaultProps();
 			render(<RightPanel {...props} />);
 
-			expect(screen.getAllByRole('button')).toHaveLength(4); // toggle + 3 tabs
+			expect(screen.getAllByRole('button')).toHaveLength(2); // toggle + 1 tab (Files)
 		});
 	});
 

@@ -24,7 +24,17 @@ import {
 	RefreshCw,
 } from 'lucide-react';
 import type { Theme, AgentConfig } from '../types';
-import type { RegisteredRepository, SymphonyIssue } from '../../shared/symphony-types';
+// Symphony types removed - inline minimal types needed
+interface RegisteredRepository {
+	url: string;
+	name: string;
+	slug: string;
+}
+interface SymphonyIssue {
+	number: number;
+	title: string;
+	documentPaths: string[];
+}
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { AgentConfigPanel } from './shared/AgentConfigPanel';
@@ -194,7 +204,7 @@ export function AgentCreationDialog({
 		if (isOpen) {
 			const id = registerLayer({
 				type: 'modal',
-				priority: MODAL_PRIORITIES.SYMPHONY_AGENT_CREATION ?? 711,
+				priority: 950,
 				blocksLowerLayers: true,
 				capturesFocus: true,
 				focusTrap: 'strict',

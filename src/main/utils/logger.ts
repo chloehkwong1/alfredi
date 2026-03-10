@@ -188,10 +188,6 @@ class Logger extends EventEmitter {
 					// Toast notifications logged with info styling (purple in LogViewer)
 					console.info(message, entry.data || '');
 					break;
-				case 'autorun':
-					// Auto Run logs for workflow tracking (orange in LogViewer)
-					console.info(message, entry.data || '');
-					break;
 			}
 		} catch {
 			// Silently ignore EPIPE errors - console is disconnected
@@ -248,17 +244,6 @@ class Logger extends EventEmitter {
 		this.addLog({
 			timestamp: Date.now(),
 			level: 'toast',
-			message,
-			context,
-			data,
-		});
-	}
-
-	autorun(message: string, context?: string, data?: unknown): void {
-		// Auto Run logs are always logged (workflow tracking cannot be turned off)
-		this.addLog({
-			timestamp: Date.now(),
-			level: 'autorun',
 			message,
 			context,
 			data,

@@ -110,7 +110,7 @@ export interface UseMainPanelPropsDeps {
 
 	// Gist publishing
 	ghCliAvailable: boolean;
-	hasGist: boolean;
+	hasGist?: boolean;
 
 	// Setters (these are stable callbacks - should be memoized at definition site)
 	setGitDiffPreview: (preview: string | null) => void;
@@ -220,19 +220,14 @@ export interface UseMainPanelPropsDeps {
 	handleOpenSendToAgentModal: (tabId: string) => void;
 	handleCopyContext: (tabId: string) => void;
 	handleExportHtml: (tabId: string) => void;
-	handlePublishTabGist: (tabId: string) => void;
 	cancelTab: (tabId: string) => void;
 	cancelMergeTab: (tabId: string) => void;
 	recordShortcutUsage: (shortcutId: string) => { newLevel: number | null };
-	onKeyboardMasteryLevelUp: (level: number) => void;
 	handleSetLightboxImage: (
 		image: string | null,
 		contextImages?: string[],
 		source?: 'staged' | 'history'
 	) => void;
-
-	// Gist publishing
-	setGistPublishModalOpen: (open: boolean) => void;
 
 	// Document Graph
 	setGraphFocusFilePath: (path: string) => void;
@@ -404,7 +399,6 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onSendToAgent: deps.handleOpenSendToAgentModal,
 			onCopyContext: deps.handleCopyContext,
 			onExportHtml: deps.handleExportHtml,
-			onPublishTabGist: deps.handlePublishTabGist,
 			// Summarization progress props
 			summarizeProgress: deps.summarizeProgress,
 			summarizeResult: deps.summarizeResult,
@@ -424,13 +418,9 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 				? () => deps.cancelMergeTab(deps.activeSession!.activeTabId!)
 				: undefined,
 			onShortcutUsed: (shortcutId: string) => {
-				const result = deps.recordShortcutUsage(shortcutId);
-				if (result.newLevel !== null) {
-					deps.onKeyboardMasteryLevelUp(result.newLevel);
-				}
+				deps.recordShortcutUsage(shortcutId);
 			},
 			ghCliAvailable: deps.ghCliAvailable,
-			onPublishGist: () => deps.setGistPublishModalOpen(true),
 			hasGist: deps.hasGist,
 			onOpenInGraph: () => {
 				if (deps.activeFileTab && deps.activeSession) {
@@ -595,12 +585,9 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleOpenSendToAgentModal,
 			deps.handleCopyContext,
 			deps.handleExportHtml,
-			deps.handlePublishTabGist,
 			deps.cancelTab,
 			deps.cancelMergeTab,
 			deps.recordShortcutUsage,
-			deps.onKeyboardMasteryLevelUp,
-			deps.setGistPublishModalOpen,
 			deps.setGraphFocusFilePath,
 			deps.setLastGraphFocusFilePath,
 			deps.setIsGraphViewOpen,

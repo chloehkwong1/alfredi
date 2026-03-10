@@ -6,7 +6,6 @@
 import { describe, it, expect } from 'vitest';
 import {
 	parseSessionId,
-	parseGroupChatSessionId,
 	isSynopsisSession,
 	isBatchSession,
 	getBaseSessionId,
@@ -14,8 +13,6 @@ import {
 	REGEX_AI_TAB,
 	REGEX_SYNOPSIS,
 	REGEX_BATCH,
-	REGEX_GROUP_CHAT_MODERATOR,
-	REGEX_GROUP_CHAT_PARTICIPANT,
 } from '../sessionIdParser';
 
 describe('sessionIdParser', () => {
@@ -92,41 +89,6 @@ describe('sessionIdParser', () => {
 		});
 	});
 
-	describe('parseGroupChatSessionId', () => {
-		it('should parse moderator session ID', () => {
-			const uuid = '533fad24-3915-4fc6-9edb-ba2292a5b903';
-			const result = parseGroupChatSessionId(`group-chat-${uuid}-moderator-1704067200000`);
-			expect(result).toEqual({
-				isGroupChat: true,
-				groupChatId: uuid,
-				isModerator: true,
-				timestamp: '1704067200000',
-			});
-		});
-
-		it('should parse participant session ID', () => {
-			const uuid = '533fad24-3915-4fc6-9edb-ba2292a5b903';
-			const result = parseGroupChatSessionId(`group-chat-${uuid}-Agent1-1704067200000`);
-			expect(result).toEqual({
-				isGroupChat: true,
-				groupChatId: uuid,
-				isModerator: false,
-				participantName: 'Agent1',
-				timestamp: '1704067200000',
-			});
-		});
-
-		it('should return isGroupChat: false for non-group chat sessions', () => {
-			const result = parseGroupChatSessionId('session-123-ai-tab1');
-			expect(result).toEqual({ isGroupChat: false });
-		});
-
-		it('should return isGroupChat: false for regular sessions', () => {
-			const result = parseGroupChatSessionId('session-123');
-			expect(result).toEqual({ isGroupChat: false });
-		});
-	});
-
 	describe('helper functions', () => {
 		describe('isSynopsisSession', () => {
 			it('should return true for synopsis sessions', () => {
@@ -152,7 +114,6 @@ describe('sessionIdParser', () => {
 			});
 
 			it('should not match false positives with batch in UUID', () => {
-				// Session ID with "batch" in the UUID should NOT match
 				expect(isBatchSession('session-batch-uuid-ai-tab1')).toBe(false);
 			});
 		});
@@ -198,18 +159,6 @@ describe('sessionIdParser', () => {
 			expect('session-batch-123'.match(REGEX_BATCH)).toBeTruthy();
 			expect('session-123-batch-1234567890'.match(REGEX_BATCH)).toBeTruthy();
 			expect('session-batch'.match(REGEX_BATCH)).toBeFalsy();
-		});
-
-		it('REGEX_GROUP_CHAT_MODERATOR should match moderator format', () => {
-			const uuid = '533fad24-3915-4fc6-9edb-ba2292a5b903';
-			expect(`group-chat-${uuid}-moderator-123`.match(REGEX_GROUP_CHAT_MODERATOR)).toBeTruthy();
-			expect('group-chat-invalid-moderator-123'.match(REGEX_GROUP_CHAT_MODERATOR)).toBeFalsy();
-		});
-
-		it('REGEX_GROUP_CHAT_PARTICIPANT should match participant format', () => {
-			const uuid = '533fad24-3915-4fc6-9edb-ba2292a5b903';
-			expect(`group-chat-${uuid}-Agent1-123`.match(REGEX_GROUP_CHAT_PARTICIPANT)).toBeTruthy();
-			expect('group-chat-invalid-Agent1-123'.match(REGEX_GROUP_CHAT_PARTICIPANT)).toBeFalsy();
 		});
 	});
 });

@@ -7,12 +7,7 @@
 
 import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
-import {
-	useWebSocket,
-	type CustomCommand,
-	type AutoRunState,
-	type AITabData,
-} from '../hooks/useWebSocket';
+import { useWebSocket, type CustomCommand, type AITabData } from '../hooks/useWebSocket';
 // Command history is no longer used in the mobile UI
 import { useNotifications } from '../hooks/useNotifications';
 import { useUnreadBadge } from '../hooks/useUnreadBadge';
@@ -35,7 +30,6 @@ import { DEFAULT_SLASH_COMMANDS, type SlashCommand } from './SlashCommandAutocom
 import { ResponseViewer, type ResponseItem } from './ResponseViewer';
 import { OfflineQueueBanner } from './OfflineQueueBanner';
 import { MessageHistory } from './MessageHistory';
-import { AutoRunIndicator } from './AutoRunIndicator';
 import { TabBar } from './TabBar';
 import { TabSearchModal } from './TabSearchModal';
 import type { Session, LastResponsePreview } from '../hooks/useSessions';
@@ -300,9 +294,6 @@ export default function MobileApp() {
 	// Custom slash commands from desktop
 	const [customCommands, setCustomCommands] = useState<CustomCommand[]>([]);
 
-	// AutoRun state per session (batch processing on desktop)
-	const [autoRunStates, setAutoRunStates] = useState<Record<string, AutoRunState | null>>({});
-
 	// History panel state (persisted)
 	const [historyFilter, setHistoryFilter] = useState<'all' | 'AUTO' | 'USER'>(
 		savedState.historyFilter
@@ -464,16 +455,6 @@ export default function MobileApp() {
 		onResponseComplete: handleResponseComplete,
 		onThemeUpdate: setDesktopTheme,
 		onCustomCommands: setCustomCommands,
-		onAutoRunStateChange: (sessionId, state) => {
-			webLogger.info(
-				`[App] AutoRun state change: session=${sessionId}, isRunning=${state?.isRunning}, tasks=${state?.completedTasks}/${state?.totalTasks}`,
-				'Mobile'
-			);
-			setAutoRunStates((prev) => ({
-				...prev,
-				[sessionId]: state,
-			}));
-		},
 	});
 
 	// Save session selection when it changes (using hook's persistence function)
@@ -1031,14 +1012,6 @@ export default function MobileApp() {
 						onReorderTab={handleReorderTab}
 					/>
 				)}
-
-			{/* AutoRun indicator - shown when batch processing is active on desktop */}
-			{activeSessionId && autoRunStates[activeSessionId] && (
-				<AutoRunIndicator
-					state={autoRunStates[activeSessionId]}
-					sessionName={activeSession?.name}
-				/>
-			)}
 
 			{/* Offline queue banner - shown when there are queued commands */}
 			{offlineQueueLength > 0 && (

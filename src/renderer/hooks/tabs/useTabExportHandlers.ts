@@ -4,14 +4,12 @@
  * Provides handlers for tab content export operations:
  *   - Copy tab context to clipboard
  *   - Export tab as HTML file
- *   - Publish tab as GitHub Gist
  *
- * Reads from: sessionStore (sessions, activeSessionId), tabStore, modalStore
+ * Reads from: sessionStore (sessions, activeSessionId), tabStore
  */
 
 import { useCallback } from 'react';
 import type { Session, Theme, AITab } from '../../types';
-import { useTabStore } from '../../stores/tabStore';
 import { formatLogsForClipboard } from '../../utils/contextExtractor';
 import { notifyToast } from '../../stores/notificationStore';
 
@@ -26,8 +24,6 @@ export interface UseTabExportHandlersDeps {
 	activeSessionIdRef: React.RefObject<string | null>;
 	/** Ref to latest theme */
 	themeRef: React.RefObject<Theme>;
-	/** Open the gist publish modal (local App.tsx state) */
-	setGistPublishModalOpen: (open: boolean) => void;
 }
 
 // ============================================================================
@@ -39,8 +35,6 @@ export interface UseTabExportHandlersReturn {
 	handleCopyContext: (tabId: string) => void;
 	/** Export tab as HTML file download */
 	handleExportHtml: (tabId: string) => Promise<void>;
-	/** Open Gist publish modal with tab content */
-	handlePublishTabGist: (tabId: string) => void;
 }
 
 // ============================================================================
@@ -48,7 +42,7 @@ export interface UseTabExportHandlersReturn {
 // ============================================================================
 
 export function useTabExportHandlers(deps: UseTabExportHandlersDeps): UseTabExportHandlersReturn {
-	const { sessionsRef, activeSessionIdRef, themeRef, setGistPublishModalOpen } = deps;
+	const { sessionsRef, activeSessionIdRef, themeRef } = deps;
 
 	/**
 	 * Resolve the active session and the specified tab.
@@ -127,34 +121,8 @@ export function useTabExportHandlers(deps: UseTabExportHandlersDeps): UseTabExpo
 		}
 	}, []);
 
-	const handlePublishTabGist = useCallback((tabId: string) => {
-		const resolved = resolveSessionAndTab(tabId);
-		if (!resolved) return;
-
-		// Convert logs to markdown-like text format
-		const content = formatLogsForClipboard(resolved.tab.logs);
-		if (!content.trim()) {
-			notifyToast({
-				type: 'warning',
-				title: 'Nothing to Publish',
-				message: 'No user or assistant messages to publish.',
-			});
-			return;
-		}
-
-		// Generate filename based on tab name or session ID
-		const tabName =
-			resolved.tab.name || (resolved.tab.agentSessionId?.slice(0, 8) ?? 'conversation');
-		const filename = `${tabName.replace(/[^a-zA-Z0-9-_]/g, '_')}_context.md`;
-
-		// Set content and open the modal
-		useTabStore.getState().setTabGistContent({ filename, content });
-		setGistPublishModalOpen(true);
-	}, []);
-
 	return {
 		handleCopyContext,
 		handleExportHtml,
-		handlePublishTabGist,
 	};
 }

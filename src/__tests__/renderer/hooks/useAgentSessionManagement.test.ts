@@ -63,7 +63,7 @@ describe('useAgentSessionManagement', () => {
 	const originalMaestro = { ...window.maestro };
 
 	const createRightPanelRef = (): RefObject<RightPanelHandle | null> =>
-		({ current: { refreshHistoryPanel: vi.fn() } }) as RefObject<RightPanelHandle | null>;
+		({ current: {} }) as RefObject<RightPanelHandle | null>;
 
 	beforeEach(() => {
 		vi.clearAllMocks();
@@ -144,7 +144,6 @@ describe('useAgentSessionManagement', () => {
 		});
 		expect(payload.id).toEqual(expect.any(String));
 		expect(Object.prototype.hasOwnProperty.call(payload, 'contextUsage')).toBe(true);
-		expect(rightPanelRef.current?.refreshHistoryPanel).toHaveBeenCalledOnce();
 
 		nowSpy.mockRestore();
 	});

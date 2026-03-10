@@ -18,8 +18,6 @@ import { withIpcErrorLogging, CreateHandlerOptions } from '../../utils/ipcHandle
 import { getStatsDB } from '../../stats';
 import {
 	QueryEvent,
-	AutoRunSession,
-	AutoRunTask,
 	SessionLifecycleEvent,
 	StatsTimeRange,
 	StatsFilters,
@@ -100,78 +98,6 @@ export function registerStatsHandlers(deps: StatsHandlerDependencies): void {
 		})
 	);
 
-	// Start an Auto Run session (returns ID for later updates)
-	ipcMain.handle(
-		'stats:start-autorun',
-		withIpcErrorLogging(
-			handlerOpts('startAutoRun'),
-			async (session: Omit<AutoRunSession, 'id' | 'duration'>) => {
-				// Check if stats collection is enabled
-				if (!isStatsCollectionEnabled(settingsStore)) {
-					logger.debug('Stats collection disabled, skipping Auto Run session start', LOG_CONTEXT);
-					return null;
-				}
-
-				const db = getStatsDB();
-				const fullSession: Omit<AutoRunSession, 'id'> = {
-					...session,
-					duration: 0, // Will be updated when session ends
-				};
-				const id = db.insertAutoRunSession(fullSession);
-				logger.info(`Started Auto Run session: ${id}`, LOG_CONTEXT, {
-					sessionId: session.sessionId,
-					documentPath: session.documentPath,
-				});
-				broadcastStatsUpdate(getMainWindow);
-				return id;
-			}
-		)
-	);
-
-	// End an Auto Run session (update duration and completed count)
-	ipcMain.handle(
-		'stats:end-autorun',
-		withIpcErrorLogging(
-			handlerOpts('endAutoRun'),
-			async (id: string, duration: number, tasksCompleted: number) => {
-				const db = getStatsDB();
-				const updated = db.updateAutoRunSession(id, { duration, tasksCompleted });
-				if (updated) {
-					logger.info(`Ended Auto Run session: ${id}`, LOG_CONTEXT, {
-						duration,
-						tasksCompleted,
-					});
-				} else {
-					logger.warn(`Auto Run session not found: ${id}`, LOG_CONTEXT);
-				}
-				broadcastStatsUpdate(getMainWindow);
-				return updated;
-			}
-		)
-	);
-
-	// Record an Auto Run task completion
-	ipcMain.handle(
-		'stats:record-task',
-		withIpcErrorLogging(handlerOpts('recordTask'), async (task: Omit<AutoRunTask, 'id'>) => {
-			// Check if stats collection is enabled
-			if (!isStatsCollectionEnabled(settingsStore)) {
-				logger.debug('Stats collection disabled, skipping Auto Run task', LOG_CONTEXT);
-				return null;
-			}
-
-			const db = getStatsDB();
-			const id = db.insertAutoRunTask(task);
-			logger.debug(`Recorded Auto Run task: ${id}`, LOG_CONTEXT, {
-				autoRunSessionId: task.autoRunSessionId,
-				taskIndex: task.taskIndex,
-				success: task.success,
-			});
-			broadcastStatsUpdate(getMainWindow);
-			return id;
-		})
-	);
-
 	// Get query events with time range and optional filters
 	ipcMain.handle(
 		'stats:get-stats',
@@ -182,24 +108,6 @@ export function registerStatsHandlers(deps: StatsHandlerDependencies): void {
 				return db.getQueryEvents(range, filters);
 			}
 		)
-	);
-
-	// Get Auto Run sessions within a time range
-	ipcMain.handle(
-		'stats:get-autorun-sessions',
-		withIpcErrorLogging(handlerOpts('getAutoRunSessions'), async (range: StatsTimeRange) => {
-			const db = getStatsDB();
-			return db.getAutoRunSessions(range);
-		})
-	);
-
-	// Get tasks for a specific Auto Run session
-	ipcMain.handle(
-		'stats:get-autorun-tasks',
-		withIpcErrorLogging(handlerOpts('getAutoRunTasks'), async (autoRunSessionId: string) => {
-			const db = getStatsDB();
-			return db.getAutoRunTasks(autoRunSessionId);
-		})
 	);
 
 	// Get aggregated stats for dashboard display

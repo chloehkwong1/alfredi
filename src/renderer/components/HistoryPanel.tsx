@@ -29,7 +29,6 @@ interface HistoryPanelProps {
 	onJumpToAgentSession?: (agentSessionId: string) => void;
 	onResumeSession?: (agentSessionId: string) => void;
 	onOpenSessionAsTab?: (agentSessionId: string) => void;
-	onOpenAboutModal?: () => void; // For opening About/achievements panel from history entries
 	// File linking props for history detail modal
 	fileTree?: any[];
 	onFileClick?: (path: string) => void;
@@ -51,7 +50,6 @@ export const HistoryPanel = React.memo(
 			onJumpToAgentSession,
 			onResumeSession,
 			onOpenSessionAsTab,
-			onOpenAboutModal,
 			fileTree,
 			onFileClick,
 		},
@@ -202,11 +200,10 @@ export const HistoryPanel = React.memo(
 			(index: number) => {
 				const entry = allFilteredEntries[index];
 				if (!entry) return ESTIMATED_ROW_HEIGHT;
-				// Entries with footer (elapsed time, cost, or achievement) are taller
+				// Entries with footer (elapsed time or cost) are taller
 				const hasFooter =
 					entry.elapsedTimeMs !== undefined ||
-					(entry.usageStats && entry.usageStats.totalCostUsd > 0) ||
-					entry.achievementAction;
+					(entry.usageStats && entry.usageStats.totalCostUsd > 0);
 				return hasFooter ? ESTIMATED_ROW_HEIGHT : ESTIMATED_ROW_HEIGHT_SIMPLE;
 			},
 			[allFilteredEntries]
@@ -581,7 +578,6 @@ export const HistoryPanel = React.memo(
 											theme={theme}
 											onOpenDetailModal={openDetailModal}
 											onOpenSessionAsTab={onOpenSessionAsTab}
-											onOpenAboutModal={onOpenAboutModal}
 										/>
 									</div>
 								);

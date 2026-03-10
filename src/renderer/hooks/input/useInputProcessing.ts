@@ -53,9 +53,9 @@ export interface UseInputProcessingDeps {
 	/** Reference to sessions array (for avoiding stale closures) */
 	sessionsRef: React.MutableRefObject<Session[]>;
 	/** Get batch state for a session */
-	getBatchState: (sessionId: string) => BatchState;
+	getBatchState: (sessionId: string) => BatchState | null;
 	/** Active batch run state (may differ from session's batch state) */
-	activeBatchRunState: BatchState;
+	activeBatchRunState: BatchState | null;
 	/** Ref to processQueuedItem function (defined later in component, accessed via ref to avoid stale closure) */
 	processQueuedItemRef: React.MutableRefObject<
 		((sessionId: string, item: QueuedItem) => Promise<void>) | null
@@ -253,7 +253,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							const isReadOnlyMode = activeTab?.readOnlyMode === true;
 							// Check both session busy state AND AutoRun state
 							// AutoRun runs in isolation and doesn't set session to busy, so we check it explicitly
-							const isAutoRunActive = getBatchState(activeSession.id).isRunning;
+							const isAutoRunActive = getBatchState(activeSession.id)?.isRunning ?? false;
 							const sessionIsIdle = activeSession.state !== 'busy' && !isAutoRunActive;
 
 							const queuedItem: QueuedItem = {
@@ -398,7 +398,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				// Check if AutoRun is active for this session
 				// AutoRun runs batch operations in isolation (doesn't set session to busy),
 				// so we need to explicitly check the batch state to prevent write conflicts
-				const isAutoRunActive = getBatchState(activeSession.id).isRunning;
+				const isAutoRunActive = getBatchState(activeSession.id)?.isRunning ?? false;
 
 				// Determine if we should queue this message
 				// Read-only tabs can run in parallel - only queue if this specific tab is busy
@@ -464,7 +464,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			// Check if we're in read-only mode for the log entry (tab setting OR Auto Run without worktree)
 			const activeTabForEntry = currentMode === 'ai' ? getActiveTab(activeSession) : null;
 			const currentBatchState = getBatchState(activeSession.id);
-			const isAutoRunReadOnly = currentBatchState.isRunning && !currentBatchState.worktreeActive;
+			const isAutoRunReadOnly = currentBatchState?.isRunning && !currentBatchState?.worktreeActive;
 			const isReadOnlyEntry = activeTabForEntry?.readOnlyMode === true || isAutoRunReadOnly;
 
 			const newEntry: LogEntry = {
@@ -876,7 +876,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 						// Check CURRENT session's Auto Run state (not any session's) and respect worktree bypass
 						const currentSessionBatchState = getBatchState(activeSessionId);
 						const isAutoRunReadOnly =
-							currentSessionBatchState.isRunning && !currentSessionBatchState.worktreeActive;
+							currentSessionBatchState?.isRunning && !currentSessionBatchState?.worktreeActive;
 						const isReadOnly = isAutoRunReadOnly || freshActiveTab?.readOnlyMode;
 
 						// For read-only mode, filter out any YOLO/skip-permissions flags from base args

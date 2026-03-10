@@ -12,7 +12,7 @@
  *   - Wizard tab launching from Auto Run panel
  *   - Onboarding wizard → session creation
  *
- * Reads from: sessionStore, settingsStore, modalStore, groupChatStore
+ * Reads from: sessionStore, settingsStore, modalStore
  * Contexts: useInlineWizardContext, useWizard, useInputContext
  */
 
@@ -35,13 +35,14 @@ import { getActiveTab, createTab } from '../../utils/tabHelpers';
 import { generateId } from '../../utils/ids';
 import { getSlashCommandDescription } from '../../constants/app';
 import { validateNewSession } from '../../utils/sessionValidation';
-import { autorunSynopsisPrompt } from '../../../prompts';
 import { parseSynopsis } from '../../../shared/synopsis';
 import { formatRelativeTime } from '../../../shared/formatters';
 import { gitService } from '../../services/git';
 import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
-import { DEFAULT_BATCH_PROMPT } from '../../components/BatchRunnerModal';
-import type { PreviousUIState, UseInlineWizardReturn } from '../batch/useInlineWizard';
+// Inline types and constants after stripping batch module
+const DEFAULT_BATCH_PROMPT = '';
+const autorunSynopsisPrompt = '';
+import type { UseInlineWizardReturn, PreviousUIState } from '../../contexts/InlineWizardContext';
 import type { WizardState } from '../../components/Wizard/WizardContext';
 import type { HistoryEntryInput } from '../agent/useAgentSessionManagement';
 import type { AgentSpawnResult } from '../agent/useAgentExecution';
@@ -330,7 +331,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					goal: tabWizardState.goal ?? undefined,
 					confidence: tabWizardState.confidence,
 					ready: tabWizardState.ready,
-					conversationHistory: tabWizardState.conversationHistory.map((msg) => ({
+					conversationHistory: tabWizardState.conversationHistory.map((msg: any) => ({
 						id: msg.id,
 						role: msg.role as 'user' | 'assistant' | 'system',
 						content: msg.content,
@@ -346,7 +347,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					},
 					error: tabWizardState.error,
 					isGeneratingDocs: tabWizardState.isGeneratingDocs,
-					generatedDocuments: tabWizardState.generatedDocuments.map((doc) => ({
+					generatedDocuments: tabWizardState.generatedDocuments.map((doc: any) => ({
 						filename: doc.filename,
 						content: doc.content,
 						taskCount: doc.taskCount,
@@ -414,7 +415,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 			const tabId = activeTab?.id;
 
 			await sendInlineWizardMessage(content, images, {
-				onThinkingChunk: (chunk) => {
+				onThinkingChunk: (chunk: string) => {
 					if (!sessionId || !tabId) return;
 
 					const trimmed = chunk.trim();
@@ -451,7 +452,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 						})
 					);
 				},
-				onToolExecution: (toolEvent) => {
+				onToolExecution: (toolEvent: any) => {
 					if (!sessionId || !tabId) return;
 
 					setSessions((prev) =>
@@ -1189,7 +1190,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 
 			clearResumeState();
 			completeWizard(newId);
-			setActiveRightTab('autorun');
+			setActiveRightTab('files');
 
 			if (wantsTour) {
 				setTimeout(() => {

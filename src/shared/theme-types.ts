@@ -26,7 +26,7 @@ export type ThemeId =
 	| 'catppuccin-latte'
 	| 'ayu-light'
 	| 'pedurple'
-	| 'maestros-choice'
+	| 'alfredis-choice'
 	| 'dre-synth'
 	| 'inquest'
 	| 'custom';
@@ -101,7 +101,7 @@ export function isValidThemeId(id: string): id is ThemeId {
 		'catppuccin-latte',
 		'ayu-light',
 		'pedurple',
-		'maestros-choice',
+		'alfredis-choice',
 		'dre-synth',
 		'inquest',
 		'custom',

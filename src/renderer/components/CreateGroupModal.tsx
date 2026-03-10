@@ -1,7 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import type { Theme, Group } from '../types';
-import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { Modal, ModalFooter, EmojiPickerField, FormInput } from './ui';
 import { generateId } from '../utils/ids';
 
 interface CreateGroupModalProps {
@@ -9,80 +7,84 @@ interface CreateGroupModalProps {
 	onClose: () => void;
 	groups: Group[];
 	setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
-	onGroupCreated?: (groupId: string) => void; // Optional callback when group is created
+	onGroupCreated?: (groupId: string) => void;
 }
 
-export function CreateGroupModal(props: CreateGroupModalProps) {
-	const { theme, onClose, groups, setGroups, onGroupCreated } = props;
-
-	const [groupName, setGroupName] = useState('');
-	const [groupEmoji, setGroupEmoji] = useState('📂');
-
-	const inputRef = useRef<HTMLInputElement>(null);
+export function CreateGroupModal({
+	theme,
+	onClose,
+	groups: _groups,
+	setGroups,
+	onGroupCreated,
+}: CreateGroupModalProps) {
+	const [name, setName] = useState('');
+	const emoji = '📁';
 
 	const handleCreate = () => {
-		if (groupName.trim()) {
-			const newGroupId = `group-${generateId()}`;
-			const newGroup: Group = {
-				id: newGroupId,
-				name: groupName.trim().toUpperCase(),
-				emoji: groupEmoji,
-				collapsed: false,
-			};
-			setGroups([...groups, newGroup]);
+		const trimmed = name.trim();
+		if (!trimmed) return;
 
-			// Call callback with new group ID if provided
-			if (onGroupCreated) {
-				onGroupCreated(newGroupId);
-			}
-
-			setGroupName('');
-			setGroupEmoji('📂');
-			onClose();
-		}
+		const id = generateId();
+		const newGroup: Group = {
+			id,
+			name: trimmed.toUpperCase(),
+			emoji,
+			collapsed: false,
+		};
+		setGroups((prev) => [...prev, newGroup]);
+		onGroupCreated?.(id);
+		onClose();
 	};
 
 	return (
-		<Modal
-			theme={theme}
-			title="Create New Group"
-			priority={MODAL_PRIORITIES.CREATE_GROUP}
-			onClose={onClose}
-			initialFocusRef={inputRef}
-			footer={
-				<ModalFooter
-					theme={theme}
-					onCancel={onClose}
-					onConfirm={handleCreate}
-					confirmLabel="Create"
-					confirmDisabled={!groupName.trim()}
-				/>
-			}
+		<div
+			className="fixed inset-0 z-50 flex items-center justify-center"
+			style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
 		>
-			<div className="flex gap-4 items-end">
-				{/* Emoji Selector - Left Side */}
-				<EmojiPickerField
-					theme={theme}
-					value={groupEmoji}
-					onChange={setGroupEmoji}
-					restoreFocusRef={inputRef}
+			<div
+				className="rounded-lg p-6 w-80"
+				style={{ backgroundColor: theme.colors.bgMain, border: `1px solid ${theme.colors.border}` }}
+			>
+				<h2 className="text-lg font-semibold mb-4" style={{ color: theme.colors.textMain }}>
+					Create Group
+				</h2>
+				<input
+					type="text"
+					value={name}
+					onChange={(e) => setName(e.target.value)}
+					placeholder="Group name"
+					className="w-full px-3 py-2 rounded mb-4"
+					style={{
+						backgroundColor: theme.colors.bgSidebar,
+						color: theme.colors.textMain,
+						border: `1px solid ${theme.colors.border}`,
+					}}
+					autoFocus
+					onKeyDown={(e) => {
+						if (e.key === 'Enter') handleCreate();
+						if (e.key === 'Escape') onClose();
+					}}
 				/>
-
-				{/* Group Name Input - Right Side */}
-				<div className="flex-1">
-					<FormInput
-						ref={inputRef}
-						theme={theme}
-						label="Group Name"
-						value={groupName}
-						onChange={setGroupName}
-						onSubmit={groupName.trim() ? handleCreate : undefined}
-						placeholder="Enter group name..."
-						heightClass="h-[52px]"
-						autoFocus
-					/>
+				<div className="flex justify-end gap-2">
+					<button
+						onClick={onClose}
+						className="px-3 py-1.5 rounded text-sm"
+						style={{ color: theme.colors.textDim }}
+					>
+						Cancel
+					</button>
+					<button
+						onClick={handleCreate}
+						className="px-3 py-1.5 rounded text-sm"
+						style={{
+							backgroundColor: theme.colors.accent,
+							color: theme.colors.bgMain,
+						}}
+					>
+						Create
+					</button>
 				</div>
 			</div>
-		</Modal>
+		</div>
 	);
 }

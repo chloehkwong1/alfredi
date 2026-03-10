@@ -6,16 +6,14 @@ import {
 	FileCode,
 	BarChart3,
 	Loader2,
-	Trophy,
 	Globe,
-	Check,
 	BookOpen,
 } from 'lucide-react';
-import type { Theme, AutoRunStats, MaestroUsageStats, LeaderboardRegistration } from '../types';
+import type { Theme, AutoRunStats, MaestroUsageStats } from '../types';
 import type { GlobalAgentStats } from '../../shared/types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import pedramAvatar from '../assets/pedram-avatar.png';
-import { AchievementCard } from './AchievementCard';
+
 import { formatTokensCompact } from '../utils/formatters';
 import { Modal } from './ui/Modal';
 
@@ -26,9 +24,6 @@ interface AboutModalProps {
 	/** Global hands-on time in milliseconds (from settings, persists across sessions) */
 	handsOnTimeMs: number;
 	onClose: () => void;
-	onOpenLeaderboardRegistration?: () => void;
-	isLeaderboardRegistered?: boolean;
-	leaderboardRegistration?: LeaderboardRegistration | null;
 }
 
 export function AboutModal({
@@ -37,14 +32,10 @@ export function AboutModal({
 	usageStats,
 	handsOnTimeMs,
 	onClose,
-	onOpenLeaderboardRegistration,
-	isLeaderboardRegistered,
-	leaderboardRegistration,
 }: AboutModalProps) {
 	const [globalStats, setGlobalStats] = useState<GlobalAgentStats | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [isStatsComplete, setIsStatsComplete] = useState(false);
-	const badgeEscapeHandlerRef = useRef<(() => boolean) | null>(null);
 
 	// Use ref to avoid re-registering layer when onClose changes
 	const onCloseRef = useRef(onClose);
@@ -103,17 +94,9 @@ export function AboutModal({
 		return `${seconds}s`;
 	};
 
-	// Custom escape handler that checks for badge overlay first
-	// Uses refs to avoid dependency changes that would cause infinite loops
 	const handleEscape = useCallback(() => {
-		// If badge overlay is open, close it first
-		if (badgeEscapeHandlerRef.current) {
-			badgeEscapeHandlerRef.current();
-			return;
-		}
-		// Otherwise close the modal
 		onCloseRef.current();
-	}, []); // No dependencies - uses refs
+	}, []);
 
 	// Custom header with Globe and Discord buttons (includes close button)
 	const customHeader = (
@@ -123,7 +106,7 @@ export function AboutModal({
 		>
 			<div className="flex items-center gap-2">
 				<h2 className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
-					About Maestro
+					About Alfredi
 				</h2>
 				<button
 					onClick={() => window.maestro.shell.openExternal('https://runmaestro.ai')}
@@ -167,7 +150,7 @@ export function AboutModal({
 	return (
 		<Modal
 			theme={theme}
-			title="About Maestro"
+			title="About Alfredi"
 			priority={MODAL_PRIORITIES.ABOUT}
 			onClose={handleEscape}
 			width={450}
@@ -184,7 +167,7 @@ export function AboutModal({
 								className="text-2xl font-bold tracking-widest"
 								style={{ color: theme.colors.textMain }}
 							>
-								MAESTRO
+								<span style={{ color: theme.colors.accent }}>Al</span>fredi
 							</h1>
 							<span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
 								v{__APP_VERSION__}
@@ -192,23 +175,10 @@ export function AboutModal({
 							</span>
 						</div>
 						<p className="text-xs opacity-70" style={{ color: theme.colors.textDim }}>
-							Agent Orchestration Command Center
+							AI Agent Command Center
 						</p>
 					</div>
 				</div>
-
-				{/* Achievements Section */}
-				<AchievementCard
-					theme={theme}
-					autoRunStats={autoRunStats}
-					globalStats={globalStats}
-					usageStats={usageStats}
-					handsOnTimeMs={handsOnTimeMs}
-					leaderboardRegistration={leaderboardRegistration}
-					onEscapeWithBadgeOpen={(handler) => {
-						badgeEscapeHandlerRef.current = handler;
-					}}
-				/>
 
 				{/* Global Usage Stats - show loading or stats from all Claude projects */}
 				<div
@@ -343,33 +313,6 @@ export function AboutModal({
 						</div>
 						<ExternalLink className="w-4 h-4" style={{ color: theme.colors.textDim }} />
 					</button>
-
-					{/* Leaderboard Registration */}
-					{onOpenLeaderboardRegistration && (
-						<button
-							onClick={onOpenLeaderboardRegistration}
-							className="flex-1 flex items-center justify-between p-3 rounded border hover:bg-white/5 transition-colors"
-							style={{
-								borderColor: isLeaderboardRegistered ? theme.colors.success : theme.colors.accent,
-								backgroundColor: isLeaderboardRegistered ? `${theme.colors.success}10` : undefined,
-							}}
-						>
-							<div className="flex items-center gap-2">
-								<Trophy
-									className="w-4 h-4"
-									style={{ color: isLeaderboardRegistered ? theme.colors.success : '#FFD700' }}
-								/>
-								<span className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-									{isLeaderboardRegistered ? 'Leaderboard' : 'Join Leaderboard'}
-								</span>
-							</div>
-							{isLeaderboardRegistered ? (
-								<Check className="w-4 h-4" style={{ color: theme.colors.success }} />
-							) : (
-								<ExternalLink className="w-4 h-4" style={{ color: theme.colors.textDim }} />
-							)}
-						</button>
-					)}
 				</div>
 
 				{/* Divider */}

@@ -3,10 +3,10 @@
  *
  * Centralized hook for agent configuration state management.
  * Eliminates duplicated detection, config loading, model fetching,
- * and custom path/args/envvars state across GroupChatModal, EncoreTab,
+ * and custom path/args/envvars state across EncoreTab,
  * AgentCreationDialog, and NewInstanceModal.
  *
- * Supports single-agent mode (flat state) for GroupChatModal and EncoreTab.
+ * Supports single-agent mode (flat state) for EncoreTab.
  * Multi-agent mode (Record-based state) will be added in a later phase.
  */
 
@@ -289,6 +289,7 @@ export function useAgentConfiguration(
 		if (shouldLoadSshRemotes) {
 			(async () => {
 				try {
+					if (!window.maestro.sshRemote) return;
 					const configsResult = await window.maestro.sshRemote.getConfigs();
 					if (configsResult.success && configsResult.configs) {
 						setSshRemotes(configsResult.configs);

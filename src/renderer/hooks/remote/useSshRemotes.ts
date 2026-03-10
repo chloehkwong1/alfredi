@@ -80,6 +80,7 @@ export function useSshRemotes(): UseSshRemotesReturn {
 	 */
 	const loadConfigs = useCallback(async () => {
 		try {
+			if (!window.maestro.sshRemote) return;
 			const result = await ipcCache.getOrFetch(
 				'ssh-configs',
 				() => window.maestro.sshRemote.getConfigs(),
@@ -101,6 +102,7 @@ export function useSshRemotes(): UseSshRemotesReturn {
 	 */
 	const loadDefaultId = useCallback(async () => {
 		try {
+			if (!window.maestro.sshRemote) return;
 			const result = await window.maestro.sshRemote.getDefaultId();
 			if (result.success) {
 				setDefaultIdState(result.id ?? null);
@@ -137,6 +139,7 @@ export function useSshRemotes(): UseSshRemotesReturn {
 			config: Partial<SshRemoteConfig> & { id?: string }
 		): Promise<{ success: boolean; config?: SshRemoteConfig; error?: string }> => {
 			try {
+				if (!window.maestro.sshRemote) return { success: false, error: 'SSH remote not available' };
 				const result = await window.maestro.sshRemote.saveConfig(config);
 				if (result.success && result.config) {
 					// Invalidate cache since configs changed
@@ -178,6 +181,7 @@ export function useSshRemotes(): UseSshRemotesReturn {
 	const deleteConfig = useCallback(
 		async (id: string): Promise<{ success: boolean; error?: string }> => {
 			try {
+				if (!window.maestro.sshRemote) return { success: false, error: 'SSH remote not available' };
 				const result = await window.maestro.sshRemote.deleteConfig(id);
 				if (result.success) {
 					// Invalidate cache since configs changed
@@ -212,6 +216,7 @@ export function useSshRemotes(): UseSshRemotesReturn {
 	const setDefaultId = useCallback(
 		async (id: string | null): Promise<{ success: boolean; error?: string }> => {
 			try {
+				if (!window.maestro.sshRemote) return { success: false, error: 'SSH remote not available' };
 				const result = await window.maestro.sshRemote.setDefaultId(id);
 				if (result.success) {
 					setDefaultIdState(id);
@@ -245,6 +250,10 @@ export function useSshRemotes(): UseSshRemotesReturn {
 			setTestingConfigId(testId);
 
 			try {
+				if (!window.maestro.sshRemote) {
+					setTestingConfigId(null);
+					return { success: false, error: 'SSH remote not available' };
+				}
 				const result = await window.maestro.sshRemote.test(configOrId, agentCommand);
 				setTestingConfigId(null);
 

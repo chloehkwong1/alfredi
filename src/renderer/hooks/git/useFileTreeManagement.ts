@@ -349,9 +349,8 @@ export function useFileTreeManagement(
 					)
 				);
 
-				// Also refresh history panel (reload from disk first to bypass electron-store cache)
+				// Also reload history from disk (to bypass electron-store cache)
 				await window.maestro.history.reload();
-				rightPanelRef.current?.refreshHistoryPanel();
 			} catch (error) {
 				// Refresh failed — log it but preserve the existing file tree.
 				// A transient SSH failure shouldn't wipe out a working tree.

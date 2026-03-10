@@ -16,27 +16,19 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 	navBack: { id: 'navBack', label: 'Navigate Back', keys: ['Meta', 'Shift', ','] },
 	navForward: { id: 'navForward', label: 'Navigate Forward', keys: ['Meta', 'Shift', '.'] },
 	newInstance: { id: 'newInstance', label: 'New Agent', keys: ['Meta', 'n'] },
-	newGroupChat: { id: 'newGroupChat', label: 'New Group Chat', keys: ['Alt', 'Meta', 'c'] },
 	killInstance: { id: 'killInstance', label: 'Remove', keys: ['Meta', 'Shift', 'Backspace'] },
 	moveToGroup: { id: 'moveToGroup', label: 'Move Session to Group', keys: ['Meta', 'Shift', 'm'] },
 	toggleMode: { id: 'toggleMode', label: 'Switch AI/Shell Mode', keys: ['Meta', 'j'] },
 	quickAction: { id: 'quickAction', label: 'Quick Actions', keys: ['Meta', 'k'] },
-	help: { id: 'help', label: 'Show Shortcuts', keys: ['Meta', '/'] },
 	settings: { id: 'settings', label: 'Open Settings', keys: ['Meta', ','] },
 	agentSettings: { id: 'agentSettings', label: 'Open Agent Settings', keys: ['Alt', 'Meta', ','] },
 	goToFiles: { id: 'goToFiles', label: 'Go to Files Tab', keys: ['Meta', 'Shift', 'f'] },
 	goToHistory: { id: 'goToHistory', label: 'Go to History Tab', keys: ['Meta', 'Shift', 'h'] },
-	goToAutoRun: { id: 'goToAutoRun', label: 'Go to Auto Run Tab', keys: ['Meta', 'Shift', '1'] },
 	copyFilePath: { id: 'copyFilePath', label: 'Copy File Path (in Preview)', keys: ['Meta', 'p'] },
 	toggleMarkdownMode: {
 		id: 'toggleMarkdownMode',
 		label: 'Toggle Edit/Preview',
 		keys: ['Meta', 'e'],
-	},
-	toggleAutoRunExpanded: {
-		id: 'toggleAutoRunExpanded',
-		label: 'Toggle Auto Run Expanded',
-		keys: ['Meta', 'Shift', 'e'],
 	},
 	focusInput: { id: 'focusInput', label: 'Toggle Input/Output Focus', keys: ['Meta', '.'] },
 	focusSidebar: { id: 'focusSidebar', label: 'Focus Left Panel', keys: ['Meta', 'Shift', 'a'] },
@@ -53,7 +45,6 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 		label: 'System Process Monitor',
 		keys: ['Alt', 'Meta', 'p'],
 	},
-	usageDashboard: { id: 'usageDashboard', label: 'Usage Dashboard', keys: ['Alt', 'Meta', 'u'] },
 	jumpToBottom: { id: 'jumpToBottom', label: 'Jump to Bottom', keys: ['Meta', 'Shift', 'j'] },
 	prevTab: { id: 'prevTab', label: 'Previous Tab', keys: ['Meta', 'Shift', '['] },
 	nextTab: { id: 'nextTab', label: 'Next Tab', keys: ['Meta', 'Shift', ']'] },
@@ -67,16 +58,10 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 	openWizard: { id: 'openWizard', label: 'New Agent Wizard', keys: ['Meta', 'Shift', 'n'] },
 	fuzzyFileSearch: { id: 'fuzzyFileSearch', label: 'Fuzzy File Search', keys: ['Meta', 'g'] },
 	toggleBookmark: { id: 'toggleBookmark', label: 'Toggle Bookmark', keys: ['Meta', 'Shift', 'b'] },
-	openSymphony: { id: 'openSymphony', label: 'Maestro Symphony', keys: ['Meta', 'Shift', 'y'] },
 	toggleAutoScroll: {
 		id: 'toggleAutoScroll',
 		label: 'Toggle Auto-Scroll AI Output',
 		keys: ['Alt', 'Meta', 's'],
-	},
-	directorNotes: {
-		id: 'directorNotes',
-		label: "Director's Notes",
-		keys: ['Meta', 'Shift', 'o'],
 	},
 };
 
@@ -102,11 +87,6 @@ export const FIXED_SHORTCUTS: Record<string, Shortcut> = {
 	searchOutput: {
 		id: 'searchOutput',
 		label: 'Search Output (in Main Window)',
-		keys: ['Meta', 'f'],
-	},
-	searchDirectorNotes: {
-		id: 'searchDirectorNotes',
-		label: "Search Director's Notes",
 		keys: ['Meta', 'f'],
 	},
 	filePreviewBack: {

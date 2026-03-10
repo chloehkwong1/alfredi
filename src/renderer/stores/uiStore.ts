@@ -24,7 +24,6 @@ export interface UIStoreState {
 
 	// Sidebar collapse/expand
 	bookmarksCollapsed: boolean;
-	groupChatsExpanded: boolean;
 
 	// Session list filter
 	showUnreadOnly: boolean;
@@ -48,9 +47,6 @@ export interface UIStoreState {
 	// History panel search
 	historySearchFilterOpen: boolean;
 
-	// Group chat history panel search
-	groupChatHistorySearchFilterOpen: boolean;
-
 	// Drag and drop (session dragging in sidebar)
 	draggingSessionId: string | null;
 
@@ -73,9 +69,6 @@ export interface UIStoreActions {
 	// Sidebar collapse/expand
 	setBookmarksCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
 	toggleBookmarksCollapsed: () => void;
-	setGroupChatsExpanded: (expanded: boolean | ((prev: boolean) => boolean)) => void;
-	toggleGroupChatsExpanded: () => void;
-
 	// Session list filter
 	setShowUnreadOnly: (show: boolean | ((prev: boolean) => boolean)) => void;
 	toggleShowUnreadOnly: () => void;
@@ -101,9 +94,6 @@ export interface UIStoreActions {
 	// History panel search
 	setHistorySearchFilterOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 
-	// Group chat history panel search
-	setGroupChatHistorySearchFilterOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-
 	// Drag and drop
 	setDraggingSessionId: (id: string | null | ((prev: string | null) => string | null)) => void;
 
@@ -128,7 +118,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 	activeFocus: 'main',
 	activeRightTab: 'files',
 	bookmarksCollapsed: false,
-	groupChatsExpanded: true,
 	showUnreadOnly: false,
 	preFilterActiveTabId: null,
 	preTerminalFileTabId: null,
@@ -139,7 +128,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 	outputSearchQuery: '',
 	sessionFilterOpen: false,
 	historySearchFilterOpen: false,
-	groupChatHistorySearchFilterOpen: false,
 	draggingSessionId: null,
 	editingGroupId: null,
 	editingSessionId: null,
@@ -156,10 +144,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 	setBookmarksCollapsed: (v) =>
 		set((s) => ({ bookmarksCollapsed: resolve(v, s.bookmarksCollapsed) })),
 	toggleBookmarksCollapsed: () => set((s) => ({ bookmarksCollapsed: !s.bookmarksCollapsed })),
-	setGroupChatsExpanded: (v) =>
-		set((s) => ({ groupChatsExpanded: resolve(v, s.groupChatsExpanded) })),
-	toggleGroupChatsExpanded: () => set((s) => ({ groupChatsExpanded: !s.groupChatsExpanded })),
-
 	setShowUnreadOnly: (v) => set((s) => ({ showUnreadOnly: resolve(v, s.showUnreadOnly) })),
 	toggleShowUnreadOnly: () => set((s) => ({ showUnreadOnly: !s.showUnreadOnly })),
 	setPreFilterActiveTabId: (id) => set({ preFilterActiveTabId: id }),
@@ -178,11 +162,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 	setSessionFilterOpen: (v) => set((s) => ({ sessionFilterOpen: resolve(v, s.sessionFilterOpen) })),
 	setHistorySearchFilterOpen: (v) =>
 		set((s) => ({ historySearchFilterOpen: resolve(v, s.historySearchFilterOpen) })),
-	setGroupChatHistorySearchFilterOpen: (v) =>
-		set((s) => ({
-			groupChatHistorySearchFilterOpen: resolve(v, s.groupChatHistorySearchFilterOpen),
-		})),
-
 	setDraggingSessionId: (v) => set((s) => ({ draggingSessionId: resolve(v, s.draggingSessionId) })),
 
 	setEditingGroupId: (v) => set((s) => ({ editingGroupId: resolve(v, s.editingGroupId) })),

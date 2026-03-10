@@ -30,27 +30,18 @@ import {
 	createUpdatesApi,
 	createAppApi,
 } from './system';
-import { createSshRemoteApi } from './sshRemote';
 import { createLoggerApi } from './logger';
 import { createClaudeApi, createAgentSessionsApi } from './sessions';
 import { createTempfileApi, createHistoryApi, createCliApi } from './files';
-import { createSpeckitApi, createOpenspecApi } from './commands';
-import { createAutorunApi, createPlaybooksApi, createMarketplaceApi } from './autorun';
-import { createDebugApi, createDocumentGraphApi } from './debug';
-import { createGroupChatApi } from './groupChat';
 import { createStatsApi } from './stats';
 import { createNotificationApi } from './notifications';
-import { createLeaderboardApi } from './leaderboard';
+
 import { createAttachmentsApi } from './attachments';
 import { createProcessApi } from './process';
 import { createGitApi } from './git';
 import { createFsApi } from './fs';
 import { createAgentsApi } from './agents';
-import { createSymphonyApi } from './symphony';
 import { createTabNamingApi } from './tabNaming';
-import { createDirectorNotesApi } from './directorNotes';
-import { createWakatimeApi } from './wakatime';
-
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('maestro', {
@@ -105,9 +96,6 @@ contextBridge.exposeInMainWorld('maestro', {
 	// Tunnel API (Cloudflare)
 	tunnel: createTunnelApi(),
 
-	// SSH Remote API
-	sshRemote: createSshRemoteApi(),
-
 	// Sync API
 	sync: createSyncApi(),
 
@@ -138,35 +126,11 @@ contextBridge.exposeInMainWorld('maestro', {
 	// CLI activity API
 	cli: createCliApi(),
 
-	// Spec Kit API
-	speckit: createSpeckitApi(),
-
-	// OpenSpec API
-	openspec: createOpenspecApi(),
-
 	// Notification API
 	notification: createNotificationApi(),
 
 	// Attachments API
 	attachments: createAttachmentsApi(),
-
-	// Auto Run API
-	autorun: createAutorunApi(),
-
-	// Playbooks API
-	playbooks: createPlaybooksApi(),
-
-	// Marketplace API
-	marketplace: createMarketplaceApi(),
-
-	// Debug Package API
-	debug: createDebugApi(),
-
-	// Document Graph API
-	documentGraph: createDocumentGraphApi(),
-
-	// Group Chat API
-	groupChat: createGroupChatApi(),
 
 	// App lifecycle API
 	app: createAppApi(),
@@ -177,20 +141,8 @@ contextBridge.exposeInMainWorld('maestro', {
 	// Stats API
 	stats: createStatsApi(),
 
-	// Leaderboard API
-	leaderboard: createLeaderboardApi(),
-
-	// Symphony API (token donations / open source contributions)
-	symphony: createSymphonyApi(),
-
 	// Tab Naming API (automatic tab name generation)
 	tabNaming: createTabNamingApi(),
-
-	// Director's Notes API (unified history + synopsis)
-	directorNotes: createDirectorNotesApi(),
-
-	// WakaTime API (CLI check, API key validation)
-	wakatime: createWakatimeApi(),
 });
 
 // Re-export factory functions for external consumers (e.g., tests)
@@ -217,8 +169,6 @@ export {
 	createPowerApi,
 	createUpdatesApi,
 	createAppApi,
-	// SSH Remote
-	createSshRemoteApi,
 	// Logger
 	createLoggerApi,
 	// Sessions
@@ -228,24 +178,10 @@ export {
 	createTempfileApi,
 	createHistoryApi,
 	createCliApi,
-	// Commands
-	createSpeckitApi,
-	createOpenspecApi,
-	// Auto Run
-	createAutorunApi,
-	createPlaybooksApi,
-	createMarketplaceApi,
-	// Debug
-	createDebugApi,
-	createDocumentGraphApi,
-	// Group Chat
-	createGroupChatApi,
 	// Stats
 	createStatsApi,
 	// Notifications
 	createNotificationApi,
-	// Leaderboard
-	createLeaderboardApi,
 	// Attachments
 	createAttachmentsApi,
 	// Process
@@ -256,14 +192,8 @@ export {
 	createFsApi,
 	// Agents
 	createAgentsApi,
-	// Symphony
-	createSymphonyApi,
 	// Tab Naming
 	createTabNamingApi,
-	// Director's Notes
-	createDirectorNotesApi,
-	// WakaTime
-	createWakatimeApi,
 };
 
 // Re-export types for TypeScript consumers
@@ -304,12 +234,6 @@ export type {
 	UpdateStatus,
 } from './system';
 export type {
-	// From sshRemote
-	SshRemoteApi,
-	SshRemoteConfig,
-	SshConfigHost,
-} from './sshRemote';
-export type {
 	// From logger
 	LoggerApi,
 } from './logger';
@@ -329,43 +253,9 @@ export type {
 	HistoryEntry,
 } from './files';
 export type {
-	// From commands
-	SpeckitApi,
-	OpenspecApi,
-	CommandMetadata,
-	CommandDefinition,
-} from './commands';
-export type {
-	// From autorun
-	AutorunApi,
-	PlaybooksApi,
-	MarketplaceApi,
-	Playbook,
-	PlaybookDocument,
-	WorktreeSettings,
-} from './autorun';
-export type {
-	// From debug
-	DebugApi,
-	DocumentGraphApi,
-	DebugPackageOptions,
-	DocumentGraphChange,
-} from './debug';
-export type {
-	// From groupChat
-	GroupChatApi,
-	ModeratorConfig,
-	Participant,
-	ChatMessage,
-	GroupChatHistoryEntry,
-	ModeratorUsage,
-} from './groupChat';
-export type {
 	// From stats
 	StatsApi,
 	QueryEvent,
-	AutoRunSession,
-	AutoRunTask,
 	SessionCreatedEvent,
 	StatsAggregation,
 } from './stats';
@@ -375,19 +265,6 @@ export type {
 	NotificationShowResponse,
 	NotificationCommandResponse,
 } from './notifications';
-export type {
-	// From leaderboard
-	LeaderboardApi,
-	LeaderboardSubmitData,
-	LeaderboardSubmitResponse,
-	AuthStatusResponse,
-	ResendConfirmationResponse,
-	LeaderboardEntry,
-	LongestRunEntry,
-	LeaderboardGetResponse,
-	LongestRunsGetResponse,
-	LeaderboardSyncResponse,
-} from './leaderboard';
 export type {
 	// From attachments
 	AttachmentsApi,
@@ -433,42 +310,7 @@ export type {
 	AgentRefreshResult,
 } from './agents';
 export type {
-	// From symphony
-	SymphonyApi,
-	SymphonyRegistry,
-	SymphonyRepository,
-	SymphonyIssue,
-	DocumentReference,
-	ClaimedByPR,
-	ActiveContribution,
-	CompletedContribution,
-	ContributorStats,
-	ContributionProgress,
-	ContributionTokenUsage,
-	SymphonyState,
-	GetRegistryResponse,
-	GetIssuesResponse,
-	GetStateResponse,
-	StartContributionParams,
-	StartContributionResponse,
-	CreateDraftPRResponse,
-	CompleteContributionResponse,
-} from './symphony';
-export type {
 	// From tabNaming
 	TabNamingApi,
 	TabNamingConfig,
 } from './tabNaming';
-export type {
-	// From directorNotes
-	DirectorNotesApi,
-	UnifiedHistoryOptions,
-	UnifiedHistoryEntry,
-	SynopsisOptions,
-	SynopsisResult,
-	SynopsisStats,
-} from './directorNotes';
-export type {
-	// From wakatime
-	WakatimeApi,
-} from './wakatime';

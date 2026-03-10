@@ -6,13 +6,12 @@
  * in App.tsx. Modals are grouped by their purpose for easier maintenance.
  *
  * Current Groups:
- * - AppInfoModals: Info/display modals (AboutModal, ShortcutsHelpModal, etc.)
+ * - AppInfoModals: Info/display modals (AboutModal, etc.)
  * - AppConfirmModals: Confirmation modals (ConfirmModal, QuitConfirmModal)
  * - AppSessionModals: Session management modals (NewInstanceModal, EditAgentModal, RenameSessionModal, RenameTabModal)
  * - AppGroupModals: Group management modals (CreateGroupModal, RenameGroupModal)
  * - AppWorktreeModals: Worktree/PR management modals
  * - AppUtilityModals: Utility and workflow modals
- * - AppGroupChatModals: Group Chat management modals
  * - AppAgentModals: Agent error and context transfer modals
  *
  * NOTE: LogViewer is NOT included here because it's a content replacement component
@@ -23,17 +22,12 @@
 import React, { lazy, Suspense, memo, useMemo } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useSessionStore } from '../stores/sessionStore';
-import { useGroupChatStore } from '../stores/groupChatStore';
 import { useModalStore } from '../stores/modalStore';
 import type {
 	Theme,
 	Session,
 	Group,
-	GroupChat,
-	GroupChatMessage,
-	ModeratorConfig,
 	Shortcut,
-	KeyboardMasteryStats,
 	AutoRunStats,
 	MaestroUsageStats,
 	RightPanelTab,
@@ -41,7 +35,6 @@ import type {
 	BatchRunConfig,
 	AgentError,
 	ToolType,
-	LeaderboardRegistration,
 	ThinkingMode,
 } from '../types';
 import type { FileNode } from '../types/fileTree';
@@ -50,15 +43,11 @@ import type { GroomingProgress, MergeResult } from '../types/contextMerge';
 
 // Info/Display Modal Components
 import { AboutModal } from './AboutModal';
-import { ShortcutsHelpModal } from './ShortcutsHelpModal';
 import { UpdateCheckModal } from './UpdateCheckModal';
 
 // Lazy-loaded heavy modals (rarely used, loaded on-demand)
 const ProcessMonitor = lazy(() =>
 	import('./ProcessMonitor').then((m) => ({ default: m.ProcessMonitor }))
-);
-const UsageDashboardModal = lazy(() =>
-	import('./UsageDashboard').then((m) => ({ default: m.UsageDashboardModal }))
 );
 const GitDiffViewer = lazy(() =>
 	import('./GitDiffViewer').then((m) => ({ default: m.GitDiffViewer }))
@@ -92,22 +81,14 @@ import { TabSwitcherModal } from './TabSwitcherModal';
 import { FileSearchModal, type FlatFileItem } from './FileSearchModal';
 import { PromptComposerModal } from './PromptComposerModal';
 import { ExecutionQueueBrowser } from './ExecutionQueueBrowser';
-import { BatchRunnerModal } from './BatchRunnerModal';
-import { AutoRunSetupModal } from './AutoRunSetupModal';
+// BatchRunnerModal and AutoRunSetupModal removed (Auto Run stripped)
 import { LightboxModal } from './LightboxModal';
-
-// Group Chat Modal Components
-import { GroupChatModal } from './GroupChatModal';
-import { DeleteGroupChatModal } from './DeleteGroupChatModal';
-import { RenameGroupChatModal } from './RenameGroupChatModal';
-import { GroupChatInfoOverlay } from './GroupChatInfoOverlay';
 
 // Agent/Transfer Modal Components
 import { AgentErrorModal, type RecoveryAction } from './AgentErrorModal';
 import { MergeSessionModal, type MergeOptions } from './MergeSessionModal';
-import { SendToAgentModal, type SendToAgentOptions } from './SendToAgentModal';
+import type { SendToAgentOptions } from '../types';
 import { TransferProgressModal } from './TransferProgressModal';
-import { LeaderboardRegistrationModal } from './LeaderboardRegistrationModal';
 
 // Re-export types for consumers
 export type { PRDetails, FlatFileItem, RecoveryAction, MergeOptions, SendToAgentOptions };
@@ -122,14 +103,6 @@ export type { PRDetails, FlatFileItem, RecoveryAction, MergeOptions, SendToAgent
 export interface AppInfoModalsProps {
 	theme: Theme;
 
-	// Shortcuts Help Modal
-	shortcutsHelpOpen: boolean;
-	onCloseShortcutsHelp: () => void;
-	shortcuts: Record<string, Shortcut>;
-	tabShortcuts: Record<string, Shortcut>;
-	hasNoAgents: boolean;
-	keyboardMasteryStats: KeyboardMasteryStats;
-
 	// About Modal
 	aboutModalOpen: boolean;
 	onCloseAboutModal: () => void;
@@ -137,9 +110,6 @@ export interface AppInfoModalsProps {
 	usageStats?: MaestroUsageStats | null;
 	/** Global hands-on time in milliseconds (from settings) */
 	handsOnTimeMs: number;
-	onOpenLeaderboardRegistration: () => void;
-	isLeaderboardRegistered: boolean;
-	leaderboardRegistration?: LeaderboardRegistration | null;
 
 	// Update Check Modal
 	updateCheckModalOpen: boolean;
@@ -150,50 +120,28 @@ export interface AppInfoModalsProps {
 	onCloseProcessMonitor: () => void;
 	sessions: Session[]; // Used by ProcessMonitor
 	groups: Group[];
-	groupChats: GroupChat[];
 	onNavigateToSession: (sessionId: string, tabId?: string) => void;
-	onNavigateToGroupChat: (groupChatId: string) => void;
-
-	// Usage Dashboard Modal
-	usageDashboardOpen: boolean;
-	onCloseUsageDashboard: () => void;
-	/** Default time range for the Usage Dashboard from settings */
-	defaultStatsTimeRange?: 'day' | 'week' | 'month' | 'year' | 'all';
-	/** Enable colorblind-friendly colors for dashboard charts */
-	colorBlindMode?: boolean;
 }
 
 /**
  * AppInfoModals - Renders info/display modals (overlay modals only)
  *
  * Contains:
- * - ShortcutsHelpModal: Shows keyboard shortcuts reference
  * - AboutModal: Shows app info and stats
  * - UpdateCheckModal: Shows update status
  * - ProcessMonitor: Shows running processes
- * - UsageDashboardModal: Shows usage analytics and visualizations
  *
  * NOTE: LogViewer is intentionally excluded - it's a content replacement component
  * that needs to be positioned in the flex layout, not an overlay modal.
  */
 export const AppInfoModals = memo(function AppInfoModals({
 	theme,
-	// Shortcuts Help Modal
-	shortcutsHelpOpen,
-	onCloseShortcutsHelp,
-	shortcuts,
-	tabShortcuts,
-	hasNoAgents,
-	keyboardMasteryStats,
 	// About Modal
 	aboutModalOpen,
 	onCloseAboutModal,
 	autoRunStats,
 	usageStats,
 	handsOnTimeMs,
-	onOpenLeaderboardRegistration,
-	isLeaderboardRegistered,
-	leaderboardRegistration,
 	// Update Check Modal
 	updateCheckModalOpen,
 	onCloseUpdateCheckModal,
@@ -202,29 +150,10 @@ export const AppInfoModals = memo(function AppInfoModals({
 	onCloseProcessMonitor,
 	sessions,
 	groups,
-	groupChats,
 	onNavigateToSession,
-	onNavigateToGroupChat,
-	// Usage Dashboard Modal
-	usageDashboardOpen,
-	onCloseUsageDashboard,
-	defaultStatsTimeRange,
-	colorBlindMode,
 }: AppInfoModalsProps) {
 	return (
 		<>
-			{/* --- SHORTCUTS HELP MODAL --- */}
-			{shortcutsHelpOpen && (
-				<ShortcutsHelpModal
-					theme={theme}
-					shortcuts={shortcuts}
-					tabShortcuts={tabShortcuts}
-					onClose={onCloseShortcutsHelp}
-					hasNoAgents={hasNoAgents}
-					keyboardMasteryStats={keyboardMasteryStats}
-				/>
-			)}
-
 			{/* --- ABOUT MODAL --- */}
 			{aboutModalOpen && (
 				<AboutModal
@@ -233,9 +162,6 @@ export const AppInfoModals = memo(function AppInfoModals({
 					usageStats={usageStats}
 					handsOnTimeMs={handsOnTimeMs}
 					onClose={onCloseAboutModal}
-					onOpenLeaderboardRegistration={onOpenLeaderboardRegistration}
-					isLeaderboardRegistered={isLeaderboardRegistered}
-					leaderboardRegistration={leaderboardRegistration}
 				/>
 			)}
 
@@ -249,24 +175,8 @@ export const AppInfoModals = memo(function AppInfoModals({
 						theme={theme}
 						sessions={sessions}
 						groups={groups}
-						groupChats={groupChats}
 						onClose={onCloseProcessMonitor}
 						onNavigateToSession={onNavigateToSession}
-						onNavigateToGroupChat={onNavigateToGroupChat}
-					/>
-				</Suspense>
-			)}
-
-			{/* --- USAGE DASHBOARD MODAL (lazy-loaded) --- */}
-			{usageDashboardOpen && (
-				<Suspense fallback={null}>
-					<UsageDashboardModal
-						isOpen={usageDashboardOpen}
-						onClose={onCloseUsageDashboard}
-						theme={theme}
-						defaultTimeRange={defaultStatsTimeRange}
-						colorBlindMode={colorBlindMode}
-						sessions={sessions}
 					/>
 				</Suspense>
 			)}
@@ -791,11 +701,9 @@ export interface AppUtilityModalsProps {
 	deleteSession: (id: string) => void;
 	setSettingsModalOpen: (open: boolean) => void;
 	setSettingsTab: (tab: SettingsTab) => void;
-	setShortcutsHelpOpen: (open: boolean) => void;
 	setAboutModalOpen: (open: boolean) => void;
 	setLogViewerOpen: (open: boolean) => void;
 	setProcessMonitorOpen: (open: boolean) => void;
-	setUsageDashboardOpen: (open: boolean) => void;
 	setActiveRightTab: (tab: RightPanelTab) => void;
 	setAgentSessionsOpen: (open: boolean) => void;
 	setActiveAgentSessionId: (id: string | null) => void;
@@ -819,17 +727,9 @@ export interface AppUtilityModalsProps {
 	setUpdateCheckModalOpen?: (open: boolean) => void;
 	openWizard: () => void;
 	wizardGoToStep: (step: WizardStep) => void;
-	setDebugWizardModalOpen?: (open: boolean) => void;
-	setDebugPackageModalOpen?: (open: boolean) => void;
 	startTour: () => void;
 	setFuzzyFileSearchOpen: (open: boolean) => void;
 	onEditAgent: (session: Session) => void;
-	groupChats: GroupChat[];
-	onNewGroupChat: () => void;
-	onOpenGroupChat: (id: string) => void;
-	onCloseGroupChat: () => void;
-	onDeleteGroupChat: (id: string) => void;
-	activeGroupChatId: string | null;
 	hasActiveSessionCapability: (
 		capability:
 			| 'supportsSessionStorage'
@@ -859,9 +759,6 @@ export interface AppUtilityModalsProps {
 	// Symphony
 	onOpenSymphony?: () => void;
 
-	// Director's Notes
-	onOpenDirectorNotes?: () => void;
-
 	// Auto-scroll
 	autoScrollAiMode?: boolean;
 	setAutoScrollAiMode?: (value: boolean) => void;
@@ -883,28 +780,6 @@ export interface AppUtilityModalsProps {
 	gitLogOpen: boolean;
 	onCloseGitLog: () => void;
 
-	// AutoRunSetupModal
-	autoRunSetupModalOpen: boolean;
-	onCloseAutoRunSetup: () => void;
-	onAutoRunFolderSelected: (folderPath: string) => void;
-
-	// BatchRunnerModal
-	batchRunnerModalOpen: boolean;
-	onCloseBatchRunner: () => void;
-	onStartBatchRun: (config: BatchRunConfig) => void | Promise<void>;
-	onSaveBatchPrompt: (prompt: string) => void;
-	showConfirmation: (message: string, onConfirm: () => void) => void;
-	autoRunDocumentList: string[];
-	autoRunDocumentTree?: Array<{
-		name: string;
-		type: 'file' | 'folder';
-		path: string;
-		children?: unknown[];
-	}>;
-	getDocumentTaskCount: (filename: string) => Promise<number>;
-	onAutoRunRefresh: () => Promise<void>;
-	onOpenMarketplace?: () => void;
-
 	// TabSwitcherModal
 	tabSwitcherOpen: boolean;
 	onCloseTabSwitcher: () => void;
@@ -917,7 +792,6 @@ export interface AppUtilityModalsProps {
 		starred?: boolean
 	) => void;
 	/** Whether colorblind-friendly colors should be used for extension badges */
-	colorBlindMode?: boolean;
 
 	// FileSearchModal
 	fuzzyFileSearchOpen: boolean;
@@ -1003,11 +877,9 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	deleteSession,
 	setSettingsModalOpen,
 	setSettingsTab,
-	setShortcutsHelpOpen,
 	setAboutModalOpen,
 	setLogViewerOpen,
 	setProcessMonitorOpen,
-	setUsageDashboardOpen,
 	setActiveRightTab,
 	setAgentSessionsOpen,
 	setActiveAgentSessionId,
@@ -1031,17 +903,9 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	setUpdateCheckModalOpen,
 	openWizard,
 	wizardGoToStep,
-	setDebugWizardModalOpen,
-	setDebugPackageModalOpen,
 	startTour,
 	setFuzzyFileSearchOpen,
 	onEditAgent,
-	groupChats,
-	onNewGroupChat,
-	onOpenGroupChat,
-	onCloseGroupChat,
-	onDeleteGroupChat,
-	activeGroupChatId,
 	hasActiveSessionCapability,
 	onOpenMergeSession,
 	onOpenSendToAgent,
@@ -1061,8 +925,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	onOpenLastDocumentGraph,
 	// Symphony
 	onOpenSymphony,
-	// Director's Notes
-	onOpenDirectorNotes,
 	// Auto-scroll
 	autoScrollAiMode,
 	setAutoScrollAiMode,
@@ -1080,28 +942,12 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	// GitLogViewer
 	gitLogOpen,
 	onCloseGitLog,
-	// AutoRunSetupModal
-	autoRunSetupModalOpen,
-	onCloseAutoRunSetup,
-	onAutoRunFolderSelected,
-	// BatchRunnerModal
-	batchRunnerModalOpen,
-	onCloseBatchRunner,
-	onStartBatchRun,
-	onSaveBatchPrompt,
-	showConfirmation,
-	autoRunDocumentList,
-	autoRunDocumentTree,
-	getDocumentTaskCount,
-	onAutoRunRefresh,
-	onOpenMarketplace,
 	// TabSwitcherModal
 	tabSwitcherOpen,
 	onCloseTabSwitcher,
 	onTabSelect,
 	onFileTabSelect,
 	onNamedSessionSelect,
-	colorBlindMode,
 	// FileSearchModal
 	fuzzyFileSearchOpen,
 	filteredFileTree,
@@ -1164,11 +1010,9 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					deleteSession={deleteSession}
 					setSettingsModalOpen={setSettingsModalOpen}
 					setSettingsTab={setSettingsTab}
-					setShortcutsHelpOpen={setShortcutsHelpOpen}
 					setAboutModalOpen={setAboutModalOpen}
 					setLogViewerOpen={setLogViewerOpen}
 					setProcessMonitorOpen={setProcessMonitorOpen}
-					setUsageDashboardOpen={setUsageDashboardOpen}
 					setActiveRightTab={setActiveRightTab}
 					setAgentSessionsOpen={setAgentSessionsOpen}
 					setActiveAgentSessionId={setActiveAgentSessionId}
@@ -1192,17 +1036,9 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					setUpdateCheckModalOpen={setUpdateCheckModalOpen}
 					openWizard={openWizard}
 					wizardGoToStep={wizardGoToStep}
-					setDebugWizardModalOpen={setDebugWizardModalOpen}
-					setDebugPackageModalOpen={setDebugPackageModalOpen}
 					startTour={startTour}
 					setFuzzyFileSearchOpen={setFuzzyFileSearchOpen}
 					onEditAgent={onEditAgent}
-					groupChats={groupChats}
-					onNewGroupChat={onNewGroupChat}
-					onOpenGroupChat={onOpenGroupChat}
-					onCloseGroupChat={onCloseGroupChat}
-					onDeleteGroupChat={onDeleteGroupChat}
-					activeGroupChatId={activeGroupChatId}
 					hasActiveSessionCapability={hasActiveSessionCapability}
 					onOpenMergeSession={onOpenMergeSession}
 					onOpenSendToAgent={onOpenSendToAgent}
@@ -1216,11 +1052,9 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					isFilePreviewOpen={isFilePreviewOpen}
 					ghCliAvailable={ghCliAvailable}
 					onPublishGist={onPublishGist}
-					onOpenPlaybookExchange={onOpenMarketplace}
 					lastGraphFocusFile={lastGraphFocusFile}
 					onOpenLastDocumentGraph={onOpenLastDocumentGraph}
 					onOpenSymphony={onOpenSymphony}
-					onOpenDirectorNotes={onOpenDirectorNotes}
 					autoScrollAiMode={autoScrollAiMode}
 					setAutoScrollAiMode={setAutoScrollAiMode}
 				/>
@@ -1268,46 +1102,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 				</Suspense>
 			)}
 
-			{/* --- AUTO RUN SETUP MODAL --- */}
-			{autoRunSetupModalOpen && (
-				<AutoRunSetupModal
-					theme={theme}
-					onClose={onCloseAutoRunSetup}
-					onFolderSelected={onAutoRunFolderSelected}
-					currentFolder={activeSession?.autoRunFolderPath}
-					sessionName={activeSession?.name}
-					sshRemoteId={
-						activeSession?.sshRemoteId ||
-						(activeSession?.sessionSshRemoteConfig?.enabled
-							? activeSession.sessionSshRemoteConfig.remoteId
-							: undefined) ||
-						undefined
-					}
-					sshRemoteHost={activeSession?.sshRemote?.host}
-				/>
-			)}
-
-			{/* --- BATCH RUNNER MODAL --- */}
-			{batchRunnerModalOpen && activeSession && activeSession.autoRunFolderPath && (
-				<BatchRunnerModal
-					theme={theme}
-					onClose={onCloseBatchRunner}
-					onGo={onStartBatchRun}
-					onSave={onSaveBatchPrompt}
-					initialPrompt={activeSession.batchRunnerPrompt || ''}
-					lastModifiedAt={activeSession.batchRunnerPromptModifiedAt}
-					showConfirmation={showConfirmation}
-					folderPath={activeSession.autoRunFolderPath}
-					currentDocument={activeSession.autoRunSelectedFile || ''}
-					allDocuments={autoRunDocumentList}
-					documentTree={autoRunDocumentTree}
-					getDocumentTaskCount={getDocumentTaskCount}
-					onRefreshDocuments={onAutoRunRefresh}
-					sessionId={activeSession.id}
-					onOpenMarketplace={onOpenMarketplace}
-				/>
-			)}
-
 			{/* --- TAB SWITCHER MODAL --- */}
 			{tabSwitcherOpen && activeSession?.aiTabs && (
 				<TabSwitcherModal
@@ -1323,7 +1117,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					onFileTabSelect={onFileTabSelect}
 					onNamedSessionSelect={onNamedSessionSelect}
 					onClose={onCloseTabSwitcher}
-					colorBlindMode={colorBlindMode}
 				/>
 			)}
 
@@ -1383,181 +1176,8 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 });
 
 // ============================================================================
-// APP GROUP CHAT MODALS - Group Chat management modals
-// ============================================================================
-
-/**
- * Props for the AppGroupChatModals component
- */
-export interface AppGroupChatModalsProps {
-	theme: Theme;
-	groupChats: GroupChat[];
-
-	// NewGroupChatModal
-	showNewGroupChatModal: boolean;
-	onCloseNewGroupChatModal: () => void;
-	onCreateGroupChat: (
-		name: string,
-		moderatorAgentId: string,
-		moderatorConfig?: ModeratorConfig
-	) => void;
-
-	// DeleteGroupChatModal
-	showDeleteGroupChatModal: string | null;
-	onCloseDeleteGroupChatModal: () => void;
-	onConfirmDeleteGroupChat: () => void;
-
-	// RenameGroupChatModal
-	showRenameGroupChatModal: string | null;
-	onCloseRenameGroupChatModal: () => void;
-	onRenameGroupChat: (newName: string) => void;
-
-	// EditGroupChatModal
-	showEditGroupChatModal: string | null;
-	onCloseEditGroupChatModal: () => void;
-	onUpdateGroupChat: (
-		id: string,
-		name: string,
-		moderatorAgentId: string,
-		moderatorConfig?: ModeratorConfig
-	) => void;
-
-	// GroupChatInfoOverlay
-	showGroupChatInfo: boolean;
-	activeGroupChatId: string | null;
-	groupChatMessages: GroupChatMessage[];
-	onCloseGroupChatInfo: () => void;
-	onOpenModeratorSession: (moderatorSessionId: string) => void;
-}
-
-/**
- * AppGroupChatModals - Renders Group Chat management modals
- *
- * Contains:
- * - NewGroupChatModal: Create a new group chat
- * - DeleteGroupChatModal: Confirm deletion of a group chat
- * - RenameGroupChatModal: Rename an existing group chat
- * - EditGroupChatModal: Edit group chat settings (name, moderator)
- * - GroupChatInfoOverlay: View group chat info and statistics
- */
-export const AppGroupChatModals = memo(function AppGroupChatModals({
-	theme,
-	groupChats,
-	// NewGroupChatModal
-	showNewGroupChatModal,
-	onCloseNewGroupChatModal,
-	onCreateGroupChat,
-	// DeleteGroupChatModal
-	showDeleteGroupChatModal,
-	onCloseDeleteGroupChatModal,
-	onConfirmDeleteGroupChat,
-	// RenameGroupChatModal
-	showRenameGroupChatModal,
-	onCloseRenameGroupChatModal,
-	onRenameGroupChat,
-	// EditGroupChatModal
-	showEditGroupChatModal,
-	onCloseEditGroupChatModal,
-	onUpdateGroupChat,
-	// GroupChatInfoOverlay
-	showGroupChatInfo,
-	activeGroupChatId,
-	groupChatMessages,
-	onCloseGroupChatInfo,
-	onOpenModeratorSession,
-}: AppGroupChatModalsProps) {
-	// Find group chats by ID for modal props
-	const deleteGroupChat = showDeleteGroupChatModal
-		? groupChats.find((c) => c.id === showDeleteGroupChatModal)
-		: null;
-
-	const renameGroupChat = showRenameGroupChatModal
-		? groupChats.find((c) => c.id === showRenameGroupChatModal)
-		: null;
-
-	const editGroupChat = showEditGroupChatModal
-		? groupChats.find((c) => c.id === showEditGroupChatModal)
-		: null;
-
-	const infoGroupChat = activeGroupChatId
-		? groupChats.find((c) => c.id === activeGroupChatId)
-		: null;
-
-	return (
-		<>
-			{/* --- NEW GROUP CHAT MODAL --- */}
-			{showNewGroupChatModal && (
-				<GroupChatModal
-					mode="create"
-					theme={theme}
-					isOpen={showNewGroupChatModal}
-					onClose={onCloseNewGroupChatModal}
-					onCreate={onCreateGroupChat}
-				/>
-			)}
-
-			{/* --- DELETE GROUP CHAT MODAL --- */}
-			{showDeleteGroupChatModal && deleteGroupChat && (
-				<DeleteGroupChatModal
-					theme={theme}
-					isOpen={!!showDeleteGroupChatModal}
-					groupChatName={deleteGroupChat.name}
-					onClose={onCloseDeleteGroupChatModal}
-					onConfirm={onConfirmDeleteGroupChat}
-				/>
-			)}
-
-			{/* --- RENAME GROUP CHAT MODAL --- */}
-			{showRenameGroupChatModal && renameGroupChat && (
-				<RenameGroupChatModal
-					theme={theme}
-					isOpen={!!showRenameGroupChatModal}
-					currentName={renameGroupChat.name}
-					onClose={onCloseRenameGroupChatModal}
-					onRename={onRenameGroupChat}
-				/>
-			)}
-
-			{/* --- EDIT GROUP CHAT MODAL --- */}
-			{showEditGroupChatModal && (
-				<GroupChatModal
-					mode="edit"
-					theme={theme}
-					isOpen={!!showEditGroupChatModal}
-					groupChat={editGroupChat || null}
-					onClose={onCloseEditGroupChatModal}
-					onSave={onUpdateGroupChat}
-				/>
-			)}
-
-			{/* --- GROUP CHAT INFO OVERLAY --- */}
-			{showGroupChatInfo && activeGroupChatId && infoGroupChat && (
-				<GroupChatInfoOverlay
-					theme={theme}
-					isOpen={showGroupChatInfo}
-					groupChat={infoGroupChat}
-					messages={groupChatMessages}
-					onClose={onCloseGroupChatInfo}
-					onOpenModeratorSession={onOpenModeratorSession}
-				/>
-			)}
-		</>
-	);
-});
-
-// ============================================================================
 // APP AGENT MODALS - Agent error and context transfer modals
 // ============================================================================
-
-/**
- * Group chat error structure (used for displaying agent errors in group chat context)
- */
-export interface GroupChatErrorInfo {
-	groupChatId: string;
-	participantId?: string;
-	participantName?: string;
-	error: AgentError;
-}
 
 /**
  * Props for the AppAgentModals component
@@ -1566,16 +1186,8 @@ export interface AppAgentModalsProps {
 	theme: Theme;
 	sessions: Session[];
 	activeSession: Session | null;
-	groupChats: GroupChat[];
 
-	// LeaderboardRegistrationModal
-	leaderboardRegistrationOpen: boolean;
-	onCloseLeaderboardRegistration: () => void;
 	autoRunStats: AutoRunStats;
-	keyboardMasteryStats: KeyboardMasteryStats;
-	leaderboardRegistration: LeaderboardRegistration | null;
-	onSaveLeaderboardRegistration: (registration: LeaderboardRegistration) => void;
-	onLeaderboardOptOut: () => void;
 	onSyncAutoRunStats?: (stats: {
 		cumulativeTimeMs: number;
 		totalRuns: number;
@@ -1590,11 +1202,6 @@ export interface AppAgentModalsProps {
 	effectiveAgentError: AgentError | null;
 	recoveryActions: RecoveryAction[];
 	onDismissAgentError: () => void;
-
-	// AgentErrorModal (for group chats)
-	groupChatError: GroupChatErrorInfo | null;
-	groupChatRecoveryActions: RecoveryAction[];
-	onClearGroupChatError: () => void;
 
 	// MergeSessionModal
 	mergeSessionModalOpen: boolean;
@@ -1623,8 +1230,7 @@ export interface AppAgentModalsProps {
  * AppAgentModals - Renders agent error and context transfer modals
  *
  * Contains:
- * - LeaderboardRegistrationModal: Register for the runmaestro.ai leaderboard
- * - AgentErrorModal: Display agent errors with recovery options (agents and group chats)
+ * - AgentErrorModal: Display agent errors with recovery options
  * - MergeSessionModal: Merge current context into another session
  * - TransferProgressModal: Show progress during cross-agent context transfer
  * - SendToAgentModal: Send session context to another Maestro session
@@ -1633,25 +1239,13 @@ export const AppAgentModals = memo(function AppAgentModals({
 	theme,
 	sessions,
 	activeSession,
-	groupChats,
-	// LeaderboardRegistrationModal
-	leaderboardRegistrationOpen,
-	onCloseLeaderboardRegistration,
 	autoRunStats,
-	keyboardMasteryStats,
-	leaderboardRegistration,
-	onSaveLeaderboardRegistration,
-	onLeaderboardOptOut,
 	onSyncAutoRunStats,
 	// AgentErrorModal (for individual agents)
 	errorSession,
 	effectiveAgentError,
 	recoveryActions,
 	onDismissAgentError,
-	// AgentErrorModal (for group chats)
-	groupChatError,
-	groupChatRecoveryActions,
-	onClearGroupChatError,
 	// MergeSessionModal
 	mergeSessionModalOpen,
 	onCloseMergeSession,
@@ -1670,20 +1264,6 @@ export const AppAgentModals = memo(function AppAgentModals({
 }: AppAgentModalsProps) {
 	return (
 		<>
-			{/* --- LEADERBOARD REGISTRATION MODAL --- */}
-			{leaderboardRegistrationOpen && (
-				<LeaderboardRegistrationModal
-					theme={theme}
-					autoRunStats={autoRunStats}
-					keyboardMasteryStats={keyboardMasteryStats}
-					existingRegistration={leaderboardRegistration}
-					onClose={onCloseLeaderboardRegistration}
-					onSave={onSaveLeaderboardRegistration}
-					onOptOut={onLeaderboardOptOut}
-					onSyncStats={onSyncAutoRunStats}
-				/>
-			)}
-
 			{/* --- AGENT ERROR MODAL (individual agents) --- */}
 			{effectiveAgentError && (
 				<AgentErrorModal
@@ -1700,21 +1280,6 @@ export const AppAgentModals = memo(function AppAgentModals({
 					recoveryActions={recoveryActions}
 					onDismiss={onDismissAgentError}
 					dismissible={effectiveAgentError.recoverable !== false}
-				/>
-			)}
-
-			{/* --- AGENT ERROR MODAL (group chats) --- */}
-			{groupChatError && (
-				<AgentErrorModal
-					theme={theme}
-					error={groupChatError.error}
-					agentName={groupChatError.participantName || 'Group Chat'}
-					sessionName={
-						groupChats.find((c) => c.id === groupChatError.groupChatId)?.name || 'Unknown'
-					}
-					recoveryActions={groupChatRecoveryActions}
-					onDismiss={onClearGroupChatError}
-					dismissible={groupChatError.error.recoverable}
 				/>
 			)}
 
@@ -1748,19 +1313,6 @@ export const AppAgentModals = memo(function AppAgentModals({
 						onComplete={onCompleteTransfer}
 					/>
 				)}
-
-			{/* --- SEND TO AGENT MODAL --- */}
-			{sendToAgentModalOpen && activeSession && activeSession.activeTabId && (
-				<SendToAgentModal
-					theme={theme}
-					isOpen={sendToAgentModalOpen}
-					sourceSession={activeSession}
-					sourceTabId={activeSession.activeTabId}
-					allSessions={sessions}
-					onClose={onCloseSendToAgent}
-					onSend={onSendToAgent}
-				/>
-			)}
 		</>
 	);
 });
@@ -1775,32 +1327,23 @@ export const AppAgentModals = memo(function AppAgentModals({
  * usage in App.tsx.
  */
 export interface AppModalsProps {
-	// Common props (sessions/groups/groupChats/modal booleans self-sourced from stores — Tier 1B)
+	// Common props (sessions/groups/modal booleans self-sourced from stores — Tier 1B)
 	theme: Theme;
 	shortcuts: Record<string, Shortcut>;
 	tabShortcuts: Record<string, Shortcut>;
 
 	// --- AppInfoModals props ---
-	onCloseShortcutsHelp: () => void;
 	hasNoAgents: boolean;
-	keyboardMasteryStats: KeyboardMasteryStats;
 	onCloseAboutModal: () => void;
 	autoRunStats: AutoRunStats;
 	usageStats?: MaestroUsageStats | null;
 	/** Global hands-on time in milliseconds (from settings) */
 	handsOnTimeMs: number;
-	onOpenLeaderboardRegistration: () => void;
-	isLeaderboardRegistered: boolean;
-	// leaderboardRegistration is provided via AppAgentModals props below
 	onCloseUpdateCheckModal: () => void;
 	onCloseProcessMonitor: () => void;
 	onNavigateToSession: (sessionId: string, tabId?: string) => void;
-	onNavigateToGroupChat: (groupChatId: string) => void;
-	onCloseUsageDashboard: () => void;
 	/** Default time range for the Usage Dashboard from settings */
-	defaultStatsTimeRange?: 'day' | 'week' | 'month' | 'year' | 'all';
 	/** Enable colorblind-friendly colors for dashboard charts */
-	colorBlindMode?: boolean;
 
 	// --- AppConfirmModals props ---
 	confirmModalMessage: string;
@@ -1907,11 +1450,9 @@ export interface AppModalsProps {
 	deleteSession: (id: string) => void;
 	setSettingsModalOpen: (open: boolean) => void;
 	setSettingsTab: (tab: SettingsTab) => void;
-	setShortcutsHelpOpen: (open: boolean) => void;
 	setAboutModalOpen: (open: boolean) => void;
 	setLogViewerOpen: (open: boolean) => void;
 	setProcessMonitorOpen: (open: boolean) => void;
-	setUsageDashboardOpen: (open: boolean) => void;
 	setActiveRightTab: (tab: RightPanelTab) => void;
 	setAgentSessionsOpen: (open: boolean) => void;
 	setActiveAgentSessionId: (id: string | null) => void;
@@ -1935,15 +1476,9 @@ export interface AppModalsProps {
 	setUpdateCheckModalOpenForQuickActions?: (open: boolean) => void;
 	openWizard: () => void;
 	wizardGoToStep: (step: WizardStep) => void;
-	setDebugWizardModalOpen?: (open: boolean) => void;
-	setDebugPackageModalOpen?: (open: boolean) => void;
 	startTour: () => void;
 	setFuzzyFileSearchOpen: (open: boolean) => void;
 	onEditAgent: (session: Session) => void;
-	onNewGroupChat: () => void;
-	onOpenGroupChat: (id: string) => void;
-	onCloseGroupChat: () => void;
-	onDeleteGroupChat: (id: string) => void;
 	hasActiveSessionCapability: (
 		capability:
 			| 'supportsSessionStorage'
@@ -1977,9 +1512,7 @@ export interface AppModalsProps {
 	gitViewerCwd: string;
 	onCloseGitDiff: () => void;
 	onCloseGitLog: () => void;
-	onCloseAutoRunSetup: () => void;
 	onAutoRunFolderSelected: (folderPath: string) => void;
-	onCloseBatchRunner: () => void;
 	onStartBatchRun: (config: BatchRunConfig) => void | Promise<void>;
 	onSaveBatchPrompt: (prompt: string) => void;
 	showConfirmation: (message: string, onConfirm: () => void) => void;
@@ -1995,8 +1528,6 @@ export interface AppModalsProps {
 	onOpenMarketplace?: () => void;
 	// Symphony
 	onOpenSymphony?: () => void;
-	// Director's Notes
-	onOpenDirectorNotes?: () => void;
 	// Auto-scroll
 	autoScrollAiMode?: boolean;
 	setAutoScrollAiMode?: (value: boolean) => void;
@@ -2040,36 +1571,7 @@ export interface AppModalsProps {
 	onSwitchQueueSession: (sessionId: string) => void;
 	onReorderQueueItems: (sessionId: string, fromIndex: number, toIndex: number) => void;
 
-	// --- AppGroupChatModals props ---
-	onCloseNewGroupChatModal: () => void;
-	onCreateGroupChat: (
-		name: string,
-		moderatorAgentId: string,
-		moderatorConfig?: ModeratorConfig
-	) => void;
-	showDeleteGroupChatModal: string | null;
-	onCloseDeleteGroupChatModal: () => void;
-	onConfirmDeleteGroupChat: () => void;
-	showRenameGroupChatModal: string | null;
-	onCloseRenameGroupChatModal: () => void;
-	onRenameGroupChatFromModal: (newName: string) => void;
-	showEditGroupChatModal: string | null;
-	onCloseEditGroupChatModal: () => void;
-	onUpdateGroupChat: (
-		id: string,
-		name: string,
-		moderatorAgentId: string,
-		moderatorConfig?: ModeratorConfig
-	) => void;
-	groupChatMessages: GroupChatMessage[];
-	onCloseGroupChatInfo: () => void;
-	onOpenModeratorSession: (moderatorSessionId: string) => void;
-
 	// --- AppAgentModals props ---
-	onCloseLeaderboardRegistration: () => void;
-	leaderboardRegistration: LeaderboardRegistration | null;
-	onSaveLeaderboardRegistration: (registration: LeaderboardRegistration) => void;
-	onLeaderboardOptOut: () => void;
 	onSyncAutoRunStats?: (stats: {
 		cumulativeTimeMs: number;
 		totalRuns: number;
@@ -2082,9 +1584,6 @@ export interface AppModalsProps {
 	effectiveAgentError: AgentError | null;
 	recoveryActions: RecoveryAction[];
 	onDismissAgentError: () => void;
-	groupChatError: GroupChatErrorInfo | null;
-	groupChatRecoveryActions: RecoveryAction[];
-	onClearGroupChatError: () => void;
 	onCloseMergeSession: () => void;
 	onMerge: (
 		targetSessionId: string,
@@ -2111,7 +1610,6 @@ export interface AppModalsProps {
  * - AppGroupModals: Group management modals
  * - AppWorktreeModals: Worktree/PR modals
  * - AppUtilityModals: Utility and workflow modals
- * - AppGroupChatModals: Group Chat modals
  * - AppAgentModals: Agent error and transfer modals
  */
 export const AppModals = memo(function AppModals(props: AppModalsProps) {
@@ -2125,16 +1623,11 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		() => sessions.find((s) => s.id === activeSessionId) ?? null,
 		[sessions, activeSessionId]
 	);
-	const groupChats = useGroupChatStore((s) => s.groupChats);
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
-
 	// Self-source modal boolean states from modalStore (Tier 1B)
 	const {
-		shortcutsHelpOpen,
 		aboutModalOpen,
 		updateCheckModalOpen,
 		processMonitorOpen,
-		usageDashboardOpen,
 		confirmModalOpen,
 		quitConfirmModalOpen,
 		newInstanceModalOpen,
@@ -2151,21 +1644,14 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		fuzzyFileSearchOpen,
 		promptComposerOpen,
 		queueBrowserOpen,
-		autoRunSetupModalOpen,
-		batchRunnerModalOpen,
 		gitLogOpen,
-		showNewGroupChatModal,
-		showGroupChatInfo,
-		leaderboardRegistrationOpen,
 		mergeSessionModalOpen,
 		sendToAgentModalOpen,
 	} = useModalStore(
 		useShallow((s) => ({
-			shortcutsHelpOpen: s.modals.get('shortcutsHelp')?.open ?? false,
 			aboutModalOpen: s.modals.get('about')?.open ?? false,
 			updateCheckModalOpen: s.modals.get('updateCheck')?.open ?? false,
 			processMonitorOpen: s.modals.get('processMonitor')?.open ?? false,
-			usageDashboardOpen: s.modals.get('usageDashboard')?.open ?? false,
 			confirmModalOpen: s.modals.get('confirm')?.open ?? false,
 			quitConfirmModalOpen: s.modals.get('quitConfirm')?.open ?? false,
 			newInstanceModalOpen: s.modals.get('newInstance')?.open ?? false,
@@ -2182,12 +1668,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 			fuzzyFileSearchOpen: s.modals.get('fuzzyFileSearch')?.open ?? false,
 			promptComposerOpen: s.modals.get('promptComposer')?.open ?? false,
 			queueBrowserOpen: s.modals.get('queueBrowser')?.open ?? false,
-			autoRunSetupModalOpen: s.modals.get('autoRunSetup')?.open ?? false,
-			batchRunnerModalOpen: s.modals.get('batchRunner')?.open ?? false,
 			gitLogOpen: s.modals.get('gitLog')?.open ?? false,
-			showNewGroupChatModal: s.modals.get('newGroupChat')?.open ?? false,
-			showGroupChatInfo: s.modals.get('groupChatInfo')?.open ?? false,
-			leaderboardRegistrationOpen: s.modals.get('leaderboard')?.open ?? false,
 			mergeSessionModalOpen: s.modals.get('mergeSession')?.open ?? false,
 			sendToAgentModalOpen: s.modals.get('sendToAgent')?.open ?? false,
 		}))
@@ -2199,23 +1680,14 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		shortcuts,
 		tabShortcuts,
 		// Info modals
-		onCloseShortcutsHelp,
 		hasNoAgents,
-		keyboardMasteryStats,
 		onCloseAboutModal,
 		autoRunStats,
 		usageStats,
 		handsOnTimeMs,
-		onOpenLeaderboardRegistration,
-		isLeaderboardRegistered,
-		// leaderboardRegistration is destructured below in Agent modals section
 		onCloseUpdateCheckModal,
 		onCloseProcessMonitor,
 		onNavigateToSession,
-		onNavigateToGroupChat,
-		onCloseUsageDashboard,
-		defaultStatsTimeRange,
-		colorBlindMode,
 		// Confirm modals
 		confirmModalMessage,
 		confirmModalOnConfirm,
@@ -2285,11 +1757,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		deleteSession,
 		setSettingsModalOpen,
 		setSettingsTab,
-		setShortcutsHelpOpen,
 		setAboutModalOpen,
 		setLogViewerOpen,
 		setProcessMonitorOpen,
-		setUsageDashboardOpen,
 		setActiveRightTab,
 		setAgentSessionsOpen,
 		setActiveAgentSessionId,
@@ -2313,15 +1783,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		setUpdateCheckModalOpenForQuickActions,
 		openWizard,
 		wizardGoToStep,
-		setDebugWizardModalOpen,
-		setDebugPackageModalOpen,
 		startTour,
 		setFuzzyFileSearchOpen,
 		onEditAgent,
-		onNewGroupChat,
-		onOpenGroupChat,
-		onCloseGroupChat,
-		onDeleteGroupChat,
 		hasActiveSessionCapability,
 		onOpenMergeSession,
 		onOpenSendToAgent,
@@ -2349,9 +1813,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		gitViewerCwd,
 		onCloseGitDiff,
 		onCloseGitLog,
-		onCloseAutoRunSetup,
 		onAutoRunFolderSelected,
-		onCloseBatchRunner,
 		onStartBatchRun,
 		onSaveBatchPrompt,
 		showConfirmation,
@@ -2362,8 +1824,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		onOpenMarketplace,
 		// Symphony
 		onOpenSymphony,
-		// Director's Notes
-		onOpenDirectorNotes,
 		// Auto-scroll
 		autoScrollAiMode,
 		setAutoScrollAiMode,
@@ -2397,34 +1857,12 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		onRemoveQueueItem,
 		onSwitchQueueSession,
 		onReorderQueueItems,
-		// Group Chat modals
-		onCloseNewGroupChatModal,
-		onCreateGroupChat,
-		showDeleteGroupChatModal,
-		onCloseDeleteGroupChatModal,
-		onConfirmDeleteGroupChat,
-		showRenameGroupChatModal,
-		onCloseRenameGroupChatModal,
-		onRenameGroupChatFromModal,
-		showEditGroupChatModal,
-		onCloseEditGroupChatModal,
-		onUpdateGroupChat,
-		groupChatMessages,
-		onCloseGroupChatInfo,
-		onOpenModeratorSession,
 		// Agent modals
-		onCloseLeaderboardRegistration,
-		leaderboardRegistration,
-		onSaveLeaderboardRegistration,
-		onLeaderboardOptOut,
 		onSyncAutoRunStats,
 		errorSession,
 		effectiveAgentError,
 		recoveryActions,
 		onDismissAgentError,
-		groupChatError,
-		groupChatRecoveryActions,
-		onClearGroupChatError,
 		onCloseMergeSession,
 		onMerge,
 		transferState,
@@ -2447,33 +1885,18 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 			{/* Info/Display Modals */}
 			<AppInfoModals
 				theme={theme}
-				shortcutsHelpOpen={shortcutsHelpOpen}
-				onCloseShortcutsHelp={onCloseShortcutsHelp}
-				shortcuts={shortcuts}
-				tabShortcuts={tabShortcuts}
-				hasNoAgents={hasNoAgents}
-				keyboardMasteryStats={keyboardMasteryStats}
 				aboutModalOpen={aboutModalOpen}
 				onCloseAboutModal={onCloseAboutModal}
 				autoRunStats={autoRunStats}
 				usageStats={usageStats}
 				handsOnTimeMs={handsOnTimeMs}
-				onOpenLeaderboardRegistration={onOpenLeaderboardRegistration}
-				isLeaderboardRegistered={isLeaderboardRegistered}
-				leaderboardRegistration={leaderboardRegistration}
 				updateCheckModalOpen={updateCheckModalOpen}
 				onCloseUpdateCheckModal={onCloseUpdateCheckModal}
 				processMonitorOpen={processMonitorOpen}
 				onCloseProcessMonitor={onCloseProcessMonitor}
 				sessions={sessions}
 				groups={groups}
-				groupChats={groupChats}
 				onNavigateToSession={onNavigateToSession}
-				onNavigateToGroupChat={onNavigateToGroupChat}
-				usageDashboardOpen={usageDashboardOpen}
-				onCloseUsageDashboard={onCloseUsageDashboard}
-				defaultStatsTimeRange={defaultStatsTimeRange}
-				colorBlindMode={colorBlindMode}
 			/>
 
 			{/* Confirmation Modals */}
@@ -2591,11 +2014,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				deleteSession={deleteSession}
 				setSettingsModalOpen={setSettingsModalOpen}
 				setSettingsTab={setSettingsTab}
-				setShortcutsHelpOpen={setShortcutsHelpOpen}
 				setAboutModalOpen={setAboutModalOpen}
 				setLogViewerOpen={setLogViewerOpen}
 				setProcessMonitorOpen={setProcessMonitorOpen}
-				setUsageDashboardOpen={setUsageDashboardOpen}
 				setActiveRightTab={setActiveRightTab}
 				setAgentSessionsOpen={setAgentSessionsOpen}
 				setActiveAgentSessionId={setActiveAgentSessionId}
@@ -2618,17 +2039,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				setUpdateCheckModalOpen={setUpdateCheckModalOpenForQuickActions}
 				openWizard={openWizard}
 				wizardGoToStep={wizardGoToStep}
-				setDebugWizardModalOpen={setDebugWizardModalOpen}
-				setDebugPackageModalOpen={setDebugPackageModalOpen}
 				startTour={startTour}
 				setFuzzyFileSearchOpen={setFuzzyFileSearchOpen}
 				onEditAgent={onEditAgent}
-				groupChats={groupChats}
-				onNewGroupChat={onNewGroupChat}
-				onOpenGroupChat={onOpenGroupChat}
-				onCloseGroupChat={onCloseGroupChat}
-				onDeleteGroupChat={onDeleteGroupChat}
-				activeGroupChatId={activeGroupChatId}
 				hasActiveSessionCapability={hasActiveSessionCapability}
 				onOpenMergeSession={onOpenMergeSession}
 				onOpenSendToAgent={onOpenSendToAgent}
@@ -2655,21 +2068,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onCloseGitDiff={onCloseGitDiff}
 				gitLogOpen={gitLogOpen}
 				onCloseGitLog={onCloseGitLog}
-				autoRunSetupModalOpen={autoRunSetupModalOpen}
-				onCloseAutoRunSetup={onCloseAutoRunSetup}
-				onAutoRunFolderSelected={onAutoRunFolderSelected}
-				batchRunnerModalOpen={batchRunnerModalOpen}
-				onCloseBatchRunner={onCloseBatchRunner}
-				onStartBatchRun={onStartBatchRun}
-				onSaveBatchPrompt={onSaveBatchPrompt}
-				showConfirmation={showConfirmation}
-				autoRunDocumentList={autoRunDocumentList}
-				autoRunDocumentTree={autoRunDocumentTree}
-				getDocumentTaskCount={getDocumentTaskCount}
-				onAutoRunRefresh={onAutoRunRefresh}
-				onOpenMarketplace={onOpenMarketplace}
 				onOpenSymphony={onOpenSymphony}
-				onOpenDirectorNotes={onOpenDirectorNotes}
 				autoScrollAiMode={autoScrollAiMode}
 				setAutoScrollAiMode={setAutoScrollAiMode}
 				tabSwitcherOpen={tabSwitcherOpen}
@@ -2677,7 +2076,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onTabSelect={onTabSelect}
 				onFileTabSelect={onFileTabSelect}
 				onNamedSessionSelect={onNamedSessionSelect}
-				colorBlindMode={colorBlindMode}
 				fuzzyFileSearchOpen={fuzzyFileSearchOpen}
 				filteredFileTree={filteredFileTree}
 				fileExplorerExpanded={fileExplorerExpanded}
@@ -2709,50 +2107,17 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onReorderQueueItems={onReorderQueueItems}
 			/>
 
-			{/* Group Chat Modals */}
-			<AppGroupChatModals
-				theme={theme}
-				groupChats={groupChats}
-				showNewGroupChatModal={showNewGroupChatModal}
-				onCloseNewGroupChatModal={onCloseNewGroupChatModal}
-				onCreateGroupChat={onCreateGroupChat}
-				showDeleteGroupChatModal={showDeleteGroupChatModal}
-				onCloseDeleteGroupChatModal={onCloseDeleteGroupChatModal}
-				onConfirmDeleteGroupChat={onConfirmDeleteGroupChat}
-				showRenameGroupChatModal={showRenameGroupChatModal}
-				onCloseRenameGroupChatModal={onCloseRenameGroupChatModal}
-				onRenameGroupChat={onRenameGroupChatFromModal}
-				showEditGroupChatModal={showEditGroupChatModal}
-				onCloseEditGroupChatModal={onCloseEditGroupChatModal}
-				onUpdateGroupChat={onUpdateGroupChat}
-				showGroupChatInfo={showGroupChatInfo}
-				activeGroupChatId={activeGroupChatId}
-				groupChatMessages={groupChatMessages}
-				onCloseGroupChatInfo={onCloseGroupChatInfo}
-				onOpenModeratorSession={onOpenModeratorSession}
-			/>
-
 			{/* Agent/Transfer Modals */}
 			<AppAgentModals
 				theme={theme}
 				sessions={sessions}
 				activeSession={activeSession}
-				groupChats={groupChats}
-				leaderboardRegistrationOpen={leaderboardRegistrationOpen}
-				onCloseLeaderboardRegistration={onCloseLeaderboardRegistration}
 				autoRunStats={autoRunStats}
-				keyboardMasteryStats={keyboardMasteryStats}
-				leaderboardRegistration={leaderboardRegistration}
-				onSaveLeaderboardRegistration={onSaveLeaderboardRegistration}
-				onLeaderboardOptOut={onLeaderboardOptOut}
 				onSyncAutoRunStats={onSyncAutoRunStats}
 				errorSession={errorSession}
 				effectiveAgentError={effectiveAgentError}
 				recoveryActions={recoveryActions}
 				onDismissAgentError={onDismissAgentError}
-				groupChatError={groupChatError}
-				groupChatRecoveryActions={groupChatRecoveryActions}
-				onClearGroupChatError={onClearGroupChatError}
 				mergeSessionModalOpen={mergeSessionModalOpen}
 				onCloseMergeSession={onCloseMergeSession}
 				onMerge={onMerge}

@@ -132,9 +132,6 @@ export function useAgentSessionManagement(
 				// Pass through task execution time
 				elapsedTimeMs: entry.elapsedTimeMs,
 			});
-
-			// Refresh history panel to show the new entry
-			rightPanelRef.current?.refreshHistoryPanel();
 		},
 		[activeSession, rightPanelRef]
 	);

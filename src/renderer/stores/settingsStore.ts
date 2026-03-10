@@ -24,16 +24,14 @@ import type {
 	AutoRunStats,
 	MaestroUsageStats,
 	OnboardingStats,
-	LeaderboardRegistration,
 	ContextManagementSettings,
 	KeyboardMasteryStats,
 	ThinkingMode,
-	DirectorNotesSettings,
 	EncoreFeatureFlags,
 } from '../types';
 import { DEFAULT_CUSTOM_THEME_COLORS } from '../constants/themes';
-import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS, FIXED_SHORTCUTS } from '../constants/shortcuts';
-import { getLevelIndex } from '../constants/keyboardMastery';
+import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS } from '../constants/shortcuts';
+// keyboardMastery constants removed (gamification stripped)
 import { commitCommandPrompt } from '../../prompts';
 
 // ============================================================================
@@ -87,11 +85,6 @@ export const DEFAULT_KEYBOARD_MASTERY_STATS: KeyboardMasteryStats = {
 	lastAcknowledgedLevel: 0,
 };
 
-const TOTAL_SHORTCUTS_COUNT =
-	Object.keys(DEFAULT_SHORTCUTS).length +
-	Object.keys(TAB_SHORTCUTS).length +
-	Object.keys(FIXED_SHORTCUTS).length;
-
 export const DEFAULT_ONBOARDING_STATS: OnboardingStats = {
 	wizardStartCount: 0,
 	wizardCompletionCount: 0,
@@ -114,14 +107,7 @@ export const DEFAULT_ONBOARDING_STATS: OnboardingStats = {
 	averageTasksPerPhase: 0,
 };
 
-export const DEFAULT_ENCORE_FEATURES: EncoreFeatureFlags = {
-	directorNotes: false,
-};
-
-export const DEFAULT_DIRECTOR_NOTES_SETTINGS: DirectorNotesSettings = {
-	provider: 'claude-code',
-	defaultLookbackDays: 7,
-};
+export const DEFAULT_ENCORE_FEATURES: EncoreFeatureFlags = {};
 
 export const DEFAULT_AI_COMMANDS: CustomAICommand[] = [
 	{
@@ -136,38 +122,6 @@ export const DEFAULT_AI_COMMANDS: CustomAICommand[] = [
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-export function getBadgeLevelForTime(cumulativeTimeMs: number): number {
-	const MINUTE = 60 * 1000;
-	const HOUR = 60 * MINUTE;
-	const DAY = 24 * HOUR;
-	const WEEK = 7 * DAY;
-	const MONTH = 30 * DAY;
-
-	const thresholds = [
-		15 * MINUTE,
-		1 * HOUR,
-		8 * HOUR,
-		1 * DAY,
-		1 * WEEK,
-		1 * MONTH,
-		3 * MONTH,
-		6 * MONTH,
-		365 * DAY,
-		5 * 365 * DAY,
-		10 * 365 * DAY,
-	];
-
-	let level = 0;
-	for (let i = 0; i < thresholds.length; i++) {
-		if (cumulativeTimeMs >= thresholds[i]) {
-			level = i + 1;
-		} else {
-			break;
-		}
-	}
-	return level;
-}
 
 // ============================================================================
 // Store Types
@@ -218,9 +172,7 @@ export interface SettingsStoreState {
 	usageStats: MaestroUsageStats;
 	ungroupedCollapsed: boolean;
 	tourCompleted: boolean;
-	firstAutoRunCompleted: boolean;
 	onboardingStats: OnboardingStats;
-	leaderboardRegistration: LeaderboardRegistration | null;
 	webInterfaceUseCustomPort: boolean;
 	webInterfaceCustomPort: number;
 	contextManagementSettings: ContextManagementSettings;
@@ -234,21 +186,15 @@ export interface SettingsStoreState {
 	defaultStatsTimeRange: 'day' | 'week' | 'month' | 'year' | 'all';
 	preventSleepEnabled: boolean;
 	disableGpuAcceleration: boolean;
-	disableConfetti: boolean;
 	localIgnorePatterns: string[];
 	localHonorGitignore: boolean;
 	sshRemoteIgnorePatterns: string[];
 	sshRemoteHonorGitignore: boolean;
 	automaticTabNamingEnabled: boolean;
 	fileTabAutoRefreshEnabled: boolean;
-	suppressWindowsWarning: boolean;
 	autoScrollAiMode: boolean;
 	userMessageAlignment: 'left' | 'right';
 	encoreFeatures: EncoreFeatureFlags;
-	directorNotesSettings: DirectorNotesSettings;
-	wakatimeApiKey: string;
-	wakatimeEnabled: boolean;
-	wakatimeDetailedTracking: boolean;
 	useNativeTitleBar: boolean;
 	autoHideMenuBar: boolean;
 }
@@ -293,8 +239,6 @@ export interface SettingsStoreActions {
 	setCustomAICommands: (value: CustomAICommand[]) => void;
 	setUngroupedCollapsed: (value: boolean) => void;
 	setTourCompleted: (value: boolean) => void;
-	setFirstAutoRunCompleted: (value: boolean) => void;
-	setLeaderboardRegistration: (value: LeaderboardRegistration | null) => void;
 	setWebInterfaceUseCustomPort: (value: boolean) => void;
 	setWebInterfaceCustomPort: (value: number) => void;
 	setColorBlindMode: (value: boolean) => void;
@@ -305,21 +249,15 @@ export interface SettingsStoreActions {
 	setStatsCollectionEnabled: (value: boolean) => void;
 	setDefaultStatsTimeRange: (value: 'day' | 'week' | 'month' | 'year' | 'all') => void;
 	setDisableGpuAcceleration: (value: boolean) => void;
-	setDisableConfetti: (value: boolean) => void;
 	setLocalIgnorePatterns: (value: string[]) => void;
 	setLocalHonorGitignore: (value: boolean) => void;
 	setSshRemoteIgnorePatterns: (value: string[]) => void;
 	setSshRemoteHonorGitignore: (value: boolean) => void;
 	setAutomaticTabNamingEnabled: (value: boolean) => void;
 	setFileTabAutoRefreshEnabled: (value: boolean) => void;
-	setSuppressWindowsWarning: (value: boolean) => void;
 	setAutoScrollAiMode: (value: boolean) => void;
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
-	setDirectorNotesSettings: (value: DirectorNotesSettings) => void;
-	setWakatimeApiKey: (value: string) => void;
-	setWakatimeEnabled: (value: boolean) => void;
-	setWakatimeDetailedTracking: (value: boolean) => void;
 	setUseNativeTitleBar: (value: boolean) => void;
 	setAutoHideMenuBar: (value: boolean) => void;
 
@@ -335,19 +273,6 @@ export interface SettingsStoreActions {
 	// Usage stats
 	setUsageStats: (value: MaestroUsageStats) => void;
 	updateUsageStats: (currentValues: Partial<MaestroUsageStats>) => void;
-
-	// Auto-run stats
-	setAutoRunStats: (value: AutoRunStats) => void;
-	recordAutoRunComplete: (elapsedTimeMs: number) => {
-		newBadgeLevel: number | null;
-		isNewRecord: boolean;
-	};
-	updateAutoRunProgress: (deltaMs: number) => {
-		newBadgeLevel: number | null;
-		isNewRecord: boolean;
-	};
-	acknowledgeBadge: (level: number) => void;
-	getUnacknowledgedBadgeLevel: () => number | null;
 
 	// Onboarding stats
 	setOnboardingStats: (value: OnboardingStats) => void;
@@ -377,8 +302,6 @@ export interface SettingsStoreActions {
 	// Keyboard mastery
 	setKeyboardMasteryStats: (value: KeyboardMasteryStats) => void;
 	recordShortcutUsage: (shortcutId: string) => { newLevel: number | null };
-	acknowledgeKeyboardMasteryLevel: (level: number) => void;
-	getUnacknowledgedKeyboardMasteryLevel: () => number | null;
 }
 
 export type SettingsStore = SettingsStoreState & SettingsStoreActions;
@@ -436,9 +359,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	usageStats: DEFAULT_USAGE_STATS,
 	ungroupedCollapsed: false,
 	tourCompleted: false,
-	firstAutoRunCompleted: false,
 	onboardingStats: DEFAULT_ONBOARDING_STATS,
-	leaderboardRegistration: null,
 	webInterfaceUseCustomPort: false,
 	webInterfaceCustomPort: 8080,
 	contextManagementSettings: DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
@@ -452,21 +373,15 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	defaultStatsTimeRange: 'week',
 	preventSleepEnabled: false,
 	disableGpuAcceleration: false,
-	disableConfetti: false,
 	localIgnorePatterns: [...DEFAULT_LOCAL_IGNORE_PATTERNS],
 	localHonorGitignore: true,
 	sshRemoteIgnorePatterns: ['.git', '*cache*'],
 	sshRemoteHonorGitignore: true,
 	automaticTabNamingEnabled: true,
 	fileTabAutoRefreshEnabled: false,
-	suppressWindowsWarning: false,
 	autoScrollAiMode: false,
 	userMessageAlignment: 'right',
 	encoreFeatures: DEFAULT_ENCORE_FEATURES,
-	directorNotesSettings: DEFAULT_DIRECTOR_NOTES_SETTINGS,
-	wakatimeApiKey: '',
-	wakatimeEnabled: false,
-	wakatimeDetailedTracking: false,
 	useNativeTitleBar: false,
 	autoHideMenuBar: false,
 
@@ -666,16 +581,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		window.maestro.settings.set('tourCompleted', value);
 	},
 
-	setFirstAutoRunCompleted: (value) => {
-		set({ firstAutoRunCompleted: value });
-		window.maestro.settings.set('firstAutoRunCompleted', value);
-	},
-
-	setLeaderboardRegistration: (value) => {
-		set({ leaderboardRegistration: value });
-		window.maestro.settings.set('leaderboardRegistration', value);
-	},
-
 	setWebInterfaceUseCustomPort: (value) => {
 		set({ webInterfaceUseCustomPort: value });
 		window.maestro.settings.set('webInterfaceUseCustomPort', value);
@@ -733,11 +638,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		window.maestro.settings.set('disableGpuAcceleration', value);
 	},
 
-	setDisableConfetti: (value) => {
-		set({ disableConfetti: value });
-		window.maestro.settings.set('disableConfetti', value);
-	},
-
 	setLocalIgnorePatterns: (value) => {
 		set({ localIgnorePatterns: value });
 		window.maestro.settings.set('localIgnorePatterns', value);
@@ -768,11 +668,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		window.maestro.settings.set('fileTabAutoRefreshEnabled', value);
 	},
 
-	setSuppressWindowsWarning: (value) => {
-		set({ suppressWindowsWarning: value });
-		window.maestro.settings.set('suppressWindowsWarning', value);
-	},
-
 	setAutoScrollAiMode: (value) => {
 		set({ autoScrollAiMode: value });
 		window.maestro.settings.set('autoScrollAiMode', value);
@@ -786,26 +681,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setEncoreFeatures: (value) => {
 		set({ encoreFeatures: value });
 		window.maestro.settings.set('encoreFeatures', value);
-	},
-
-	setDirectorNotesSettings: (value) => {
-		set({ directorNotesSettings: value });
-		window.maestro.settings.set('directorNotesSettings', value);
-	},
-
-	setWakatimeApiKey: (value) => {
-		set({ wakatimeApiKey: value });
-		window.maestro.settings.set('wakatimeApiKey', value);
-	},
-
-	setWakatimeEnabled: (value) => {
-		set({ wakatimeEnabled: value });
-		window.maestro.settings.set('wakatimeEnabled', value);
-	},
-
-	setWakatimeDetailedTracking: (value) => {
-		set({ wakatimeDetailedTracking: value });
-		window.maestro.settings.set('wakatimeDetailedTracking', value);
 	},
 
 	setUseNativeTitleBar: (value) => {
@@ -910,117 +785,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 			window.maestro.settings.set('usageStats', updated);
 		}
 		set({ usageStats: updated });
-	},
-
-	// ============================================================================
-	// Auto-run Stats Actions
-	// ============================================================================
-
-	setAutoRunStats: (value) => {
-		set({ autoRunStats: value });
-		window.maestro.settings.set('autoRunStats', value);
-	},
-
-	recordAutoRunComplete: (elapsedTimeMs) => {
-		const prev = get().autoRunStats;
-
-		// Don't add to cumulative time - it was already added incrementally during the run
-		// Just check current badge level in case a badge wasn't triggered during incremental updates
-		const newBadgeLevelCalc = getBadgeLevelForTime(prev.cumulativeTimeMs);
-
-		// Check if this would be a new badge (edge case: badge threshold crossed between updates)
-		let newBadgeLevel: number | null = null;
-		if (newBadgeLevelCalc > prev.lastBadgeUnlockLevel) {
-			newBadgeLevel = newBadgeLevelCalc;
-		}
-
-		// Check if this is a new longest run record
-		const isNewRecord = elapsedTimeMs > prev.longestRunMs;
-
-		// Build updated badge history if new badge unlocked
-		let updatedBadgeHistory = prev.badgeHistory || [];
-		if (newBadgeLevel !== null) {
-			updatedBadgeHistory = [
-				...updatedBadgeHistory,
-				{ level: newBadgeLevel, unlockedAt: Date.now() },
-			];
-		}
-
-		const updated: AutoRunStats = {
-			cumulativeTimeMs: prev.cumulativeTimeMs, // Already updated incrementally
-			longestRunMs: isNewRecord ? elapsedTimeMs : prev.longestRunMs,
-			longestRunTimestamp: isNewRecord ? Date.now() : prev.longestRunTimestamp,
-			totalRuns: prev.totalRuns + 1,
-			currentBadgeLevel: newBadgeLevelCalc,
-			lastBadgeUnlockLevel: newBadgeLevel !== null ? newBadgeLevelCalc : prev.lastBadgeUnlockLevel,
-			lastAcknowledgedBadgeLevel: prev.lastAcknowledgedBadgeLevel ?? 0,
-			badgeHistory: updatedBadgeHistory,
-		};
-
-		set({ autoRunStats: updated });
-		window.maestro.settings.set('autoRunStats', updated);
-
-		return { newBadgeLevel, isNewRecord };
-	},
-
-	updateAutoRunProgress: (deltaMs) => {
-		const prev = get().autoRunStats;
-
-		// Add the delta to cumulative time
-		const newCumulativeTime = prev.cumulativeTimeMs + deltaMs;
-		const newBadgeLevelCalc = getBadgeLevelForTime(newCumulativeTime);
-
-		// Check if this unlocks a new badge
-		let newBadgeLevel: number | null = null;
-		if (newBadgeLevelCalc > prev.lastBadgeUnlockLevel) {
-			newBadgeLevel = newBadgeLevelCalc;
-		}
-
-		// Build updated badge history if new badge unlocked
-		let updatedBadgeHistory = prev.badgeHistory || [];
-		if (newBadgeLevel !== null) {
-			updatedBadgeHistory = [
-				...updatedBadgeHistory,
-				{ level: newBadgeLevel, unlockedAt: Date.now() },
-			];
-		}
-
-		const updated: AutoRunStats = {
-			cumulativeTimeMs: newCumulativeTime,
-			longestRunMs: prev.longestRunMs, // Don't update until run completes
-			longestRunTimestamp: prev.longestRunTimestamp,
-			totalRuns: prev.totalRuns, // Don't increment - run not complete yet
-			currentBadgeLevel: newBadgeLevelCalc,
-			lastBadgeUnlockLevel: newBadgeLevel !== null ? newBadgeLevelCalc : prev.lastBadgeUnlockLevel,
-			lastAcknowledgedBadgeLevel: prev.lastAcknowledgedBadgeLevel ?? 0,
-			badgeHistory: updatedBadgeHistory,
-		};
-
-		set({ autoRunStats: updated });
-		window.maestro.settings.set('autoRunStats', updated);
-
-		// Note: isNewRecord is always false during progress - we don't know total run time yet
-		return { newBadgeLevel, isNewRecord: false };
-	},
-
-	acknowledgeBadge: (level) => {
-		const prev = get().autoRunStats;
-		const updated: AutoRunStats = {
-			...prev,
-			lastAcknowledgedBadgeLevel: Math.max(level, prev.lastAcknowledgedBadgeLevel ?? 0),
-		};
-		set({ autoRunStats: updated });
-		window.maestro.settings.set('autoRunStats', updated);
-	},
-
-	getUnacknowledgedBadgeLevel: () => {
-		const stats = get().autoRunStats;
-		const acknowledged = stats.lastAcknowledgedBadgeLevel ?? 0;
-		const current = stats.currentBadgeLevel;
-		if (current > acknowledged) {
-			return current;
-		}
-		return null;
 	},
 
 	// ============================================================================
@@ -1191,57 +955,24 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 			return { newLevel: null };
 		}
 
-		// Add new shortcut to the list
+		// Track which shortcuts have been used (gamification/level-ups stripped)
 		const updatedShortcuts = [...currentStats.usedShortcuts, shortcutId];
 
-		// Calculate new percentage and level
-		const percentage = (updatedShortcuts.length / TOTAL_SHORTCUTS_COUNT) * 100;
-		const newLevelIndex = getLevelIndex(percentage);
-
-		// Check if user leveled up
-		const newLevel = newLevelIndex > currentStats.currentLevel ? newLevelIndex : null;
-
 		const updated: KeyboardMasteryStats = {
+			...currentStats,
 			usedShortcuts: updatedShortcuts,
-			currentLevel: newLevelIndex,
-			lastLevelUpTimestamp: newLevel !== null ? Date.now() : currentStats.lastLevelUpTimestamp,
-			lastAcknowledgedLevel: currentStats.lastAcknowledgedLevel,
 		};
 
 		set({ keyboardMasteryStats: updated });
 		window.maestro.settings.set('keyboardMasteryStats', updated);
 
-		return { newLevel };
-	},
-
-	acknowledgeKeyboardMasteryLevel: (level) => {
-		const prev = get().keyboardMasteryStats;
-		const updated: KeyboardMasteryStats = {
-			...prev,
-			lastAcknowledgedLevel: Math.max(level, prev.lastAcknowledgedLevel),
-		};
-		set({ keyboardMasteryStats: updated });
-		window.maestro.settings.set('keyboardMasteryStats', updated);
-	},
-
-	getUnacknowledgedKeyboardMasteryLevel: () => {
-		const stats = get().keyboardMasteryStats;
-		const acknowledged = stats.lastAcknowledgedLevel;
-		const current = stats.currentLevel;
-		if (current > acknowledged) {
-			return current;
-		}
-		return null;
+		return { newLevel: null };
 	},
 }));
 
 // ============================================================================
 // Selectors
 // ============================================================================
-
-export function selectIsLeaderboardRegistered(s: SettingsStoreState): boolean {
-	return s.leaderboardRegistration !== null && s.leaderboardRegistration.emailConfirmed;
-}
 
 // ============================================================================
 // Load All Settings
@@ -1582,14 +1313,6 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['tourCompleted'] !== undefined)
 			patch.tourCompleted = allSettings['tourCompleted'] as boolean;
 
-		if (allSettings['firstAutoRunCompleted'] !== undefined)
-			patch.firstAutoRunCompleted = allSettings['firstAutoRunCompleted'] as boolean;
-
-		if (allSettings['leaderboardRegistration'] !== undefined)
-			patch.leaderboardRegistration = allSettings[
-				'leaderboardRegistration'
-			] as LeaderboardRegistration | null;
-
 		if (allSettings['webInterfaceUseCustomPort'] !== undefined)
 			patch.webInterfaceUseCustomPort = allSettings['webInterfaceUseCustomPort'] as boolean;
 
@@ -1648,9 +1371,6 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['disableGpuAcceleration'] !== undefined)
 			patch.disableGpuAcceleration = allSettings['disableGpuAcceleration'] as boolean;
 
-		if (allSettings['disableConfetti'] !== undefined)
-			patch.disableConfetti = allSettings['disableConfetti'] as boolean;
-
 		// Local file indexing ignore patterns (with array validation)
 		if (
 			allSettings['localIgnorePatterns'] !== undefined &&
@@ -1679,9 +1399,6 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['fileTabAutoRefreshEnabled'] !== undefined)
 			patch.fileTabAutoRefreshEnabled = allSettings['fileTabAutoRefreshEnabled'] as boolean;
 
-		if (allSettings['suppressWindowsWarning'] !== undefined)
-			patch.suppressWindowsWarning = allSettings['suppressWindowsWarning'] as boolean;
-
 		if (allSettings['autoScrollAiMode'] !== undefined)
 			patch.autoScrollAiMode = allSettings['autoScrollAiMode'] as boolean;
 
@@ -1695,23 +1412,6 @@ export async function loadAllSettings(): Promise<void> {
 				...(allSettings['encoreFeatures'] as Partial<EncoreFeatureFlags>),
 			};
 		}
-
-		// Director's Notes settings (merge with defaults to preserve new fields)
-		if (allSettings['directorNotesSettings'] !== undefined) {
-			patch.directorNotesSettings = {
-				...DEFAULT_DIRECTOR_NOTES_SETTINGS,
-				...(allSettings['directorNotesSettings'] as Partial<DirectorNotesSettings>),
-			};
-		}
-
-		if (allSettings['wakatimeApiKey'] !== undefined)
-			patch.wakatimeApiKey = allSettings['wakatimeApiKey'] as string;
-
-		if (allSettings['wakatimeEnabled'] !== undefined)
-			patch.wakatimeEnabled = allSettings['wakatimeEnabled'] as boolean;
-
-		if (allSettings['wakatimeDetailedTracking'] !== undefined)
-			patch.wakatimeDetailedTracking = allSettings['wakatimeDetailedTracking'] as boolean;
 
 		if (allSettings['useNativeTitleBar'] !== undefined)
 			patch.useNativeTitleBar = allSettings['useNativeTitleBar'] as boolean;
@@ -1780,16 +1480,10 @@ export function getSettingsActions() {
 		setCustomAICommands: state.setCustomAICommands,
 		setTotalActiveTimeMs: state.setTotalActiveTimeMs,
 		addTotalActiveTimeMs: state.addTotalActiveTimeMs,
-		setAutoRunStats: state.setAutoRunStats,
-		recordAutoRunComplete: state.recordAutoRunComplete,
-		updateAutoRunProgress: state.updateAutoRunProgress,
-		acknowledgeBadge: state.acknowledgeBadge,
-		getUnacknowledgedBadgeLevel: state.getUnacknowledgedBadgeLevel,
 		setUsageStats: state.setUsageStats,
 		updateUsageStats: state.updateUsageStats,
 		setUngroupedCollapsed: state.setUngroupedCollapsed,
 		setTourCompleted: state.setTourCompleted,
-		setFirstAutoRunCompleted: state.setFirstAutoRunCompleted,
 		setOnboardingStats: state.setOnboardingStats,
 		recordWizardStart: state.recordWizardStart,
 		recordWizardComplete: state.recordWizardComplete,
@@ -1799,15 +1493,12 @@ export function getSettingsActions() {
 		recordTourComplete: state.recordTourComplete,
 		recordTourSkip: state.recordTourSkip,
 		getOnboardingAnalytics: state.getOnboardingAnalytics,
-		setLeaderboardRegistration: state.setLeaderboardRegistration,
 		setWebInterfaceUseCustomPort: state.setWebInterfaceUseCustomPort,
 		setWebInterfaceCustomPort: state.setWebInterfaceCustomPort,
 		setContextManagementSettings: state.setContextManagementSettings,
 		updateContextManagementSettings: state.updateContextManagementSettings,
 		setKeyboardMasteryStats: state.setKeyboardMasteryStats,
 		recordShortcutUsage: state.recordShortcutUsage,
-		acknowledgeKeyboardMasteryLevel: state.acknowledgeKeyboardMasteryLevel,
-		getUnacknowledgedKeyboardMasteryLevel: state.getUnacknowledgedKeyboardMasteryLevel,
 		setColorBlindMode: state.setColorBlindMode,
 		setDocumentGraphShowExternalLinks: state.setDocumentGraphShowExternalLinks,
 		setDocumentGraphMaxNodes: state.setDocumentGraphMaxNodes,
@@ -1817,20 +1508,14 @@ export function getSettingsActions() {
 		setDefaultStatsTimeRange: state.setDefaultStatsTimeRange,
 		setPreventSleepEnabled: state.setPreventSleepEnabled,
 		setDisableGpuAcceleration: state.setDisableGpuAcceleration,
-		setDisableConfetti: state.setDisableConfetti,
 		setLocalIgnorePatterns: state.setLocalIgnorePatterns,
 		setLocalHonorGitignore: state.setLocalHonorGitignore,
 		setSshRemoteIgnorePatterns: state.setSshRemoteIgnorePatterns,
 		setSshRemoteHonorGitignore: state.setSshRemoteHonorGitignore,
 		setAutomaticTabNamingEnabled: state.setAutomaticTabNamingEnabled,
 		setFileTabAutoRefreshEnabled: state.setFileTabAutoRefreshEnabled,
-		setSuppressWindowsWarning: state.setSuppressWindowsWarning,
 		setAutoScrollAiMode: state.setAutoScrollAiMode,
 		setEncoreFeatures: state.setEncoreFeatures,
-		setDirectorNotesSettings: state.setDirectorNotesSettings,
-		setWakatimeApiKey: state.setWakatimeApiKey,
-		setWakatimeEnabled: state.setWakatimeEnabled,
-		setWakatimeDetailedTracking: state.setWakatimeDetailedTracking,
 		setUseNativeTitleBar: state.setUseNativeTitleBar,
 		setAutoHideMenuBar: state.setAutoHideMenuBar,
 	};

@@ -276,9 +276,9 @@ export const THEMES: Record<ThemeId, Theme> = {
 			error: '#da70d6',
 		},
 	},
-	'maestros-choice': {
-		id: 'maestros-choice',
-		name: "Maestro's Choice",
+	'alfredis-choice': {
+		id: 'alfredis-choice',
+		name: "Alfredi's Choice",
 		mode: 'vibe',
 		colors: {
 			bgMain: '#1a1a24',

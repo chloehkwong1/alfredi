@@ -1,7 +1,6 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import type { Session, Group, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
-import type { GroupChat } from '../../shared/group-chat-types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { notifyToast } from '../stores/notificationStore';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
@@ -47,11 +46,9 @@ interface QuickActionsModalProps {
 	addNewSession: () => void;
 	setSettingsModalOpen: (open: boolean) => void;
 	setSettingsTab: (tab: SettingsTab) => void;
-	setShortcutsHelpOpen: (open: boolean) => void;
 	setAboutModalOpen: (open: boolean) => void;
 	setLogViewerOpen: (open: boolean) => void;
 	setProcessMonitorOpen: (open: boolean) => void;
-	setUsageDashboardOpen: (open: boolean) => void;
 	setAgentSessionsOpen: (open: boolean) => void;
 	setActiveAgentSessionId: (id: string | null) => void;
 	setGitDiffPreview: (diff: string | null) => void;
@@ -70,18 +67,9 @@ interface QuickActionsModalProps {
 	setUpdateCheckModalOpen?: (open: boolean) => void;
 	openWizard?: () => void;
 	wizardGoToStep?: (step: WizardStep) => void;
-	setDebugWizardModalOpen?: (open: boolean) => void;
-	setDebugPackageModalOpen?: (open: boolean) => void;
 	startTour?: () => void;
 	setFuzzyFileSearchOpen?: (open: boolean) => void;
 	onEditAgent?: (session: Session) => void;
-	// Group Chat
-	groupChats?: GroupChat[];
-	onNewGroupChat?: () => void;
-	onOpenGroupChat?: (id: string) => void;
-	onCloseGroupChat?: () => void;
-	onDeleteGroupChat?: (id: string) => void;
-	activeGroupChatId?: string | null;
 	hasActiveSessionCapability?: (
 		capability: 'supportsSessionStorage' | 'supportsSlashCommands' | 'supportsContextMerge'
 	) => boolean;
@@ -116,8 +104,6 @@ interface QuickActionsModalProps {
 	onOpenLastDocumentGraph?: () => void;
 	// Symphony
 	onOpenSymphony?: () => void;
-	// Director's Notes
-	onOpenDirectorNotes?: () => void;
 	// Auto-scroll
 	autoScrollAiMode?: boolean;
 	setAutoScrollAiMode?: (value: boolean) => void;
@@ -150,11 +136,9 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		addNewSession,
 		setSettingsModalOpen,
 		setSettingsTab,
-		setShortcutsHelpOpen,
 		setAboutModalOpen,
 		setLogViewerOpen,
 		setProcessMonitorOpen,
-		setUsageDashboardOpen,
 		setAgentSessionsOpen,
 		setActiveAgentSessionId,
 		setGitDiffPreview,
@@ -173,17 +157,9 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		setUpdateCheckModalOpen,
 		openWizard,
 		wizardGoToStep: _wizardGoToStep,
-		setDebugWizardModalOpen,
-		setDebugPackageModalOpen,
 		startTour,
 		setFuzzyFileSearchOpen,
 		onEditAgent,
-		groupChats,
-		onNewGroupChat,
-		onOpenGroupChat,
-		onCloseGroupChat,
-		onDeleteGroupChat,
-		activeGroupChatId,
 		hasActiveSessionCapability,
 		onOpenMergeSession,
 		onOpenSendToAgent,
@@ -204,7 +180,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		lastGraphFocusFile,
 		onOpenLastDocumentGraph,
 		onOpenSymphony,
-		onOpenDirectorNotes,
 		autoScrollAiMode,
 		setAutoScrollAiMode,
 	} = props;
@@ -214,8 +189,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const storeSetSessionFilterOpen = useUIStore((s) => s.setSessionFilterOpen);
 	const storeSetOutputSearchOpen = useUIStore((s) => s.setOutputSearchOpen);
 	const storeSetFileTreeFilterOpen = useFileExplorerStore((s) => s.setFileTreeFilterOpen);
-	const storeSetHistorySearchFilterOpen = useUIStore((s) => s.setHistorySearchFilterOpen);
-
 	const [search, setSearch] = useState('');
 	const [mode, setMode] = useState<'main' | 'move-to-group'>(initialMode);
 	const [renamingSession, setRenamingSession] = useState(false);
@@ -230,6 +203,12 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 	const activeSession = sessions.find((s) => s.id === activeSessionId);
 
+	// Stable ref for setQuickActionOpen so the layer registration effect
+	// doesn't depend on its identity (getModalActions() creates new functions
+	// each call, causing an infinite register→context change→re-render loop).
+	const setQuickActionOpenRef = useRef(setQuickActionOpen);
+	setQuickActionOpenRef.current = setQuickActionOpen;
+
 	// Register layer on mount (handler will be updated by separate effect)
 	useEffect(() => {
 		layerIdRef.current = registerLayer({
@@ -239,7 +218,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			capturesFocus: true,
 			focusTrap: 'strict',
 			ariaLabel: 'Quick Actions',
-			onEscape: () => setQuickActionOpen(false), // Initial handler, updated below
+			onEscape: () => setQuickActionOpenRef.current(false), // Initial handler, updated below
 		});
 
 		return () => {
@@ -247,7 +226,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				unregisterLayer(layerIdRef.current);
 			}
 		};
-	}, [registerLayer, unregisterLayer, setQuickActionOpen]);
+	}, [registerLayer, unregisterLayer]);
 
 	// Update handler when mode changes - use a ref-based approach to avoid stale closure
 	const handleEscapeRef = useRef<() => void>(() => setQuickActionOpen(false));
@@ -277,14 +256,14 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	}, []);
 
 	// Track scroll position to determine which items are visible
-	const handleScroll = () => {
+	const handleScroll = useCallback(() => {
 		if (scrollContainerRef.current) {
 			const scrollTop = scrollContainerRef.current.scrollTop;
 			const itemHeight = 52; // Approximate height of each item (py-3 = 12px top + 12px bottom + content)
 			const visibleIndex = Math.floor(scrollTop / itemHeight);
 			setFirstVisibleIndex(visibleIndex);
 		}
-	};
+	}, []);
 
 	const handleRenameSession = () => {
 		if (renameValue.trim()) {
@@ -334,23 +313,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		};
 	});
 
-	// Group chat jump actions
-	const groupChatActions: QuickAction[] =
-		groupChats && onOpenGroupChat
-			? groupChats.map((gc) => ({
-					id: `groupchat-${gc.id}`,
-					label: `Group Chat: ${gc.name}`,
-					action: () => {
-						onOpenGroupChat(gc.id);
-						setQuickActionOpen(false);
-					},
-					subtext: `${gc.participants.length} participant${gc.participants.length !== 1 ? 's' : ''}`,
-				}))
-			: [];
-
 	const mainActions: QuickAction[] = [
 		...sessionActions,
-		...groupChatActions,
 		{
 			id: 'new',
 			label: 'Create New Agent',
@@ -655,15 +619,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				setQuickActionOpen(false);
 			},
 		},
-		{
-			id: 'shortcuts',
-			label: 'View Shortcuts',
-			shortcut: shortcuts.help,
-			action: () => {
-				setShortcutsHelpOpen(true);
-				setQuickActionOpen(false);
-			},
-		},
 		...(startTour
 			? [
 					{
@@ -692,15 +647,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			shortcut: shortcuts.processMonitor,
 			action: () => {
 				setProcessMonitorOpen(true);
-				setQuickActionOpen(false);
-			},
-		},
-		{
-			id: 'usageDashboard',
-			label: 'Usage Dashboard',
-			shortcut: shortcuts.usageDashboard,
-			action: () => {
-				setUsageDashboardOpen(true);
 				setQuickActionOpen(false);
 			},
 		},
@@ -920,74 +866,12 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				]
 			: []),
 		{
-			id: 'createDebugPackage',
-			label: 'Create Debug Package',
-			subtext: 'Generate a support bundle for bug reporting',
-			action: () => {
-				setQuickActionOpen(false);
-				if (setDebugPackageModalOpen) {
-					setDebugPackageModalOpen(true);
-				} else {
-					// Fallback to direct API call if modal not available
-					notifyToast({
-						type: 'info',
-						title: 'Debug Package',
-						message: 'Creating debug package...',
-					});
-					window.maestro.debug
-						.createPackage()
-						.then((result) => {
-							if (result.success && result.path) {
-								notifyToast({
-									type: 'success',
-									title: 'Debug Package Created',
-									message: `Saved to ${result.path}`,
-								});
-							} else if (result.error !== 'Cancelled by user') {
-								notifyToast({
-									type: 'error',
-									title: 'Debug Package Failed',
-									message: result.error || 'Unknown error',
-								});
-							}
-						})
-						.catch((error) => {
-							notifyToast({
-								type: 'error',
-								title: 'Debug Package Failed',
-								message: error instanceof Error ? error.message : 'Unknown error',
-							});
-						});
-				}
-			},
-		},
-		{
 			id: 'goToFiles',
 			label: 'Go to Files Tab',
 			shortcut: shortcuts.goToFiles,
 			action: () => {
 				setRightPanelOpen(true);
 				setActiveRightTab('files');
-				setQuickActionOpen(false);
-			},
-		},
-		{
-			id: 'goToHistory',
-			label: 'Go to History Tab',
-			shortcut: shortcuts.goToHistory,
-			action: () => {
-				setRightPanelOpen(true);
-				setActiveRightTab('history');
-				setQuickActionOpen(false);
-			},
-		},
-		{
-			id: 'goToAutoRun',
-			label: 'Go to Auto Run Tab',
-			shortcut: shortcuts.goToAutoRun,
-			action: () => {
-				setRightPanelOpen(true);
-				setActiveRightTab('autorun');
 				setQuickActionOpen(false);
 			},
 		},
@@ -1020,21 +904,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 					},
 				]
 			: []),
-		// Director's Notes - unified history and AI synopsis
-		...(onOpenDirectorNotes
-			? [
-					{
-						id: 'directorNotes',
-						label: "Director's Notes",
-						shortcut: shortcuts.directorNotes,
-						subtext: 'View unified history and AI synopsis across all sessions',
-						action: () => {
-							onOpenDirectorNotes();
-							setQuickActionOpen(false);
-						},
-					},
-				]
-			: []),
 		// Auto-scroll toggle
 		...(setAutoScrollAiMode
 			? [
@@ -1060,23 +929,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						subtext: `Re-open: ${lastGraphFocusFile}`,
 						action: () => {
 							onOpenLastDocumentGraph();
-							setQuickActionOpen(false);
-						},
-					},
-				]
-			: []),
-		// Auto Run reset tasks - only show when there are completed tasks in the selected document
-		...(autoRunSelectedDocument &&
-		autoRunCompletedTaskCount &&
-		autoRunCompletedTaskCount > 0 &&
-		onAutoRunResetTasks
-			? [
-					{
-						id: 'resetAutoRunTasks',
-						label: `Reset Finished Tasks in ${autoRunSelectedDocument}`,
-						subtext: `Uncheck ${autoRunCompletedTaskCount} completed task${autoRunCompletedTaskCount !== 1 ? 's' : ''}`,
-						action: () => {
-							onAutoRunResetTasks();
 							setQuickActionOpen(false);
 						},
 					},
@@ -1129,18 +981,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				setTimeout(() => storeSetFileTreeFilterOpen(true), 50);
 			},
 		},
-		{
-			id: 'searchHistory',
-			label: 'Search: History',
-			subtext: 'Search in the history panel',
-			action: () => {
-				setQuickActionOpen(false);
-				setRightPanelOpen(true);
-				setActiveRightTab('history');
-				setActiveFocus('right');
-				setTimeout(() => storeSetHistorySearchFilterOpen(true), 50);
-			},
-		},
 		// Publish document as GitHub Gist - only when file preview is open, gh CLI is available, and not in edit mode
 		...(isFilePreviewOpen && ghCliAvailable && onPublishGist && !markdownEditMode
 			? [
@@ -1150,44 +990,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						subtext: 'Share current file as a public or secret gist',
 						action: () => {
 							onPublishGist();
-							setQuickActionOpen(false);
-						},
-					},
-				]
-			: []),
-		// Group Chat commands - only show when at least 2 AI agents exist
-		...(onNewGroupChat && sessions.filter((s) => s.toolType !== 'terminal').length >= 2
-			? [
-					{
-						id: 'newGroupChat',
-						label: 'New Group Chat',
-						action: () => {
-							onNewGroupChat();
-							setQuickActionOpen(false);
-						},
-					},
-				]
-			: []),
-		...(activeGroupChatId && onCloseGroupChat
-			? [
-					{
-						id: 'closeGroupChat',
-						label: 'Close Group Chat',
-						action: () => {
-							onCloseGroupChat();
-							setQuickActionOpen(false);
-						},
-					},
-				]
-			: []),
-		...(activeGroupChatId && onDeleteGroupChat && groupChats
-			? [
-					{
-						id: 'deleteGroupChat',
-						label: `Remove Group Chat: ${groupChats.find((c) => c.id === activeGroupChatId)?.name || 'Group Chat'}`,
-						shortcut: shortcuts.killInstance,
-						action: () => {
-							onDeleteGroupChat(activeGroupChatId);
 							setQuickActionOpen(false);
 						},
 					},
@@ -1300,45 +1102,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 					},
 				]
 			: []),
-		...(setDebugWizardModalOpen
-			? [
-					{
-						id: 'debugWizardPhaseReview',
-						label: 'Debug: Wizard → Review Playbooks',
-						subtext: 'Jump directly to Phase Review step (requires existing Auto Run docs)',
-						action: () => {
-							setDebugWizardModalOpen(true);
-							setQuickActionOpen(false);
-						},
-					},
-				]
-			: []),
-		{
-			id: 'debugCopyInstallGuid',
-			label: 'Debug: Copy Install GUID to Clipboard',
-			subtext: 'Copy your unique installation identifier',
-			action: async () => {
-				try {
-					const installationId = await window.maestro.leaderboard.getInstallationId();
-					if (installationId) {
-						await safeClipboardWrite(installationId);
-						notifyToast({ type: 'success', title: 'Install GUID Copied', message: installationId });
-						console.log('[Debug] Installation GUID copied to clipboard:', installationId);
-					} else {
-						notifyToast({ type: 'error', title: 'Error', message: 'No installation GUID found' });
-						console.warn('[Debug] No installation GUID found');
-					}
-				} catch (err) {
-					notifyToast({
-						type: 'error',
-						title: 'Error',
-						message: 'Failed to copy installation GUID',
-					});
-					console.error('[Debug] Failed to copy installation GUID:', err);
-				}
-				setQuickActionOpen(false);
-			},
-		},
 	];
 
 	const groupActions: QuickAction[] = [
@@ -1401,7 +1164,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		selectedIndex,
 		setSelectedIndex,
 		handleKeyDown: listHandleKeyDown,
-		resetSelection,
 	} = useListNavigation({
 		listLength: filtered.length,
 		onSelect: handleSelectByIndex,
@@ -1410,19 +1172,24 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		enabled: !renamingSession, // Disable navigation when renaming
 	});
 
-	// Scroll selected item into view
+	// Scroll selected item into view — only run when selectedIndex actually changes.
+	// Use a ref to avoid triggering scroll on every render when selectedIndex is the same.
+	const prevSelectedIndexRef = useRef(selectedIndex);
 	useEffect(() => {
-		selectedItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		if (prevSelectedIndexRef.current !== selectedIndex) {
+			prevSelectedIndexRef.current = selectedIndex;
+			selectedItemRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+		}
 	}, [selectedIndex]);
 
 	// Reset selection when search or mode changes.
-	// resetSelection is intentionally excluded from deps — it changes when filtered.length
-	// changes, but we only want to reset on user-driven search/mode changes, not on every
-	// list length fluctuation from parent re-renders (which causes infinite update loops).
+	// Uses setSelectedIndex(0) directly instead of resetSelection() to avoid depending
+	// on resetSelection which changes identity when filtered.length changes — that
+	// dependency would cause infinite update loops on parent re-renders.
 	useEffect(() => {
-		resetSelection();
+		setSelectedIndex(0);
 		setFirstVisibleIndex(0);
-	}, [search, mode]);
+	}, [search, mode, setSelectedIndex]);
 
 	// Clear search when switching to move-to-group mode
 	useEffect(() => {

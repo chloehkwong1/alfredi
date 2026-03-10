@@ -521,7 +521,7 @@ export function WizardConversationView({
 			style={{ backgroundColor: theme.colors.bgMain }}
 			data-testid="wizard-conversation-view"
 		>
-			{/* Empty state - informative introduction similar to Group Chat */}
+			{/* Empty state - informative introduction */}
 			{conversationHistory.length === 0 && !isLoading && (
 				<div
 					className="flex items-center justify-center h-full px-6"

@@ -1,177 +1,143 @@
 /**
- * InlineWizardContext - Context provider for inline wizard state management
+ * InlineWizardContext - Stub after stripping Auto Run / Batch features
  *
- * This context wraps the useInlineWizard hook to provide cross-component access
- * to inline wizard state. The inline wizard is triggered by the `/wizard` slash
- * command and allows users to create or iterate on Auto Run documents within
- * their existing session context.
- *
- * Unlike the full-screen onboarding wizard (MaestroWizard.tsx), this wizard
- * runs inline within the existing AI conversation interface.
- *
- * States managed:
- * - isActive: Whether the wizard is currently active
- * - mode: Current wizard mode ('new' | 'iterate' | 'ask' | null)
- * - goal: Goal for iterate mode (what the user wants to add/change)
- * - confidence: Confidence level from agent responses (0-100)
- * - isGeneratingDocs: Whether documents are being generated
- * - generatedDocuments: Generated documents (if any)
- * - previousUIState: Previous UI state to restore when wizard ends
- *
- * Usage:
- * 1. Wrap App with InlineWizardProvider
- * 2. Access wizard state via useInlineWizardContext() hook
+ * The inline wizard depended on the batch/auto run infrastructure.
+ * This stub provides the context interface so consuming components compile,
+ * but the wizard functionality is no-op.
  */
 
-import { createContext, useContext, useMemo, ReactNode } from 'react';
-import {
-	useInlineWizard,
-	type UseInlineWizardReturn,
-	type InlineWizardState,
-	type InlineWizardMode,
-	type InlineWizardMessage,
-	type InlineGeneratedDocument,
-	type PreviousUIState,
-} from '../hooks/batch/useInlineWizard';
+import { createContext, useContext, ReactNode } from 'react';
+import type { ThinkingMode } from '../types';
 
-/**
- * Context value type - exposes the full useInlineWizard return value
- */
+// Inline types (previously from batch/useInlineWizard)
+export type InlineWizardMode = 'new' | 'iterate' | null;
+export interface InlineWizardMessage {
+	id: string;
+	role: 'user' | 'assistant' | 'system';
+	content: string;
+	timestamp: number;
+}
+export interface InlineGeneratedDocument {
+	filename: string;
+	content: string;
+	taskCount: number;
+	savedPath?: string;
+}
+export interface PreviousUIState {
+	readOnlyMode: boolean;
+	saveToHistory: boolean;
+	showThinking: ThinkingMode;
+}
+export interface InlineWizardState {
+	isActive: boolean;
+	mode: InlineWizardMode;
+	goal?: string;
+	confidence: number;
+	ready?: boolean;
+}
+
+export interface UseInlineWizardReturn {
+	isWizardActive: boolean;
+	isInitializing: boolean;
+	isWaiting: boolean;
+	wizardMode: InlineWizardMode;
+	wizardGoal: string;
+	confidence: number;
+	ready: boolean;
+	readyToGenerate: boolean;
+	conversationHistory: InlineWizardMessage[];
+	isGeneratingDocs: boolean;
+	generatedDocuments: InlineGeneratedDocument[];
+	existingDocuments: any[];
+	error: string | null;
+	state: InlineWizardState;
+	streamingContent: string;
+	generationProgress: string;
+	wizardTabId: string | null;
+	startWizard: (...args: any[]) => void;
+	endWizard: (...args: any[]) => PreviousUIState | null;
+	sendMessage: (...args: any[]) => void;
+	setConfidence: (n: number) => void;
+	setMode: (m: InlineWizardMode) => void;
+	setGoal: (g: string) => void;
+	setGeneratingDocs: (b: boolean) => void;
+	setGeneratedDocuments: (docs: InlineGeneratedDocument[]) => void;
+	setExistingDocuments: (docs: any[]) => void;
+	setError: (e: string | null) => void;
+	clearError: () => void;
+	retryLastMessage: () => void;
+	addAssistantMessage: (content: string) => void;
+	clearConversation: () => void;
+	reset: () => void;
+	generateDocuments: (...args: any[]) => Promise<void>;
+	getStateForTab: (tabId: string) => any;
+	cancelGeneration: (...args: any[]) => void;
+	selectDocument: (...args: any[]) => void;
+	updateDocument: (...args: any[]) => void;
+	saveDocuments: (...args: any[]) => void;
+	handleTabClose: (...args: any[]) => void;
+	getPreviousUIState: () => PreviousUIState | null;
+}
+
 export type InlineWizardContextValue = UseInlineWizardReturn;
 
-// Create context with null as default (will throw if used outside provider)
 const InlineWizardContext = createContext<InlineWizardContextValue | null>(null);
+
+const noopReturn: UseInlineWizardReturn = {
+	isWizardActive: false,
+	isInitializing: false,
+	isWaiting: false,
+	wizardMode: null,
+	wizardGoal: '',
+	confidence: 0,
+	ready: false,
+	readyToGenerate: false,
+	conversationHistory: [],
+	isGeneratingDocs: false,
+	generatedDocuments: [],
+	existingDocuments: [],
+	error: null,
+	state: { isActive: false, mode: null, confidence: 0 },
+	streamingContent: '',
+	generationProgress: '',
+	wizardTabId: null,
+	startWizard: () => {},
+	endWizard: () => null,
+	sendMessage: () => {},
+	setConfidence: () => {},
+	setMode: () => {},
+	setGoal: () => {},
+	setGeneratingDocs: () => {},
+	setGeneratedDocuments: () => {},
+	setExistingDocuments: () => {},
+	setError: () => {},
+	clearError: () => {},
+	retryLastMessage: () => {},
+	addAssistantMessage: () => {},
+	clearConversation: () => {},
+	reset: () => {},
+	generateDocuments: async () => {},
+	getStateForTab: () => null,
+	cancelGeneration: () => {},
+	selectDocument: () => {},
+	updateDocument: () => {},
+	saveDocuments: () => {},
+	handleTabClose: () => {},
+	getPreviousUIState: () => null,
+};
 
 interface InlineWizardProviderProps {
 	children: ReactNode;
 }
 
-/**
- * InlineWizardProvider - Provides centralized inline wizard state management
- *
- * This provider wraps the useInlineWizard hook to make wizard state available
- * throughout the component tree without prop drilling.
- *
- * The provider should be added near the root of the app, alongside other
- * context providers like SessionProvider, AutoRunProvider, etc.
- *
- * Usage:
- * ```tsx
- * <SessionProvider>
- *   <AutoRunProvider>
- *     <GroupChatProvider>
- *       <InlineWizardProvider>
- *         <InputProvider>
- *           <MaestroConsoleInner />
- *         </InputProvider>
- *       </InlineWizardProvider>
- *     </GroupChatProvider>
- *   </AutoRunProvider>
- * </SessionProvider>
- * ```
- */
 export function InlineWizardProvider({ children }: InlineWizardProviderProps) {
-	// Use the inline wizard hook
-	const wizardState = useInlineWizard();
-
-	// Memoize the context value to prevent unnecessary re-renders
-	// The useInlineWizard hook already memoizes its return value,
-	// but we wrap it here for safety
-	const value = useMemo<InlineWizardContextValue>(
-		() => wizardState,
-		[
-			// Dependencies from the wizard state
-			wizardState.isWizardActive,
-			wizardState.isInitializing,
-			wizardState.isWaiting,
-			wizardState.wizardMode,
-			wizardState.wizardGoal,
-			wizardState.confidence,
-			wizardState.ready,
-			wizardState.readyToGenerate,
-			wizardState.conversationHistory,
-			wizardState.isGeneratingDocs,
-			wizardState.generatedDocuments,
-			wizardState.existingDocuments,
-			wizardState.error,
-			wizardState.state,
-			// Actions (stable references from useCallback)
-			wizardState.startWizard,
-			wizardState.endWizard,
-			wizardState.sendMessage,
-			wizardState.setConfidence,
-			wizardState.setMode,
-			wizardState.setGoal,
-			wizardState.setGeneratingDocs,
-			wizardState.setGeneratedDocuments,
-			wizardState.setExistingDocuments,
-			wizardState.setError,
-			wizardState.clearError,
-			wizardState.retryLastMessage,
-			wizardState.addAssistantMessage,
-			wizardState.clearConversation,
-			wizardState.reset,
-			wizardState.generateDocuments,
-			wizardState.streamingContent,
-			wizardState.generationProgress,
-			wizardState.wizardTabId,
-		]
-	);
-
-	return <InlineWizardContext.Provider value={value}>{children}</InlineWizardContext.Provider>;
+	return <InlineWizardContext.Provider value={noopReturn}>{children}</InlineWizardContext.Provider>;
 }
 
-/**
- * useInlineWizardContext - Hook to access inline wizard state management
- *
- * Must be used within an InlineWizardProvider. Throws an error if used outside.
- *
- * @returns InlineWizardContextValue - All inline wizard states and actions
- *
- * @example
- * // Access wizard state
- * const { isWizardActive, wizardMode, confidence } = useInlineWizardContext();
- *
- * @example
- * // Start the wizard
- * const { startWizard } = useInlineWizardContext();
- * startWizard('add authentication to my app', {
- *   readOnlyMode: true,
- *   saveToHistory: false,
- *   showThinking: false
- * });
- *
- * @example
- * // End wizard and restore UI state
- * const { endWizard } = useInlineWizardContext();
- * const previousState = endWizard();
- * if (previousState) {
- *   setReadOnlyMode(previousState.readOnlyMode);
- *   setSaveToHistory(previousState.saveToHistory);
- * }
- *
- * @example
- * // Check if wizard should intercept input
- * const { isWizardActive, sendMessage } = useInlineWizardContext();
- * if (isWizardActive) {
- *   sendMessage(userInput);
- * }
- */
 export function useInlineWizardContext(): InlineWizardContextValue {
 	const context = useContext(InlineWizardContext);
-
 	if (!context) {
 		throw new Error('useInlineWizardContext must be used within an InlineWizardProvider');
 	}
-
 	return context;
 }
-
-// Re-export types for convenience
-export type {
-	InlineWizardState,
-	InlineWizardMode,
-	InlineWizardMessage,
-	InlineGeneratedDocument,
-	PreviousUIState,
-};

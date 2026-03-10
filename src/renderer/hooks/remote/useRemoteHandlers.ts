@@ -4,21 +4,18 @@
  * Handles remote command processing from the web interface:
  *   - handleRemoteCommand event listener (terminal + AI mode dispatching)
  *   - handleQuickActionsToggleRemoteControl (live mode toggle)
- *   - sessionSshRemoteNames (memoized map for group chat participant cards)
+ *   - sessionSshRemoteNames (memoized map for SSH remote name display)
  *
  * Reads from: sessionStore, settingsStore, uiStore
  * Event: 'maestro:remoteCommand' custom DOM event
  */
 
 import { useEffect, useMemo, useCallback } from 'react';
-import type { Session, ToolType, SessionState, LogEntry, CustomAICommand } from '../../types';
+import type { Session, ToolType, SessionState, LogEntry } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
-import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
 import { getActiveTab } from '../../utils/tabHelpers';
 import { generateId } from '../../utils/ids';
-import { substituteTemplateVariables } from '../../utils/templateVariables';
-import { gitService } from '../../services/git';
 import { captureException } from '../../utils/sentry';
 import { filterYoloArgs } from '../../utils/agentArgs';
 
@@ -29,18 +26,10 @@ import { filterYoloArgs } from '../../utils/agentArgs';
 export interface UseRemoteHandlersDeps {
 	/** Sessions ref for non-reactive access in event handlers */
 	sessionsRef: React.MutableRefObject<Session[]>;
-	/** Custom AI commands ref (updated on every render) */
-	customAICommandsRef: React.MutableRefObject<CustomAICommand[]>;
-	/** Spec-Kit commands ref */
-	speckitCommandsRef: React.MutableRefObject<CustomAICommand[]>;
-	/** OpenSpec commands ref */
-	openspecCommandsRef: React.MutableRefObject<CustomAICommand[]>;
 	/** Toggle global live mode (web interface) */
 	toggleGlobalLive: () => Promise<void>;
 	/** Whether live/remote mode is active */
 	isLiveMode: boolean;
-	/** SSH remote configs from app initialization */
-	sshRemoteConfigs: Array<{ id: string; name: string }>;
 }
 
 // ============================================================================
@@ -67,12 +56,8 @@ const selectSessions = (s: ReturnType<typeof useSessionStore.getState>) => s.ses
 export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandlersReturn {
 	const {
 		sessionsRef,
-		customAICommandsRef,
-		speckitCommandsRef,
-		openspecCommandsRef,
 		toggleGlobalLive,
 		isLiveMode,
-		sshRemoteConfigs,
 	} = deps;
 
 	// --- Store subscriptions ---
@@ -85,23 +70,12 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 	);
 
 	// ====================================================================
-	// sessionSshRemoteNames — memoized map for group chat participant cards
+	// sessionSshRemoteNames — memoized map for participant cards
 	// ====================================================================
 
 	const sessionSshRemoteNames = useMemo(() => {
-		const map = new Map<string, string>();
-		for (const session of sessions) {
-			if (session.sessionSshRemoteConfig?.enabled && session.sessionSshRemoteConfig.remoteId) {
-				const sshConfig = sshRemoteConfigs.find(
-					(c) => c.id === session.sessionSshRemoteConfig?.remoteId
-				);
-				if (sshConfig) {
-					map.set(session.name, sshConfig.name);
-				}
-			}
-		}
-		return map;
-	}, [sessions, sshRemoteConfigs]);
+		return new Map<string, string>();
+	}, [sessions]);
 
 	// ====================================================================
 	// handleRemoteCommand — processes commands from web interface
@@ -228,83 +202,18 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 			}
 
 			// Check for slash commands (built-in and custom)
-			let promptToSend = command;
+			const promptToSend = command;
 			let commandMetadata: { command: string; description: string } | undefined;
 
-			// Handle slash commands (custom AI commands only)
+			// Handle slash commands
 			if (command.trim().startsWith('/')) {
 				const commandText = command.trim();
-				console.log('[Remote] Detected slash command:', commandText);
-
-				const matchingCustomCommand = customAICommandsRef.current.find(
-					(cmd) => cmd.command === commandText
-				);
-				const matchingSpeckitCommand = speckitCommandsRef.current.find(
-					(cmd) => cmd.command === commandText
-				);
-				const matchingOpenspecCommand = openspecCommandsRef.current.find(
-					(cmd) => cmd.command === commandText
-				);
-
-				const matchingCommand =
-					matchingCustomCommand || matchingSpeckitCommand || matchingOpenspecCommand;
-
-				if (matchingCommand) {
-					console.log(
-						'[Remote] Found matching command:',
-						matchingCommand.command,
-						matchingSpeckitCommand
-							? '(spec-kit)'
-							: matchingOpenspecCommand
-								? '(openspec)'
-								: '(custom)'
-					);
-
-					// Get git branch for template substitution
-					let gitBranch: string | undefined;
-					if (session.isGitRepo) {
-						try {
-							const status = await gitService.getStatus(session.cwd);
-							gitBranch = status.branch;
-						} catch (error) {
-							captureException(error, {
-								extra: {
-									cwd: session.cwd,
-									sessionId: session.id,
-									sessionName: session.name,
-									operation: 'git-status-for-remote-command',
-								},
-							});
-						}
-					}
-
-					// Read conductorProfile from settings store at call time
-					const conductorProfile = useSettingsStore.getState().conductorProfile;
-
-					// Substitute template variables
-					promptToSend = substituteTemplateVariables(matchingCommand.prompt, {
-						session,
-						gitBranch,
-						conductorProfile,
-					});
-					commandMetadata = {
-						command: matchingCommand.command,
-						description: matchingCommand.description,
-					};
-
-					console.log(
-						'[Remote] Substituted prompt (first 100 chars):',
-						promptToSend.substring(0, 100)
-					);
-				} else {
-					// Unknown slash command
-					console.log('[Remote] Unknown slash command:', commandText);
-					addLogToActiveTab(sessionId, {
-						source: 'system',
-						text: `Unknown command: ${commandText}`,
-					});
-					return;
-				}
+				console.log('[Remote] Unknown slash command:', commandText);
+				addLogToActiveTab(sessionId, {
+					source: 'system',
+					text: `Unknown command: ${commandText}`,
+				});
+				return;
 			}
 
 			try {

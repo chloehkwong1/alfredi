@@ -38,7 +38,6 @@ export function useWebBroadcasting(deps: UseWebBroadcastingDeps): UseWebBroadcas
 		const unsubscribe = window.maestro.history.onExternalChange(async () => {
 			// Reload from disk before refreshing (to bypass electron-store cache)
 			await window.maestro.history.reload();
-			rightPanelRef.current?.refreshHistoryPanel();
 		});
 		return unsubscribe;
 	}, [rightPanelRef]);

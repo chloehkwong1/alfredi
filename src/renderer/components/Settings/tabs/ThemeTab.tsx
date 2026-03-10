@@ -8,7 +8,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Moon, Sun, Sparkles, Check } from 'lucide-react';
 import { useSettings } from '../../../hooks';
-import { CustomThemeBuilder } from '../../CustomThemeBuilder';
 import type { Theme, ThemeId } from '../../../types';
 
 export interface ThemeTabProps {
@@ -24,14 +23,7 @@ export function ThemeTab({
 	onThemeImportError,
 	onThemeImportSuccess,
 }: ThemeTabProps) {
-	const {
-		activeThemeId,
-		setActiveThemeId,
-		customThemeColors,
-		setCustomThemeColors,
-		customThemeBaseId,
-		setCustomThemeBaseId,
-	} = useSettings();
+	const { activeThemeId, setActiveThemeId } = useSettings();
 
 	const themePickerRef = useRef<HTMLDivElement>(null);
 
@@ -147,21 +139,6 @@ export function ThemeTab({
 					</div>
 				</div>
 			))}
-
-			{/* Custom Theme Builder */}
-			<div data-theme-id="custom">
-				<CustomThemeBuilder
-					theme={theme}
-					customThemeColors={customThemeColors}
-					setCustomThemeColors={setCustomThemeColors}
-					customThemeBaseId={customThemeBaseId}
-					setCustomThemeBaseId={setCustomThemeBaseId}
-					isSelected={activeThemeId === 'custom'}
-					onSelect={() => setActiveThemeId('custom')}
-					onImportError={onThemeImportError}
-					onImportSuccess={onThemeImportSuccess}
-				/>
-			</div>
 		</div>
 	);
 }

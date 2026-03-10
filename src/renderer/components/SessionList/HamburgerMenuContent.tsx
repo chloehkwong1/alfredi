@@ -2,7 +2,6 @@ import {
 	Wand2,
 	Plus,
 	Settings,
-	Keyboard,
 	ScrollText,
 	Cpu,
 	ExternalLink,
@@ -11,8 +10,6 @@ import {
 	Compass,
 	Globe,
 	BookOpen,
-	BarChart3,
-	Music,
 	Command,
 } from 'lucide-react';
 import type { Theme } from '../../types';
@@ -36,16 +33,11 @@ export function HamburgerMenuContent({
 	setMenuOpen,
 }: HamburgerMenuContentProps) {
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
-	const directorNotesEnabled = useSettingsStore((s) => s.encoreFeatures.directorNotes);
 	const {
-		setShortcutsHelpOpen,
 		setSettingsModalOpen,
 		setSettingsTab,
 		setLogViewerOpen,
 		setProcessMonitorOpen,
-		setUsageDashboardOpen,
-		setSymphonyModalOpen,
-		setDirectorNotesOpen,
 		setUpdateCheckModalOpen,
 		setAboutModalOpen,
 		setQuickActionOpen,
@@ -148,29 +140,6 @@ export function HamburgerMenuContent({
 			<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 			<button
 				onClick={() => {
-					setShortcutsHelpOpen(true);
-					setMenuOpen(false);
-				}}
-				className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-			>
-				<Keyboard className="w-5 h-5" style={{ color: theme.colors.accent }} />
-				<div className="flex-1">
-					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						Keyboard Shortcuts
-					</div>
-					<div className="text-xs" style={{ color: theme.colors.textDim }}>
-						View all available shortcuts
-					</div>
-				</div>
-				<span
-					className="text-xs font-mono px-1.5 py-0.5 rounded"
-					style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-				>
-					{formatShortcutKeys(shortcuts.help.keys)}
-				</span>
-			</button>
-			<button
-				onClick={() => {
 					setSettingsModalOpen(true);
 					setSettingsTab('general');
 					setMenuOpen(false);
@@ -239,79 +208,6 @@ export function HamburgerMenuContent({
 					{formatShortcutKeys(shortcuts.processMonitor.keys)}
 				</span>
 			</button>
-			<button
-				onClick={() => {
-					setUsageDashboardOpen(true);
-					setMenuOpen(false);
-				}}
-				className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-			>
-				<BarChart3 className="w-5 h-5" style={{ color: theme.colors.accent }} />
-				<div className="flex-1">
-					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						Usage Dashboard
-					</div>
-					<div className="text-xs" style={{ color: theme.colors.textDim }}>
-						View usage analytics
-					</div>
-				</div>
-				<span
-					className="text-xs font-mono px-1.5 py-0.5 rounded"
-					style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-				>
-					{formatShortcutKeys(shortcuts.usageDashboard.keys)}
-				</span>
-			</button>
-			<button
-				onClick={() => {
-					setSymphonyModalOpen(true);
-					setMenuOpen(false);
-				}}
-				className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-			>
-				<Music className="w-5 h-5" style={{ color: theme.colors.accent }} />
-				<div className="flex-1">
-					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						Maestro Symphony
-					</div>
-					<div className="text-xs" style={{ color: theme.colors.textDim }}>
-						Contribute to open source
-					</div>
-				</div>
-				<span
-					className="text-xs font-mono px-1.5 py-0.5 rounded"
-					style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-				>
-					{shortcuts.openSymphony ? formatShortcutKeys(shortcuts.openSymphony.keys) : '⇧⌘Y'}
-				</span>
-			</button>
-			{directorNotesEnabled && (
-				<button
-					onClick={() => {
-						setDirectorNotesOpen(true);
-						setMenuOpen(false);
-					}}
-					className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-				>
-					<ScrollText className="w-5 h-5" style={{ color: theme.colors.accent }} />
-					<div className="flex-1">
-						<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-							Director's Notes
-						</div>
-						<div className="text-xs" style={{ color: theme.colors.textDim }}>
-							Unified history & AI synopsis
-						</div>
-					</div>
-					{shortcuts.directorNotes && (
-						<span
-							className="text-xs font-mono px-1.5 py-0.5 rounded"
-							style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-						>
-							{formatShortcutKeys(shortcuts.directorNotes.keys)}
-						</span>
-					)}
-				</button>
-			)}
 			<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 			<button
 				onClick={() => {

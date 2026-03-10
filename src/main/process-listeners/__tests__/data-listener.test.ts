@@ -1,6 +1,6 @@
 /**
  * Tests for data listener.
- * Handles process output data including group chat buffering and web broadcasting.
+ * Handles process output data and web broadcasting.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -14,8 +14,6 @@ describe('Data Listener', () => {
 	let mockSafeSend: SafeSendFn;
 	let mockGetWebServer: ProcessListenerDependencies['getWebServer'];
 	let mockWebServer: { broadcastToSessionClients: ReturnType<typeof vi.fn> };
-	let mockOutputBuffer: ProcessListenerDependencies['outputBuffer'];
-	let mockOutputParser: ProcessListenerDependencies['outputParser'];
 	let mockDebugLog: ProcessListenerDependencies['debugLog'];
 	let mockPatterns: ProcessListenerDependencies['patterns'];
 	let eventHandlers: Map<string, (...args: unknown[]) => void>;
@@ -29,19 +27,8 @@ describe('Data Listener', () => {
 			broadcastToSessionClients: vi.fn(),
 		};
 		mockGetWebServer = vi.fn().mockReturnValue(mockWebServer);
-		mockOutputBuffer = {
-			appendToGroupChatBuffer: vi.fn().mockReturnValue(100),
-			getGroupChatBufferedOutput: vi.fn().mockReturnValue('test output'),
-			clearGroupChatBuffer: vi.fn(),
-		};
-		mockOutputParser = {
-			extractTextFromStreamJson: vi.fn().mockReturnValue('parsed response'),
-			parseParticipantSessionId: vi.fn().mockReturnValue(null),
-		};
 		mockDebugLog = vi.fn();
 		mockPatterns = {
-			REGEX_MODERATOR_SESSION: /^group-chat-(.+)-moderator-/,
-			REGEX_MODERATOR_SESSION_TIMESTAMP: /^group-chat-(.+)-moderator-\d+$/,
 			REGEX_AI_SUFFIX: /-ai-.+$/,
 			REGEX_AI_TAB_ID: /-ai-(.+)$/,
 			REGEX_BATCH_SESSION: /-batch-\d+$/,
@@ -59,8 +46,6 @@ describe('Data Listener', () => {
 		setupDataListener(mockProcessManager, {
 			safeSend: mockSafeSend,
 			getWebServer: mockGetWebServer,
-			outputBuffer: mockOutputBuffer,
-			outputParser: mockOutputParser,
 			debugLog: mockDebugLog,
 			patterns: mockPatterns,
 		});
@@ -74,7 +59,7 @@ describe('Data Listener', () => {
 	});
 
 	describe('Regular Process Data', () => {
-		it('should forward data to renderer for non-group-chat sessions', () => {
+		it('should forward data to renderer', () => {
 			setupListener();
 			const handler = eventHandlers.get('data');
 
@@ -123,86 +108,6 @@ describe('Data Listener', () => {
 					sessionId: 'a053b4b3-95af-46cc-aaa4-3d37785038be',
 					tabId: '66fc905c-3062-4192-9a84-d239af5fc826',
 				})
-			);
-		});
-	});
-
-	describe('Moderator Output Buffering', () => {
-		it('should buffer moderator output instead of forwarding', () => {
-			setupListener();
-			const handler = eventHandlers.get('data');
-			const sessionId = 'group-chat-test-chat-123-moderator-abc123';
-
-			handler?.(sessionId, 'moderator output');
-
-			expect(mockOutputBuffer.appendToGroupChatBuffer).toHaveBeenCalledWith(
-				sessionId,
-				'moderator output'
-			);
-			expect(mockSafeSend).not.toHaveBeenCalled();
-		});
-
-		it('should extract group chat ID from moderator session', () => {
-			setupListener();
-			const handler = eventHandlers.get('data');
-			const sessionId = 'group-chat-my-chat-id-moderator-12345';
-
-			handler?.(sessionId, 'test');
-
-			expect(mockDebugLog).toHaveBeenCalledWith(
-				'GroupChat:Debug',
-				expect.stringContaining('my-chat-id')
-			);
-		});
-
-		it('should warn when buffer size exceeds limit', () => {
-			mockOutputBuffer.appendToGroupChatBuffer = vi.fn().mockReturnValue(15 * 1024 * 1024); // 15MB
-			setupListener();
-			const handler = eventHandlers.get('data');
-			const sessionId = 'group-chat-test-chat-123-moderator-abc123';
-
-			handler?.(sessionId, 'large output');
-
-			expect(mockDebugLog).toHaveBeenCalledWith(
-				'GroupChat:Debug',
-				expect.stringContaining('WARNING: Buffer size')
-			);
-		});
-	});
-
-	describe('Participant Output Buffering', () => {
-		beforeEach(() => {
-			mockOutputParser.parseParticipantSessionId = vi.fn().mockReturnValue({
-				groupChatId: 'test-chat-123',
-				participantName: 'TestAgent',
-			});
-		});
-
-		it('should buffer participant output instead of forwarding', () => {
-			setupListener();
-			const handler = eventHandlers.get('data');
-			const sessionId = 'group-chat-test-chat-123-participant-TestAgent-abc123';
-
-			handler?.(sessionId, 'participant output');
-
-			expect(mockOutputBuffer.appendToGroupChatBuffer).toHaveBeenCalledWith(
-				sessionId,
-				'participant output'
-			);
-			expect(mockSafeSend).not.toHaveBeenCalled();
-		});
-
-		it('should warn when participant buffer size exceeds limit', () => {
-			mockOutputBuffer.appendToGroupChatBuffer = vi.fn().mockReturnValue(15 * 1024 * 1024); // 15MB
-			setupListener();
-			const handler = eventHandlers.get('data');
-			const sessionId = 'group-chat-test-chat-123-participant-TestAgent-abc123';
-
-			handler?.(sessionId, 'large output');
-
-			expect(mockDebugLog).toHaveBeenCalledWith(
-				'GroupChat:Debug',
-				expect.stringContaining('WARNING: Buffer size')
 			);
 		});
 	});

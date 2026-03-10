@@ -20,18 +20,11 @@ import type {
 	AutoRunStats,
 	MaestroUsageStats,
 	OnboardingStats,
-	LeaderboardRegistration,
 	ContextManagementSettings,
-	KeyboardMasteryStats,
 	ThinkingMode,
-	DirectorNotesSettings,
 	EncoreFeatureFlags,
 } from '../../types';
-import {
-	useSettingsStore,
-	loadAllSettings,
-	selectIsLeaderboardRegistered,
-} from '../../stores/settingsStore';
+import { useSettingsStore, loadAllSettings } from '../../stores/settingsStore';
 import type { DocumentGraphLayoutType } from '../../stores/settingsStore';
 
 export interface UseSettingsReturn {
@@ -153,19 +146,8 @@ export interface UseSettingsReturn {
 
 	// Auto-run Stats (persistent across restarts)
 	autoRunStats: AutoRunStats;
-	setAutoRunStats: (value: AutoRunStats) => void;
-	recordAutoRunComplete: (elapsedTimeMs: number) => {
-		newBadgeLevel: number | null;
-		isNewRecord: boolean;
-	};
-	updateAutoRunProgress: (currentRunElapsedMs: number) => {
-		newBadgeLevel: number | null;
-		isNewRecord: boolean;
-	};
-	acknowledgeBadge: (level: number) => void;
-	getUnacknowledgedBadgeLevel: () => number | null;
 
-	// Usage Stats (peak tracking for achievements image)
+	// Usage Stats (peak tracking)
 	usageStats: MaestroUsageStats;
 	setUsageStats: (value: MaestroUsageStats) => void;
 	updateUsageStats: (currentValues: Partial<MaestroUsageStats>) => void;
@@ -177,8 +159,6 @@ export interface UseSettingsReturn {
 	// Onboarding settings
 	tourCompleted: boolean;
 	setTourCompleted: (value: boolean) => void;
-	firstAutoRunCompleted: boolean;
-	setFirstAutoRunCompleted: (value: boolean) => void;
 
 	// Onboarding Stats (persistent, local-only analytics)
 	onboardingStats: OnboardingStats;
@@ -202,11 +182,6 @@ export interface UseSettingsReturn {
 		averagePhasesPerWizard: number;
 	};
 
-	// Leaderboard Registration (persistent)
-	leaderboardRegistration: LeaderboardRegistration | null;
-	setLeaderboardRegistration: (value: LeaderboardRegistration | null) => void;
-	isLeaderboardRegistered: boolean;
-
 	// Web Interface settings
 	webInterfaceUseCustomPort: boolean;
 	setWebInterfaceUseCustomPort: (value: boolean) => void;
@@ -218,12 +193,8 @@ export interface UseSettingsReturn {
 	setContextManagementSettings: (value: ContextManagementSettings) => void;
 	updateContextManagementSettings: (partial: Partial<ContextManagementSettings>) => void;
 
-	// Keyboard Mastery (gamification for shortcut usage)
-	keyboardMasteryStats: KeyboardMasteryStats;
-	setKeyboardMasteryStats: (value: KeyboardMasteryStats) => void;
+	// Shortcut tracking
 	recordShortcutUsage: (shortcutId: string) => { newLevel: number | null };
-	acknowledgeKeyboardMasteryLevel: (level: number) => void;
-	getUnacknowledgedKeyboardMasteryLevel: () => number | null;
 
 	// Accessibility settings
 	colorBlindMode: boolean;
@@ -252,9 +223,6 @@ export interface UseSettingsReturn {
 	// Rendering settings
 	disableGpuAcceleration: boolean;
 	setDisableGpuAcceleration: (value: boolean) => void;
-	disableConfetti: boolean;
-	setDisableConfetti: (value: boolean) => void;
-
 	// Local file indexing ignore patterns
 	localIgnorePatterns: string[];
 	setLocalIgnorePatterns: (value: string[]) => void;
@@ -275,10 +243,6 @@ export interface UseSettingsReturn {
 	fileTabAutoRefreshEnabled: boolean;
 	setFileTabAutoRefreshEnabled: (value: boolean) => void;
 
-	// Windows warning suppression
-	suppressWindowsWarning: boolean;
-	setSuppressWindowsWarning: (value: boolean) => void;
-
 	// Auto-scroll in AI mode
 	autoScrollAiMode: boolean;
 	setAutoScrollAiMode: (value: boolean) => void;
@@ -291,18 +255,6 @@ export interface UseSettingsReturn {
 	encoreFeatures: EncoreFeatureFlags;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
 
-	// Director's Notes settings
-	directorNotesSettings: DirectorNotesSettings;
-	setDirectorNotesSettings: (value: DirectorNotesSettings) => void;
-
-	// WakaTime integration settings
-	wakatimeApiKey: string;
-	setWakatimeApiKey: (value: string) => void;
-	wakatimeEnabled: boolean;
-	setWakatimeEnabled: (value: boolean) => void;
-	wakatimeDetailedTracking: boolean;
-	setWakatimeDetailedTracking: (value: boolean) => void;
-
 	// Window chrome settings
 	useNativeTitleBar: boolean;
 	setUseNativeTitleBar: (value: boolean) => void;
@@ -312,7 +264,6 @@ export interface UseSettingsReturn {
 
 export function useSettings(): UseSettingsReturn {
 	const store = useSettingsStore();
-	const isLeaderboardRegistered = useSettingsStore(selectIsLeaderboardRegistered);
 
 	// Load settings on mount
 	useEffect(() => {
@@ -341,6 +292,5 @@ export function useSettings(): UseSettingsReturn {
 
 	return {
 		...store,
-		isLeaderboardRegistered,
 	};
 }

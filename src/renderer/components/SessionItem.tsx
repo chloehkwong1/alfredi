@@ -333,7 +333,7 @@ export const SessionItem = memo(function SessionItem({
 									? 'Ready and waiting'
 									: session.state === 'busy'
 										? session.cliActivity
-											? `CLI: Running playbook "${session.cliActivity.playbookName}"`
+											? 'CLI: Running task'
 											: 'Agent is thinking'
 										: session.state === 'connecting'
 											? 'Attempting to establish connection'

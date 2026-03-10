@@ -5,13 +5,12 @@
  * - generateProseStyles: Creates theme-aware CSS for markdown prose content
  * - createMarkdownComponents: Factory for ReactMarkdown component overrides
  * - generateAutoRunProseStyles: Pre-configured styles for AutoRun panel
- * - generateTerminalProseStyles: Styles for terminal output and group chat messages
+ * - generateTerminalProseStyles: Styles for terminal output
  * - generateDiffViewStyles: Styles for react-diff-view library theme overrides
  *
  * Used by:
  * - AutoRun.tsx: Document editing/preview with image attachments and mermaid diagrams
  * - TerminalOutput.tsx: AI terminal message rendering
- * - GroupChatMessages.tsx: Group chat message rendering
  * - GitDiffViewer.tsx: Git diff display
  * - GitLogViewer.tsx: Git log with commit diff display
  */
@@ -483,11 +482,11 @@ export function generateAutoRunProseStyles(theme: Theme): string {
 }
 
 /**
- * Generates prose styles for terminal output and group chat messages.
+ * Generates prose styles for terminal output messages.
  * Features: colored headings (accent/success/warning), compact spacing,
  * bgSidebar for code backgrounds, and extra list item styling.
  *
- * @param scopeSelector CSS selector to scope styles (e.g., '.terminal-output' or '.group-chat-messages')
+ * @param scopeSelector CSS selector to scope styles (e.g., '.terminal-output')
  */
 export function generateTerminalProseStyles(theme: Theme, scopeSelector: string): string {
 	const c = theme.colors;

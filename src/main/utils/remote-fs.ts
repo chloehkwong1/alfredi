@@ -12,9 +12,44 @@
 import { SshRemoteConfig } from '../../shared/types';
 import { execFileNoThrow, ExecResult } from './execFile';
 import { shellEscape } from './shell-escape';
-import { sshRemoteManager } from '../ssh-remote-manager';
 import { logger } from './logger';
 import { resolveSshPath } from './cliDetection';
+import { expandTilde } from '../../shared/pathUtils';
+
+/**
+ * Default SSH options for remote fs operations.
+ */
+const DEFAULT_SSH_OPTIONS: Record<string, string> = {
+	BatchMode: 'yes',
+	StrictHostKeyChecking: 'accept-new',
+	ConnectTimeout: '10',
+	ClearAllForwardings: 'yes',
+	RequestTTY: 'no',
+};
+
+/**
+ * Build SSH args from a remote config.
+ * Inlined from the removed SshRemoteManager.
+ */
+function buildSshArgsFromConfig(config: SshRemoteConfig): string[] {
+	const args: string[] = [];
+	args.push('-T');
+	if (config.privateKeyPath && config.privateKeyPath.trim()) {
+		args.push('-i', expandTilde(config.privateKeyPath));
+	}
+	for (const [key, value] of Object.entries(DEFAULT_SSH_OPTIONS)) {
+		args.push('-o', `${key}=${value}`);
+	}
+	if (!config.useSshConfig || config.port !== 22) {
+		args.push('-p', config.port.toString());
+	}
+	if (config.username && config.username.trim()) {
+		args.push(`${config.username}@${config.host}`);
+	} else {
+		args.push(config.host);
+	}
+	return args;
+}
 
 /**
  * File or directory entry returned from readDir operations.
@@ -71,7 +106,7 @@ const defaultDeps: RemoteFsDeps = {
 		return execFileNoThrow(command, args, undefined, { timeout: SSH_COMMAND_TIMEOUT_MS });
 	},
 	buildSshArgs: (config: SshRemoteConfig): string[] => {
-		return sshRemoteManager.buildSshArgs(config);
+		return buildSshArgsFromConfig(config);
 	},
 };
 

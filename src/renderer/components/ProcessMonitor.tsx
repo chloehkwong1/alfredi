@@ -15,7 +15,7 @@ import {
 	Hash,
 	Play,
 } from 'lucide-react';
-import type { Session, Group, Theme, GroupChat } from '../types';
+import type { Session, Group, Theme } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
@@ -23,10 +23,8 @@ interface ProcessMonitorProps {
 	theme: Theme;
 	sessions: Session[];
 	groups: Group[];
-	groupChats?: GroupChat[];
 	onClose: () => void;
 	onNavigateToSession?: (sessionId: string, tabId?: string) => void;
-	onNavigateToGroupChat?: (groupChatId: string) => void;
 }
 
 interface ActiveProcess {
@@ -43,21 +41,13 @@ interface ActiveProcess {
 
 interface ProcessNode {
 	id: string;
-	type: 'group' | 'session' | 'process' | 'groupchat';
+	type: 'group' | 'session' | 'process';
 	label: string;
 	emoji?: string;
 	sessionId?: string;
 	processSessionId?: string; // The full process session ID for killing processes (e.g., "abc123-ai-tab1")
 	pid?: number;
-	processType?:
-		| 'ai'
-		| 'terminal'
-		| 'batch'
-		| 'synopsis'
-		| 'moderator'
-		| 'participant'
-		| 'wizard'
-		| 'wizard-gen';
+	processType?: 'ai' | 'terminal' | 'batch' | 'synopsis' | 'wizard' | 'wizard-gen';
 	isAlive?: boolean;
 	expanded?: boolean;
 	children?: ProcessNode[];
@@ -66,9 +56,6 @@ interface ProcessNode {
 	agentSessionId?: string; // UUID octet from the Claude session (for AI processes)
 	tabId?: string; // Tab ID for navigation to specific AI tab
 	startTime?: number; // Process start timestamp for runtime calculation
-	isAutoRun?: boolean; // True for batch processes from Auto Run
-	groupChatId?: string; // For group chat processes - links to the group chat
-	participantName?: string; // For group chat participant processes
 	command?: string; // The command used to spawn this process
 	args?: string[]; // The arguments passed to the command
 }
@@ -108,19 +95,10 @@ interface ProcessDetailData {
 	agentSessionId?: string;
 	sessionName?: string;
 	processType?: string;
-	isAutoRun?: boolean;
 }
 
 export function ProcessMonitor(props: ProcessMonitorProps) {
-	const {
-		theme,
-		sessions,
-		groups,
-		groupChats = [],
-		onClose,
-		onNavigateToSession,
-		onNavigateToGroupChat,
-	} = props;
+	const { theme, sessions, groups, onClose, onNavigateToSession } = props;
 	const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 	const [activeProcesses, setActiveProcesses] = useState<ActiveProcess[]>([]);
@@ -373,12 +351,10 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			sessionProcesses.forEach((proc) => {
 				const processType = getProcessType(proc.sessionId);
 				let label: string;
-				let isAutoRun = false;
 				if (processType === 'terminal') {
 					label = 'Terminal Shell';
 				} else if (processType === 'batch') {
 					label = `AI Agent (${proc.toolType})`;
-					isAutoRun = true;
 				} else if (processType === 'synopsis') {
 					label = `AI Agent (${proc.toolType}) - Synopsis`;
 				} else {
@@ -426,7 +402,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 					agentSessionId,
 					tabId,
 					startTime: proc.startTime,
-					isAutoRun,
 					command: proc.command,
 					args: proc.args,
 				});
@@ -473,103 +448,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 					children: sessionNodes,
 				};
 				tree.push(rootNode);
-			}
-		}
-
-		// Add Group Chat processes
-		// Group chat session IDs follow these patterns:
-		// - group-chat-{groupChatId}-moderator-{uuid}
-		// - group-chat-{groupChatId}-moderator-synthesis-{uuid}
-		// - group-chat-{groupChatId}-participant-{name}-{uuid|timestamp}
-		const groupChatProcesses = activeProcesses.filter((proc) =>
-			proc.sessionId.startsWith('group-chat-')
-		);
-
-		if (groupChatProcesses.length > 0 && groupChats.length > 0) {
-			// Group processes by group chat ID
-			const processesByGroupChat = new Map<string, ActiveProcess[]>();
-
-			groupChatProcesses.forEach((proc) => {
-				// Extract group chat ID from session ID
-				// Pattern: group-chat-{groupChatId}-moderator-... or group-chat-{groupChatId}-participant-...
-				const moderatorMatch = proc.sessionId.match(/^group-chat-(.+?)-(moderator|participant)-/);
-				if (moderatorMatch) {
-					const groupChatId = moderatorMatch[1];
-					const existing = processesByGroupChat.get(groupChatId) || [];
-					processesByGroupChat.set(groupChatId, [...existing, proc]);
-				}
-			});
-
-			// Build group chat nodes
-			const groupChatNodes: ProcessNode[] = [];
-
-			groupChats.forEach((groupChat) => {
-				const chatProcesses = processesByGroupChat.get(groupChat.id) || [];
-
-				if (chatProcesses.length > 0) {
-					const processNodes: ProcessNode[] = chatProcesses.map((proc) => {
-						// Determine if this is a moderator or participant process
-						const isModerator = proc.sessionId.includes('-moderator-');
-						const isSynthesis = proc.sessionId.includes('-moderator-synthesis-');
-
-						let label: string;
-						let processType: 'moderator' | 'participant';
-						let participantName: string | undefined;
-
-						if (isModerator) {
-							processType = 'moderator';
-							label = isSynthesis ? 'Moderator (Synthesis)' : 'Moderator';
-						} else {
-							processType = 'participant';
-							// Extract participant name from session ID
-							// Pattern: group-chat-{id}-participant-{name}-{uuid|timestamp}
-							const participantMatch =
-								proc.sessionId.match(/^group-chat-.+-participant-(.+?)-[a-f0-9-]+$/i) ||
-								proc.sessionId.match(/^group-chat-.+-participant-(.+?)-\d{13,}$/);
-							participantName = participantMatch ? participantMatch[1] : 'Unknown';
-							label = participantName;
-						}
-
-						return {
-							id: `process-${proc.sessionId}`,
-							type: 'process' as const,
-							label,
-							pid: proc.pid,
-							processType,
-							processSessionId: proc.sessionId,
-							isAlive: true,
-							toolType: proc.toolType,
-							cwd: proc.cwd,
-							startTime: proc.startTime,
-							groupChatId: groupChat.id,
-							participantName,
-							command: proc.command,
-							args: proc.args,
-						};
-					});
-
-					groupChatNodes.push({
-						id: `groupchat-${groupChat.id}`,
-						type: 'groupchat',
-						label: groupChat.name,
-						emoji: '💬',
-						expanded: expandedNodes.has(`groupchat-${groupChat.id}`),
-						children: processNodes,
-						groupChatId: groupChat.id,
-					});
-				}
-			});
-
-			if (groupChatNodes.length > 0) {
-				const groupChatsNode: ProcessNode = {
-					id: 'group-chats-section',
-					type: 'group',
-					label: 'GROUP CHATS',
-					emoji: '💬',
-					expanded: expandedNodes.has('group-chats-section'),
-					children: groupChatNodes,
-				};
-				tree.push(groupChatsNode);
 			}
 		}
 
@@ -663,7 +541,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			agentSessionId: node.agentSessionId,
 			sessionName,
 			processType: node.processType,
-			isAutoRun: node.isAutoRun,
 		});
 	};
 
@@ -909,9 +786,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 		}
 
 		if (node.type === 'process') {
-			// Determine if this is a group chat process
-			const isGroupChatProcess =
-				node.processType === 'moderator' || node.processType === 'participant';
 			// Determine if this is a wizard process
 			const isWizardProcess = node.processType === 'wizard' || node.processType === 'wizard-gen';
 
@@ -945,40 +819,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 							style={{ backgroundColor: theme.colors.success }}
 						/>
 						<span className="text-sm flex-1 truncate">{node.label}</span>
-						{node.isAutoRun && (
-							<span
-								className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-								style={{
-									backgroundColor: theme.colors.accent + '20',
-									color: theme.colors.accent,
-								}}
-							>
-								AUTO
-							</span>
-						)}
-						{/* Group Chat badges */}
-						{node.processType === 'moderator' && (
-							<span
-								className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-								style={{
-									backgroundColor: theme.colors.warning + '20',
-									color: theme.colors.warning,
-								}}
-							>
-								MODERATOR
-							</span>
-						)}
-						{node.processType === 'participant' && (
-							<span
-								className="text-xs font-semibold px-1.5 py-0.5 rounded flex-shrink-0"
-								style={{
-									backgroundColor: theme.colors.accent + '20',
-									color: theme.colors.accent,
-								}}
-							>
-								PARTICIPANT
-							</span>
-						)}
 						{/* Wizard badges */}
 						{node.processType === 'wizard' && (
 							<span
@@ -1042,8 +882,8 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 								{node.agentSessionId.substring(0, 8)}...
 							</span>
 						)}
-						{/* For group chat and wizard processes, show tool type */}
-						{(isGroupChatProcess || isWizardProcess) && node.toolType && (
+						{/* For wizard processes, show tool type */}
+						{isWizardProcess && node.toolType && (
 							<span className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
 								{node.toolType}
 							</span>
@@ -1066,85 +906,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 							Running
 						</span>
 					</div>
-				</div>
-			);
-		}
-
-		// Render group chat node (individual group chat within GROUP CHATS section)
-		if (node.type === 'groupchat') {
-			const activeCount = node.children?.filter((c) => c.isAlive).length || 0;
-
-			return (
-				<div key={node.id}>
-					<button
-						ref={isSelected ? (selectedNodeRef as React.RefObject<HTMLButtonElement>) : null}
-						onClick={() => {
-							setSelectedNodeId(node.id);
-							toggleNode(node.id);
-						}}
-						className="w-full text-left px-4 py-2 flex items-center gap-2 hover:bg-opacity-5"
-						style={{
-							paddingLeft: `${paddingLeft}px`,
-							backgroundColor: isSelected ? `${theme.colors.accent}25` : 'transparent',
-							color: theme.colors.textMain,
-							outline: isSelected ? `2px solid ${theme.colors.accent}` : 'none',
-							outlineOffset: '-2px',
-						}}
-						onMouseEnter={(e) => {
-							if (!isSelected) e.currentTarget.style.backgroundColor = `${theme.colors.accent}15`;
-						}}
-						onMouseLeave={(e) => {
-							if (!isSelected) e.currentTarget.style.backgroundColor = 'transparent';
-						}}
-					>
-						{hasChildren &&
-							(isExpanded ? (
-								<ChevronDown
-									className="w-4 h-4 flex-shrink-0"
-									style={{ color: theme.colors.textDim }}
-								/>
-							) : (
-								<ChevronRight
-									className="w-4 h-4 flex-shrink-0"
-									style={{ color: theme.colors.textDim }}
-								/>
-							))}
-						{!hasChildren && <div className="w-4 h-4 flex-shrink-0" />}
-						<span className="mr-2">{node.emoji}</span>
-						<span className="flex-1 truncate">{node.label}</span>
-						<span
-							className="text-xs flex items-center gap-2 flex-shrink-0"
-							style={{ color: theme.colors.textDim }}
-						>
-							{activeCount > 0 && (
-								<span
-									className="px-1.5 py-0.5 rounded text-xs"
-									style={{
-										backgroundColor: `${theme.colors.success}20`,
-										color: theme.colors.success,
-									}}
-								>
-									{activeCount} running
-								</span>
-							)}
-							{node.groupChatId && onNavigateToGroupChat && (
-								<button
-									className="text-xs hover:underline cursor-pointer"
-									style={{ color: theme.colors.accent }}
-									onClick={(e) => {
-										e.stopPropagation();
-										onNavigateToGroupChat(node.groupChatId!);
-									}}
-									title="Go to group chat"
-								>
-									Open
-								</button>
-							)}
-						</span>
-					</button>
-					{isExpanded && hasChildren && (
-						<div>{node.children!.map((child) => renderNode(child, depth + 1))}</div>
-					)}
 				</div>
 			);
 		}
@@ -1192,17 +953,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 						<h2 className="text-lg font-semibold" style={{ color: theme.colors.textMain }}>
 							Process Details
 						</h2>
-						{detailView.isAutoRun && (
-							<span
-								className="text-xs font-semibold px-2 py-1 rounded"
-								style={{
-									backgroundColor: theme.colors.accent + '20',
-									color: theme.colors.accent,
-								}}
-							>
-								AUTO RUN
-							</span>
-						)}
 					</div>
 					<button
 						onClick={onClose}

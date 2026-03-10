@@ -16,16 +16,9 @@ export type {
 	Group,
 	UsageStats,
 	BatchDocumentEntry,
-	PlaybookDocumentEntry,
-	Playbook,
 	ThinkingMode,
 	WorktreeRunTarget,
 } from '../../shared/types';
-
-// Re-export Symphony types for session metadata
-export type { SymphonySessionMetadata } from '../../shared/symphony-types';
-// Import Symphony types for use in this file
-import type { SymphonySessionMetadata } from '../../shared/symphony-types';
 
 // Import for extension in this file
 import type {
@@ -37,26 +30,33 @@ import type {
 	ThinkingMode,
 } from '../../shared/types';
 
-// Re-export group chat types from shared location
-export type {
-	GroupChat,
-	GroupChatParticipant,
-	GroupChatMessage,
-	GroupChatState,
-	GroupChatHistoryEntry,
-	GroupChatHistoryEntryType,
-	ModeratorConfig,
-} from '../../shared/group-chat-types';
 // Import AgentError for use within this file
 import type { AgentError } from '../../shared/types';
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'error';
 export type FileChangeType = 'modified' | 'added' | 'deleted';
-export type RightPanelTab = 'files' | 'history' | 'autorun';
-export type SettingsTab = 'general' | 'shortcuts' | 'theme' | 'notifications' | 'aicommands';
+export type RightPanelTab = 'files';
+export type SettingsTab =
+	| 'general'
+	| 'shortcuts'
+	| 'theme'
+	| 'notifications'
+	| 'display'
+	| 'llm'
+	| 'encore';
 // Note: ScratchPadMode was removed as part of the Scratchpad → Auto Run migration
 export type FocusArea = 'sidebar' | 'main' | 'right';
 export type LLMProvider = 'openrouter' | 'anthropic' | 'ollama';
+
+/** Options for sending context to another agent */
+export interface SendToAgentOptions {
+	/** Use AI to groom/deduplicate context before sending */
+	groomContext: boolean;
+	/** Target session ID to send context to */
+	targetSessionId: string;
+	/** Whether to create a new session (default: true) */
+	createNewSession?: boolean;
+}
 
 // Inline wizard types for per-session/per-tab wizard state
 export type WizardMode = 'new' | 'iterate' | null;
@@ -242,9 +242,7 @@ export type { HistoryEntryType } from '../../shared/types';
 import { HistoryEntry as BaseHistoryEntry } from '../../shared/types';
 
 // Renderer-specific HistoryEntry extends the shared base with UI-specific fields
-export interface HistoryEntry extends BaseHistoryEntry {
-	achievementAction?: 'openAbout'; // If set, this entry has an action button to open the About/achievements panel
-}
+export interface HistoryEntry extends BaseHistoryEntry {}
 
 // Renderer-specific WorktreeConfig extends the shared base with UI-specific fields
 export interface WorktreeConfig extends BaseWorktreeConfig {
@@ -279,8 +277,16 @@ export interface BatchRunConfig {
 	worktreeTarget?: WorktreeRunTarget; // Optional target for dispatching to a worktree agent
 }
 
-// Import BatchProcessingState for state machine integration
-import type { BatchProcessingState } from '../hooks/batch/batchStateMachine';
+// Batch processing state (inline after stripping batch module)
+type BatchProcessingState =
+	| 'idle'
+	| 'initializing'
+	| 'processing'
+	| 'waiting'
+	| 'looping'
+	| 'completing'
+	| 'error'
+	| 'stopped';
 
 // Batch processing state
 export interface BatchRunState {
@@ -345,7 +351,7 @@ export interface BadgeUnlockRecord {
 	unlockedAt: number; // Timestamp when badge was unlocked
 }
 
-// Auto-run achievement statistics (survives app restarts)
+// Auto-run statistics (survives app restarts)
 export interface AutoRunStats {
 	cumulativeTimeMs: number; // Total cumulative AutoRun time across all sessions
 	longestRunMs: number; // Longest single AutoRun session
@@ -358,13 +364,37 @@ export interface AutoRunStats {
 }
 
 // Maestro usage peak statistics (survives app restarts)
-// These track maximum usage peaks for achievement display
+// These track maximum usage peaks
 export interface MaestroUsageStats {
 	maxAgents: number; // Maximum number of agents active at once
 	maxDefinedAgents: number; // Maximum number of defined agents (ever configured)
 	maxSimultaneousAutoRuns: number; // Maximum concurrent Auto Run sessions
 	maxSimultaneousQueries: number; // Maximum concurrent AI queries
 	maxQueueDepth: number; // Maximum number of queued queries at once
+}
+
+// Leaderboard registration data (persisted in settings store)
+export interface LeaderboardRegistration {
+	email: string;
+	displayName: string;
+	twitterHandle?: string;
+	githubUsername?: string;
+	linkedinHandle?: string;
+	discordUsername?: string;
+	blueskyHandle?: string;
+	registeredAt: number;
+	emailConfirmed: boolean;
+	lastSubmissionAt?: number;
+	clientToken?: string;
+	authToken?: string;
+}
+
+// Keyboard mastery stats (persisted in settings store)
+export interface KeyboardMasteryStats {
+	usedShortcuts: string[];
+	currentLevel: number;
+	lastLevelUpTimestamp: number;
+	lastAcknowledgedLevel: number;
 }
 
 // Onboarding analytics statistics (survives app restarts)
@@ -703,9 +733,6 @@ export interface Session {
 	// SSH connection status - runtime only, not persisted
 	// Set when background SSH operations fail (e.g., git info fetch on startup)
 	sshConnectionFailed?: boolean;
-
-	// Symphony contribution metadata (only set for Symphony sessions)
-	symphonyMetadata?: SymphonySessionMetadata;
 }
 
 export interface AgentConfigOption {
@@ -849,79 +876,11 @@ export interface OpenSpecMetadata {
 	sourceUrl: string; // GitHub repo URL
 }
 
-// Leaderboard registration data for runmaestro.ai integration
-export interface LeaderboardRegistration {
-	// Required fields
-	email: string; // User's email (will be confirmed)
-	displayName: string; // Display name on leaderboard
-	// Optional social handles (without @)
-	twitterHandle?: string; // X/Twitter handle
-	githubUsername?: string; // GitHub username
-	linkedinHandle?: string; // LinkedIn handle
-	discordUsername?: string; // Discord username (for @mentions in Discord posts)
-	blueskyHandle?: string; // Bluesky handle (username.bsky.social or custom domain)
-	// Registration state
-	registeredAt: number; // Timestamp when registered
-	emailConfirmed: boolean; // Whether email has been confirmed
-	lastSubmissionAt?: number; // Last successful submission timestamp
-	// Authentication
-	clientToken?: string; // Client-generated token for polling auth status
-	authToken?: string; // 64-character token received after email confirmation
-	// Keyboard mastery data
-	keyboardMasteryLevel?: number; // 0-4 (Beginner to Maestro)
-	keyboardMasteryLevelName?: string; // Level name
-	keyboardMasteryPercentage?: number; // 0-100
-}
-
-// Ranking info for a single leaderboard category
-export interface LeaderboardRankingInfo {
-	rank: number; // User's position (1 = first place)
-	total: number; // Total entries on leaderboard
-	previousRank: number | null; // Previous position (null if new entry)
-	improved: boolean; // Did they move up?
-}
-
-// Keyboard Mastery gamification types
-export type KeyboardMasteryLevel = 'beginner' | 'student' | 'performer' | 'virtuoso' | 'maestro';
-
-export interface KeyboardMasteryStats {
-	usedShortcuts: string[]; // Array of shortcut IDs that have been used
-	currentLevel: number; // 0-4 (Beginner to Keyboard Maestro)
-	lastLevelUpTimestamp: number; // When user last leveled up
-	lastAcknowledgedLevel: number; // Last level user dismissed celebration for
-}
-
-// Response from leaderboard submission API
-export interface LeaderboardSubmitResponse {
-	success: boolean;
-	message: string;
-	requiresConfirmation?: boolean;
-	confirmationUrl?: string;
-	error?: string;
-	ranking?: {
-		cumulative: LeaderboardRankingInfo;
-		longestRun: LeaderboardRankingInfo | null; // null if no longestRunMs submitted
-	};
-}
-
 // Encore Features - optional features that are disabled by default
 // Each key is a feature ID, value indicates whether it's enabled
+ 
 export interface EncoreFeatureFlags {
-	directorNotes: boolean;
-}
-
-// Director's Notes settings for synopsis generation
-export interface DirectorNotesSettings {
-	/** Agent type to use for synopsis generation */
-	provider: ToolType;
-	/** Default lookback period in days (1-90) */
-	defaultLookbackDays: number;
-	/** Custom path to the agent binary */
-	customPath?: string;
-	/** Custom arguments for the agent */
-	customArgs?: string;
-	/** Custom environment variables for the agent */
-	customEnvVars?: Record<string, string>;
+	// No active encore features
 }
 
 // Context management settings for merge and transfer operations

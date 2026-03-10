@@ -56,7 +56,7 @@ export function ExistingDocsModal({
 	useEffect(() => {
 		const id = registerLayer({
 			type: 'modal',
-			priority: MODAL_PRIORITIES.EXISTING_AUTORUN_DOCS,
+			priority: MODAL_PRIORITIES.WIZARD,
 			blocksLowerLayers: true,
 			capturesFocus: true,
 			focusTrap: 'strict',

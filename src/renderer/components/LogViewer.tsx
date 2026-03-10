@@ -30,7 +30,7 @@ interface LogViewerProps {
 	logLevel?: string; // Current log level setting (debug, info, warn, error)
 	savedSelectedLevels?: string[]; // Persisted filter selections
 	onSelectedLevelsChange?: (levels: string[]) => void; // Callback to persist filter changes
-	onShortcutUsed?: (shortcutId: string) => void; // Keyboard mastery tracking
+	onShortcutUsed?: (shortcutId: string) => void;
 }
 
 // Log level priority for determining which levels are enabled

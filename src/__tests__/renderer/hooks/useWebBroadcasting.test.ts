@@ -17,11 +17,7 @@ describe('useWebBroadcasting', () => {
 	let unsubscribeFn: Mock;
 
 	const createRightPanelRef = (): RefObject<RightPanelHandle | null> => ({
-		current: {
-			refreshHistoryPanel: vi.fn(),
-			focusAutoRun: vi.fn(),
-			toggleAutoRunExpanded: vi.fn(),
-		},
+		current: {},
 	});
 
 	beforeEach(() => {
@@ -72,7 +68,7 @@ describe('useWebBroadcasting', () => {
 		expect(unsubscribeFn).toHaveBeenCalledOnce();
 	});
 
-	it('should reload history and refresh panel when external change is detected', async () => {
+	it('should reload history when external change is detected', async () => {
 		const rightPanelRef = createRightPanelRef();
 
 		renderHook(() => useWebBroadcasting({ rightPanelRef }));
@@ -85,9 +81,6 @@ describe('useWebBroadcasting', () => {
 		});
 
 		expect(historyMock.reload).toHaveBeenCalledOnce();
-		await waitFor(() => {
-			expect(rightPanelRef.current?.refreshHistoryPanel).toHaveBeenCalledOnce();
-		});
 	});
 
 	it('should handle null rightPanelRef gracefully', async () => {

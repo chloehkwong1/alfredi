@@ -597,6 +597,7 @@ export function NewInstanceModal({
 		if (isOpen) {
 			const loadSshConfigs = async () => {
 				try {
+					if (!window.maestro.sshRemote) return;
 					const sshConfigsResult = await window.maestro.sshRemote.getConfigs();
 					if (sshConfigsResult.success && sshConfigsResult.configs) {
 						setSshRemotes(sshConfigsResult.configs);

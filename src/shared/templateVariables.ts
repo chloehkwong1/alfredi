@@ -17,9 +17,8 @@
  *
  * Path Variables:
  *   {{CWD}}               - Current working directory
- *   {{AUTORUN_FOLDER}}    - Auto Run documents folder path
  *
- * Auto Run Variables:
+ * Document Variables:
  *   {{DOCUMENT_NAME}}     - Current Auto Run document name (without .md)
  *   {{DOCUMENT_PATH}}     - Full path to current Auto Run document
  *   {{LOOP_NUMBER}}       - Current loop iteration (5-digit padded, e.g., 00001)
@@ -54,7 +53,6 @@ export interface TemplateSessionInfo {
 	cwd: string;
 	projectRoot?: string;
 	fullPath?: string;
-	autoRunFolderPath?: string;
 	agentSessionId?: string;
 	isGitRepo?: boolean;
 	contextUsage?: number;
@@ -64,7 +62,6 @@ export interface TemplateContext {
 	session: TemplateSessionInfo;
 	gitBranch?: string;
 	groupName?: string;
-	autoRunFolder?: string;
 	loopNumber?: number;
 	// Auto Run document context
 	documentName?: string;
@@ -76,7 +73,6 @@ export interface TemplateContext {
 }
 
 // List of all available template variables for documentation (alphabetically sorted)
-// Variables marked as autoRunOnly are only shown in Auto Run contexts, not in AI Commands settings
 export const TEMPLATE_VARIABLES = [
 	{ variable: '{{AGENT_GROUP}}', description: 'Agent group name' },
 	{ variable: '{{CONDUCTOR_PROFILE}}', description: "Conductor's About Me profile" },
@@ -84,7 +80,6 @@ export const TEMPLATE_VARIABLES = [
 	{ variable: '{{AGENT_NAME}}', description: 'Agent name' },
 	{ variable: '{{AGENT_PATH}}', description: 'Agent home directory path' },
 	{ variable: '{{AGENT_SESSION_ID}}', description: 'Agent session ID' },
-	{ variable: '{{AUTORUN_FOLDER}}', description: 'Auto Run folder path', autoRunOnly: true },
 	{ variable: '{{TAB_NAME}}', description: 'Custom tab name' },
 	{ variable: '{{CONTEXT_USAGE}}', description: 'Context usage %' },
 	{ variable: '{{CWD}}', description: 'Working directory' },
@@ -92,15 +87,11 @@ export const TEMPLATE_VARIABLES = [
 	{ variable: '{{DATETIME}}', description: 'Full datetime' },
 	{ variable: '{{DATE_SHORT}}', description: 'Date (MM/DD/YY)' },
 	{ variable: '{{DAY}}', description: 'Day of month (01-31)' },
-	{ variable: '{{DOCUMENT_NAME}}', description: 'Current document name', autoRunOnly: true },
-	{ variable: '{{DOCUMENT_PATH}}', description: 'Current document path', autoRunOnly: true },
+	{ variable: '{{DOCUMENT_NAME}}', description: 'Current document name' },
+	{ variable: '{{DOCUMENT_PATH}}', description: 'Current document path' },
 	{ variable: '{{GIT_BRANCH}}', description: 'Git branch name' },
 	{ variable: '{{IS_GIT_REPO}}', description: 'Is git repo (true/false)' },
-	{
-		variable: '{{LOOP_NUMBER}}',
-		description: 'Loop iteration (00001, 00002...)',
-		autoRunOnly: true,
-	},
+	{ variable: '{{LOOP_NUMBER}}', description: 'Loop iteration (00001, 00002...)' },
 	{ variable: '{{MONTH}}', description: 'Month (01-12)' },
 	{ variable: '{{TIME}}', description: 'Time (HH:MM:SS)' },
 	{ variable: '{{TIMESTAMP}}', description: 'Unix timestamp (ms)' },
@@ -110,8 +101,8 @@ export const TEMPLATE_VARIABLES = [
 	{ variable: '{{YEAR}}', description: 'Current year' },
 ];
 
-// Filtered list excluding Auto Run-only variables (for AI Commands panel)
-export const TEMPLATE_VARIABLES_GENERAL = TEMPLATE_VARIABLES.filter((v) => !v.autoRunOnly);
+// Alias for backwards compatibility (previously filtered out Auto Run-only variables)
+export const TEMPLATE_VARIABLES_GENERAL = TEMPLATE_VARIABLES;
 
 /**
  * Substitute template variables in a string with actual values
@@ -121,7 +112,6 @@ export function substituteTemplateVariables(template: string, context: TemplateC
 		session,
 		gitBranch,
 		groupName,
-		autoRunFolder,
 		loopNumber,
 		documentName,
 		documentPath,
@@ -146,7 +136,7 @@ export function substituteTemplateVariables(template: string, context: TemplateC
 
 		// Path variables
 		CWD: session.cwd,
-		AUTORUN_FOLDER: autoRunFolder || session.autoRunFolderPath || '',
+		AUTORUN_FOLDER: '',
 
 		// Aliases (not documented in TEMPLATE_VARIABLES but still supported for internal use and backwards compatibility)
 		SESSION_ID: session.id,

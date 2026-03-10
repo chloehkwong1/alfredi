@@ -5,12 +5,7 @@
  * Centralizes the mapping logic that was previously duplicated across CRUD methods.
  */
 
-import type {
-	QueryEvent,
-	AutoRunSession,
-	AutoRunTask,
-	SessionLifecycleEvent,
-} from '../../shared/stats-types';
+import type { QueryEvent, SessionLifecycleEvent } from '../../shared/stats-types';
 import type { MigrationRecord } from './types';
 
 // ============================================================================
@@ -27,30 +22,6 @@ export interface QueryEventRow {
 	project_path: string | null;
 	tab_id: string | null;
 	is_remote: number | null;
-}
-
-export interface AutoRunSessionRow {
-	id: string;
-	session_id: string;
-	agent_type: string;
-	document_path: string | null;
-	start_time: number;
-	duration: number;
-	tasks_total: number | null;
-	tasks_completed: number | null;
-	project_path: string | null;
-}
-
-export interface AutoRunTaskRow {
-	id: string;
-	auto_run_session_id: string;
-	session_id: string;
-	agent_type: string;
-	task_index: number;
-	task_content: string | null;
-	start_time: number;
-	duration: number;
-	success: number;
 }
 
 export interface SessionLifecycleRow {
@@ -87,34 +58,6 @@ export function mapQueryEventRow(row: QueryEventRow): QueryEvent {
 		projectPath: row.project_path ?? undefined,
 		tabId: row.tab_id ?? undefined,
 		isRemote: row.is_remote !== null ? row.is_remote === 1 : undefined,
-	};
-}
-
-export function mapAutoRunSessionRow(row: AutoRunSessionRow): AutoRunSession {
-	return {
-		id: row.id,
-		sessionId: row.session_id,
-		agentType: row.agent_type,
-		documentPath: row.document_path ?? undefined,
-		startTime: row.start_time,
-		duration: row.duration,
-		tasksTotal: row.tasks_total ?? undefined,
-		tasksCompleted: row.tasks_completed ?? undefined,
-		projectPath: row.project_path ?? undefined,
-	};
-}
-
-export function mapAutoRunTaskRow(row: AutoRunTaskRow): AutoRunTask {
-	return {
-		id: row.id,
-		autoRunSessionId: row.auto_run_session_id,
-		sessionId: row.session_id,
-		agentType: row.agent_type,
-		taskIndex: row.task_index,
-		taskContent: row.task_content ?? undefined,
-		startTime: row.start_time,
-		duration: row.duration,
-		success: row.success === 1,
 	};
 }
 

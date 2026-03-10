@@ -1,7 +1,13 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
 import type { Session } from '../../types';
 import type { FileNode } from '../../types/fileTree';
-import type { AutoRunTreeNode } from '../batch/useAutoRunHandlers';
+// AutoRunTreeNode inline type (batch module stripped)
+type AutoRunTreeNode = {
+	name: string;
+	type: 'file' | 'folder';
+	path: string;
+	children?: AutoRunTreeNode[];
+};
 import { fuzzyMatchWithScore } from '../../utils/search';
 
 export interface AtMentionSuggestion {

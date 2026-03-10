@@ -23,7 +23,6 @@ import { useModalHandlers } from '../../../renderer/hooks/modal/useModalHandlers
 import { useModalStore, getModalActions } from '../../../renderer/stores/modalStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
-import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { useAgentStore } from '../../../renderer/stores/agentStore';
 import { useAgentErrorRecovery } from '../../../renderer/hooks/agent/useAgentErrorRecovery';
 import { gitService } from '../../../renderer/services/git';
@@ -110,11 +109,6 @@ beforeEach(() => {
 		sessionsLoaded: false,
 		initialLoadComplete: false,
 	});
-	useGroupChatStore.setState({
-		activeGroupChatId: null,
-		groupChatStagedImages: [],
-	});
-
 	// Ensure window.maestro.app mock is present
 	(window.maestro as any).app = {
 		confirmQuit: vi.fn(),
@@ -1050,30 +1044,6 @@ describe('useModalHandlers', () => {
 
 			const lightboxData = useModalStore.getState().getData('lightbox');
 			expect(lightboxData?.image).toBe('img2.png');
-		});
-
-		it('handleDeleteLightboxImage removes image from group chat staged images', () => {
-			useGroupChatStore.setState({
-				activeGroupChatId: 'gc-1',
-				groupChatStagedImages: ['img1.png', 'img2.png', 'img3.png'],
-			});
-
-			// Open lightbox with isGroupChat = true
-			const actions = getModalActions();
-			actions.setLightboxImage('img2.png');
-			actions.setLightboxImages(['img1.png', 'img2.png', 'img3.png']);
-			actions.setLightboxIsGroupChat(true);
-
-			const { result } = renderHook(() =>
-				useModalHandlers(createInputRef(), createTerminalOutputRef())
-			);
-			act(() => {
-				result.current.handleDeleteLightboxImage('img2.png');
-			});
-
-			expect(useGroupChatStore.getState().groupChatStagedImages).toEqual(['img1.png', 'img3.png']);
-			const lightboxData = useModalStore.getState().getData('lightbox');
-			expect(lightboxData?.images).toEqual(['img1.png', 'img3.png']);
 		});
 
 		it('handleDeleteLightboxImage removes image from session staged images', () => {

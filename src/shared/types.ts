@@ -27,7 +27,6 @@ export interface SessionInfo {
 	toolType: ToolType;
 	cwd: string;
 	projectRoot: string;
-	autoRunFolderPath?: string;
 }
 
 // Usage statistics from AI agent CLI (Claude Code, Codex, etc.)
@@ -64,29 +63,6 @@ export interface HistoryEntry {
 	success?: boolean;
 	elapsedTimeMs?: number;
 	validated?: boolean;
-}
-
-// Document entry within a playbook
-export interface PlaybookDocumentEntry {
-	filename: string;
-	resetOnCompletion: boolean;
-}
-
-// A saved Playbook configuration
-export interface Playbook {
-	id: string;
-	name: string;
-	createdAt: number;
-	updatedAt: number;
-	documents: PlaybookDocumentEntry[];
-	loopEnabled: boolean;
-	maxLoops?: number | null;
-	prompt: string;
-	worktreeSettings?: {
-		branchNameTemplate: string;
-		createPROnCompletion: boolean;
-		prTargetBranch?: string;
-	};
 }
 
 // Document entry in the batch run queue (runtime version with IDs)
@@ -232,31 +208,6 @@ export interface PowerStatus {
 	/** Current platform */
 	platform: 'darwin' | 'win32' | 'linux';
 }
-
-// ============================================================================
-// Marketplace Types (re-exported from marketplace-types.ts)
-// ============================================================================
-
-export type {
-	MarketplaceManifest,
-	MarketplacePlaybook,
-	MarketplaceDocument,
-	MarketplaceCache,
-	MarketplaceDocumentContent,
-	MarketplaceErrorType,
-	MarketplaceError,
-	GetManifestResponse,
-	GetDocumentResponse,
-	GetReadmeResponse,
-	ImportPlaybookResponse,
-	MarketplaceErrorResponse,
-} from './marketplace-types';
-
-export {
-	MarketplaceFetchError,
-	MarketplaceCacheError,
-	MarketplaceImportError,
-} from './marketplace-types';
 
 // ============================================================================
 // SSH Remote Execution Types

@@ -17,32 +17,16 @@
 import { create } from 'zustand';
 import type { Session, SettingsTab, AgentError } from '../types';
 import type { SerializableWizardState } from '../components/Wizard';
-import type { ConductorBadge } from '../constants/conductorBadges';
 
 // ============================================================================
 // Modal Data Types
 // ============================================================================
-
-/** Standing ovation celebration data */
-export interface StandingOvationData {
-	badge: ConductorBadge;
-	isNewRecord: boolean;
-	recordTimeMs?: number;
-}
-
-/** First run celebration data */
-export interface FirstRunCelebrationData {
-	elapsedTimeMs: number;
-	completedTasks: number;
-	totalTasks: number;
-}
 
 /** Lightbox modal data */
 export interface LightboxData {
 	image: string | null;
 	images: string[];
 	source: 'staged' | 'history';
-	isGroupChat: boolean;
 	allowDelete: boolean;
 }
 
@@ -120,11 +104,6 @@ export interface WorktreeModalData {
 	session: Session;
 }
 
-/** Group chat modal data (delete/rename/edit) */
-export interface GroupChatModalData {
-	groupChatId: string;
-}
-
 /** Git diff preview data */
 export interface GitDiffModalData {
 	diff: string;
@@ -133,11 +112,6 @@ export interface GitDiffModalData {
 /** Tour modal data */
 export interface TourModalData {
 	fromWizard: boolean;
-}
-
-/** Keyboard mastery celebration data */
-export interface KeyboardMasteryData {
-	level: number;
 }
 
 // ============================================================================
@@ -149,12 +123,11 @@ export interface KeyboardMasteryData {
  *
  * Naming convention:
  * - Use camelCase
- * - Group related modals with common prefix (e.g., groupChat*, worktree*)
+ * - Group related modals with common prefix (e.g., worktree*)
  */
 export type ModalId =
 	// Settings & Help
 	| 'settings'
-	| 'shortcutsHelp'
 	| 'about'
 	| 'updateCheck'
 	// Instance Management
@@ -176,51 +149,28 @@ export type ModalId =
 	| 'mergeSession'
 	| 'sendToAgent'
 	| 'agentSessions'
-	// Batch & Auto Run
+	// Queue
 	| 'queueBrowser'
-	| 'batchRunner'
-	| 'autoRunSetup'
-	| 'marketplace'
 	// Worktree
 	| 'worktreeConfig'
 	| 'createWorktree'
 	| 'createPR'
 	| 'deleteWorktree'
-	// Group Chat
-	| 'newGroupChat'
-	| 'deleteGroupChat'
-	| 'renameGroupChat'
-	| 'editGroupChat'
-	| 'groupChatInfo'
 	// Git
 	| 'gitDiff'
 	| 'gitLog'
 	// Wizard & Tour
 	| 'wizardResume'
 	| 'tour'
-	// Debug & Dev
-	| 'debugWizard'
-	| 'debugPackage'
+	// Dev
 	| 'playground'
 	| 'logViewer'
 	| 'processMonitor'
-	| 'usageDashboard'
 	// Confirmations
 	| 'confirm'
 	| 'quitConfirm'
-	// Celebrations & Overlays
-	| 'standingOvation'
-	| 'firstRunCelebration'
-	| 'keyboardMastery'
-	| 'leaderboard'
 	// Media
-	| 'lightbox'
-	// Symphony
-	| 'symphony'
-	// Platform Warnings
-	| 'windowsWarning'
-	// Director's Notes
-	| 'directorNotes';
+	| 'lightbox';
 
 /**
  * Type mapping from ModalId to its data type.
@@ -242,14 +192,8 @@ export interface ModalDataMap {
 	createWorktree: WorktreeModalData;
 	createPR: WorktreeModalData;
 	deleteWorktree: WorktreeModalData;
-	deleteGroupChat: GroupChatModalData;
-	renameGroupChat: GroupChatModalData;
-	editGroupChat: GroupChatModalData;
 	gitDiff: GitDiffModalData;
 	tour: TourModalData;
-	standingOvation: StandingOvationData;
-	firstRunCelebration: FirstRunCelebrationData;
-	keyboardMastery: KeyboardMasteryData;
 	lightbox: LightboxData;
 }
 
@@ -443,9 +387,13 @@ export const selectModal =
  * Get all modal actions (stable references, no re-renders).
  * Use this for event handlers and callbacks.
  */
-export function getModalActions() {
-	const { openModal, closeModal, updateModalData } = useModalStore.getState();
+// Cached actions singleton — avoids creating new arrow functions on every call.
+// openModal/closeModal/updateModalData are stable Zustand store methods so the
+// closures never go stale.
+let _cachedActions: ReturnType<typeof _buildModalActions> | null = null;
 
+function _buildModalActions() {
+	const { openModal, closeModal, updateModalData } = useModalStore.getState();
 	return {
 		// Settings Modal
 		setSettingsModalOpen: (open: boolean) =>
@@ -472,13 +420,6 @@ export function getModalActions() {
 		setDeleteAgentSession: (session: Session | null) =>
 			session ? openModal('deleteAgent', { session }) : closeModal('deleteAgent'),
 
-		// Shortcuts Help Modal
-		setShortcutsHelpOpen: (open: boolean) =>
-			open ? openModal('shortcutsHelp') : closeModal('shortcutsHelp'),
-		setShortcutsSearchQuery: (_query: string) => {
-			/* no-op, query is local state */
-		},
-
 		// Quick Actions Modal
 		setQuickActionOpen: (open: boolean) =>
 			open ? openModal('quickAction', { initialMode: 'main' }) : closeModal('quickAction'),
@@ -493,7 +434,6 @@ export function getModalActions() {
 					image,
 					images: current?.images ?? [],
 					source: current?.source ?? 'history',
-					isGroupChat: current?.isGroupChat ?? false,
 					allowDelete: current?.allowDelete ?? false,
 				});
 			} else {
@@ -520,18 +460,6 @@ export function getModalActions() {
 		setUpdateCheckModalOpen: (open: boolean) =>
 			open ? openModal('updateCheck') : closeModal('updateCheck'),
 
-		// Leaderboard Registration Modal
-		setLeaderboardRegistrationOpen: (open: boolean) =>
-			open ? openModal('leaderboard') : closeModal('leaderboard'),
-
-		// Standing Ovation Overlay
-		setStandingOvationData: (data: StandingOvationData | null) =>
-			data ? openModal('standingOvation', data) : closeModal('standingOvation'),
-
-		// First Run Celebration
-		setFirstRunCelebrationData: (data: FirstRunCelebrationData | null) =>
-			data ? openModal('firstRunCelebration', data) : closeModal('firstRunCelebration'),
-
 		// Log Viewer
 		setLogViewerOpen: (open: boolean) => (open ? openModal('logViewer') : closeModal('logViewer')),
 
@@ -539,25 +467,9 @@ export function getModalActions() {
 		setProcessMonitorOpen: (open: boolean) =>
 			open ? openModal('processMonitor') : closeModal('processMonitor'),
 
-		// Usage Dashboard
-		setUsageDashboardOpen: (open: boolean) =>
-			open ? openModal('usageDashboard') : closeModal('usageDashboard'),
-
-		// Keyboard Mastery Celebration
-		setPendingKeyboardMasteryLevel: (level: number | null) =>
-			level !== null ? openModal('keyboardMastery', { level }) : closeModal('keyboardMastery'),
-
 		// Playground Panel
 		setPlaygroundOpen: (open: boolean) =>
 			open ? openModal('playground') : closeModal('playground'),
-
-		// Debug Wizard Modal
-		setDebugWizardModalOpen: (open: boolean) =>
-			open ? openModal('debugWizard') : closeModal('debugWizard'),
-
-		// Debug Package Modal
-		setDebugPackageModalOpen: (open: boolean) =>
-			open ? openModal('debugPackage') : closeModal('debugPackage'),
 
 		// Confirmation Modal
 		setConfirmModalOpen: (open: boolean) => (open ? openModal('confirm') : closeModal('confirm')),
@@ -665,18 +577,6 @@ export function getModalActions() {
 		setQueueBrowserOpen: (open: boolean) =>
 			open ? openModal('queueBrowser') : closeModal('queueBrowser'),
 
-		// Batch Runner Modal
-		setBatchRunnerModalOpen: (open: boolean) =>
-			open ? openModal('batchRunner') : closeModal('batchRunner'),
-
-		// Auto Run Setup Modal
-		setAutoRunSetupModalOpen: (open: boolean) =>
-			open ? openModal('autoRunSetup') : closeModal('autoRunSetup'),
-
-		// Marketplace Modal
-		setMarketplaceModalOpen: (open: boolean) =>
-			open ? openModal('marketplace') : closeModal('marketplace'),
-
 		// Wizard Resume Modal
 		setWizardResumeModalOpen: (open: boolean) =>
 			open ? openModal('wizardResume') : closeModal('wizardResume'),
@@ -725,18 +625,6 @@ export function getModalActions() {
 		setSendToAgentModalOpen: (open: boolean) =>
 			open ? openModal('sendToAgent') : closeModal('sendToAgent'),
 
-		// Group Chat Modals
-		setShowNewGroupChatModal: (open: boolean) =>
-			open ? openModal('newGroupChat') : closeModal('newGroupChat'),
-		setShowDeleteGroupChatModal: (id: string | null) =>
-			id ? openModal('deleteGroupChat', { groupChatId: id }) : closeModal('deleteGroupChat'),
-		setShowRenameGroupChatModal: (id: string | null) =>
-			id ? openModal('renameGroupChat', { groupChatId: id }) : closeModal('renameGroupChat'),
-		setShowEditGroupChatModal: (id: string | null) =>
-			id ? openModal('editGroupChat', { groupChatId: id }) : closeModal('editGroupChat'),
-		setShowGroupChatInfo: (open: boolean) =>
-			open ? openModal('groupChatInfo') : closeModal('groupChatInfo'),
-
 		// Git Diff Viewer
 		setGitDiffPreview: (diff: string | null) =>
 			diff ? openModal('gitDiff', { diff }) : closeModal('gitDiff'),
@@ -749,22 +637,16 @@ export function getModalActions() {
 			open ? openModal('tour', { fromWizard: false }) : closeModal('tour'),
 		setTourFromWizard: (fromWizard: boolean) => updateModalData('tour', { fromWizard }),
 
-		// Symphony Modal
-		setSymphonyModalOpen: (open: boolean) =>
-			open ? openModal('symphony') : closeModal('symphony'),
-
-		// Windows Warning Modal
-		setWindowsWarningModalOpen: (open: boolean) =>
-			open ? openModal('windowsWarning') : closeModal('windowsWarning'),
-
-		// Director's Notes Modal
-		setDirectorNotesOpen: (open: boolean) =>
-			open ? openModal('directorNotes') : closeModal('directorNotes'),
-
 		// Lightbox refs replacement - use updateModalData instead
-		setLightboxIsGroupChat: (isGroupChat: boolean) => updateModalData('lightbox', { isGroupChat }),
 		setLightboxAllowDelete: (allowDelete: boolean) => updateModalData('lightbox', { allowDelete }),
 	};
+}
+
+export function getModalActions() {
+	if (!_cachedActions) {
+		_cachedActions = _buildModalActions();
+	}
+	return _cachedActions;
 }
 
 /**
@@ -792,22 +674,14 @@ export function useModalActions() {
 	const editAgentData = useModalStore(selectModalData('editAgent'));
 	const deleteAgentModalOpen = useModalStore(selectModalOpen('deleteAgent'));
 	const deleteAgentData = useModalStore(selectModalData('deleteAgent'));
-	const shortcutsHelpOpen = useModalStore(selectModalOpen('shortcutsHelp'));
 	const quickActionOpen = useModalStore(selectModalOpen('quickAction'));
 	const quickActionData = useModalStore(selectModalData('quickAction'));
 	const lightboxData = useModalStore(selectModalData('lightbox'));
 	const aboutModalOpen = useModalStore(selectModalOpen('about'));
 	const updateCheckModalOpen = useModalStore(selectModalOpen('updateCheck'));
-	const leaderboardRegistrationOpen = useModalStore(selectModalOpen('leaderboard'));
-	const standingOvationData = useModalStore(selectModalData('standingOvation'));
-	const firstRunCelebrationData = useModalStore(selectModalData('firstRunCelebration'));
 	const logViewerOpen = useModalStore(selectModalOpen('logViewer'));
 	const processMonitorOpen = useModalStore(selectModalOpen('processMonitor'));
-	const usageDashboardOpen = useModalStore(selectModalOpen('usageDashboard'));
-	const keyboardMasteryData = useModalStore(selectModalData('keyboardMastery'));
 	const playgroundOpen = useModalStore(selectModalOpen('playground'));
-	const debugWizardModalOpen = useModalStore(selectModalOpen('debugWizard'));
-	const debugPackageModalOpen = useModalStore(selectModalOpen('debugPackage'));
 	const confirmModalOpen = useModalStore(selectModalOpen('confirm'));
 	const confirmData = useModalStore(selectModalData('confirm'));
 	const quitConfirmModalOpen = useModalStore(selectModalOpen('quitConfirm'));
@@ -820,9 +694,6 @@ export function useModalActions() {
 	const agentSessionsOpen = useModalStore(selectModalOpen('agentSessions'));
 	const agentSessionsData = useModalStore(selectModalData('agentSessions'));
 	const queueBrowserOpen = useModalStore(selectModalOpen('queueBrowser'));
-	const batchRunnerModalOpen = useModalStore(selectModalOpen('batchRunner'));
-	const autoRunSetupModalOpen = useModalStore(selectModalOpen('autoRunSetup'));
-	const marketplaceModalOpen = useModalStore(selectModalOpen('marketplace'));
 	const wizardResumeModalOpen = useModalStore(selectModalOpen('wizardResume'));
 	const wizardResumeData = useModalStore(selectModalData('wizardResume'));
 	const agentErrorData = useModalStore(selectModalData('agentError'));
@@ -838,18 +709,10 @@ export function useModalActions() {
 	const promptComposerOpen = useModalStore(selectModalOpen('promptComposer'));
 	const mergeSessionModalOpen = useModalStore(selectModalOpen('mergeSession'));
 	const sendToAgentModalOpen = useModalStore(selectModalOpen('sendToAgent'));
-	const newGroupChatModalOpen = useModalStore(selectModalOpen('newGroupChat'));
-	const deleteGroupChatData = useModalStore(selectModalData('deleteGroupChat'));
-	const renameGroupChatData = useModalStore(selectModalData('renameGroupChat'));
-	const editGroupChatData = useModalStore(selectModalData('editGroupChat'));
-	const groupChatInfoOpen = useModalStore(selectModalOpen('groupChatInfo'));
 	const gitDiffData = useModalStore(selectModalData('gitDiff'));
 	const gitLogOpen = useModalStore(selectModalOpen('gitLog'));
 	const tourOpen = useModalStore(selectModalOpen('tour'));
 	const tourData = useModalStore(selectModalData('tour'));
-	const symphonyModalOpen = useModalStore(selectModalOpen('symphony'));
-	const windowsWarningModalOpen = useModalStore(selectModalOpen('windowsWarning'));
-	const directorNotesOpen = useModalStore(selectModalOpen('directorNotes'));
 
 	// Get stable actions
 	const actions = getModalActions();
@@ -872,9 +735,6 @@ export function useModalActions() {
 		deleteAgentModalOpen,
 		deleteAgentSession: deleteAgentData?.session ?? null,
 
-		// Shortcuts Help Modal
-		shortcutsHelpOpen,
-
 		// Quick Actions Modal
 		quickActionOpen,
 		quickActionInitialMode: quickActionData?.initialMode ?? 'main',
@@ -889,35 +749,14 @@ export function useModalActions() {
 		// Update Check Modal
 		updateCheckModalOpen,
 
-		// Leaderboard Registration Modal
-		leaderboardRegistrationOpen,
-
-		// Standing Ovation Overlay
-		standingOvationData: standingOvationData ?? null,
-
-		// First Run Celebration
-		firstRunCelebrationData: firstRunCelebrationData ?? null,
-
 		// Log Viewer
 		logViewerOpen,
 
 		// Process Monitor
 		processMonitorOpen,
 
-		// Usage Dashboard
-		usageDashboardOpen,
-
-		// Keyboard Mastery Celebration
-		pendingKeyboardMasteryLevel: keyboardMasteryData?.level ?? null,
-
 		// Playground Panel
 		playgroundOpen,
-
-		// Debug Wizard Modal
-		debugWizardModalOpen,
-
-		// Debug Package Modal
-		debugPackageModalOpen,
 
 		// Confirmation Modal
 		confirmModalOpen,
@@ -952,15 +791,6 @@ export function useModalActions() {
 		// Execution Queue Browser Modal
 		queueBrowserOpen,
 
-		// Batch Runner Modal
-		batchRunnerModalOpen,
-
-		// Auto Run Setup Modal
-		autoRunSetupModalOpen,
-
-		// Marketplace Modal
-		marketplaceModalOpen,
-
 		// Wizard Resume Modal
 		wizardResumeModalOpen,
 		wizardResumeState: wizardResumeData?.state ?? null,
@@ -992,13 +822,6 @@ export function useModalActions() {
 		// Send to Agent Modal
 		sendToAgentModalOpen,
 
-		// Group Chat Modals
-		showNewGroupChatModal: newGroupChatModalOpen,
-		showDeleteGroupChatModal: deleteGroupChatData?.groupChatId ?? null,
-		showRenameGroupChatModal: renameGroupChatData?.groupChatId ?? null,
-		showEditGroupChatModal: editGroupChatData?.groupChatId ?? null,
-		showGroupChatInfo: groupChatInfoOpen,
-
 		// Git Diff Viewer
 		gitDiffPreview: gitDiffData?.diff ?? null,
 
@@ -1009,17 +832,7 @@ export function useModalActions() {
 		tourOpen,
 		tourFromWizard: tourData?.fromWizard ?? false,
 
-		// Symphony Modal
-		symphonyModalOpen,
-
-		// Windows Warning Modal
-		windowsWarningModalOpen,
-
-		// Director's Notes Modal
-		directorNotesOpen,
-
 		// Lightbox ref replacements (now stored as data)
-		lightboxIsGroupChat: lightboxData?.isGroupChat ?? false,
 		lightboxAllowDelete: lightboxData?.allowDelete ?? false,
 	};
 }

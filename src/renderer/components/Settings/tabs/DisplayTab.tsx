@@ -221,7 +221,7 @@ export function DisplayTab({ theme }: DisplayTabProps) {
 								Use native title bar
 							</p>
 							<p className="text-xs opacity-50 mt-0.5">
-								Use the OS native title bar instead of Maestro&apos;s custom title bar. Requires
+								Use the OS native title bar instead of Alfredi&apos;s custom title bar. Requires
 								restart.
 							</p>
 						</div>

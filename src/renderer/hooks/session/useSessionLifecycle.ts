@@ -20,7 +20,6 @@ import type { Session, AITab } from '../../types';
 import type { ToolType } from '../../../shared/types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { generateId } from '../../utils/ids';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useModalStore } from '../../stores/modalStore';
 import { useUIStore } from '../../stores/uiStore';
 import { notifyToast } from '../../stores/notificationStore';
@@ -300,15 +299,6 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 				});
 			}
 
-			// Delete associated playbooks
-			try {
-				await window.maestro.playbooks.deleteAll(id);
-			} catch (error) {
-				captureException(error, {
-					extra: { sessionId: id, operation: 'delete-playbooks' },
-				});
-			}
-
 			// If this is a worktree session, track its path to prevent re-discovery
 			if (session.worktreeParentPath && session.cwd) {
 				setRemovedWorktreePaths((prev) => new Set([...prev, session.cwd]));
@@ -454,13 +444,8 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	}, [groups, initialLoadComplete]);
 
 	// Track navigation history when session or AI tab changes
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
-
 	useEffect(() => {
-		// Group chat navigation takes precedence when a group chat is open
-		if (activeGroupChatId) {
-			pushNavigation({ groupChatId: activeGroupChatId });
-		} else if (activeSession) {
+		if (activeSession) {
 			pushNavigation({
 				sessionId: activeSession.id,
 				tabId:
@@ -474,7 +459,6 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 		activeSession?.activeTabId,
 		activeSession?.inputMode,
 		activeSession?.aiTabs?.length,
-		activeGroupChatId,
 	]);
 
 	return {

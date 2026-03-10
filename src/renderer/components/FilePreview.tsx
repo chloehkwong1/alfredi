@@ -115,7 +115,7 @@ interface FilePreviewProps {
 	currentHistoryIndex?: number;
 	/** Callback to open fuzzy file search (available in preview mode, not edit mode) */
 	onOpenFuzzySearch?: () => void;
-	/** Callback to track shortcut usage for keyboard mastery */
+	/** Callback to track shortcut usage */
 	onShortcutUsed?: (shortcutId: string) => void;
 	/** Whether GitHub CLI is available for gist publishing */
 	ghCliAvailable?: boolean;

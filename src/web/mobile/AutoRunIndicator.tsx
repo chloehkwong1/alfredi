@@ -7,7 +7,19 @@
  */
 
 import { useThemeColors } from '../components/ThemeProvider';
-import type { AutoRunState } from '../hooks/useWebSocket';
+
+/** AutoRun state for batch processing (legacy) */
+interface AutoRunState {
+	isRunning: boolean;
+	totalTasks: number;
+	completedTasks: number;
+	currentTaskIndex: number;
+	isStopping?: boolean;
+	totalDocuments?: number;
+	currentDocumentIndex?: number;
+	totalTasksAcrossAllDocs?: number;
+	completedTasksAcrossAllDocs?: number;
+}
 
 interface AutoRunIndicatorProps {
 	/** AutoRun state from WebSocket - null when not running */

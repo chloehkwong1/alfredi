@@ -16,10 +16,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { Session, SessionState, ToolType, LogEntry } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { gitService } from '../../services/git';
 import { generateId } from '../../utils/ids';
-import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
 
 // ============================================================================
 // Return type
@@ -52,8 +50,6 @@ export function useSessionRestoration(): SessionRestorationReturn {
 		() => useSessionStore.getState(),
 		[]
 	);
-	const { setGroupChats } = useMemo(() => useGroupChatStore.getState(), []);
-
 	// --- initialLoadComplete proxy ref ---
 	// Bridges ref API (.current = true) to store boolean so both ref-style
 	// and store-style consumers stay in sync.
@@ -127,14 +123,6 @@ export function useSessionRestoration(): SessionRestorationReturn {
 			// Migration: ensure projectRoot is set (for sessions created before this field was added)
 			if (!session.projectRoot) {
 				session = { ...session, projectRoot: session.cwd };
-			}
-
-			// Migration: default autoRunFolderPath for sessions that don't have one
-			if (!session.autoRunFolderPath && session.projectRoot) {
-				session = {
-					...session,
-					autoRunFolderPath: `${session.projectRoot}/${AUTO_RUN_FOLDER_NAME}`,
-				};
 			}
 
 			// Migration: ensure fileTreeAutoRefreshInterval is set (default 180s for legacy sessions)
@@ -376,15 +364,6 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					setGroups(savedGroups);
 				} else {
 					setGroups([]);
-				}
-
-				// Load group chats
-				try {
-					const savedGroupChats = await window.maestro.groupChat.list();
-					setGroupChats(savedGroupChats || []);
-				} catch (gcError) {
-					console.error('Failed to load group chats:', gcError);
-					setGroupChats([]);
 				}
 			} catch (e) {
 				console.error('Failed to load sessions/groups:', e);

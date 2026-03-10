@@ -31,7 +31,7 @@ export function useTourActions(): void {
 
 			switch (type) {
 				case 'setRightTab':
-					if (value === 'files' || value === 'history' || value === 'autorun') {
+					if (value === 'files') {
 						setActiveRightTab(value as RightPanelTab);
 					}
 					break;

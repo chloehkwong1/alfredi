@@ -4,7 +4,6 @@ import {
 	Bot,
 	Menu,
 	Settings,
-	HelpCircle,
 	Info,
 	RefreshCw,
 	Compass,
@@ -23,7 +22,6 @@ interface EmptyStateViewProps {
 	onNewAgent: () => void;
 	onOpenWizard: () => void;
 	onOpenSettings: () => void;
-	onOpenShortcutsHelp: () => void;
 	onOpenAbout: () => void;
 	onCheckForUpdates: () => void;
 	onStartTour?: () => void;
@@ -35,7 +33,6 @@ export function EmptyStateView({
 	onNewAgent,
 	onOpenWizard,
 	onOpenSettings,
-	onOpenShortcutsHelp,
 	onOpenAbout,
 	onCheckForUpdates,
 	onStartTour,
@@ -75,7 +72,7 @@ export function EmptyStateView({
 						className="font-bold tracking-widest text-lg"
 						style={{ color: theme.colors.textMain }}
 					>
-						MAESTRO
+						ALFREDI
 					</h1>
 				</div>
 
@@ -170,30 +167,6 @@ export function EmptyStateView({
 										}}
 									>
 										{shortcuts.settings ? formatShortcutKeys(shortcuts.settings.keys) : '⌘,'}
-									</span>
-								</button>
-
-								<button
-									onClick={() => {
-										onOpenShortcutsHelp();
-										setMenuOpen(false);
-									}}
-									className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-								>
-									<HelpCircle className="w-5 h-5" style={{ color: theme.colors.textDim }} />
-									<div className="flex-1">
-										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-											Keyboard Shortcuts
-										</div>
-									</div>
-									<span
-										className="text-xs font-mono px-1.5 py-0.5 rounded"
-										style={{
-											backgroundColor: theme.colors.bgActivity,
-											color: theme.colors.textDim,
-										}}
-									>
-										{shortcuts.help ? formatShortcutKeys(shortcuts.help.keys) : '?'}
 									</span>
 								</button>
 

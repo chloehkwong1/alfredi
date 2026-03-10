@@ -10,6 +10,3 @@ export type { ModalProps, ModalFooterProps } from './Modal';
 
 export { FormInput } from './FormInput';
 export type { FormInputProps } from './FormInput';
-
-export { EmojiPickerField } from './EmojiPickerField';
-export type { EmojiPickerFieldProps } from './EmojiPickerField';

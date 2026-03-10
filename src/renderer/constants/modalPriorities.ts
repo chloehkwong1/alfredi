@@ -14,12 +14,6 @@
  * - 1-99: Search and autocomplete
  */
 export const MODAL_PRIORITIES = {
-	/** Standing ovation achievement overlay - celebration! */
-	STANDING_OVATION: 1100,
-
-	/** Keyboard mastery level-up celebration - high priority celebration */
-	KEYBOARD_MASTERY: 1095,
-
 	/** Onboarding tour overlay - above wizard, guides new users */
 	TOUR: 1050,
 
@@ -35,20 +29,11 @@ export const MODAL_PRIORITIES = {
 	/** Gist publish confirmation modal - high priority */
 	GIST_PUBLISH: 980,
 
-	/** Playbook delete confirmation - high priority, appears on top of BatchRunner */
-	PLAYBOOK_DELETE_CONFIRM: 950,
-
-	/** Playbook name input modal - appears on top of BatchRunner */
-	PLAYBOOK_NAME: 940,
-
 	/** Rename instance modal */
 	RENAME_INSTANCE: 900,
 
 	/** Rename tab modal */
 	RENAME_TAB: 875,
-
-	/** Director's Notes modal - unified history and AI overview */
-	DIRECTOR_NOTES: 848,
 
 	/** Rename group modal */
 	RENAME_GROUP: 850,
@@ -56,26 +41,8 @@ export const MODAL_PRIORITIES = {
 	/** Create new group modal */
 	CREATE_GROUP: 800,
 
-	/** Delete group chat confirmation */
-	DELETE_GROUP_CHAT: 660,
-
-	/** New group chat creation modal */
-	NEW_GROUP_CHAT: 650,
-
-	/** Edit group chat modal */
-	EDIT_GROUP_CHAT: 645,
-
-	/** Rename group chat modal */
-	RENAME_GROUP_CHAT: 640,
-
-	/** Group chat info overlay */
-	GROUP_CHAT_INFO: 630,
-
 	/** Wizard exit confirmation dialog - appears above wizard when exiting mid-flow */
 	WIZARD_EXIT_CONFIRM: 770,
-
-	/** Existing Auto Run docs detection modal - appears above wizard during directory selection */
-	EXISTING_AUTORUN_DOCS: 768,
 
 	/** Wizard resume dialog - appears above wizard to ask about resuming */
 	WIZARD_RESUME: 765,
@@ -101,12 +68,6 @@ export const MODAL_PRIORITIES = {
 	/** New instance creation modal */
 	NEW_INSTANCE: 750,
 
-	/** Batch runner modal for scratchpad auto mode */
-	BATCH_RUNNER: 720,
-
-	/** Document selector modal (opens from BatchRunner to add documents) */
-	DOCUMENT_SELECTOR: 725,
-
 	/** Tab switcher modal (Opt+Cmd+T) */
 	TAB_SWITCHER: 710,
 
@@ -118,30 +79,6 @@ export const MODAL_PRIORITIES = {
 
 	/** Agent prompt composer modal (opens from batch runner) */
 	AGENT_PROMPT_COMPOSER: 730,
-
-	/** Auto Run setup/folder selection modal */
-	AUTORUN_SETUP: 710,
-
-	/** Auto Run expanded view modal */
-	AUTORUN_EXPANDED: 705,
-
-	/** Auto Run search bar (within expanded modal) */
-	AUTORUN_SEARCH: 706,
-
-	/** Playbook Exchange modal - browse and import community playbooks (opens from BatchRunner or AutoRunExpanded, so needs higher priority than both) */
-	MARKETPLACE: 735,
-
-	/** Symphony modal - browse and contribute to open source projects */
-	SYMPHONY: 710,
-
-	/** Symphony agent creation dialog - appears above Symphony modal for agent selection */
-	SYMPHONY_AGENT_CREATION: 711,
-
-	/** Auto Run lightbox (above expanded modal so Escape closes it first) */
-	AUTORUN_LIGHTBOX: 715,
-
-	/** Auto Run reset tasks confirmation modal */
-	AUTORUN_RESET_TASKS: 712,
 
 	/** Quick actions command palette (Cmd+K) */
 	QUICK_ACTION: 700,
@@ -172,18 +109,6 @@ export const MODAL_PRIORITIES = {
 
 	/** Execution queue browser modal */
 	EXECUTION_QUEUE_BROWSER: 670,
-
-	/** Keyboard shortcuts help modal */
-	SHORTCUTS_HELP: 650,
-
-	/** Leaderboard registration modal */
-	LEADERBOARD_REGISTRATION: 620,
-
-	/** Debug package generation modal */
-	DEBUG_PACKAGE: 605,
-
-	/** Windows warning modal - shown on startup for Windows users */
-	WINDOWS_WARNING: 615,
 
 	/** About/info modal */
 	ABOUT: 600,

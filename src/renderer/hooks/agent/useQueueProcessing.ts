@@ -10,13 +10,7 @@
  */
 
 import { useEffect, useRef, useCallback } from 'react';
-import type {
-	SessionState,
-	QueuedItem,
-	CustomAICommand,
-	SpecKitCommand,
-	OpenSpecCommand,
-} from '../../types';
+import type { SessionState, QueuedItem } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useAgentStore } from '../../stores/agentStore';
 import { getActiveTab } from '../../utils/tabHelpers';
@@ -28,12 +22,6 @@ import { getActiveTab } from '../../utils/tabHelpers';
 export interface UseQueueProcessingDeps {
 	/** Conductor profile name for agent config */
 	conductorProfile: string;
-	/** Ref to current custom AI commands */
-	customAICommandsRef: React.RefObject<CustomAICommand[]>;
-	/** Ref to current speckit commands */
-	speckitCommandsRef: React.RefObject<SpecKitCommand[]>;
-	/** Ref to current openspec commands */
-	openspecCommandsRef: React.RefObject<OpenSpecCommand[]>;
 }
 
 // ============================================================================
@@ -54,7 +42,7 @@ export interface UseQueueProcessingReturn {
 // ============================================================================
 
 export function useQueueProcessing(deps: UseQueueProcessingDeps): UseQueueProcessingReturn {
-	const { conductorProfile, customAICommandsRef, speckitCommandsRef, openspecCommandsRef } = deps;
+	const { conductorProfile } = deps;
 
 	// --- Reactive subscriptions ---
 	const sessionsLoaded = useSessionStore((s) => s.sessionsLoaded);
@@ -73,9 +61,9 @@ export function useQueueProcessing(deps: UseQueueProcessingDeps): UseQueueProces
 		async (sessionId: string, item: QueuedItem) => {
 			await useAgentStore.getState().processQueuedItem(sessionId, item, {
 				conductorProfile,
-				customAICommands: customAICommandsRef.current ?? [],
-				speckitCommands: speckitCommandsRef.current ?? [],
-				openspecCommands: openspecCommandsRef.current ?? [],
+				customAICommands: [],
+				speckitCommands: [],
+				openspecCommands: [],
 			});
 		},
 		[conductorProfile]

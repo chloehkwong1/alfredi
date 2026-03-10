@@ -35,7 +35,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { Session } from './useSessions';
-import type { WebSocketState, AITabData, AutoRunState, CustomCommand } from './useWebSocket';
+import type { WebSocketState, AITabData, CustomCommand } from './useWebSocket';
 import { buildApiUrl, getMaestroConfig, updateUrlForSessionTab } from '../utils/config';
 import { webLogger } from '../utils/logger';
 import type { Theme } from '../../shared/theme-types';
@@ -85,8 +85,6 @@ export interface UseMobileSessionManagementDeps {
 	onThemeUpdate?: (theme: Theme) => void;
 	/** Callback when custom commands are received */
 	onCustomCommands?: (commands: CustomCommand[]) => void;
-	/** Callback when AutoRun state changes */
-	onAutoRunStateChange?: (sessionId: string, state: AutoRunState | null) => void;
 }
 
 /**
@@ -115,7 +113,6 @@ export interface MobileSessionHandlers {
 	onUserInput: (sessionId: string, command: string, inputMode: 'ai' | 'terminal') => void;
 	onThemeUpdate: (theme: Theme) => void;
 	onCustomCommands: (commands: CustomCommand[]) => void;
-	onAutoRunStateChange: (sessionId: string, state: AutoRunState | null) => void;
 	onTabsChanged: (sessionId: string, aiTabs: AITabData[], newActiveTabId: string) => void;
 }
 
@@ -191,7 +188,6 @@ export function useMobileSessionManagement(
 		onResponseComplete,
 		onThemeUpdate,
 		onCustomCommands,
-		onAutoRunStateChange,
 	} = deps;
 
 	// Get URL-based session/tab from config (takes precedence over localStorage)
@@ -647,14 +643,6 @@ export function useMobileSessionManagement(
 				webLogger.debug(`Custom commands received: ${commands.length}`, 'Mobile');
 				onCustomCommands?.(commands);
 			},
-			onAutoRunStateChange: (sessionId: string, state: AutoRunState | null) => {
-				// AutoRun (batch processing) state from desktop app
-				webLogger.debug(
-					`AutoRun state change: ${sessionId} - ${state ? `running (${state.completedTasks}/${state.totalTasks})` : 'stopped'}`,
-					'Mobile'
-				);
-				onAutoRunStateChange?.(sessionId, state);
-			},
 			onTabsChanged: (sessionId: string, aiTabs: AITabData[], newActiveTabId: string) => {
 				// Tab state changed on desktop - update session
 				webLogger.debug(
@@ -672,7 +660,7 @@ export function useMobileSessionManagement(
 				}
 			},
 		}),
-		[onResponseComplete, onThemeUpdate, onCustomCommands, onAutoRunStateChange]
+		[onResponseComplete, onThemeUpdate, onCustomCommands]
 	);
 
 	return {

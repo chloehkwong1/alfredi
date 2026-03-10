@@ -19,10 +19,6 @@ export {
 	wizardInlineNewPrompt,
 	wizardInlineIterateGenerationPrompt,
 
-	// AutoRun
-	autorunDefaultPrompt,
-	autorunSynopsisPrompt,
-
 	// Input processing
 	imageOnlyDefaultPrompt,
 
@@ -32,12 +28,6 @@ export {
 	// Maestro system prompt
 	maestroSystemPrompt,
 
-	// Group chat prompts
-	groupChatModeratorSystemPrompt,
-	groupChatModeratorSynthesisPrompt,
-	groupChatParticipantPrompt,
-	groupChatParticipantRequestPrompt,
-
 	// Context management
 	contextGroomingPrompt,
 	contextTransferPrompt,
@@ -45,7 +35,4 @@ export {
 
 	// Tab naming
 	tabNamingPrompt,
-
-	// Director's Notes
-	directorNotesPrompt,
 } from '../generated/prompts';

@@ -150,6 +150,7 @@ export function DirectorySelectionScreen({ theme }: DirectorySelectionScreenProp
 
 		async function loadSshRemoteHost() {
 			try {
+				if (!window.maestro.sshRemote) return;
 				const configsResult = await window.maestro.sshRemote.getConfigs();
 				if (configsResult.success && configsResult.configs) {
 					const remote = configsResult.configs.find(

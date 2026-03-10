@@ -91,7 +91,7 @@ const createDeps = (
 	setSessions: state.setSessions,
 	activeSessionId: state.getSessions()[0]?.id ?? null,
 	activeSession: state.getSessions()[0] ?? null,
-	rightPanelRef: { current: { refreshHistoryPanel: vi.fn() } },
+	rightPanelRef: { current: {} },
 	...overrides,
 });
 
@@ -194,7 +194,7 @@ describe('useFileTreeManagement', () => {
 		});
 		const state = createSessionsState([session]);
 		const rightPanelRef: RefObject<RightPanelHandle | null> = {
-			current: { refreshHistoryPanel: vi.fn() },
+			current: {},
 		};
 		const deps = createDeps(state, { rightPanelRef });
 		const { result } = renderHook(() => useFileTreeManagement(deps));
@@ -217,7 +217,6 @@ describe('useFileTreeManagement', () => {
 		expect(gitService.getBranches).toHaveBeenCalledWith('/test/shell', undefined);
 		expect(gitService.getTags).toHaveBeenCalledWith('/test/shell', undefined);
 		expect(window.maestro.history.reload).toHaveBeenCalled();
-		expect(rightPanelRef.current?.refreshHistoryPanel).toHaveBeenCalled();
 
 		const updated = state.getSessions()[0];
 		expect(updated.fileTree).toEqual(nextTree);

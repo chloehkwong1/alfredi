@@ -1,10 +1,9 @@
 import { useRef, useCallback } from 'react';
 
-// Navigation history entry - tracks session/tab position or group chat
+// Navigation history entry - tracks session/tab position
 export interface NavHistoryEntry {
 	sessionId?: string;
 	tabId?: string; // Optional AI tab ID (only for AI mode with tabs)
-	groupChatId?: string; // Set when navigating to a group chat
 }
 
 const MAX_HISTORY = 50;
@@ -40,8 +39,7 @@ export function useNavigationHistory() {
 		if (
 			currentRef.current &&
 			currentRef.current.sessionId === entry.sessionId &&
-			currentRef.current.tabId === entry.tabId &&
-			currentRef.current.groupChatId === entry.groupChatId
+			currentRef.current.tabId === entry.tabId
 		) {
 			return;
 		}

@@ -6,7 +6,7 @@
  * - AgentCreationDialog (Symphony)
  * - NewInstanceModal (new session creation)
  * - Wizard AgentSelectionScreen
- * - Group chat modals
+ * - Agent modals
  *
  * Features:
  * - Renders agent cards with selection state

@@ -159,9 +159,7 @@ export function generateSystemPrompt(config: SystemPromptConfig): string {
 			toolType: 'claude-code',
 			cwd: agentPath,
 			fullPath: agentPath,
-			autoRunFolderPath: effectiveAutoRunFolder,
 		},
-		autoRunFolder: effectiveAutoRunFolder,
 		historyFilePath: historyFilePath,
 		conductorProfile: conductorProfile,
 	};

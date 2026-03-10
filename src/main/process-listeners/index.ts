@@ -19,7 +19,7 @@ import { setupStatsListener } from './stats-listener';
 import { setupExitListener } from './exit-listener';
 
 // Re-export types for consumers
-export type { ProcessListenerDependencies, ParticipantInfo } from './types';
+export type { ProcessListenerDependencies } from './types';
 
 /**
  * Sets up all process event listeners.
@@ -35,13 +35,13 @@ export function setupProcessListeners(
 	// Simple forwarding listeners (slash-commands, thinking-chunk, tool-execution, stderr, command-exit)
 	setupForwardingListeners(processManager, deps);
 
-	// Data output listener (with group chat buffering and web broadcast)
+	// Data output listener (with web broadcast)
 	setupDataListener(processManager, deps);
 
-	// Usage statistics listener (with group chat participant/moderator updates)
+	// Usage statistics listener
 	setupUsageListener(processManager, deps);
 
-	// Session ID listener (with group chat participant/moderator storage)
+	// Session ID listener
 	setupSessionIdListener(processManager, deps);
 
 	// Agent error listener
@@ -50,6 +50,6 @@ export function setupProcessListeners(
 	// Stats/query-complete listener
 	setupStatsListener(processManager, deps);
 
-	// Exit listener (with group chat routing, recovery, and synthesis)
+	// Exit listener
 	setupExitListener(processManager, deps);
 }

@@ -16,7 +16,6 @@ import {
 } from '../../../renderer/hooks/agent/useAgentListeners';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useModalStore } from '../../../renderer/stores/modalStore';
-import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import type { Session, AITab, AgentError } from '../../../renderer/types';
 
 // ============================================================================
@@ -748,31 +747,6 @@ describe('useAgentListeners', () => {
 			onAgentErrorHandler?.('sess-1-ai-tab-1', baseError);
 
 			expect(pauseBatchOnError).toHaveBeenCalledWith('sess-1', baseError, 2, 'Processing doc3.md');
-		});
-
-		it('delegates group chat errors to groupChatStore', () => {
-			useGroupChatStore.setState({ groupChatError: null });
-
-			const deps = createMockDeps();
-			const session = createMockSession({
-				id: 'sess-1',
-				state: 'busy',
-				aiTabs: [createMockTab({ id: 'tab-1' })],
-			});
-			useSessionStore.setState({
-				sessions: [session],
-				activeSessionId: 'sess-1',
-			});
-
-			renderHook(() => useAgentListeners(deps));
-
-			// Group chat session format: group-chat-{uuid}-{participantName}-{timestamp}
-			const groupChatSessionId =
-				'group-chat-12345678-1234-1234-1234-123456789012-claude-1700000000000';
-			onAgentErrorHandler?.(groupChatSessionId, baseError);
-
-			// Should set error in groupChatStore directly
-			expect(useGroupChatStore.getState().groupChatError).not.toBeNull();
 		});
 	});
 

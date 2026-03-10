@@ -10,8 +10,6 @@
 import { BrowserWindow, App } from 'electron';
 import Store from 'electron-store';
 import { registerGitHandlers, GitHandlerDependencies } from './git';
-import { registerAutorunHandlers } from './autorun';
-import { registerPlaybooksHandlers } from './playbooks';
 import { registerHistoryHandlers } from './history';
 import { registerAgentsHandlers, AgentsHandlerDependencies } from './agents';
 import { registerProcessHandlers, ProcessHandlerDependencies } from './process';
@@ -29,30 +27,19 @@ import {
 } from './system';
 import { registerClaudeHandlers, ClaudeHandlerDependencies } from './claude';
 import { registerAgentSessionsHandlers, AgentSessionsHandlerDependencies } from './agentSessions';
-import { registerGroupChatHandlers, GroupChatHandlerDependencies } from './groupChat';
-import { registerDebugHandlers, DebugHandlerDependencies } from './debug';
-import { registerSpeckitHandlers } from './speckit';
-import { registerOpenSpecHandlers } from './openspec';
 import {
 	registerContextHandlers,
 	ContextHandlerDependencies,
 	cleanupAllGroomingSessions,
 	getActiveGroomingSessionCount,
 } from './context';
-import { registerMarketplaceHandlers, MarketplaceHandlerDependencies } from './marketplace';
 import { registerStatsHandlers, StatsHandlerDependencies } from './stats';
-import { registerDocumentGraphHandlers, DocumentGraphHandlerDependencies } from './documentGraph';
-import { registerSshRemoteHandlers, SshRemoteHandlerDependencies } from './ssh-remote';
 import { registerFilesystemHandlers } from './filesystem';
 import { registerAttachmentsHandlers, AttachmentsHandlerDependencies } from './attachments';
 import { registerWebHandlers, WebHandlerDependencies } from './web';
-import { registerLeaderboardHandlers, LeaderboardHandlerDependencies } from './leaderboard';
 import { registerNotificationsHandlers } from './notifications';
-import { registerSymphonyHandlers, SymphonyHandlerDependencies } from './symphony';
 import { registerAgentErrorHandlers } from './agent-error';
 import { registerTabNamingHandlers, TabNamingHandlerDependencies } from './tabNaming';
-import { registerDirectorNotesHandlers, DirectorNotesHandlerDependencies } from './director-notes';
-import { registerWakatimeHandlers } from './wakatime';
 import { AgentDetector } from '../../agents';
 import { ProcessManager } from '../../process-manager';
 import { WebServer } from '../../web-server';
@@ -63,8 +50,6 @@ type TunnelManagerType = typeof tunnelManagerInstance;
 
 // Re-export individual handlers for selective registration
 export { registerGitHandlers };
-export { registerAutorunHandlers };
-export { registerPlaybooksHandlers };
 export { registerHistoryHandlers };
 export { registerAgentsHandlers };
 export { registerProcessHandlers };
@@ -72,45 +57,26 @@ export { registerPersistenceHandlers };
 export { registerSystemHandlers, setupLoggerEventForwarding };
 export { registerClaudeHandlers };
 export { registerAgentSessionsHandlers };
-export { registerGroupChatHandlers };
-export { registerDebugHandlers };
-export { registerSpeckitHandlers };
-export { registerOpenSpecHandlers };
 export { registerContextHandlers, cleanupAllGroomingSessions, getActiveGroomingSessionCount };
-export { registerMarketplaceHandlers };
-export type { MarketplaceHandlerDependencies };
 export { registerStatsHandlers };
-export { registerDocumentGraphHandlers };
-export { registerSshRemoteHandlers };
 export { registerFilesystemHandlers };
 export { registerAttachmentsHandlers };
 export type { AttachmentsHandlerDependencies };
 export { registerWebHandlers };
 export type { WebHandlerDependencies };
-export { registerLeaderboardHandlers };
-export type { LeaderboardHandlerDependencies };
 export { registerNotificationsHandlers };
-export { registerSymphonyHandlers };
 export { registerAgentErrorHandlers };
 export { registerTabNamingHandlers };
 export type { TabNamingHandlerDependencies };
-export { registerDirectorNotesHandlers };
-export type { DirectorNotesHandlerDependencies };
-export { registerWakatimeHandlers };
 export type { AgentsHandlerDependencies };
 export type { ProcessHandlerDependencies };
 export type { PersistenceHandlerDependencies };
 export type { SystemHandlerDependencies };
 export type { ClaudeHandlerDependencies };
 export type { AgentSessionsHandlerDependencies };
-export type { GroupChatHandlerDependencies };
-export type { DebugHandlerDependencies };
 export type { ContextHandlerDependencies };
 export type { StatsHandlerDependencies };
-export type { DocumentGraphHandlerDependencies };
-export type { SshRemoteHandlerDependencies };
 export type { GitHandlerDependencies };
-export type { SymphonyHandlerDependencies };
 export type { MaestroSettings, SessionsData, GroupsData };
 
 /**
@@ -170,8 +136,6 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 	registerGitHandlers({
 		settingsStore: deps.settingsStore,
 	});
-	registerAutorunHandlers(deps);
-	registerPlaybooksHandlers(deps);
 	registerHistoryHandlers();
 	registerAgentsHandlers({
 		getAgentDetector: deps.getAgentDetector,
@@ -203,49 +167,15 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 		claudeSessionOriginsStore: deps.claudeSessionOriginsStore,
 		getMainWindow: deps.getMainWindow,
 	});
-	registerGroupChatHandlers({
-		getMainWindow: deps.getMainWindow,
-		// ProcessManager is structurally compatible with the group chat's IProcessManager interface
-		getProcessManager:
-			deps.getProcessManager as unknown as GroupChatHandlerDependencies['getProcessManager'],
-		getAgentDetector: deps.getAgentDetector,
-	});
-	registerDebugHandlers({
-		getMainWindow: deps.getMainWindow,
-		getAgentDetector: deps.getAgentDetector,
-		getProcessManager: deps.getProcessManager,
-		getWebServer: deps.getWebServer,
-		settingsStore: deps.settingsStore,
-		sessionsStore: deps.sessionsStore,
-		groupsStore: deps.groupsStore,
-		// bootstrapStore is optional - not available in HandlerDependencies
-	});
-	// Register spec-kit handlers (no dependencies needed)
-	registerSpeckitHandlers();
-	// Register OpenSpec handlers (no dependencies needed)
-	registerOpenSpecHandlers();
 	registerContextHandlers({
 		getMainWindow: deps.getMainWindow,
 		getProcessManager: deps.getProcessManager,
 		getAgentDetector: deps.getAgentDetector,
 		agentConfigsStore: deps.agentConfigsStore,
 	});
-	// Register marketplace handlers
-	registerMarketplaceHandlers({
-		app: deps.app,
-	});
 	// Register stats handlers for usage tracking
 	registerStatsHandlers({
 		getMainWindow: deps.getMainWindow,
-		settingsStore: deps.settingsStore,
-	});
-	// Register document graph handlers for file watching
-	registerDocumentGraphHandlers({
-		getMainWindow: deps.getMainWindow,
-		app: deps.app,
-	});
-	// Register SSH remote handlers
-	registerSshRemoteHandlers({
 		settingsStore: deps.settingsStore,
 	});
 	// Register filesystem handlers (no dependencies needed - uses stores directly)
@@ -254,19 +184,8 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 	registerAttachmentsHandlers({
 		app: deps.app,
 	});
-	// Register leaderboard handlers
-	registerLeaderboardHandlers({
-		app: deps.app,
-		settingsStore: deps.settingsStore,
-	});
 	// Register notification handlers (OS notifications and TTS)
 	registerNotificationsHandlers();
-	// Register Symphony handlers for token donation / open source contributions
-	registerSymphonyHandlers({
-		app: deps.app,
-		getMainWindow: deps.getMainWindow,
-		sessionsStore: deps.sessionsStore,
-	});
 	// Register agent error handlers (error state management)
 	registerAgentErrorHandlers();
 	// Register tab naming handlers for automatic tab naming
@@ -275,12 +194,6 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 		getAgentDetector: deps.getAgentDetector,
 		agentConfigsStore: deps.agentConfigsStore,
 		settingsStore: deps.settingsStore,
-	});
-	// Register Director's Notes handlers (unified history + synopsis)
-	registerDirectorNotesHandlers({
-		getProcessManager: deps.getProcessManager,
-		getAgentDetector: deps.getAgentDetector,
-		agentConfigsStore: deps.agentConfigsStore,
 	});
 	// Setup logger event forwarding to renderer
 	setupLoggerEventForwarding(deps.getMainWindow);

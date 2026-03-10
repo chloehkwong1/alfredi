@@ -69,7 +69,7 @@ export function useQuickActionsHandlers(
 	const {
 		refreshGitFileState,
 		mainPanelRef,
-		rightPanelRef,
+		rightPanelRef: _rightPanelRef,
 		handleSummarizeAndContinue,
 		processQueuedItem,
 	} = deps;
@@ -175,7 +175,7 @@ export function useQuickActionsHandlers(
 	);
 
 	const handleQuickActionsAutoRunResetTasks = useCallback(() => {
-		rightPanelRef.current?.openAutoRunResetTasksModal();
+		// Auto Run reset tasks no longer available from Right Panel
 	}, []);
 
 	return {

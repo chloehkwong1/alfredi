@@ -10,9 +10,8 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { useModalStore } from '../../../renderer/stores/modalStore';
-import type { Theme, Session, Shortcut, Group, GroupChat } from '../../../renderer/types';
+import type { Theme, Session, Shortcut, Group } from '../../../renderer/types';
 
 // Track props passed to sub-components
 let capturedInfoProps: Record<string, unknown> = {};
@@ -21,14 +20,10 @@ let capturedSessionProps: Record<string, unknown> = {};
 let capturedGroupProps: Record<string, unknown> = {};
 let capturedWorktreeProps: Record<string, unknown> = {};
 let capturedUtilityProps: Record<string, unknown> = {};
-let capturedGroupChatProps: Record<string, unknown> = {};
 let capturedAgentProps: Record<string, unknown> = {};
 
 // Mock ALL sub-components to capture props
 vi.mock('../../../renderer/components/AboutModal', () => ({ AboutModal: () => null }));
-vi.mock('../../../renderer/components/ShortcutsHelpModal', () => ({
-	ShortcutsHelpModal: () => null,
-}));
 vi.mock('../../../renderer/components/UpdateCheckModal', () => ({ UpdateCheckModal: () => null }));
 vi.mock('../../../renderer/components/ProcessMonitor', () => ({ ProcessMonitor: () => null }));
 vi.mock('../../../renderer/components/UsageDashboard', () => ({ UsageDashboardModal: () => null }));
@@ -76,18 +71,6 @@ vi.mock('../../../renderer/components/AutoRunSetupModal', () => ({
 	AutoRunSetupModal: () => null,
 }));
 vi.mock('../../../renderer/components/LightboxModal', () => ({ LightboxModal: () => null }));
-vi.mock('../../../renderer/components/GroupChatModal', () => ({
-	GroupChatModal: () => null,
-}));
-vi.mock('../../../renderer/components/DeleteGroupChatModal', () => ({
-	DeleteGroupChatModal: () => null,
-}));
-vi.mock('../../../renderer/components/RenameGroupChatModal', () => ({
-	RenameGroupChatModal: () => null,
-}));
-vi.mock('../../../renderer/components/GroupChatInfoOverlay', () => ({
-	GroupChatInfoOverlay: () => null,
-}));
 vi.mock('../../../renderer/components/AgentErrorModal', () => ({
 	AgentErrorModal: () => null,
 }));
@@ -185,16 +168,6 @@ function createMockGroup(overrides: Partial<Group> = {}): Group {
 	} as Group;
 }
 
-function createMockGroupChat(overrides: Partial<GroupChat> = {}): GroupChat {
-	return {
-		id: 'gc-1',
-		name: 'Test Group Chat',
-		sessionIds: ['session-1'],
-		messages: [],
-		...overrides,
-	} as GroupChat;
-}
-
 /**
  * Creates minimal required props for AppModals.
  * Data props (sessions, groups, groupChats, activeSessionId, modal booleans)
@@ -206,7 +179,6 @@ function createDefaultProps(overrides: Record<string, unknown> = {}) {
 		shortcuts: {} as Record<string, Shortcut>,
 		tabShortcuts: {} as Record<string, Shortcut>,
 		// Info modals
-		onCloseShortcutsHelp: vi.fn(),
 		hasNoAgents: false,
 		keyboardMasteryStats: {
 			totalShortcutsUsed: 0,
@@ -288,7 +260,6 @@ function createDefaultProps(overrides: Record<string, unknown> = {}) {
 		deleteSession: vi.fn(),
 		setSettingsModalOpen: vi.fn(),
 		setSettingsTab: vi.fn(),
-		setShortcutsHelpOpen: vi.fn(),
 		setAboutModalOpen: vi.fn(),
 		setLogViewerOpen: vi.fn(),
 		setProcessMonitorOpen: vi.fn(),
@@ -318,19 +289,6 @@ function createDefaultProps(overrides: Record<string, unknown> = {}) {
 		onCloseGitDiffViewer: vi.fn(),
 		onCloseGitLog: vi.fn(),
 		onGitLogCheckout: vi.fn(),
-		// Group Chat modals
-		showDeleteGroupChatModal: null,
-		showRenameGroupChatModal: null,
-		showEditGroupChatModal: null,
-		onDeleteGroupChat: vi.fn(),
-		onRenameGroupChat: vi.fn(),
-		onCloseNewGroupChatModal: vi.fn(),
-		onCreateGroupChat: vi.fn(),
-		onCloseGroupChatInfo: vi.fn(),
-		onCloseDeleteGroupChatModal: vi.fn(),
-		onCloseRenameGroupChatModal: vi.fn(),
-		onCloseEditGroupChatModal: vi.fn(),
-		onUpdateGroupChat: vi.fn(),
 		// Agent modals
 		agentErrorData: null,
 		onAgentErrorRecover: vi.fn(),
@@ -396,7 +354,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 		capturedGroupProps = {};
 		capturedWorktreeProps = {};
 		capturedUtilityProps = {};
-		capturedGroupChatProps = {};
 		capturedAgentProps = {};
 
 		// Reset stores
@@ -404,10 +361,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 			sessions: [],
 			activeSessionId: '',
 			groups: [],
-		});
-		useGroupChatStore.setState({
-			groupChats: [],
-			activeGroupChatId: null,
 		});
 		useModalStore.setState({ modals: new Map() });
 	});
@@ -470,26 +423,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 		});
 	});
 
-	describe('groupChatStore self-sourcing', () => {
-		it('reads groupChats from groupChatStore', () => {
-			const groupChats = [createMockGroupChat({ id: 'gc-1', name: 'Chat 1' })];
-			useGroupChatStore.setState({ groupChats });
-
-			const { unmount } = render(<AppModals {...createDefaultProps()} />);
-			unmount();
-		});
-
-		it('reads activeGroupChatId from groupChatStore', () => {
-			useGroupChatStore.setState({
-				groupChats: [createMockGroupChat({ id: 'gc-1' })],
-				activeGroupChatId: 'gc-1',
-			});
-
-			const { unmount } = render(<AppModals {...createDefaultProps()} />);
-			unmount();
-		});
-	});
-
 	describe('modalStore self-sourcing', () => {
 		it('reads modal booleans from modalStore instead of props', () => {
 			// Open a modal via the store
@@ -497,14 +430,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 			openModal('about');
 
 			// Render without passing aboutModalOpen as prop — component sources it from store
-			const { unmount } = render(<AppModals {...createDefaultProps()} />);
-			unmount();
-		});
-
-		it('reads shortcutsHelp open state from modalStore', () => {
-			const { openModal } = useModalStore.getState();
-			openModal('shortcutsHelp');
-
 			const { unmount } = render(<AppModals {...createDefaultProps()} />);
 			unmount();
 		});
@@ -525,11 +450,10 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 			unmount();
 		});
 
-		it('reads all 29 modal booleans from modalStore', () => {
-			// Open all 29 modals at once
+		it('reads all 27 modal booleans from modalStore', () => {
+			// Open all modals at once
 			const { openModal } = useModalStore.getState();
 			const modalIds = [
-				'shortcutsHelp',
 				'about',
 				'updateCheck',
 				'processMonitor',
@@ -553,8 +477,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 				'autoRunSetup',
 				'batchRunner',
 				'gitLog',
-				'newGroupChat',
-				'groupChatInfo',
 				'leaderboard',
 				'mergeSession',
 				'sendToAgent',
@@ -613,26 +535,9 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 			unmount();
 		});
 
-		it('does not require groupChats prop', () => {
-			const props = createDefaultProps();
-			expect(props).not.toHaveProperty('groupChats');
-
-			const { unmount } = render(<AppModals {...props} />);
-			unmount();
-		});
-
-		it('does not require activeGroupChatId prop', () => {
-			const props = createDefaultProps();
-			expect(props).not.toHaveProperty('activeGroupChatId');
-
-			const { unmount } = render(<AppModals {...props} />);
-			unmount();
-		});
-
-		it('does not require any of the 29 modal boolean props', () => {
+		it('does not require any of the 27 modal boolean props', () => {
 			const props = createDefaultProps();
 			const removedBooleanProps = [
-				'shortcutsHelpOpen',
 				'aboutModalOpen',
 				'updateCheckModalOpen',
 				'processMonitorOpen',
@@ -656,8 +561,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 				'autoRunSetupModalOpen',
 				'batchRunnerModalOpen',
 				'gitLogOpen',
-				'showNewGroupChatModal',
-				'showGroupChatInfo',
 				'leaderboardRegistrationOpen',
 				'mergeSessionModalOpen',
 				'sendToAgentModalOpen',
@@ -675,14 +578,6 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 			// createGroupModalOpen has no ModalId, so remains as a prop
 			const props = createDefaultProps({ createGroupModalOpen: true });
 			expect(props).toHaveProperty('createGroupModalOpen', true);
-
-			const { unmount } = render(<AppModals {...props} />);
-			unmount();
-		});
-
-		it('still accepts showDeleteGroupChatModal as string|null prop', () => {
-			const props = createDefaultProps({ showDeleteGroupChatModal: 'gc-1' });
-			expect(props).toHaveProperty('showDeleteGroupChatModal', 'gc-1');
 
 			const { unmount } = render(<AppModals {...props} />);
 			unmount();

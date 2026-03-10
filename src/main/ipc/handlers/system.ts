@@ -246,7 +246,11 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 			const message = error instanceof Error ? error.message : String(error);
 			// User or system cancelled the trash operation — not a real error
 			// Fixes MAESTRO-A4
-			if (message.includes('aborted') || message.includes('cancelled') || message.includes('canceled')) {
+			if (
+				message.includes('aborted') ||
+				message.includes('cancelled') ||
+				message.includes('canceled')
+			) {
 				logger.debug(`Trash operation cancelled for ${absolutePath}`, 'Shell');
 				return;
 			}
@@ -386,9 +390,6 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 				case 'toast':
 					logger.toast(message, context, data);
 					break;
-				case 'autorun':
-					logger.autorun(message, context, data);
-					break;
 				default:
 					// Log unknown levels as info to prevent silent failures
 					logger.info(`[${level}] ${message}`, context, data);
@@ -402,14 +403,7 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 		async (_event, filter?: { level?: string; context?: string; limit?: number }) => {
 			const typedFilter = filter
 				? {
-						level: filter.level as
-							| 'debug'
-							| 'info'
-							| 'warn'
-							| 'error'
-							| 'toast'
-							| 'autorun'
-							| undefined,
+						level: filter.level as 'debug' | 'info' | 'warn' | 'error' | 'toast' | undefined,
 						context: filter.context,
 						limit: filter.limit,
 					}
@@ -500,7 +494,7 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 			properties: ['openDirectory', 'createDirectory'],
 			title: 'Select Settings Folder',
 			message:
-				'Choose a folder for Maestro settings. Use a synced folder (iCloud Drive, Dropbox, OneDrive) to share settings across devices.',
+				'Choose a folder for Alfredi settings. Use a synced folder (iCloud Drive, Dropbox, OneDrive) to share settings across devices.',
 		});
 
 		if (result.canceled || result.filePaths.length === 0) {

@@ -117,7 +117,6 @@ import {
 } from '../../../renderer/hooks/input/useInputHandlers';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
-import { useGroupChatStore } from '../../../renderer/stores/groupChatStore';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
 
@@ -230,11 +229,6 @@ beforeEach(() => {
 	useSettingsStore.setState({
 		conductorProfile: 'default',
 		automaticTabNamingEnabled: true,
-	} as any);
-
-	useGroupChatStore.setState({
-		activeGroupChatId: null,
-		setGroupChatStagedImages: vi.fn(),
 	} as any);
 
 	useUIStore.setState({
@@ -997,38 +991,6 @@ describe('useInputHandlers', () => {
 			// No images should be staged
 			expect(result.current.stagedImages).toEqual([]);
 		});
-
-		it('accepts image drops in group chat mode', () => {
-			const mockSetGroupChatStagedImages = vi.fn();
-			useGroupChatStore.setState({
-				activeGroupChatId: 'group-1',
-				setGroupChatStagedImages: mockSetGroupChatStagedImages,
-			} as any);
-
-			const deps = createMockDeps();
-			const { result } = renderHook(() => useInputHandlers(deps));
-
-			// Create a mock file with FileReader support
-			const mockFile = new Blob(['mock-image-data'], { type: 'image/png' });
-			Object.defineProperty(mockFile, 'type', { value: 'image/png' });
-
-			const dropEvent = {
-				preventDefault: vi.fn(),
-				dataTransfer: {
-					files: {
-						length: 1,
-						0: mockFile,
-					} as any,
-				},
-			} as unknown as React.DragEvent;
-
-			act(() => {
-				result.current.handleDrop(dropEvent);
-			});
-
-			// The drop handler creates a FileReader — just verify it doesn't throw
-			expect(dropEvent.preventDefault).toHaveBeenCalled();
-		});
 	});
 
 	// ========================================================================
@@ -1447,65 +1409,6 @@ describe('useInputHandlers', () => {
 				const sessions = useSessionStore.getState().sessions;
 				const tab = sessions[0].aiTabs.find((t: any) => t.id === 'tab-1');
 				expect(tab?.stagedImages).toContain('data:image/png;base64,mockImageData');
-			} finally {
-				global.FileReader = originalFileReader;
-			}
-		});
-
-		it('stages image in group chat store when pasting image during active group chat', () => {
-			const mockSetGroupChatStagedImages = vi.fn().mockImplementation((updater: any) => {
-				if (typeof updater === 'function') {
-					updater([]);
-				}
-			});
-			useGroupChatStore.setState({
-				activeGroupChatId: 'group-1',
-				setGroupChatStagedImages: mockSetGroupChatStagedImages,
-			} as any);
-
-			// Mock FileReader
-			const originalFileReader = global.FileReader;
-			class MockFileReaderLocal {
-				result: string | null = null;
-				onload: ((ev: any) => void) | null = null;
-				readAsDataURL = vi.fn(function (this: MockFileReaderLocal) {
-					this.result = 'data:image/png;base64,groupChatImage';
-					if (this.onload) {
-						this.onload({ target: { result: this.result } });
-					}
-				});
-			}
-			global.FileReader = MockFileReaderLocal as unknown as typeof FileReader;
-
-			try {
-				const { result } = renderHook(() => useInputHandlers(createMockDeps()));
-
-				const mockBlob = new Blob(['image-data'], { type: 'image/png' });
-				const mockItem = {
-					type: 'image/png',
-					getAsFile: vi.fn().mockReturnValue(mockBlob),
-				};
-
-				const pasteEvent = {
-					preventDefault: vi.fn(),
-					clipboardData: {
-						items: {
-							length: 1,
-							0: mockItem,
-							[Symbol.iterator]: function* () {
-								yield mockItem;
-							},
-						},
-						getData: vi.fn().mockReturnValue(''),
-					},
-				} as unknown as React.ClipboardEvent;
-
-				act(() => {
-					result.current.handlePaste(pasteEvent);
-				});
-
-				expect(pasteEvent.preventDefault).toHaveBeenCalled();
-				expect(mockSetGroupChatStagedImages).toHaveBeenCalled();
 			} finally {
 				global.FileReader = originalFileReader;
 			}

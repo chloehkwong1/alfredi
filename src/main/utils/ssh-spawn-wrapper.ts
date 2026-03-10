@@ -3,7 +3,7 @@
  *
  * Provides a reusable function to wrap spawn configurations with SSH remote execution.
  * This extracts the SSH wrapping logic from the process:spawn IPC handler so it can be
- * used by other components like Group Chat that spawn processes directly.
+ * used by other components that spawn processes directly.
  *
  * IMPORTANT: Any feature that spawns agent processes must use this utility to properly
  * support SSH remote execution. Without it, agents will always run locally even when

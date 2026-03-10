@@ -21,36 +21,6 @@ export interface QueryEvent {
 }
 
 /**
- * An Auto Run session - a complete batch processing run of a document
- */
-export interface AutoRunSession {
-	id: string;
-	sessionId: string;
-	agentType: string;
-	documentPath?: string;
-	startTime: number;
-	duration: number;
-	tasksTotal?: number;
-	tasksCompleted?: number;
-	projectPath?: string;
-}
-
-/**
- * A single task within an Auto Run session
- */
-export interface AutoRunTask {
-	id: string;
-	autoRunSessionId: string;
-	sessionId: string;
-	agentType: string;
-	taskIndex: number;
-	taskContent?: string;
-	startTime: number;
-	duration: number;
-	success: boolean;
-}
-
-/**
  * Session lifecycle event - tracks when sessions are created and closed
  */
 export interface SessionLifecycleEvent {

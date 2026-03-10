@@ -1,7 +1,6 @@
 import { app, BrowserWindow, Menu, powerMonitor } from 'electron';
 import { isMacOS } from '../shared/platformDetection';
 import path from 'path';
-import os from 'os';
 import crypto from 'crypto';
 // Sentry is imported dynamically below to avoid module-load-time access to electron.app
 // which causes "Cannot read properties of undefined (reading 'getAppPath')" errors
@@ -22,12 +21,9 @@ import {
 	getWindowStateStore,
 	getClaudeSessionOriginsStore,
 	getAgentSessionOriginsStore,
-	getSshRemoteById,
 } from './stores';
 import {
 	registerGitHandlers,
-	registerAutorunHandlers,
-	registerPlaybooksHandlers,
 	registerHistoryHandlers,
 	registerAgentsHandlers,
 	registerProcessHandlers,
@@ -35,55 +31,25 @@ import {
 	registerSystemHandlers,
 	registerClaudeHandlers,
 	registerAgentSessionsHandlers,
-	registerGroupChatHandlers,
-	registerDebugHandlers,
-	registerSpeckitHandlers,
-	registerOpenSpecHandlers,
 	registerContextHandlers,
-	registerMarketplaceHandlers,
 	registerStatsHandlers,
-	registerDocumentGraphHandlers,
-	registerSshRemoteHandlers,
 	registerFilesystemHandlers,
 	registerAttachmentsHandlers,
 	registerWebHandlers,
-	registerLeaderboardHandlers,
 	registerNotificationsHandlers,
-	registerSymphonyHandlers,
 	registerTabNamingHandlers,
 	registerAgentErrorHandlers,
-	registerDirectorNotesHandlers,
-	registerWakatimeHandlers,
 	setupLoggerEventForwarding,
 	cleanupAllGroomingSessions,
 	getActiveGroomingSessionCount,
 } from './ipc/handlers';
 import { initializeStatsDB, closeStatsDB, getStatsDB } from './stats';
-import { groupChatEmitters } from './ipc/handlers/groupChat';
-import {
-	routeModeratorResponse,
-	routeAgentResponse,
-	setGetSessionsCallback,
-	setGetCustomEnvVarsCallback,
-	setGetAgentConfigCallback,
-	setSshStore,
-	setGetCustomShellPathCallback,
-	markParticipantResponded,
-	spawnModeratorSynthesis,
-	getGroupChatReadOnlyState,
-	respawnParticipantWithRecovery,
-} from './group-chat/group-chat-router';
-import { createSshRemoteStoreAdapter } from './utils/ssh-remote-resolver';
-import { updateParticipant, loadGroupChat, updateGroupChat } from './group-chat/group-chat-storage';
-import { needsSessionRecovery, initiateSessionRecovery } from './group-chat/session-recovery';
 import { initializeSessionStorages } from './storage';
 import { initializeOutputParsers } from './parsers';
 import { calculateContextTokens } from './parsers/usage-aggregator';
 import {
 	DEMO_MODE,
 	DEMO_DATA_PATH,
-	REGEX_MODERATOR_SESSION,
-	REGEX_MODERATOR_SESSION_TIMESTAMP,
 	REGEX_AI_SUFFIX,
 	REGEX_AI_TAB_ID,
 	REGEX_BATCH_SESSION,
@@ -92,14 +58,6 @@ import {
 } from './constants';
 // initAutoUpdater is now used by window-manager.ts (Phase 4 refactoring)
 import { checkWslEnvironment } from './utils/wslDetector';
-// Extracted modules (Phase 1 refactoring)
-import { parseParticipantSessionId } from './group-chat/session-parser';
-import { extractTextFromStreamJson } from './group-chat/output-parser';
-import {
-	appendToGroupChatBuffer,
-	getGroupChatBufferedOutput,
-	clearGroupChatBuffer,
-} from './group-chat/output-buffer';
 // Phase 2 refactoring - dependency injection
 import { createSafeSend, isWebContentsAvailable } from './utils/safe-send';
 import { createWebServerFactory } from './web-server/web-server-factory';
@@ -112,8 +70,6 @@ import {
 } from './app-lifecycle';
 // Phase 3 refactoring - process listeners
 import { setupProcessListeners as setupProcessListenersModule } from './process-listeners';
-import { setupWakaTimeListener } from './process-listeners/wakatime-listener';
-import { WakaTimeManager } from './wakatime-manager';
 
 // ============================================================================
 // Data Directory Configuration (MUST happen before any Store initialization)
@@ -170,21 +126,6 @@ if (!installationId) {
 	store.set('installationId', installationId);
 	logger.info('Generated new installation ID', 'Startup', { installationId });
 }
-
-// Initialize WakaTime heartbeat manager
-const wakatimeManager = new WakaTimeManager(store);
-
-// Auto-install WakaTime CLI on startup if enabled
-if (store.get('wakatimeEnabled', false)) {
-	wakatimeManager.ensureCliInstalled();
-}
-
-// Auto-install WakaTime CLI when user enables the feature
-store.onDidChange('wakatimeEnabled', (newValue) => {
-	if (newValue === true) {
-		wakatimeManager.ensureCliInstalled();
-	}
-});
 
 // Initialize Sentry for crash reporting (dynamic import to avoid module-load-time errors)
 // Only enable in production - skip during development to avoid noise from hot-reload artifacts
@@ -459,31 +400,9 @@ function setupIpcHandlers() {
 		settingsStore: store,
 	});
 
-	// Auto Run operations - extracted to src/main/ipc/handlers/autorun.ts
-	registerAutorunHandlers({
-		mainWindow,
-		getMainWindow: () => mainWindow,
-		app,
-		settingsStore: store,
-	});
-
-	// Playbook operations - extracted to src/main/ipc/handlers/playbooks.ts
-	registerPlaybooksHandlers({
-		mainWindow,
-		getMainWindow: () => mainWindow,
-		app,
-	});
-
 	// History operations - extracted to src/main/ipc/handlers/history.ts
 	// Uses HistoryManager singleton for per-session storage
 	registerHistoryHandlers();
-
-	// Director's Notes - unified history + synopsis generation
-	registerDirectorNotesHandlers({
-		getProcessManager: () => processManager,
-		getAgentDetector: () => agentDetector,
-		agentConfigsStore,
-	});
 
 	// Agent management operations - extracted to src/main/ipc/handlers/agents.ts
 	registerAgentsHandlers({
@@ -536,44 +455,6 @@ function setupIpcHandlers() {
 	initializeSessionStorages({ claudeSessionOriginsStore });
 	registerAgentSessionsHandlers({ getMainWindow: () => mainWindow, agentSessionOriginsStore });
 
-	// Helper to get agent config values (custom args/env vars, model, etc.)
-	const getAgentConfigForAgent = (agentId: string): Record<string, any> => {
-		const allConfigs = agentConfigsStore.get('configs', {});
-		return allConfigs[agentId] || {};
-	};
-
-	// Helper to get custom env vars for an agent
-	const getCustomEnvVarsForAgent = (agentId: string): Record<string, string> | undefined => {
-		return getAgentConfigForAgent(agentId).customEnvVars as Record<string, string> | undefined;
-	};
-
-	// Register Group Chat handlers
-	registerGroupChatHandlers({
-		getMainWindow: () => mainWindow,
-		getProcessManager: () => processManager,
-		getAgentDetector: () => agentDetector,
-		getCustomEnvVars: getCustomEnvVarsForAgent,
-		getAgentConfig: getAgentConfigForAgent,
-	});
-
-	// Register Debug Package handlers
-	registerDebugHandlers({
-		getMainWindow: () => mainWindow,
-		getAgentDetector: () => agentDetector,
-		getProcessManager: () => processManager,
-		getWebServer: () => webServer,
-		settingsStore: store,
-		sessionsStore,
-		groupsStore,
-		bootstrapStore,
-	});
-
-	// Register Spec Kit handlers (no dependencies needed)
-	registerSpeckitHandlers();
-
-	// Register OpenSpec handlers (no dependencies needed)
-	registerOpenSpecHandlers();
-
 	// Register Context Merge handlers for session context transfer and grooming
 	registerContextHandlers({
 		getMainWindow: () => mainWindow,
@@ -582,65 +463,11 @@ function setupIpcHandlers() {
 		agentConfigsStore,
 	});
 
-	// Register Marketplace handlers for fetching and importing playbooks
-	registerMarketplaceHandlers({
-		app,
-		settingsStore: store,
-	});
-
 	// Register Stats handlers for usage tracking
 	registerStatsHandlers({
 		getMainWindow: () => mainWindow,
 		settingsStore: store,
 	});
-
-	// Register Document Graph handlers for file watching
-	registerDocumentGraphHandlers({
-		getMainWindow: () => mainWindow,
-		app,
-	});
-
-	// Register SSH Remote handlers for managing SSH configurations
-	registerSshRemoteHandlers({
-		settingsStore: store,
-	});
-
-	// Set up callback for group chat router to lookup sessions for auto-add @mentions
-	setGetSessionsCallback(() => {
-		const sessions = sessionsStore.get('sessions', []);
-		return sessions.map((s: any) => {
-			// Resolve SSH remote name if session has SSH config
-			let sshRemoteName: string | undefined;
-			if (s.sessionSshRemoteConfig?.enabled && s.sessionSshRemoteConfig.remoteId) {
-				const sshConfig = getSshRemoteById(s.sessionSshRemoteConfig.remoteId);
-				sshRemoteName = sshConfig?.name;
-			}
-			return {
-				id: s.id,
-				name: s.name,
-				toolType: s.toolType,
-				cwd: s.cwd || s.fullPath || os.homedir(),
-				customArgs: s.customArgs,
-				customEnvVars: s.customEnvVars,
-				customModel: s.customModel,
-				sshRemoteName,
-				// Pass full SSH config for remote execution support
-				sshRemoteConfig: s.sessionSshRemoteConfig,
-			};
-		});
-	});
-
-	// Set up callback for group chat router to lookup custom env vars for agents
-	setGetCustomEnvVarsCallback(getCustomEnvVarsForAgent);
-	setGetAgentConfigCallback(getAgentConfigForAgent);
-
-	// Set up SSH store for group chat SSH remote execution support
-	setSshStore(createSshRemoteStoreAdapter(store));
-
-	// Set up callback for group chat to get custom shell path (for Windows PowerShell preference)
-	// This is used by both group-chat-router.ts and group-chat-agent.ts via the shared config module
-	const getCustomShellPathFn = () => store.get('customShellPath', '') as string | undefined;
-	setGetCustomShellPathCallback(getCustomShellPathFn);
 
 	// Setup logger event forwarding to renderer
 	setupLoggerEventForwarding(() => mainWindow);
@@ -662,19 +489,6 @@ function setupIpcHandlers() {
 	// Register attachments handlers (extracted to handlers/attachments.ts)
 	registerAttachmentsHandlers({ app });
 
-	// Register leaderboard handlers (extracted to handlers/leaderboard.ts)
-	registerLeaderboardHandlers({
-		app,
-		settingsStore: store,
-	});
-
-	// Register Symphony handlers for token donation / open source contributions
-	registerSymphonyHandlers({
-		app,
-		getMainWindow: () => mainWindow,
-		sessionsStore,
-	});
-
 	// Register tab naming handlers for automatic tab naming
 	registerTabNamingHandlers({
 		getProcessManager: () => processManager,
@@ -682,9 +496,6 @@ function setupIpcHandlers() {
 		agentConfigsStore,
 		settingsStore: store,
 	});
-
-	// Register WakaTime handlers (CLI check, API key validation)
-	registerWakatimeHandlers(wakatimeManager);
 }
 
 // Handle process output streaming (set up after initialization)
@@ -697,41 +508,12 @@ function setupProcessListeners() {
 			getAgentDetector: () => agentDetector,
 			safeSend,
 			powerManager,
-			groupChatEmitters,
-			groupChatRouter: {
-				routeModeratorResponse,
-				routeAgentResponse,
-				markParticipantResponded,
-				spawnModeratorSynthesis,
-				getGroupChatReadOnlyState,
-				respawnParticipantWithRecovery,
-			},
-			groupChatStorage: {
-				loadGroupChat,
-				updateGroupChat,
-				updateParticipant,
-			},
-			sessionRecovery: {
-				needsSessionRecovery,
-				initiateSessionRecovery,
-			},
-			outputBuffer: {
-				appendToGroupChatBuffer,
-				getGroupChatBufferedOutput,
-				clearGroupChatBuffer,
-			},
-			outputParser: {
-				extractTextFromStreamJson,
-				parseParticipantSessionId,
-			},
 			usageAggregator: {
 				calculateContextTokens,
 			},
 			getStatsDB,
 			debugLog,
 			patterns: {
-				REGEX_MODERATOR_SESSION,
-				REGEX_MODERATOR_SESSION_TIMESTAMP,
 				REGEX_AI_SUFFIX,
 				REGEX_AI_TAB_ID,
 				REGEX_BATCH_SESSION,
@@ -739,8 +521,5 @@ function setupProcessListeners() {
 			},
 			logger,
 		});
-
-		// WakaTime heartbeat listener (query-complete → heartbeat, exit → cleanup)
-		setupWakaTimeListener(processManager, wakatimeManager, store);
 	}
 }

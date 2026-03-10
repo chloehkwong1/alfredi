@@ -2,7 +2,7 @@
  * Context Grooming Utility
  *
  * Shared utility for context summarization/grooming operations.
- * Used by both the context merge handlers and group chat reset functionality.
+ * Used by the context merge handlers.
  *
  * This module provides a consistent way to spawn a batch-mode agent process
  * with a prompt and collect the response. It handles:

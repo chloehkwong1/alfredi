@@ -26,8 +26,7 @@ const FONT_SIZE_DEFAULT = 14;
  * - Tab management (createTab, closeTab, navigateToNextTab, etc.)
  * - Navigation handlers (handleSidebarNavigation, handleTabNavigation, etc.)
  * - Refs (logsEndRef, inputRef, terminalOutputRef)
- * - recordShortcutUsage: Track shortcut usage for keyboard mastery gamification
- * - onKeyboardMasteryLevelUp: Callback when user levels up in keyboard mastery
+ * - recordShortcutUsage: Track shortcut usage for analytics
  */
 
 /** Delay (ms) to allow React re-render before focusing the input element. */
@@ -107,10 +106,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					e.altKey && (e.metaKey || e.ctrlKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
 				// Allow right panel tab shortcuts (Cmd+Shift+F/H/S) even when overlays are open
 				const keyLower = e.key.toLowerCase();
-				const isRightPanelShortcut =
-					(e.metaKey || e.ctrlKey) &&
-					e.shiftKey &&
-					(keyLower === 'f' || keyLower === 'h' || keyLower === 's');
+				const isRightPanelShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && keyLower === 'f';
 				// Allow jumpToBottom (Cmd+Shift+J) from anywhere - always scroll main panel to bottom
 				const isJumpToBottomShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && keyLower === 'j';
 				// Allow markdown toggle (Cmd+E) for chat history, even when overlays are open
@@ -213,13 +209,10 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			// Escape in main area focuses terminal output
 			if (ctx.handleEscapeInMain(e)) return;
 
-			// Helper to track shortcut usage for keyboard mastery gamification
+			// Helper to track shortcut usage for analytics
 			const trackShortcut = (shortcutId: string) => {
 				if (ctx.recordShortcutUsage) {
-					const result = ctx.recordShortcutUsage(shortcutId);
-					if (result.newLevel !== null && ctx.onKeyboardMasteryLevelUp) {
-						ctx.onKeyboardMasteryLevelUp(result.newLevel);
-					}
+					ctx.recordShortcutUsage(shortcutId);
 				}
 			};
 
@@ -237,16 +230,8 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 				ctx.addNewSession();
 				trackShortcut('newInstance');
-			} else if (ctx.isShortcut(e, 'newGroupChat')) {
-				e.preventDefault();
-				ctx.setShowNewGroupChatModal(true);
-				trackShortcut('newGroupChat');
 			} else if (ctx.isShortcut(e, 'killInstance')) {
-				// Delete whichever is currently active: group chat or agent session
-				if (ctx.activeGroupChatId) {
-					ctx.deleteGroupChatWithConfirmation(ctx.activeGroupChatId);
-					trackShortcut('killInstance');
-				} else if (ctx.activeSessionId) {
+				if (ctx.activeSessionId) {
 					ctx.deleteSession(ctx.activeSessionId);
 					trackShortcut('killInstance');
 				}
@@ -296,10 +281,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					ctx.setQuickActionOpen(true);
 					trackShortcut('quickAction');
 				}
-			} else if (ctx.isShortcut(e, 'help')) {
-				e.preventDefault();
-				ctx.setShortcutsHelpOpen(true);
-				trackShortcut('help');
 			} else if (ctx.isShortcut(e, 'settings')) {
 				e.preventDefault();
 				ctx.setSettingsModalOpen(true);
@@ -314,31 +295,9 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			} else if (ctx.isShortcut(e, 'goToFiles')) {
 				e.preventDefault();
 				ctx.setRightPanelOpen(true);
-				// In group chat, Cmd+Shift+F goes to Participants tab (no Files tab in group chat)
-				if (ctx.activeGroupChatId) {
-					ctx.setGroupChatRightTab('participants');
-				} else {
-					ctx.handleSetActiveRightTab('files');
-				}
+				ctx.handleSetActiveRightTab('files');
 				ctx.setActiveFocus('right');
 				trackShortcut('goToFiles');
-			} else if (ctx.isShortcut(e, 'goToHistory')) {
-				e.preventDefault();
-				ctx.setRightPanelOpen(true);
-				// In group chat, Cmd+Shift+H goes to History tab (same concept)
-				if (ctx.activeGroupChatId) {
-					ctx.setGroupChatRightTab('history');
-				} else {
-					ctx.handleSetActiveRightTab('history');
-				}
-				ctx.setActiveFocus('right');
-				trackShortcut('goToHistory');
-			} else if (ctx.isShortcut(e, 'goToAutoRun')) {
-				e.preventDefault();
-				ctx.setRightPanelOpen(true);
-				ctx.handleSetActiveRightTab('autorun');
-				ctx.setActiveFocus('right');
-				trackShortcut('goToAutoRun');
 			} else if (ctx.isShortcut(e, 'fuzzyFileSearch')) {
 				e.preventDefault();
 				if (ctx.activeSession) {
@@ -353,8 +312,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 			} else if (ctx.isShortcut(e, 'openImageCarousel')) {
 				e.preventDefault();
-				// Use group chat staged images when group chat is active
-				const images = ctx.activeGroupChatId ? ctx.groupChatStagedImages : ctx.stagedImages;
+				const images = ctx.stagedImages;
 				if (images && images.length > 0) {
 					ctx.handleSetLightboxImage(images[0], images, 'staged');
 					trackShortcut('openImageCarousel');
@@ -376,17 +334,15 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				trackShortcut('openWizard');
 			} else if (ctx.isShortcut(e, 'focusInput')) {
 				e.preventDefault();
-				// Use group chat input ref when group chat is active
-				const targetInputRef = ctx.activeGroupChatId ? ctx.groupChatInputRef : ctx.inputRef;
 				// Toggle between input and main panel output for keyboard scrolling
-				if (document.activeElement === targetInputRef?.current) {
+				if (document.activeElement === ctx.inputRef?.current) {
 					// Input is focused - blur and focus main panel output
-					targetInputRef?.current?.blur();
+					ctx.inputRef?.current?.blur();
 					ctx.terminalOutputRef.current?.focus();
 				} else {
 					// Main panel output (or elsewhere) - focus input
 					ctx.setActiveFocus('main');
-					setTimeout(() => targetInputRef?.current?.focus(), 0);
+					setTimeout(() => ctx.inputRef?.current?.focus(), 0);
 				}
 				trackShortcut('focusInput');
 			} else if (ctx.isShortcut(e, 'focusSidebar')) {
@@ -399,11 +355,11 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				ctx.setActiveFocus('sidebar');
 				setTimeout(() => ctx.sidebarContainerRef?.current?.focus(), 0);
 				trackShortcut('focusSidebar');
-			} else if (ctx.isShortcut(e, 'viewGitDiff') && !ctx.activeGroupChatId) {
+			} else if (ctx.isShortcut(e, 'viewGitDiff')) {
 				e.preventDefault();
 				ctx.handleViewGitDiff();
 				trackShortcut('viewGitDiff');
-			} else if (ctx.isShortcut(e, 'viewGitLog') && !ctx.activeGroupChatId) {
+			} else if (ctx.isShortcut(e, 'viewGitLog')) {
 				e.preventDefault();
 				if (ctx.activeSession?.isGitRepo) {
 					ctx.setGitLogOpen(true);
@@ -425,22 +381,10 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 				ctx.setProcessMonitorOpen(true);
 				trackShortcut('processMonitor');
-			} else if (ctx.isShortcut(e, 'usageDashboard')) {
-				e.preventDefault();
-				ctx.setUsageDashboardOpen(true);
-				trackShortcut('usageDashboard');
-			} else if (ctx.isShortcut(e, 'openSymphony')) {
-				e.preventDefault();
-				ctx.setSymphonyModalOpen(true);
-				trackShortcut('openSymphony');
 			} else if (ctx.isShortcut(e, 'toggleAutoScroll')) {
 				e.preventDefault();
 				ctx.setAutoScrollAiMode(!ctx.autoScrollAiMode);
 				trackShortcut('toggleAutoScroll');
-			} else if (ctx.isShortcut(e, 'directorNotes') && ctx.encoreFeatures?.directorNotes) {
-				e.preventDefault();
-				ctx.setDirectorNotesOpen?.(true);
-				trackShortcut('directorNotes');
 			} else if (ctx.isShortcut(e, 'jumpToBottom')) {
 				e.preventDefault();
 				// Jump to the bottom of the current main panel output (AI logs or terminal output)
@@ -453,29 +397,14 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				trackShortcut('jumpToBottom');
 			} else if (ctx.isShortcut(e, 'toggleMarkdownMode')) {
 				// Toggle markdown raw mode for AI message history
-				// Skip when in AutoRun panel (it has its own Cmd+E handler for edit/preview toggle)
-				// Skip when Auto Run is running (editing is locked)
 				// Note: FilePreview handles its own Cmd+E with stopPropagation when focused,
 				// so if the event reaches here, the user isn't interacting with a file tab.
-				// Check both state-based detection AND DOM-based detection for robustness
-				const isInAutoRunPanel = ctx.activeFocus === 'right' && ctx.activeRightTab === 'autorun';
-				// Also check if the focused element is within an autorun panel (handles edge cases where activeFocus state may be stale)
-				const activeElement = document.activeElement;
-				const isInAutoRunDOM = activeElement?.closest('[data-tour="autorun-panel"]') !== null;
-				// Check if Auto Run is running and editing is locked (running without worktree)
-				const isAutoRunLocked =
-					ctx.activeBatchRunState?.isRunning && !ctx.activeBatchRunState?.worktreeActive;
-				if (!isInAutoRunPanel && !isInAutoRunDOM && !isAutoRunLocked) {
+				{
 					e.preventDefault();
 					// Toggle chat raw text mode (not file preview edit mode)
 					ctx.setChatRawTextMode(!ctx.chatRawTextMode);
 					trackShortcut('toggleMarkdownMode');
 				}
-			} else if (ctx.isShortcut(e, 'toggleAutoRunExpanded')) {
-				// Toggle Auto Run expanded/contracted view
-				e.preventDefault();
-				ctx.rightPanelRef?.current?.toggleAutoRunExpanded();
-				trackShortcut('toggleAutoRunExpanded');
 			}
 
 			// Opt+Cmd+NUMBER: Jump to visible session by number (1-9, 0=10th)
@@ -525,12 +454,11 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 			}
 
-			// Tab shortcuts (AI mode only, requires an explicitly selected session, disabled in group chat view)
+			// Tab shortcuts (AI mode only, requires an explicitly selected session)
 			if (
 				ctx.activeSessionId &&
 				ctx.activeSession?.inputMode === 'ai' &&
-				ctx.activeSession?.aiTabs &&
-				!ctx.activeGroupChatId
+				ctx.activeSession?.aiTabs
 			) {
 				if (ctx.isTabShortcut(e, 'tabSwitcher')) {
 					e.preventDefault();
@@ -792,9 +720,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				} else if (ctx.activeFocus === 'sidebar') {
 					// Sidebar filter - handled by SessionList component, just track here
 					trackShortcut('filterSessions');
-				} else if (ctx.activeFocus === 'right' && ctx.activeRightTab === 'history') {
-					// History filter - handled by HistoryPanel component, just track here
-					trackShortcut('filterHistory');
 				} else if (ctx.activeFocus === 'main') {
 					// Main panel search - handled by TerminalOutput component, just track here
 					trackShortcut('searchOutput');

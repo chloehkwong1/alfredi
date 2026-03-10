@@ -2,16 +2,15 @@
  * usePromptComposerHandlers — extracted from App.tsx
  *
  * Provides stable callbacks for the Prompt Composer modal:
- *   - Submit/send to AI or group chat
+ *   - Submit/send to AI
  *   - Toggle save-to-history, read-only mode, thinking mode, enter-to-send
  *
- * Reads from: sessionStore, groupChatStore, settingsStore
+ * Reads from: sessionStore, settingsStore
  */
 
 import { useCallback } from 'react';
 import type { ThinkingMode } from '../../types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
-import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { getActiveTab } from '../../utils/tabHelpers';
 
@@ -20,8 +19,6 @@ import { getActiveTab } from '../../utils/tabHelpers';
 // ============================================================================
 
 export interface UsePromptComposerHandlersDeps {
-	/** Send a message to the active group chat */
-	handleSendGroupChatMessage: (message: string, images?: string[], readOnlyMode?: boolean) => void;
 	/** Process input for AI submission */
 	processInput: (value?: string) => void;
 	/** Set the main input value */
@@ -33,15 +30,15 @@ export interface UsePromptComposerHandlersDeps {
 // ============================================================================
 
 export interface UsePromptComposerHandlersReturn {
-	/** Submit content (sets input value or group chat draft) */
+	/** Submit content (sets input value) */
 	handlePromptComposerSubmit: (value: string) => void;
-	/** Send content (triggers AI or group chat send) */
+	/** Send content (triggers AI send) */
 	handlePromptComposerSend: (value: string) => void;
 	/** Toggle save-to-history for the active tab */
 	handlePromptToggleTabSaveToHistory: () => void;
-	/** Toggle read-only mode for active tab or group chat */
+	/** Toggle read-only mode for active tab */
 	handlePromptToggleTabReadOnlyMode: () => void;
-	/** Cycle thinking mode for the active tab (off → on → sticky → off) */
+	/** Cycle thinking mode for the active tab (off -> on -> sticky -> off) */
 	handlePromptToggleTabShowThinking: () => void;
 	/** Toggle enter-to-send setting */
 	handlePromptToggleEnterToSend: () => void;
@@ -54,65 +51,30 @@ export interface UsePromptComposerHandlersReturn {
 export function usePromptComposerHandlers(
 	deps: UsePromptComposerHandlersDeps
 ): UsePromptComposerHandlersReturn {
-	const { handleSendGroupChatMessage, processInput, setInputValue } = deps;
+	const { processInput, setInputValue } = deps;
 
 	// --- Reactive subscriptions ---
 	const activeSession = useSessionStore(selectActiveSession);
-	const activeGroupChatId = useGroupChatStore((s) => s.activeGroupChatId);
-	const groupChatStagedImages = useGroupChatStore((s) => s.groupChatStagedImages);
-	const groupChatReadOnlyMode = useGroupChatStore((s) => s.groupChatReadOnlyMode);
 
 	// --- Store actions (stable via getState) ---
 	const { setSessions } = useSessionStore.getState();
-	const { setGroupChats, setGroupChatStagedImages, setGroupChatReadOnlyMode } =
-		useGroupChatStore.getState();
 
 	// --- Settings ---
 	const enterToSendAI = useSettingsStore((s) => s.enterToSendAI);
 	const { setEnterToSendAI } = useSettingsStore.getState();
 
-	const handlePromptComposerSubmit = useCallback(
-		(value: string) => {
-			if (activeGroupChatId) {
-				// Update group chat draft
-				setGroupChats((prev) =>
-					prev.map((c) => (c.id === activeGroupChatId ? { ...c, draftMessage: value } : c))
-				);
-			} else {
-				setInputValue(value);
-			}
-		},
-		[activeGroupChatId]
-	);
+	const handlePromptComposerSubmit = useCallback((value: string) => {
+		setInputValue(value);
+	}, []);
 
 	const handlePromptComposerSend = useCallback(
 		(value: string) => {
-			if (activeGroupChatId) {
-				// Send to group chat
-				handleSendGroupChatMessage(
-					value,
-					groupChatStagedImages.length > 0 ? groupChatStagedImages : undefined,
-					groupChatReadOnlyMode
-				);
-				setGroupChatStagedImages([]);
-				// Clear draft
-				setGroupChats((prev) =>
-					prev.map((c) => (c.id === activeGroupChatId ? { ...c, draftMessage: '' } : c))
-				);
-			} else {
-				// Set the input value and trigger send
-				setInputValue(value);
-				// Use setTimeout to ensure state updates before processing
-				setTimeout(() => processInput(value), 0);
-			}
+			// Set the input value and trigger send
+			setInputValue(value);
+			// Use setTimeout to ensure state updates before processing
+			setTimeout(() => processInput(value), 0);
 		},
-		[
-			activeGroupChatId,
-			groupChatStagedImages,
-			groupChatReadOnlyMode,
-			handleSendGroupChatMessage,
-			processInput,
-		]
+		[processInput]
 	);
 
 	const handlePromptToggleTabSaveToHistory = useCallback(() => {
@@ -133,25 +95,21 @@ export function usePromptComposerHandlers(
 	}, [activeSession]);
 
 	const handlePromptToggleTabReadOnlyMode = useCallback(() => {
-		if (activeGroupChatId) {
-			setGroupChatReadOnlyMode((prev: boolean) => !prev);
-		} else {
-			if (!activeSession) return;
-			const activeTab = getActiveTab(activeSession);
-			if (!activeTab) return;
-			setSessions((prev) =>
-				prev.map((s) => {
-					if (s.id !== activeSession.id) return s;
-					return {
-						...s,
-						aiTabs: s.aiTabs.map((tab) =>
-							tab.id === activeTab.id ? { ...tab, readOnlyMode: !tab.readOnlyMode } : tab
-						),
-					};
-				})
-			);
-		}
-	}, [activeGroupChatId, activeSession]);
+		if (!activeSession) return;
+		const activeTab = getActiveTab(activeSession);
+		if (!activeTab) return;
+		setSessions((prev) =>
+			prev.map((s) => {
+				if (s.id !== activeSession.id) return s;
+				return {
+					...s,
+					aiTabs: s.aiTabs.map((tab) =>
+						tab.id === activeTab.id ? { ...tab, readOnlyMode: !tab.readOnlyMode } : tab
+					),
+				};
+			})
+		);
+	}, [activeSession]);
 
 	const handlePromptToggleTabShowThinking = useCallback(() => {
 		if (!activeSession) return;

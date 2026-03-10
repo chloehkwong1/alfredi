@@ -66,7 +66,6 @@ export interface UseRightPanelPropsDeps {
 
 	// Batch processing (currentSessionBatchState is computed by useBatchHandlers, not a raw store field)
 	currentSessionBatchState: BatchRunState | undefined;
-	handleOpenBatchRunner: () => void;
 	handleStopBatchRun: (sessionId?: string) => void;
 	handleKillBatchRun: (sessionId: string) => void;
 	handleSkipCurrentDocument: () => void;
@@ -77,7 +76,6 @@ export interface UseRightPanelPropsDeps {
 
 	// Modal handlers
 	handleOpenAboutModal: () => void;
-	handleOpenMarketplace: () => void;
 	handleLaunchWizardTab: () => void;
 
 	// File linking
@@ -126,7 +124,6 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 
 			// Batch processing
 			currentSessionBatchState: deps.currentSessionBatchState,
-			onOpenBatchRunner: deps.handleOpenBatchRunner,
 			onStopBatchRun: deps.handleStopBatchRun,
 			onKillBatchRun: deps.handleKillBatchRun,
 			onSkipCurrentDocument: deps.handleSkipCurrentDocument,
@@ -138,7 +135,6 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 
 			// Modal handlers
 			onOpenAboutModal: deps.handleOpenAboutModal,
-			onOpenMarketplace: deps.handleOpenMarketplace,
 			onLaunchWizard: deps.handleLaunchWizardTab,
 
 			// File linking
@@ -168,7 +164,6 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			deps.handleAutoRunCreateDocument,
 			deps.handleAutoRunRefresh,
 			deps.handleAutoRunOpenSetup,
-			deps.handleOpenBatchRunner,
 			deps.handleStopBatchRun,
 			deps.handleKillBatchRun,
 			deps.handleSkipCurrentDocument,
@@ -177,7 +172,6 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			deps.handleJumpToAgentSession,
 			deps.handleResumeSession,
 			deps.handleOpenAboutModal,
-			deps.handleOpenMarketplace,
 			deps.handleLaunchWizardTab,
 			deps.handleMainPanelFileClick,
 			deps.handleFocusFileInGraph,

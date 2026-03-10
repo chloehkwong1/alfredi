@@ -26,7 +26,12 @@
 
 import { create } from 'zustand';
 import type { AITab, FilePreviewTab, UnifiedTab, Session } from '../types';
-import type { GistInfo } from '../components/GistPublishModal';
+/** Gist metadata for a published file */
+export interface GistInfo {
+	gistUrl: string;
+	isPublic: boolean;
+	publishedAt: number;
+}
 import {
 	createTab as createTabHelper,
 	closeTab as closeTabHelper,

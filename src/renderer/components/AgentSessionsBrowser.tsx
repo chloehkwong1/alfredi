@@ -27,7 +27,6 @@ import {
 import type { Theme, Session, LogEntry, UsageStats } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { SessionActivityGraph, type ActivityEntry } from './SessionActivityGraph';
 import { SessionListItem } from './SessionListItem';
 import { ToolCallCard, getToolName } from './ToolCallCard';
 import { formatSize, formatNumber, formatTokens, formatRelativeTime } from '../utils/formatters';
@@ -146,10 +145,6 @@ export function AgentSessionsBrowser({
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
 	const [renameValue, setRenameValue] = useState('');
-
-	// Activity graph vs search toggle state - default to search since graph needs data to load first
-	const [showSearchPanel, setShowSearchPanel] = useState(true);
-	const [graphLookbackHours, setGraphLookbackHours] = useState<number | null>(null); // null = all time (default)
 
 	// Aggregate stats for ALL sessions (calculated progressively)
 	const [aggregateStats, setAggregateStats] = useState<{
@@ -634,77 +629,6 @@ export function AgentSessionsBrowser({
 		},
 		[starredSessions, onResumeSession, onClose, buildUsageStats]
 	);
-
-	// Activity entries for the graph - cached in state to prevent re-renders during pagination
-	// Only updates when: switching TO graph view, or filters change while graph is visible
-	const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
-	const prevFiltersRef = useRef({ namedOnly, showAllSessions, showSearchPanel });
-
-	useEffect(() => {
-		const filtersChanged =
-			prevFiltersRef.current.namedOnly !== namedOnly ||
-			prevFiltersRef.current.showAllSessions !== showAllSessions;
-		const switchingToGraph = prevFiltersRef.current.showSearchPanel && !showSearchPanel;
-
-		prevFiltersRef.current = { namedOnly, showAllSessions, showSearchPanel };
-
-		// Update graph entries when:
-		// 1. Switching TO graph view (from search panel)
-		// 2. Filters change while graph is visible
-		// 3. Initial load when graph is visible and we have data
-		const shouldUpdate =
-			(switchingToGraph && filteredSessions.length > 0) ||
-			(filtersChanged && !showSearchPanel && filteredSessions.length > 0) ||
-			(!showSearchPanel && activityEntries.length === 0 && filteredSessions.length > 0);
-
-		if (shouldUpdate) {
-			setActivityEntries(filteredSessions.map((s) => ({ timestamp: s.modifiedAt })));
-		}
-	}, [showSearchPanel, namedOnly, showAllSessions, filteredSessions, activityEntries.length]);
-
-	// Handle activity graph bar click - scroll to first session in that time range
-	const handleGraphBarClick = useCallback(
-		(bucketStart: number, bucketEnd: number) => {
-			// Find the first session in this time bucket (sessions are sorted by modifiedAt desc)
-			const sessionInBucket = filteredSessions.find((s) => {
-				const timestamp = new Date(s.modifiedAt).getTime();
-				return timestamp >= bucketStart && timestamp < bucketEnd;
-			});
-
-			if (sessionInBucket) {
-				// Find its index and scroll to it
-				const index = filteredSessions.findIndex((s) => s.sessionId === sessionInBucket.sessionId);
-				if (index !== -1) {
-					setSelectedIndex(index);
-					// Scroll the item into view after state update
-					setTimeout(() => {
-						selectedItemRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-					}, 50);
-				}
-			}
-		},
-		[filteredSessions]
-	);
-
-	// Handle Cmd+F to open search panel
-	const handleGlobalKeyDown = useCallback(
-		(e: KeyboardEvent) => {
-			// Only handle when not viewing a session and search panel is not already open
-			if (!viewingSession && !showSearchPanel && (e.metaKey || e.ctrlKey) && e.key === 'f') {
-				e.preventDefault();
-				setShowSearchPanel(true);
-				// Focus the search input after state update
-				setTimeout(() => inputRef.current?.focus(), 50);
-			}
-		},
-		[viewingSession, showSearchPanel]
-	);
-
-	// Add global keyboard listener for Cmd+F
-	useEffect(() => {
-		document.addEventListener('keydown', handleGlobalKeyDown);
-		return () => document.removeEventListener('keydown', handleGlobalKeyDown);
-	}, [handleGlobalKeyDown]);
 
 	return (
 		<div className="flex-1 flex flex-col h-full" style={{ backgroundColor: theme.colors.bgMain }}>
@@ -1255,88 +1179,50 @@ export function AgentSessionsBrowser({
 						</div>
 					)}
 
-					{/* Search bar / Activity Graph toggle area */}
+					{/* Search bar area */}
 					<div className="px-4 py-3 border-b" style={{ borderColor: theme.colors.border }}>
 						<div
 							className="flex items-center gap-3 px-4 py-2.5 rounded-lg"
 							style={{ backgroundColor: theme.colors.bgActivity }}
 						>
-							{/* Toggle button: Search icon when showing graph, BarChart icon when showing search */}
-							<button
-								onClick={() => {
-									setShowSearchPanel(!showSearchPanel);
-									if (!showSearchPanel) {
-										// Switching to search - focus input after state update
-										setTimeout(() => inputRef.current?.focus(), 50);
-									} else {
-										// Switching to graph - clear search
-										handleSearchChange('');
-									}
-								}}
-								className="p-1.5 rounded hover:bg-white/10 transition-colors shrink-0"
-								style={{ color: theme.colors.textDim }}
-								title={
-									showSearchPanel
-										? 'Show activity graph'
-										: `Search sessions (${formatShortcutKeys(['Meta', 'f'])})`
-								}
-							>
-								{showSearchPanel ? (
-									<BarChart3 className="w-4 h-4" />
-								) : (
-									<Search className="w-4 h-4" />
-								)}
-							</button>
+							<Search className="w-4 h-4 shrink-0" style={{ color: theme.colors.textDim }} />
 
-							{/* Conditional: Search input OR Activity Graph - fixed height container to prevent layout shift */}
+							{/* Search input */}
 							<div className="flex-1 min-w-0 flex items-center" style={{ height: '38px' }}>
-								{showSearchPanel ? (
-									/* Search input */
-									<div className="flex-1 flex items-center gap-2">
-										<input
-											ref={inputRef}
-											className="flex-1 bg-transparent outline-none text-sm"
-											placeholder={`Search ${searchMode === 'title' ? 'titles' : searchMode === 'user' ? 'your messages' : searchMode === 'assistant' ? 'AI responses' : 'all content'}...`}
-											style={{ color: theme.colors.textMain }}
-											value={search}
-											onChange={(e) => handleSearchChange(e.target.value)}
-											onKeyDown={(e) => {
-												if (e.key === 'Escape') {
-													e.preventDefault();
-													e.stopPropagation();
-													setShowSearchPanel(false);
-													handleSearchChange('');
-												} else {
-													handleKeyDown(e);
-												}
-											}}
-										/>
-										{isSearching && (
-											<Loader2
-												className="w-4 h-4 animate-spin"
-												style={{ color: theme.colors.textDim }}
-											/>
-										)}
-										{search && !isSearching && (
-											<button
-												onClick={() => handleSearchChange('')}
-												className="p-0.5 rounded hover:bg-white/10"
-												style={{ color: theme.colors.textDim }}
-											>
-												<X className="w-3 h-3" />
-											</button>
-										)}
-									</div>
-								) : (
-									/* Activity Graph */
-									<SessionActivityGraph
-										entries={activityEntries}
-										theme={theme}
-										onBarClick={handleGraphBarClick}
-										lookbackHours={graphLookbackHours}
-										onLookbackChange={setGraphLookbackHours}
+								<div className="flex-1 flex items-center gap-2">
+									<input
+										ref={inputRef}
+										className="flex-1 bg-transparent outline-none text-sm"
+										placeholder={`Search ${searchMode === 'title' ? 'titles' : searchMode === 'user' ? 'your messages' : searchMode === 'assistant' ? 'AI responses' : 'all content'}...`}
+										style={{ color: theme.colors.textMain }}
+										value={search}
+										onChange={(e) => handleSearchChange(e.target.value)}
+										onKeyDown={(e) => {
+											if (e.key === 'Escape') {
+												e.preventDefault();
+												e.stopPropagation();
+												handleSearchChange('');
+											} else {
+												handleKeyDown(e);
+											}
+										}}
 									/>
-								)}
+									{isSearching && (
+										<Loader2
+											className="w-4 h-4 animate-spin"
+											style={{ color: theme.colors.textDim }}
+										/>
+									)}
+									{search && !isSearching && (
+										<button
+											onClick={() => handleSearchChange('')}
+											className="p-0.5 rounded hover:bg-white/10"
+											style={{ color: theme.colors.textDim }}
+										>
+											<X className="w-3 h-3" />
+										</button>
+									)}
+								</div>
 							</div>
 
 							{/* Filter controls - always visible */}
