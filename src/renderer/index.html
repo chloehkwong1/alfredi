@@ -7,7 +7,7 @@
 			content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https: wss: ws:; worker-src 'self' blob:; media-src 'self' blob:;"
 		/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Maestro - Agent Orchestration Command Center</title>
+		<title>Alfredi - AI Agent Command Center</title>
 
 		<!-- Preload fonts to prevent FOUT (Flash of Unstyled Text) -->
 		<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
@@ -79,12 +79,15 @@
 				border-radius: 24px;
 				box-shadow: 0 25px 50px -12px rgba(139, 92, 246, 0.4);
 				overflow: hidden;
+				background-color: #1a1a2e;
 			}
 
 			.splash-logo img {
 				width: 100%;
 				height: 100%;
 				object-fit: cover;
+				display: block;
+				transform: scale(1.1);
 			}
 
 			.splash-title {
@@ -117,6 +120,10 @@
 				width: 0%;
 			}
 
+			.splash-title-accent {
+				color: #a78bfa;
+			}
+
 			.splash-text {
 				font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 				font-size: 14px;
@@ -131,11 +138,11 @@
 			<div class="splash-container">
 				<!-- Logo container with app icon -->
 				<div class="splash-logo">
-					<img src="/icon.png" alt="Maestro" />
+					<img src="/icon.png" alt="Alfredi" />
 				</div>
 
-				<!-- Maestro title -->
-				<h1 class="splash-title">MAESTRO</h1>
+				<!-- Alfredi title with Al/AI styling -->
+				<h1 class="splash-title"><span class="splash-title-accent">Al</span>fredi</h1>
 
 				<!-- Progress bar -->
 				<div class="splash-progress-container">
