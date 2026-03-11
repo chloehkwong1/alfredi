@@ -5,7 +5,7 @@
  * - AllSessionsViewProps interface
  * - AllSessionsView component (main export)
  * - MobileSessionCard internal component
- * - GroupSection internal component
+ * - ProjectSection internal component
  * - Helper functions (getStatus, getStatusLabel, getToolTypeLabel, truncatePath)
  * - Session filtering and grouping logic
  * - Keyboard navigation (Escape to close)
@@ -72,9 +72,9 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		cwd: '/Users/test/project',
 		projectRoot: '/Users/test/project',
 		bookmarked: false,
-		groupId: null,
-		groupName: null,
-		groupEmoji: null,
+		projectId: null,
+		projectName: null,
+		projectEmoji: null,
 		...overrides,
 	} as Session;
 }
@@ -267,7 +267,7 @@ describe('AllSessionsView', () => {
 			});
 
 			it('shows "Terminal" badge for terminal mode', () => {
-				const sessions = [createMockSession({ inputMode: 'terminal' })];
+				const sessions = [createMockSession({ inputMode: 'ai' })];
 				render(<AllSessionsView {...createDefaultProps({ sessions })} />);
 
 				expect(screen.getByText('Terminal')).toBeInTheDocument();
@@ -318,7 +318,7 @@ describe('AllSessionsView', () => {
 						id: 'session-1',
 						name: 'Test Session',
 						state: 'busy',
-						inputMode: 'terminal',
+						inputMode: 'ai',
 					}),
 				];
 
@@ -334,28 +334,28 @@ describe('AllSessionsView', () => {
 		});
 	});
 
-	describe('GroupSection', () => {
+	describe('ProjectSection', () => {
 		const createGroupedSessions = () => [
 			createMockSession({
 				id: 's1',
 				name: 'Session 1',
-				groupId: 'group-1',
-				groupName: 'Dev Group',
-				groupEmoji: '🔧',
+				projectId: 'group-1',
+				projectName: 'Dev Group',
+				projectEmoji: '🔧',
 			}),
 			createMockSession({
 				id: 's2',
 				name: 'Session 2',
-				groupId: 'group-1',
-				groupName: 'Dev Group',
-				groupEmoji: '🔧',
+				projectId: 'group-1',
+				projectName: 'Dev Group',
+				projectEmoji: '🔧',
 			}),
 			createMockSession({
 				id: 's3',
 				name: 'Session 3',
-				groupId: 'group-2',
-				groupName: 'Test Group',
-				groupEmoji: '🧪',
+				projectId: 'group-2',
+				projectName: 'Test Group',
+				projectEmoji: '🧪',
 			}),
 		];
 
@@ -387,13 +387,13 @@ describe('AllSessionsView', () => {
 			await waitFor(() => {
 				// Dev Group has 2 sessions
 				const devGroupHeader = screen.getByRole('button', {
-					name: /Dev Group group with 2 sessions/i,
+					name: /Dev Group project with 2 sessions/i,
 				});
 				expect(devGroupHeader).toBeInTheDocument();
 
 				// Test Group has 1 session
 				const testGroupHeader = screen.getByRole('button', {
-					name: /Test Group group with 1 sessions/i,
+					name: /Test Group project with 1 sessions/i,
 				});
 				expect(testGroupHeader).toBeInTheDocument();
 			});
@@ -408,7 +408,7 @@ describe('AllSessionsView', () => {
 			});
 
 			// Groups start collapsed by default (except bookmarks)
-			const devGroupHeader = screen.getByRole('button', { name: /Dev Group group/i });
+			const devGroupHeader = screen.getByRole('button', { name: /Dev Group project/i });
 			expect(devGroupHeader).toHaveAttribute('aria-expanded', 'false');
 
 			// Click to expand
@@ -431,7 +431,7 @@ describe('AllSessionsView', () => {
 			});
 
 			// Click to expand Dev Group
-			const devGroupHeader = screen.getByRole('button', { name: /Dev Group group/i });
+			const devGroupHeader = screen.getByRole('button', { name: /Dev Group project/i });
 			fireEvent.click(devGroupHeader);
 
 			// Sessions should now be visible
@@ -470,7 +470,7 @@ describe('AllSessionsView', () => {
 
 		it('renders ungrouped section when mixed with grouped sessions', async () => {
 			const sessions = [
-				createMockSession({ id: 's1', name: 'Grouped', groupId: 'g1', groupName: 'My Group' }),
+				createMockSession({ id: 's1', name: 'Grouped', projectId: 'g1', projectName: 'My Group' }),
 				createMockSession({ id: 's2', name: 'Not Grouped' }),
 			];
 
@@ -507,14 +507,19 @@ describe('AllSessionsView', () => {
 			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
 
 			await waitFor(() => {
-				const bookmarksHeader = screen.getByRole('button', { name: /Bookmarks group/i });
+				const bookmarksHeader = screen.getByRole('button', { name: /Bookmarks project/i });
 				expect(bookmarksHeader).toHaveAttribute('aria-expanded', 'true');
 			});
 		});
 
 		it('places bookmarks group first in the order', async () => {
 			const sessions = [
-				createMockSession({ id: 's1', name: 'Regular', groupId: 'a-group', groupName: 'A Group' }),
+				createMockSession({
+					id: 's1',
+					name: 'Regular',
+					projectId: 'a-group',
+					projectName: 'A Group',
+				}),
 				createMockSession({ id: 's2', name: 'Bookmarked', bookmarked: true }),
 			];
 
@@ -720,9 +725,9 @@ describe('AllSessionsView', () => {
 	describe('group sorting', () => {
 		it('sorts groups alphabetically', async () => {
 			const sessions = [
-				createMockSession({ id: 's1', name: 'S1', groupId: 'zebra', groupName: 'Zebra Group' }),
-				createMockSession({ id: 's2', name: 'S2', groupId: 'alpha', groupName: 'Alpha Group' }),
-				createMockSession({ id: 's3', name: 'S3', groupId: 'beta', groupName: 'Beta Group' }),
+				createMockSession({ id: 's1', name: 'S1', projectId: 'zebra', projectName: 'Zebra Group' }),
+				createMockSession({ id: 's2', name: 'S2', projectId: 'alpha', projectName: 'Alpha Group' }),
+				createMockSession({ id: 's3', name: 'S3', projectId: 'beta', projectName: 'Beta Group' }),
 			];
 
 			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
@@ -740,8 +745,13 @@ describe('AllSessionsView', () => {
 
 		it('puts ungrouped sessions last', async () => {
 			const sessions = [
-				createMockSession({ id: 's1', name: 'Ungrouped', groupId: null }),
-				createMockSession({ id: 's2', name: 'Grouped', groupId: 'z-group', groupName: 'Z Group' }),
+				createMockSession({ id: 's1', name: 'Ungrouped', projectId: null }),
+				createMockSession({
+					id: 's2',
+					name: 'Grouped',
+					projectId: 'z-group',
+					projectName: 'Z Group',
+				}),
 			];
 
 			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
@@ -796,7 +806,7 @@ describe('AllSessionsView', () => {
 
 		it('handles rapid toggle of groups', async () => {
 			const sessions = [
-				createMockSession({ id: 's1', name: 'Session', groupId: 'g1', groupName: 'Group' }),
+				createMockSession({ id: 's1', name: 'Session', projectId: 'g1', projectName: 'Group' }),
 				createMockSession({ id: 's2', name: 'Session 2' }),
 			];
 
@@ -806,7 +816,7 @@ describe('AllSessionsView', () => {
 				expect(screen.getByText('Group')).toBeInTheDocument();
 			});
 
-			const groupHeader = screen.getByRole('button', { name: /Group group/i });
+			const groupHeader = screen.getByRole('button', { name: /Group project/i });
 
 			// Rapid toggles
 			for (let i = 0; i < 10; i++) {
@@ -823,8 +833,8 @@ describe('AllSessionsView', () => {
 					id: 's1',
 					name: 'Bookmarked Grouped',
 					bookmarked: true,
-					groupId: 'g1',
-					groupName: 'My Group',
+					projectId: 'g1',
+					projectName: 'My Group',
 				}),
 			];
 
@@ -872,12 +882,14 @@ describe('AllSessionsView', () => {
 		});
 
 		it('group headers have aria-expanded state', async () => {
-			const sessions = [createMockSession({ id: 's1', groupId: 'g1', groupName: 'Test Group' })];
+			const sessions = [
+				createMockSession({ id: 's1', projectId: 'g1', projectName: 'Test Group' }),
+			];
 
 			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
 
 			await waitFor(() => {
-				const groupHeader = screen.getByRole('button', { name: /Test Group group/i });
+				const groupHeader = screen.getByRole('button', { name: /Test Group project/i });
 				expect(groupHeader).toHaveAttribute('aria-expanded');
 			});
 		});
@@ -932,8 +944,8 @@ describe('AllSessionsView', () => {
 			const onSelectSession = vi.fn();
 			const onClose = vi.fn();
 			const sessions = [
-				createMockSession({ id: 's1', name: 'Frontend', groupId: 'dev', groupName: 'Dev' }),
-				createMockSession({ id: 's2', name: 'Backend', groupId: 'dev', groupName: 'Dev' }),
+				createMockSession({ id: 's1', name: 'Frontend', projectId: 'dev', projectName: 'Dev' }),
+				createMockSession({ id: 's2', name: 'Backend', projectId: 'dev', projectName: 'Dev' }),
 				createMockSession({ id: 's3', name: 'Database' }),
 			];
 

@@ -74,7 +74,7 @@ describe('viewState', () => {
 				showTabSearch: false,
 				activeSessionId: 'session-1',
 				activeTabId: 'tab-1',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				historyFilter: 'AUTO',
 				historySearchOpen: true,
 				historySearchQuery: 'test query',
@@ -88,7 +88,7 @@ describe('viewState', () => {
 			expect(state.showHistoryPanel).toBe(true);
 			expect(state.activeSessionId).toBe('session-1');
 			expect(state.activeTabId).toBe('tab-1');
-			expect(state.inputMode).toBe('terminal');
+			expect(state.inputMode).toBe('ai');
 			expect(state.historyFilter).toBe('AUTO');
 			expect(state.historySearchOpen).toBe(true);
 			expect(state.historySearchQuery).toBe('test query');
@@ -102,7 +102,7 @@ describe('viewState', () => {
 				showTabSearch: true,
 				activeSessionId: 'old-session',
 				activeTabId: 'old-tab',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				historyFilter: 'USER',
 				historySearchOpen: true,
 				historySearchQuery: 'old query',
@@ -240,7 +240,7 @@ describe('viewState', () => {
 				showTabSearch: true,
 				activeSessionId: 'test-session',
 				activeTabId: 'test-tab',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				historyFilter: 'USER',
 				historySearchOpen: true,
 				historySearchQuery: 'search text',
@@ -252,7 +252,7 @@ describe('viewState', () => {
 			expect(savedData.showTabSearch).toBe(true);
 			expect(savedData.activeSessionId).toBe('test-session');
 			expect(savedData.activeTabId).toBe('test-tab');
-			expect(savedData.inputMode).toBe('terminal');
+			expect(savedData.inputMode).toBe('ai');
 			expect(savedData.historyFilter).toBe('USER');
 			expect(savedData.historySearchOpen).toBe(true);
 			expect(savedData.historySearchQuery).toBe('search text');
@@ -557,9 +557,9 @@ describe('viewState', () => {
 			let savedData = JSON.parse(localStorageMock['maestro-web-view-state']);
 			expect(savedData.inputMode).toBe('ai');
 
-			saveViewState({ inputMode: 'terminal' });
+			saveViewState({ inputMode: 'ai' });
 			savedData = JSON.parse(localStorageMock['maestro-web-view-state']);
-			expect(savedData.inputMode).toBe('terminal');
+			expect(savedData.inputMode).toBe('ai');
 		});
 	});
 });

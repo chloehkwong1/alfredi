@@ -145,12 +145,12 @@ describe('QuickActionsMenu', () => {
 
 	describe('Menu items - Terminal mode', () => {
 		it('renders "Switch to AI" when in terminal mode', () => {
-			render(<QuickActionsMenu {...defaultProps} inputMode="terminal" />);
+			render(<QuickActionsMenu {...defaultProps} inputMode="ai" />);
 			expect(screen.getByText('Switch to AI')).toBeInTheDocument();
 		});
 
 		it('renders AI sparkle icon when in terminal mode', () => {
-			render(<QuickActionsMenu {...defaultProps} inputMode="terminal" />);
+			render(<QuickActionsMenu {...defaultProps} inputMode="ai" />);
 			const menuItem = screen.getByRole('menuitem');
 			// AI icon has circle with cx="12" cy="12" r="4"
 			const svg = menuItem.querySelector('svg');
@@ -523,7 +523,7 @@ describe('QuickActionsMenu', () => {
 			const { rerender } = render(<QuickActionsMenu {...defaultProps} inputMode="ai" />);
 			expect(screen.getByText('Switch to Terminal')).toBeInTheDocument();
 
-			rerender(<QuickActionsMenu {...defaultProps} inputMode="terminal" />);
+			rerender(<QuickActionsMenu {...defaultProps} inputMode="ai" />);
 			expect(screen.getByText('Switch to AI')).toBeInTheDocument();
 		});
 

@@ -203,7 +203,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('renders input for terminal mode', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			const input = screen.getByRole('textbox');
 			expect(input.tagName.toLowerCase()).toBe('input');
 		});
@@ -227,7 +227,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('renders send button when session is busy in terminal mode (not interrupt)', () => {
-			renderComponent({ inputMode: 'terminal', isSessionBusy: true, value: 'test' });
+			renderComponent({ inputMode: 'ai', isSessionBusy: true, value: 'test' });
 			const sendButton = screen.getByRole('button', { name: /send/i });
 			expect(sendButton).toBeInTheDocument();
 		});
@@ -250,7 +250,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('shows shortened cwd in terminal mode', () => {
-			renderComponent({ inputMode: 'terminal', cwd: '/Users/testuser/projects/myapp' });
+			renderComponent({ inputMode: 'ai', cwd: '/Users/testuser/projects/myapp' });
 			expect(screen.getByPlaceholderText('~/projects/myapp')).toBeInTheDocument();
 		});
 
@@ -287,7 +287,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('does NOT disable input when terminal session is busy', () => {
-			renderComponent({ inputMode: 'terminal', isSessionBusy: true });
+			renderComponent({ inputMode: 'ai', isSessionBusy: true });
 			expect(screen.getByRole('textbox')).not.toBeDisabled();
 		});
 	});
@@ -400,7 +400,7 @@ describe('CommandInputBar', () => {
 
 		it('Enter submits in terminal mode', () => {
 			const onSubmit = vi.fn();
-			renderComponent({ inputMode: 'terminal', value: 'test', onSubmit });
+			renderComponent({ inputMode: 'ai', value: 'test', onSubmit });
 
 			const input = screen.getByRole('textbox');
 			fireEvent.keyDown(input, { key: 'Enter' });
@@ -414,7 +414,7 @@ describe('CommandInputBar', () => {
 			// This is intentional because <input type="text"> is single-line and doesn't
 			// support multi-line input anyway.
 			const onSubmit = vi.fn();
-			renderComponent({ inputMode: 'terminal', value: 'test', onSubmit });
+			renderComponent({ inputMode: 'ai', value: 'test', onSubmit });
 
 			const input = screen.getByRole('textbox');
 			fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
@@ -436,7 +436,7 @@ describe('CommandInputBar', () => {
 
 		it('switches from terminal to AI mode', () => {
 			const onModeToggle = vi.fn();
-			renderComponent({ inputMode: 'terminal', onModeToggle });
+			renderComponent({ inputMode: 'ai', onModeToggle });
 
 			const toggleButton = screen.getByRole('button', { name: /switch to AI/i });
 			fireEvent.click(toggleButton);
@@ -473,7 +473,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('mode toggle button shows CLI label when in terminal mode', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			const toggleButton = screen.getByRole('button', { name: /currently in terminal mode/i });
 			expect(toggleButton).toHaveTextContent('CLI');
 		});
@@ -582,7 +582,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('does not show slash command button in terminal mode', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			expect(
 				screen.queryByRole('button', { name: /open slash commands/i })
 			).not.toBeInTheDocument();
@@ -777,12 +777,12 @@ describe('CommandInputBar', () => {
 
 	describe('Terminal Mode UI', () => {
 		it('shows $ prompt in terminal mode', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			expect(screen.getByText('$')).toBeInTheDocument();
 		});
 
 		it('uses monospace font for terminal input', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			const input = screen.getByRole('textbox');
 			// The inline style uses 'ui-monospace, monospace'
 			expect(input.style.fontFamily).toContain('monospace');
@@ -803,7 +803,7 @@ describe('CommandInputBar', () => {
 		it('calls onInputBlur when input loses focus (terminal mode)', () => {
 			// Test in terminal mode where onInputBlur is guaranteed to be called directly
 			const onInputBlur = vi.fn();
-			renderComponent({ inputMode: 'terminal', onInputBlur });
+			renderComponent({ inputMode: 'ai', onInputBlur });
 
 			const input = screen.getByRole('textbox');
 			fireEvent.focus(input);
@@ -822,7 +822,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('adds focus ring on focus in terminal mode', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			const input = screen.getByRole('textbox');
 
 			fireEvent.focus(input);
@@ -881,7 +881,7 @@ describe('CommandInputBar', () => {
 		});
 
 		it('has aria-label on terminal input', () => {
-			renderComponent({ inputMode: 'terminal' });
+			renderComponent({ inputMode: 'ai' });
 			expect(screen.getByLabelText(/Shell command input/i)).toBeInTheDocument();
 		});
 
@@ -1346,10 +1346,8 @@ describe('InputMode Type', () => {
 	it('exports InputMode type', async () => {
 		// TypeScript compile-time check - if this compiles, the type is exported
 		const mode1: InputMode = 'ai';
-		const mode2: InputMode = 'terminal';
 
 		expect(mode1).toBe('ai');
-		expect(mode2).toBe('terminal');
 	});
 });
 
@@ -1423,7 +1421,7 @@ describe('Edge Cases', () => {
 	});
 
 	it('handles cwd with special characters', () => {
-		renderComponent({ inputMode: 'terminal', cwd: '/Users/test user/my project (2)' });
+		renderComponent({ inputMode: 'ai', cwd: '/Users/test user/my project (2)' });
 		expect(screen.getByPlaceholderText('~/my project (2)')).toBeInTheDocument();
 	});
 

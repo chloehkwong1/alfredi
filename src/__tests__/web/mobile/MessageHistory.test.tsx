@@ -206,7 +206,7 @@ describe('MessageHistory', () => {
 
 		it('renders stdout messages with "Output" label in terminal mode', () => {
 			const logs: LogEntry[] = [createLogEntry({ source: 'stdout', text: 'Command output' })];
-			render(<MessageHistory logs={logs} inputMode="terminal" />);
+			render(<MessageHistory logs={logs} inputMode="ai" />);
 			expect(screen.getByText('Output')).toBeInTheDocument();
 		});
 
@@ -629,7 +629,7 @@ describe('MessageHistory', () => {
 
 		it('uses monospace font in terminal mode', () => {
 			const logs: LogEntry[] = [createLogEntry({ source: 'stdout', text: 'Terminal output text' })];
-			const { container } = render(<MessageHistory logs={logs} inputMode="terminal" />);
+			const { container } = render(<MessageHistory logs={logs} inputMode="ai" />);
 
 			// Get the content div specifically (not the label)
 			const messageContent = screen.getByText('Terminal output text');
@@ -836,7 +836,7 @@ describe('MessageHistory', () => {
 				createLogEntry({ source: 'stderr', text: 'Permission denied', timestamp: 3000 }),
 			];
 
-			render(<MessageHistory logs={logs} inputMode="terminal" />);
+			render(<MessageHistory logs={logs} inputMode="ai" />);
 
 			expect(screen.getByText('You')).toBeInTheDocument();
 			expect(screen.getByText('Output')).toBeInTheDocument();

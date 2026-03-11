@@ -15,7 +15,7 @@ import {
 	type InputMode,
 	type UseSessionsOptions,
 	type UseSessionsReturn,
-	type GroupInfo,
+	type ProjectInfo,
 } from '../../../web/hooks/useSessions';
 import type {
 	WebSocketState,
@@ -101,10 +101,10 @@ describe('useSessions', () => {
 			expect(result.current.activeSession).toBeNull();
 		});
 
-		it('returns empty sessionsByGroup initially', () => {
+		it('returns empty sessionsByProject initially', () => {
 			const { result } = renderHook(() => useSessions());
 
-			expect(result.current.sessionsByGroup).toEqual({});
+			expect(result.current.sessionsByProject).toEqual({});
 		});
 
 		it('exposes connection state from WebSocket', () => {
@@ -481,10 +481,10 @@ describe('useSessions', () => {
 	});
 
 	// =============================================================================
-	// 5. Sessions By Group Computation Tests
+	// 5. Sessions By Project Computation Tests
 	// =============================================================================
-	describe('Sessions By Group Computation', () => {
-		it('groups sessions by groupId', () => {
+	describe('Sessions By Project Computation', () => {
+		it('groups sessions by projectId', () => {
 			const { result } = renderHook(() => useSessions());
 
 			act(() => {
@@ -492,30 +492,30 @@ describe('useSessions', () => {
 					{
 						id: 's1',
 						name: 'Session 1',
-						groupId: 'group-a',
-						groupName: 'Group A',
+						projectId: 'group-a',
+						projectName: 'Group A',
 						state: 'idle',
 					} as SessionData,
 					{
 						id: 's2',
 						name: 'Session 2',
-						groupId: 'group-a',
-						groupName: 'Group A',
+						projectId: 'group-a',
+						projectName: 'Group A',
 						state: 'idle',
 					} as SessionData,
 					{
 						id: 's3',
 						name: 'Session 3',
-						groupId: 'group-b',
-						groupName: 'Group B',
+						projectId: 'group-b',
+						projectName: 'Group B',
 						state: 'idle',
 					} as SessionData,
 				]);
 			});
 
-			expect(Object.keys(result.current.sessionsByGroup)).toEqual(['group-a', 'group-b']);
-			expect(result.current.sessionsByGroup['group-a'].sessions).toHaveLength(2);
-			expect(result.current.sessionsByGroup['group-b'].sessions).toHaveLength(1);
+			expect(Object.keys(result.current.sessionsByProject)).toEqual(['group-a', 'group-b']);
+			expect(result.current.sessionsByProject['group-a'].sessions).toHaveLength(2);
+			expect(result.current.sessionsByProject['group-b'].sessions).toHaveLength(1);
 		});
 
 		it('places ungrouped sessions under ungrouped key', () => {
@@ -523,16 +523,16 @@ describe('useSessions', () => {
 
 			act(() => {
 				capturedHandlers.onSessionsUpdate?.([
-					{ id: 's1', name: 'Session 1', state: 'idle' } as SessionData, // No groupId
+					{ id: 's1', name: 'Session 1', state: 'idle' } as SessionData, // No projectId
 				]);
 			});
 
-			expect(result.current.sessionsByGroup['ungrouped']).toBeDefined();
-			expect(result.current.sessionsByGroup['ungrouped'].sessions).toHaveLength(1);
-			expect(result.current.sessionsByGroup['ungrouped'].name).toBe('Ungrouped');
+			expect(result.current.sessionsByProject['ungrouped']).toBeDefined();
+			expect(result.current.sessionsByProject['ungrouped'].sessions).toHaveLength(1);
+			expect(result.current.sessionsByProject['ungrouped'].name).toBe('Ungrouped');
 		});
 
-		it('includes group metadata (id, name, emoji)', () => {
+		it('includes project metadata (id, name, emoji)', () => {
 			const { result } = renderHook(() => useSessions());
 
 			act(() => {
@@ -540,19 +540,19 @@ describe('useSessions', () => {
 					{
 						id: 's1',
 						name: 'Session 1',
-						groupId: 'group-1',
-						groupName: 'My Group',
-						groupEmoji: '🚀',
+						projectId: 'group-1',
+						projectName: 'My Group',
+						projectEmoji: '🚀',
 						state: 'idle',
 					} as SessionData,
 				]);
 			});
 
-			const group = result.current.sessionsByGroup['group-1'];
+			const project = result.current.sessionsByProject['group-1'];
 
-			expect(group.id).toBe('group-1');
-			expect(group.name).toBe('My Group');
-			expect(group.emoji).toBe('🚀');
+			expect(project.id).toBe('group-1');
+			expect(project.name).toBe('My Group');
+			expect(project.emoji).toBe('🚀');
 		});
 
 		it('updates when sessions change', () => {
@@ -564,27 +564,27 @@ describe('useSessions', () => {
 					{
 						id: 's1',
 						name: 'Session 1',
-						groupId: 'group-a',
-						groupName: 'Group A',
+						projectId: 'group-a',
+						projectName: 'Group A',
 						state: 'idle',
 					} as SessionData,
 				]);
 			});
 
-			expect(result.current.sessionsByGroup['group-a'].sessions).toHaveLength(1);
+			expect(result.current.sessionsByProject['group-a'].sessions).toHaveLength(1);
 
-			// Add another session to the same group
+			// Add another session to the same project
 			act(() => {
 				capturedHandlers.onSessionAdded?.({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-a',
-					groupName: 'Group A',
+					projectId: 'group-a',
+					projectName: 'Group A',
 					state: 'idle',
 				} as SessionData);
 			});
 
-			expect(result.current.sessionsByGroup['group-a'].sessions).toHaveLength(2);
+			expect(result.current.sessionsByProject['group-a'].sessions).toHaveLength(2);
 		});
 
 		it('handles mixed grouped and ungrouped sessions', () => {
@@ -595,8 +595,8 @@ describe('useSessions', () => {
 					{
 						id: 's1',
 						name: 'Grouped',
-						groupId: 'group-1',
-						groupName: 'Group 1',
+						projectId: 'group-1',
+						projectName: 'Group 1',
 						state: 'idle',
 					} as SessionData,
 					{ id: 's2', name: 'Ungrouped 1', state: 'idle' } as SessionData,
@@ -604,8 +604,8 @@ describe('useSessions', () => {
 				]);
 			});
 
-			expect(result.current.sessionsByGroup['group-1'].sessions).toHaveLength(1);
-			expect(result.current.sessionsByGroup['ungrouped'].sessions).toHaveLength(2);
+			expect(result.current.sessionsByProject['group-1'].sessions).toHaveLength(1);
+			expect(result.current.sessionsByProject['ungrouped'].sessions).toHaveLength(2);
 		});
 	});
 
@@ -1333,30 +1333,30 @@ describe('useSessions', () => {
 			});
 		});
 
-		it('GroupInfo interface has required properties', () => {
-			const group: GroupInfo = {
+		it('ProjectInfo interface has required properties', () => {
+			const project: ProjectInfo = {
 				id: 'group-1',
 				name: 'Test Group',
 				emoji: '🚀',
 				sessions: [],
 			};
 
-			expect(group.id).toBe('group-1');
-			expect(group.name).toBe('Test Group');
-			expect(group.emoji).toBe('🚀');
-			expect(group.sessions).toEqual([]);
+			expect(project.id).toBe('group-1');
+			expect(project.name).toBe('Test Group');
+			expect(project.emoji).toBe('🚀');
+			expect(project.sessions).toEqual([]);
 		});
 
-		it('GroupInfo accepts null id and emoji', () => {
-			const group: GroupInfo = {
+		it('ProjectInfo accepts null id and emoji', () => {
+			const project: ProjectInfo = {
 				id: null,
 				name: 'Ungrouped',
 				emoji: null,
 				sessions: [],
 			};
 
-			expect(group.id).toBeNull();
-			expect(group.emoji).toBeNull();
+			expect(project.id).toBeNull();
+			expect(project.emoji).toBeNull();
 		});
 	});
 

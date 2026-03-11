@@ -361,14 +361,14 @@ describe('useCommandHistory', () => {
 			expect(result.current.history[0].mode).toBe('ai');
 		});
 
-		it('should accept terminal mode', () => {
+		it('should accept ai mode explicitly', () => {
 			const { result } = renderHook(() => useCommandHistory());
 
 			act(() => {
-				result.current.addCommand('ls -la', undefined, 'terminal');
+				result.current.addCommand('ls -la', undefined, 'ai');
 			});
 
-			expect(result.current.history[0].mode).toBe('terminal');
+			expect(result.current.history[0].mode).toBe('ai');
 		});
 
 		it('should store sessionId when provided', () => {
@@ -1084,16 +1084,16 @@ describe('useCommandHistory', () => {
 			expect(result.current.history[0].command).toBe(longCommand);
 		});
 
-		it('should handle multiple mode types correctly', () => {
+		it('should handle multiple commands with ai mode', () => {
 			const { result } = renderHook(() => useCommandHistory());
 
 			act(() => {
 				result.current.addCommand('ai command', 'session1', 'ai');
 				vi.spyOn(Date, 'now').mockReturnValue(1700000000001);
-				result.current.addCommand('terminal command', 'session1', 'terminal');
+				result.current.addCommand('another command', 'session1', 'ai');
 			});
 
-			expect(result.current.history[0].mode).toBe('terminal');
+			expect(result.current.history[0].mode).toBe('ai');
 			expect(result.current.history[1].mode).toBe('ai');
 		});
 

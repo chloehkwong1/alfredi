@@ -68,9 +68,9 @@ export interface UseSessionsOptions extends Omit<UseWebSocketOptions, 'handlers'
  * Return type for the useSessions hook
  */
 /**
- * Group info containing group metadata and sessions
+ * Project info containing project metadata and sessions
  */
-export interface GroupInfo {
+export interface ProjectInfo {
 	id: string | null;
 	name: string;
 	emoji: string | null;
@@ -80,8 +80,8 @@ export interface GroupInfo {
 export interface UseSessionsReturn {
 	/** All sessions */
 	sessions: Session[];
-	/** Sessions organized by group (keyed by groupId or 'ungrouped') */
-	sessionsByGroup: Record<string, GroupInfo>;
+	/** Sessions organized by project (keyed by projectId or 'ungrouped') */
+	sessionsByProject: Record<string, ProjectInfo>;
 	/** Currently active/selected session */
 	activeSession: Session | null;
 	/** Set the active session by ID */
@@ -351,27 +351,27 @@ export function useSessions(options: UseSessionsOptions = {}): UseSessionsReturn
 	);
 
 	/**
-	 * Sessions organized by group (using actual group data from server)
-	 * Groups are keyed by groupId (or 'ungrouped' for sessions without a group)
+	 * Sessions organized by project (using actual project data from server)
+	 * Projects are keyed by projectId (or 'ungrouped' for sessions without a project)
 	 */
-	const sessionsByGroup = useMemo((): Record<string, GroupInfo> => {
-		const groups: Record<string, GroupInfo> = {};
+	const sessionsByProject = useMemo((): Record<string, ProjectInfo> => {
+		const projects: Record<string, ProjectInfo> = {};
 
 		for (const session of sessions) {
-			const groupKey = session.groupId || 'ungrouped';
+			const projectKey = session.projectId || 'ungrouped';
 
-			if (!groups[groupKey]) {
-				groups[groupKey] = {
-					id: session.groupId || null,
-					name: session.groupName || 'Ungrouped',
-					emoji: session.groupEmoji || null,
+			if (!projects[projectKey]) {
+				projects[projectKey] = {
+					id: session.projectId || null,
+					name: session.projectName || 'Ungrouped',
+					emoji: session.projectEmoji || null,
 					sessions: [],
 				};
 			}
-			groups[groupKey].sessions.push(session);
+			projects[projectKey].sessions.push(session);
 		}
 
-		return groups;
+		return projects;
 	}, [sessions]);
 
 	/**
@@ -560,7 +560,7 @@ export function useSessions(options: UseSessionsOptions = {}): UseSessionsReturn
 	return {
 		// Session data
 		sessions,
-		sessionsByGroup,
+		sessionsByProject,
 		activeSession,
 		setActiveSessionId,
 		getSession,

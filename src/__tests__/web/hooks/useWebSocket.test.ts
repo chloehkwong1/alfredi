@@ -575,7 +575,7 @@ describe('useWebSocket', () => {
 					state: 'busy',
 					name: 'Updated Session',
 					toolType: 'claude-code',
-					inputMode: 'terminal',
+					inputMode: 'ai',
 					cwd: '/new/path',
 				} as SessionStateChangeMessage);
 			});
@@ -583,7 +583,7 @@ describe('useWebSocket', () => {
 			expect(onSessionStateChange).toHaveBeenCalledWith('session-1', 'busy', {
 				name: 'Updated Session',
 				toolType: 'claude-code',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				cwd: '/new/path',
 			});
 		});
@@ -899,7 +899,7 @@ describe('useWebSocket', () => {
 					type: 'user_input',
 					sessionId: 'session-1',
 					command: 'npm install',
-					inputMode: 'terminal',
+					inputMode: 'ai',
 				} as UserInputMessage);
 			});
 

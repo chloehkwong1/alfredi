@@ -132,12 +132,12 @@ describe('SlashCommandAutocomplete', () => {
 		});
 
 		it('shows terminal-only commands in terminal mode', () => {
-			render(<SlashCommandAutocomplete {...defaultProps} inputMode="terminal" inputValue="" />);
+			render(<SlashCommandAutocomplete {...defaultProps} inputMode="ai" inputValue="" />);
 			expect(screen.getByText('/jump')).toBeInTheDocument();
 		});
 
 		it('hides AI-only commands in terminal mode', () => {
-			render(<SlashCommandAutocomplete {...defaultProps} inputMode="terminal" inputValue="" />);
+			render(<SlashCommandAutocomplete {...defaultProps} inputMode="ai" inputValue="" />);
 			// /history is AI-only
 			expect(screen.queryByText('/history')).not.toBeInTheDocument();
 		});
@@ -153,7 +153,7 @@ describe('SlashCommandAutocomplete', () => {
 			);
 			expect(screen.getByText('/clear')).toBeInTheDocument();
 
-			rerender(<SlashCommandAutocomplete {...defaultProps} inputMode="terminal" inputValue="" />);
+			rerender(<SlashCommandAutocomplete {...defaultProps} inputMode="ai" inputValue="" />);
 			expect(screen.getByText('/clear')).toBeInTheDocument();
 		});
 	});
@@ -607,7 +607,7 @@ describe('SlashCommandAutocomplete', () => {
 			expect(screen.getByText('/history')).toBeInTheDocument();
 			expect(screen.queryByText('/jump')).not.toBeInTheDocument();
 
-			rerender(<SlashCommandAutocomplete {...defaultProps} inputMode="terminal" inputValue="" />);
+			rerender(<SlashCommandAutocomplete {...defaultProps} inputMode="ai" inputValue="" />);
 
 			expect(screen.queryByText('/history')).not.toBeInTheDocument();
 			expect(screen.getByText('/jump')).toBeInTheDocument();

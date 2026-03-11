@@ -56,9 +56,9 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		cwd: '/Users/test/project',
 		toolType: 'claude-code',
 		bookmarked: false,
-		groupId: null,
-		groupName: null,
-		groupEmoji: null,
+		projectId: null,
+		projectName: null,
+		projectEmoji: null,
 		...overrides,
 	} as Session;
 }
@@ -205,7 +205,7 @@ describe('SessionPillBar', () => {
 		});
 
 		it('renders terminal mode icon for terminal sessions', () => {
-			const sessions = [createMockSession({ id: 's1', inputMode: 'terminal' })];
+			const sessions = [createMockSession({ id: 's1', inputMode: 'ai' })];
 
 			render(<SessionPillBar sessions={sessions} activeSessionId="s1" onSelectSession={vi.fn()} />);
 
@@ -559,7 +559,7 @@ describe('SessionPillBar', () => {
 		});
 
 		it('shows Terminal mode correctly', async () => {
-			const sessions = [createMockSession({ id: 's1', inputMode: 'terminal' })];
+			const sessions = [createMockSession({ id: 's1', inputMode: 'ai' })];
 
 			render(<SessionPillBar sessions={sessions} activeSessionId="s1" onSelectSession={vi.fn()} />);
 
@@ -697,14 +697,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -720,14 +720,14 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
-					groupEmoji: '\uD83D\uDDA5',
+					projectId: 'group-1',
+					projectName: 'Frontend',
+					projectEmoji: '\uD83D\uDDA5',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -740,18 +740,18 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's3',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -779,8 +779,8 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'My Group',
+					projectId: 'group-1',
+					projectName: 'My Group',
 				}),
 			];
 
@@ -797,14 +797,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -828,14 +828,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -857,14 +857,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -889,14 +889,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -924,13 +924,13 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -957,14 +957,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -987,13 +987,13 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -1022,14 +1022,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session 1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Session 2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -1045,13 +1045,13 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -1075,8 +1075,8 @@ describe('SessionPillBar', () => {
 					id: 's2',
 					name: 'Regular Session',
 					bookmarked: false,
-					groupId: 'group-1',
-					groupName: 'My Group',
+					projectId: 'group-1',
+					projectName: 'My Group',
 				}),
 			];
 
@@ -1097,8 +1097,8 @@ describe('SessionPillBar', () => {
 					id: 's2',
 					name: 'Regular Session',
 					bookmarked: false,
-					groupId: 'group-1',
-					groupName: 'My Group',
+					projectId: 'group-1',
+					projectName: 'My Group',
 				}),
 			];
 
@@ -1117,8 +1117,8 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Session A',
-					groupId: 'a-group',
-					groupName: 'Alpha',
+					projectId: 'a-group',
+					projectName: 'Alpha',
 				}),
 				createMockSession({
 					id: 's2',
@@ -1128,8 +1128,8 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's3',
 					name: 'Session Z',
-					groupId: 'z-group',
-					groupName: 'Zeta',
+					projectId: 'z-group',
+					projectName: 'Zeta',
 				}),
 			];
 
@@ -1137,10 +1137,10 @@ describe('SessionPillBar', () => {
 
 			// Get all group headers
 			const buttons = screen.getAllByRole('button');
-			const groupHeaders = buttons.filter((btn) => btn.getAttribute('aria-expanded') !== null);
+			const projectHeaders = buttons.filter((btn) => btn.getAttribute('aria-expanded') !== null);
 
 			// First group should be Bookmarks
-			expect(groupHeaders[0]).toHaveAccessibleName(/Bookmarks/);
+			expect(projectHeaders[0]).toHaveAccessibleName(/Bookmarks/);
 		});
 	});
 
@@ -1150,14 +1150,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Grouped',
-					groupId: 'group-1',
-					groupName: 'My Group',
+					projectId: 'group-1',
+					projectName: 'My Group',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Ungrouped Session',
-					groupId: null,
-					groupName: null,
+					projectId: null,
+					projectName: null,
 				}),
 			];
 
@@ -1174,18 +1174,18 @@ describe('SessionPillBar', () => {
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-1',
-					groupName: 'Alpha',
+					projectId: 'group-1',
+					projectName: 'Alpha',
 				}),
 			];
 
 			render(<SessionPillBar sessions={sessions} activeSessionId="s1" onSelectSession={vi.fn()} />);
 
 			const buttons = screen.getAllByRole('button');
-			const groupHeaders = buttons.filter((btn) => btn.getAttribute('aria-expanded') !== null);
+			const projectHeaders = buttons.filter((btn) => btn.getAttribute('aria-expanded') !== null);
 
 			// Last group should be Ungrouped
-			expect(groupHeaders[groupHeaders.length - 1]).toHaveAccessibleName(/Ungrouped/);
+			expect(projectHeaders[projectHeaders.length - 1]).toHaveAccessibleName(/Ungrouped/);
 		});
 	});
 
@@ -1356,7 +1356,7 @@ describe('SessionPillBar', () => {
 					id: 's1',
 					name: 'My Session',
 					state: 'busy',
-					inputMode: 'terminal',
+					inputMode: 'ai',
 				}),
 			];
 
@@ -1381,13 +1381,13 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -1395,12 +1395,12 @@ describe('SessionPillBar', () => {
 				<SessionPillBar sessions={sessions} activeSessionId={null} onSelectSession={vi.fn()} />
 			);
 
-			const groupHeaders = screen
+			const projectHeaders = screen
 				.getAllByRole('button')
 				.filter((btn) => btn.getAttribute('aria-expanded') !== null);
 
-			expect(groupHeaders).toHaveLength(2);
-			expect(groupHeaders[0]).toHaveAttribute('aria-expanded', 'false');
+			expect(projectHeaders).toHaveLength(2);
+			expect(projectHeaders[0]).toHaveAttribute('aria-expanded', 'false');
 		});
 
 		it('updates aria-expanded when group is expanded', () => {
@@ -1410,13 +1410,13 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'group-1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Backend',
+					projectId: 'group-2',
+					projectName: 'Backend',
 				}),
 			];
 
@@ -1560,13 +1560,13 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'My Group',
+					projectId: 'group-1',
+					projectName: 'My Group',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Another Group',
+					projectId: 'group-2',
+					projectName: 'Another Group',
 				}),
 			];
 
@@ -1585,13 +1585,13 @@ describe('SessionPillBar', () => {
 			const sessions = [
 				createMockSession({
 					id: 's1',
-					groupId: 'group-1',
-					groupName: 'My Group',
+					projectId: 'group-1',
+					projectName: 'My Group',
 				}),
 				createMockSession({
 					id: 's2',
-					groupId: 'group-2',
-					groupName: 'Another Group',
+					projectId: 'group-2',
+					projectName: 'Another Group',
 				}),
 			];
 
@@ -1698,14 +1698,14 @@ describe('SessionPillBar', () => {
 				createMockSession({
 					id: 's1',
 					name: 'Frontend Session',
-					groupId: 'g1',
-					groupName: 'Frontend',
+					projectId: 'g1',
+					projectName: 'Frontend',
 				}),
 				createMockSession({
 					id: 's2',
 					name: 'Backend Session',
-					groupId: 'g2',
-					groupName: 'Backend',
+					projectId: 'g2',
+					projectName: 'Backend',
 				}),
 			];
 

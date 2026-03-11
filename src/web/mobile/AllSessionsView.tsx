@@ -8,7 +8,7 @@
  *
  * Features:
  * - Larger, touch-friendly session cards
- * - Sessions organized by group with collapsible group headers
+ * - Sessions organized by project with collapsible project headers
  * - Status indicator, mode badge, and working directory visible
  * - Swipe down to dismiss / back button at top
  * - Search/filter sessions
@@ -17,7 +17,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { StatusDot, type SessionStatus } from '../components/Badge';
-import type { Session, GroupInfo } from '../hooks/useSessions';
+import type { Session, ProjectInfo } from '../hooks/useSessions';
 import { triggerHaptic, HAPTIC_PATTERNS } from './constants';
 import { truncatePath } from '../../shared/formatters';
 
@@ -271,47 +271,47 @@ function getSessionDisplayName(session: Session, sessions: Session[]): string {
 }
 
 /**
- * Get the effective group for a session
- * Worktree children inherit their parent's group
+ * Get the effective project for a session
+ * Worktree children inherit their parent's project
  */
-function getSessionEffectiveGroup(
+function getSessionEffectiveProject(
 	session: Session,
 	sessions: Session[]
-): { groupId: string | null; groupName: string | null; groupEmoji: string | null } {
+): { projectId: string | null; projectName: string | null; projectEmoji: string | null } {
 	const parent = findParentSession(session, sessions);
 	if (parent) {
 		return {
-			groupId: parent.groupId || null,
-			groupName: parent.groupName || null,
-			groupEmoji: parent.groupEmoji || null,
+			projectId: parent.projectId || null,
+			projectName: parent.projectName || null,
+			projectEmoji: parent.projectEmoji || null,
 		};
 	}
-	// Use session's own group
+	// Use session's own project
 	return {
-		groupId: session.groupId || null,
-		groupName: session.groupName || null,
-		groupEmoji: session.groupEmoji || null,
+		projectId: session.projectId || null,
+		projectName: session.projectName || null,
+		projectEmoji: session.projectEmoji || null,
 	};
 }
 
 /**
- * Group section component with collapsible header
+ * Project section component with collapsible header
  */
-interface GroupSectionProps {
-	groupId: string;
+interface ProjectSectionProps {
+	projectId: string;
 	name: string;
 	emoji: string | null;
 	sessions: Session[];
 	activeSessionId: string | null;
 	onSelectSession: (sessionId: string) => void;
 	isCollapsed: boolean;
-	onToggleCollapse: (groupId: string) => void;
+	onToggleCollapse: (projectId: string) => void;
 	/** All sessions for parent lookup */
 	allSessions: Session[];
 }
 
-function GroupSection({
-	groupId,
+function ProjectSection({
+	projectId,
 	name,
 	emoji,
 	sessions,
@@ -320,13 +320,13 @@ function GroupSection({
 	isCollapsed,
 	onToggleCollapse,
 	allSessions,
-}: GroupSectionProps) {
+}: ProjectSectionProps) {
 	const colors = useThemeColors();
 
 	const handleToggle = useCallback(() => {
 		triggerHaptic(HAPTIC_PATTERNS.tap);
-		onToggleCollapse(groupId);
-	}, [groupId, onToggleCollapse]);
+		onToggleCollapse(projectId);
+	}, [projectId, onToggleCollapse]);
 
 	return (
 		<div style={{ marginBottom: '16px' }}>
@@ -355,7 +355,7 @@ function GroupSection({
 					transition: 'all 0.15s ease',
 				}}
 				aria-expanded={!isCollapsed}
-				aria-label={`${name} group with ${sessions.length} sessions. ${isCollapsed ? 'Tap to expand' : 'Tap to collapse'}`}
+				aria-label={`${name} project with ${sessions.length} sessions. ${isCollapsed ? 'Tap to expand' : 'Tap to collapse'}`}
 			>
 				{/* Collapse/expand indicator */}
 				<span
@@ -434,7 +434,7 @@ export interface AllSessionsViewProps {
 /**
  * AllSessionsView component
  *
- * Full-screen view showing all sessions as larger cards, organized by group.
+ * Full-screen view showing all sessions as larger cards, organized by project.
  * Provides better visibility when there are many sessions.
  */
 export function AllSessionsView({
@@ -465,15 +465,15 @@ export function AllSessionsView({
 		});
 	}, [sessions, localSearchQuery]);
 
-	// Organize sessions by group, including a special "bookmarks" group
-	// Worktree children inherit their parent's group
-	const sessionsByGroup = useMemo((): Record<string, GroupInfo> => {
-		const groups: Record<string, GroupInfo> = {};
+	// Organize sessions by project, including a special "bookmarks" group
+	// Worktree children inherit their parent's project
+	const sessionsByProject = useMemo((): Record<string, ProjectInfo> => {
+		const projects: Record<string, ProjectInfo> = {};
 
 		// Add bookmarked sessions to a special "bookmarks" group
 		const bookmarkedSessions = filteredSessions.filter((s) => s.bookmarked);
 		if (bookmarkedSessions.length > 0) {
-			groups['bookmarks'] = {
+			projects['bookmarks'] = {
 				id: 'bookmarks',
 				name: 'Bookmarks',
 				emoji: '★',
@@ -481,29 +481,29 @@ export function AllSessionsView({
 			};
 		}
 
-		// Organize remaining sessions by their actual groups (or inherited group for worktree children)
+		// Organize remaining sessions by their actual projects (or inherited project for worktree children)
 		for (const session of filteredSessions) {
-			// Get effective group (worktree children inherit from parent)
-			const effectiveGroup = getSessionEffectiveGroup(session, sessions);
-			const groupKey = effectiveGroup.groupId || 'ungrouped';
+			// Get effective project (worktree children inherit from parent)
+			const effectiveProject = getSessionEffectiveProject(session, sessions);
+			const projectKey = effectiveProject.projectId || 'ungrouped';
 
-			if (!groups[groupKey]) {
-				groups[groupKey] = {
-					id: effectiveGroup.groupId,
-					name: effectiveGroup.groupName || 'Ungrouped',
-					emoji: effectiveGroup.groupEmoji,
+			if (!projects[projectKey]) {
+				projects[projectKey] = {
+					id: effectiveProject.projectId,
+					name: effectiveProject.projectName || 'Ungrouped',
+					emoji: effectiveProject.projectEmoji,
 					sessions: [],
 				};
 			}
-			groups[groupKey].sessions.push(session);
+			projects[projectKey].sessions.push(session);
 		}
 
-		return groups;
+		return projects;
 	}, [filteredSessions, sessions]);
 
 	// Get sorted group keys (bookmarks first, ungrouped last)
 	const sortedGroupKeys = useMemo(() => {
-		const keys = Object.keys(sessionsByGroup);
+		const keys = Object.keys(sessionsByProject);
 		return keys.sort((a, b) => {
 			// Put 'bookmarks' at the start
 			if (a === 'bookmarks') return -1;
@@ -511,9 +511,9 @@ export function AllSessionsView({
 			// Put 'ungrouped' at the end
 			if (a === 'ungrouped') return 1;
 			if (b === 'ungrouped') return -1;
-			return sessionsByGroup[a].name.localeCompare(sessionsByGroup[b].name);
+			return sessionsByProject[a].name.localeCompare(sessionsByProject[b].name);
 		});
-	}, [sessionsByGroup]);
+	}, [sessionsByProject]);
 
 	// Initialize collapsed groups with all groups collapsed by default, except bookmarks
 	useEffect(() => {
@@ -527,33 +527,33 @@ export function AllSessionsView({
 	// Auto-expand groups that contain search results when searching
 	useEffect(() => {
 		if (localSearchQuery.trim() && collapsedGroups) {
-			// Find groups that have matching sessions and expand them
-			const groupsWithMatches = new Set(
-				sortedGroupKeys.filter((key) => sessionsByGroup[key]?.sessions.length > 0)
+			// Find projects that have matching sessions and expand them
+			const projectsWithMatches = new Set(
+				sortedGroupKeys.filter((key) => sessionsByProject[key]?.sessions.length > 0)
 			);
 
-			// If any groups have matches, expand them
-			if (groupsWithMatches.size > 0) {
+			// If any projects have matches, expand them
+			if (projectsWithMatches.size > 0) {
 				setCollapsedGroups((prev) => {
 					const next = new Set(prev || []);
-					// Remove groups with matches from collapsed set (expand them)
-					for (const groupKey of groupsWithMatches) {
-						next.delete(groupKey);
+					// Remove projects with matches from collapsed set (expand them)
+					for (const projectKey of projectsWithMatches) {
+						next.delete(projectKey);
 					}
 					return next;
 				});
 			}
 		}
-	}, [localSearchQuery, sortedGroupKeys, sessionsByGroup]);
+	}, [localSearchQuery, sortedGroupKeys, sessionsByProject]);
 
-	// Toggle group collapse
-	const handleToggleCollapse = useCallback((groupId: string) => {
+	// Toggle project collapse
+	const handleToggleCollapse = useCallback((projectId: string) => {
 		setCollapsedGroups((prev) => {
 			const next = new Set(prev || []);
-			if (next.has(groupId)) {
-				next.delete(groupId);
+			if (next.has(projectId)) {
+				next.delete(projectId);
 			} else {
-				next.add(groupId);
+				next.add(projectId);
 			}
 			return next;
 		});
@@ -762,16 +762,16 @@ export function AllSessionsView({
 						))}
 					</div>
 				) : (
-					// Render with group sections
+					// Render with project sections
 					sortedGroupKeys.map((groupKey) => {
-						const group = sessionsByGroup[groupKey];
+						const project = sessionsByProject[groupKey];
 						return (
-							<GroupSection
+							<ProjectSection
 								key={groupKey}
-								groupId={groupKey}
-								name={group.name}
-								emoji={group.emoji}
-								sessions={group.sessions}
+								projectId={groupKey}
+								name={project.name}
+								emoji={project.emoji}
+								sessions={project.sessions}
 								activeSessionId={activeSessionId}
 								onSelectSession={handleSelectSession}
 								isCollapsed={collapsedGroups?.has(groupKey) ?? true}

@@ -72,9 +72,9 @@ export interface SessionData {
 	state: string;
 	inputMode: string;
 	cwd: string;
-	groupId?: string | null;
-	groupName?: string | null;
-	groupEmoji?: string | null;
+	projectId?: string | null;
+	projectName?: string | null;
+	projectEmoji?: string | null;
 	usageStats?: UsageStats | null;
 	lastResponse?: LastResponsePreview | null;
 	agentSessionId?: string | null;

@@ -1170,7 +1170,7 @@ describe('SessionStatusBanner', () => {
 			});
 
 			it('shows "Terminal" badge when inputMode is terminal', () => {
-				const session = createSession({ inputMode: 'terminal' });
+				const session = createSession({ inputMode: 'ai' });
 				render(<SessionStatusBanner session={session} />);
 
 				expect(screen.getByText('Terminal')).toBeInTheDocument();

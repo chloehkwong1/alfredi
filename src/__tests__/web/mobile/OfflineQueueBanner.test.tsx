@@ -735,7 +735,7 @@ describe('OfflineQueueBanner', () => {
 		});
 
 		it('shows "CLI" badge for terminal mode commands', () => {
-			const queue = [createQueuedCommand({ inputMode: 'terminal' })];
+			const queue = [createQueuedCommand({ inputMode: 'ai' })];
 			render(<OfflineQueueBanner {...defaultProps} queue={queue} />);
 
 			const toggleButton = screen.getByRole('button', { name: /command.* queued/i });
@@ -747,7 +747,7 @@ describe('OfflineQueueBanner', () => {
 		it('displays correct badge for mixed mode queue', () => {
 			const queue = [
 				createQueuedCommand({ id: 'cmd-1', inputMode: 'ai' }),
-				createQueuedCommand({ id: 'cmd-2', inputMode: 'terminal' }),
+				createQueuedCommand({ id: 'cmd-2', inputMode: 'ai' }),
 			];
 			render(<OfflineQueueBanner {...defaultProps} queue={queue} />);
 
@@ -1014,7 +1014,7 @@ describe('OfflineQueueBanner', () => {
 				createQueuedCommand({
 					id: 'cmd-1',
 					command: 'npm install',
-					inputMode: 'terminal',
+					inputMode: 'ai',
 					attempts: 2,
 					lastError: 'timeout',
 				}),

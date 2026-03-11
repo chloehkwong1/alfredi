@@ -125,7 +125,7 @@ describe('useOfflineQueue', () => {
 				command: 'test',
 				sessionId: 'session-1',
 				timestamp: Date.now(),
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				attempts: 1,
 				lastError: 'Connection failed',
 			};
@@ -244,14 +244,14 @@ describe('useOfflineQueue', () => {
 			expect(result.current.queue[0].timestamp).toBe(now);
 		});
 
-		it('should support terminal input mode', () => {
+		it('should support ai input mode', () => {
 			const { result } = renderHook(() => useOfflineQueue(createDefaultOptions()));
 
 			act(() => {
-				result.current.queueCommand('session-1', 'ls -la', 'terminal');
+				result.current.queueCommand('session-1', 'ls -la', 'ai');
 			});
 
-			expect(result.current.queue[0].inputMode).toBe('terminal');
+			expect(result.current.queue[0].inputMode).toBe('ai');
 		});
 
 		it('should return the queued command', () => {
@@ -696,7 +696,7 @@ describe('useOfflineQueue', () => {
 					command: 'second',
 					sessionId: 's2',
 					timestamp: 2,
-					inputMode: 'terminal',
+					inputMode: 'ai',
 					attempts: 0,
 				},
 			];
@@ -1755,7 +1755,7 @@ describe('useOfflineQueue', () => {
 					command: 'for s2',
 					sessionId: 's2',
 					timestamp: 2,
-					inputMode: 'terminal',
+					inputMode: 'ai',
 					attempts: 0,
 				},
 				{

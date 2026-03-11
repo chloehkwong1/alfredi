@@ -313,7 +313,7 @@ vi.mock('../../../web/mobile/CommandInputBar', () => ({
 		placeholder: string;
 		disabled: boolean;
 		inputMode: string;
-		onModeToggle: (mode: 'ai' | 'terminal') => void;
+		onModeToggle: (mode: 'ai') => void;
 		isSessionBusy: boolean;
 		onInterrupt: () => void;
 		hasActiveSession: boolean;
@@ -518,9 +518,9 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		cwd: '/Users/test/project',
 		toolType: 'claude-code',
 		bookmarked: false,
-		groupId: null,
-		groupName: null,
-		groupEmoji: null,
+		projectId: null,
+		projectName: null,
+		projectEmoji: null,
 		aiTabs: undefined,
 		activeTabId: undefined,
 		agentSessionId: undefined,
@@ -1186,7 +1186,7 @@ describe('MobileApp', () => {
 				mockHandlers.onSessionsUpdate?.([
 					createMockSession({
 						id: 'session-1',
-						inputMode: 'terminal',
+						inputMode: 'ai',
 						aiTabs: [
 							{ id: 'tab-1', name: 'Tab 1', state: 'idle' },
 							{ id: 'tab-2', name: 'Tab 2', state: 'idle' },
@@ -1508,9 +1508,7 @@ describe('MobileApp', () => {
 			render(<MobileApp />);
 
 			await act(async () => {
-				mockHandlers.onSessionsUpdate?.([
-					createMockSession({ id: 'session-1', inputMode: 'terminal' }),
-				]);
+				mockHandlers.onSessionsUpdate?.([createMockSession({ id: 'session-1', inputMode: 'ai' })]);
 			});
 
 			await act(async () => {
