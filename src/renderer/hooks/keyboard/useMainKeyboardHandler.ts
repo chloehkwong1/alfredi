@@ -279,6 +279,10 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					// Let the persistent terminal handle Cmd+K (clear scrollback)
 					return;
 				}
+				// In AI mode, don't intercept Cmd+K — use /clear command instead
+				if (ctx.activeSession?.inputMode === 'ai') {
+					return;
+				}
 				e.preventDefault();
 				if (ctx.activeSession && ctx.hasActiveSessionCapability('supportsClearContext')) {
 					ctx.clearContext();

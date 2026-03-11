@@ -20,6 +20,7 @@ import {
 	outputStyleLearningPrompt,
 } from '../../../prompts';
 import type { OutputStyle } from '../../../shared/types';
+import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 /** Map of output style to its prompt text (default has no extra prompt). */
@@ -178,6 +179,21 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					onHistoryCommand().catch((error) => {
 						console.error('[processInput] /history command failed:', error);
 					});
+					return;
+				}
+
+				// Handle built-in /clear command
+				// Sends /clear to the agent process and clears the active tab's logs
+				if (commandText === '/clear') {
+					setInputValue('');
+					setSlashCommandOpen(false);
+					syncAiInputToSession('');
+					if (inputRef.current) inputRef.current.style.height = 'auto';
+
+					// Write /clear to the agent's process stdin
+					window.maestro.process.write(activeSession.id, '/clear\n');
+					// Clear the active tab's logs in the store
+					useSessionStore.getState().clearActiveTabLogs(activeSession.id);
 					return;
 				}
 
