@@ -140,7 +140,6 @@ export type ModalId =
 	| 'quickAction'
 	| 'tabSwitcher'
 	| 'fuzzyFileSearch'
-	| 'promptComposer'
 	// Tab Management
 	| 'renameTab'
 	// Project Management
@@ -613,10 +612,6 @@ function _buildModalActions() {
 		setFuzzyFileSearchOpen: (open: boolean) =>
 			open ? openModal('fuzzyFileSearch') : closeModal('fuzzyFileSearch'),
 
-		// Prompt Composer Modal
-		setPromptComposerOpen: (open: boolean) =>
-			open ? openModal('promptComposer') : closeModal('promptComposer'),
-
 		// Merge Session Modal
 		setMergeSessionModalOpen: (open: boolean) =>
 			open ? openModal('mergeSession') : closeModal('mergeSession'),
@@ -706,7 +701,6 @@ export function useModalActions() {
 	const deleteWorktreeData = useModalStore(selectModalData('deleteWorktree'));
 	const tabSwitcherOpen = useModalStore(selectModalOpen('tabSwitcher'));
 	const fuzzyFileSearchOpen = useModalStore(selectModalOpen('fuzzyFileSearch'));
-	const promptComposerOpen = useModalStore(selectModalOpen('promptComposer'));
 	const mergeSessionModalOpen = useModalStore(selectModalOpen('mergeSession'));
 	const sendToAgentModalOpen = useModalStore(selectModalOpen('sendToAgent'));
 	const gitDiffData = useModalStore(selectModalData('gitDiff'));
@@ -812,9 +806,6 @@ export function useModalActions() {
 
 		// Fuzzy File Search Modal
 		fuzzyFileSearchOpen,
-
-		// Prompt Composer Modal
-		promptComposerOpen,
 
 		// Merge Session Modal
 		mergeSessionModalOpen,

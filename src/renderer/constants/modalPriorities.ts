@@ -74,13 +74,10 @@ export const MODAL_PRIORITIES = {
 	/** Tab context menu (right-click on tab) */
 	TAB_CONTEXT_MENU: 708,
 
-	/** Prompt composer modal for long prompts */
-	PROMPT_COMPOSER: 725,
-
 	/** Agent prompt composer modal (opens from batch runner) */
 	AGENT_PROMPT_COMPOSER: 730,
 
-	/** Quick actions command palette (Cmd+K) */
+	/** Quick actions command palette (Cmd+Shift+P) */
 	QUICK_ACTION: 700,
 
 	/** Fuzzy file search modal (Cmd+G) */

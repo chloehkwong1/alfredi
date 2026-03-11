@@ -27,6 +27,7 @@ import type {
 	Theme,
 	Session,
 	Project,
+	ProjectWorktreeConfig,
 	Shortcut,
 	AutoRunStats,
 	MaestroUsageStats,
@@ -79,7 +80,6 @@ import { DeleteWorktreeModal } from './DeleteWorktreeModal';
 import { QuickActionsModal } from './QuickActionsModal';
 import { TabSwitcherModal } from './TabSwitcherModal';
 import { FileSearchModal, type FlatFileItem } from './FileSearchModal';
-import { PromptComposerModal } from './PromptComposerModal';
 import { ExecutionQueueBrowser } from './ExecutionQueueBrowser';
 // BatchRunnerModal and AutoRunSetupModal removed (Auto Run stripped)
 import { LightboxModal } from './LightboxModal';
@@ -545,7 +545,7 @@ export interface AppWorktreeModalsProps {
 	// WorktreeConfigModal
 	worktreeConfigModalOpen: boolean;
 	onCloseWorktreeConfigModal: () => void;
-	onSaveWorktreeConfig: (config: { basePath: string; watchEnabled: boolean }) => void;
+	onSaveWorktreeConfig: (config: ProjectWorktreeConfig) => void;
 	onCreateWorktreeFromConfig: (branchName: string, basePath: string) => void;
 	onDisableWorktreeConfig: () => void;
 
@@ -800,29 +800,6 @@ export interface AppUtilityModalsProps {
 	onCloseFileSearch: () => void;
 	onFileSearchSelect: (file: FlatFileItem) => void;
 
-	// PromptComposerModal
-	promptComposerOpen: boolean;
-	onClosePromptComposer: () => void;
-	promptComposerInitialValue: string;
-	onPromptComposerSubmit: (value: string) => void;
-	onPromptComposerSend: (value: string) => void;
-	promptComposerSessionName?: string;
-	promptComposerStagedImages: string[];
-	setPromptComposerStagedImages?: React.Dispatch<React.SetStateAction<string[]>>;
-	onPromptImageAttachBlocked?: () => void;
-	onPromptOpenLightbox: (
-		image: string,
-		contextImages?: string[],
-		source?: 'staged' | 'history'
-	) => void;
-	promptTabReadOnlyMode: boolean;
-	onPromptToggleTabReadOnlyMode: () => void;
-	promptTabShowThinking: ThinkingMode;
-	onPromptToggleTabShowThinking?: () => void;
-	promptSupportsThinking: boolean;
-	promptEnterToSend: boolean;
-	onPromptToggleEnterToSend: () => void;
-
 	// ExecutionQueueBrowser
 	queueBrowserOpen: boolean;
 	onCloseQueueBrowser: () => void;
@@ -835,10 +812,9 @@ export interface AppUtilityModalsProps {
  * AppUtilityModals - Renders utility and workflow modals
  *
  * Contains:
- * - QuickActionsModal: Command palette (Cmd+K)
+ * - QuickActionsModal: Command palette (Cmd+Shift+P)
  * - TabSwitcherModal: Switch between conversation tabs
  * - FileSearchModal: Fuzzy file search
- * - PromptComposerModal: Full-screen prompt editor
  * - ExecutionQueueBrowser: View and manage execution queue
  * - BatchRunnerModal: Configure batch/Auto Run execution
  * - AutoRunSetupModal: Set up Auto Run folder
@@ -952,24 +928,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	fileExplorerExpanded,
 	onCloseFileSearch,
 	onFileSearchSelect,
-	// PromptComposerModal
-	promptComposerOpen,
-	onClosePromptComposer,
-	promptComposerInitialValue,
-	onPromptComposerSubmit,
-	onPromptComposerSend,
-	promptComposerSessionName,
-	promptComposerStagedImages,
-	setPromptComposerStagedImages,
-	onPromptImageAttachBlocked,
-	onPromptOpenLightbox,
-	promptTabReadOnlyMode,
-	onPromptToggleTabReadOnlyMode,
-	promptTabShowThinking,
-	onPromptToggleTabShowThinking,
-	promptSupportsThinking,
-	promptEnterToSend,
-	onPromptToggleEnterToSend,
 	// ExecutionQueueBrowser
 	queueBrowserOpen,
 	onCloseQueueBrowser,
@@ -979,7 +937,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 }: AppUtilityModalsProps) {
 	return (
 		<>
-			{/* --- QUICK ACTIONS MODAL (Cmd+K) --- */}
+			{/* --- QUICK ACTIONS MODAL (Cmd+Shift+P) --- */}
 			{quickActionOpen && (
 				<QuickActionsModal
 					theme={theme}
@@ -1125,30 +1083,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					shortcut={shortcuts.fuzzyFileSearch}
 					onFileSelect={onFileSearchSelect}
 					onClose={onCloseFileSearch}
-				/>
-			)}
-
-			{/* --- PROMPT COMPOSER MODAL --- */}
-			{promptComposerOpen && (
-				<PromptComposerModal
-					isOpen={promptComposerOpen}
-					onClose={onClosePromptComposer}
-					theme={theme}
-					initialValue={promptComposerInitialValue}
-					onSubmit={onPromptComposerSubmit}
-					onSend={onPromptComposerSend}
-					sessionName={promptComposerSessionName}
-					stagedImages={promptComposerStagedImages}
-					setStagedImages={setPromptComposerStagedImages}
-					onImageAttachBlocked={onPromptImageAttachBlocked}
-					onOpenLightbox={onPromptOpenLightbox}
-					tabReadOnlyMode={promptTabReadOnlyMode}
-					onToggleTabReadOnlyMode={onPromptToggleTabReadOnlyMode}
-					tabShowThinking={promptTabShowThinking}
-					onToggleTabShowThinking={onPromptToggleTabShowThinking}
-					supportsThinking={promptSupportsThinking}
-					enterToSend={promptEnterToSend}
-					onToggleEnterToSend={onPromptToggleEnterToSend}
 				/>
 			)}
 
@@ -1412,7 +1346,7 @@ export interface AppModalsProps {
 
 	// --- AppWorktreeModals props ---
 	onCloseWorktreeConfigModal: () => void;
-	onSaveWorktreeConfig: (config: { basePath: string; watchEnabled: boolean }) => void;
+	onSaveWorktreeConfig: (config: ProjectWorktreeConfig) => void;
 	onCreateWorktreeFromConfig: (branchName: string, basePath: string) => void;
 	onDisableWorktreeConfig: () => void;
 	createWorktreeSession: Session | null;
@@ -1538,26 +1472,6 @@ export interface AppModalsProps {
 	fileExplorerExpanded?: string[];
 	onCloseFileSearch: () => void;
 	onFileSearchSelect: (file: FlatFileItem) => void;
-	onClosePromptComposer: () => void;
-	promptComposerInitialValue: string;
-	onPromptComposerSubmit: (value: string) => void;
-	onPromptComposerSend: (value: string) => void;
-	promptComposerSessionName?: string;
-	promptComposerStagedImages: string[];
-	setPromptComposerStagedImages?: React.Dispatch<React.SetStateAction<string[]>>;
-	onPromptImageAttachBlocked?: () => void;
-	onPromptOpenLightbox: (
-		image: string,
-		contextImages?: string[],
-		source?: 'staged' | 'history'
-	) => void;
-	promptTabReadOnlyMode: boolean;
-	onPromptToggleTabReadOnlyMode: () => void;
-	promptTabShowThinking: ThinkingMode;
-	onPromptToggleTabShowThinking?: () => void;
-	promptSupportsThinking: boolean;
-	promptEnterToSend: boolean;
-	onPromptToggleEnterToSend: () => void;
 	onCloseQueueBrowser: () => void;
 	onRemoveQueueItem: (sessionId: string, itemId: string) => void;
 	onSwitchQueueSession: (sessionId: string) => void;
@@ -1634,7 +1548,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		quickActionOpen,
 		tabSwitcherOpen,
 		fuzzyFileSearchOpen,
-		promptComposerOpen,
 		queueBrowserOpen,
 		gitLogOpen,
 		mergeSessionModalOpen,
@@ -1658,7 +1571,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 			quickActionOpen: s.modals.get('quickAction')?.open ?? false,
 			tabSwitcherOpen: s.modals.get('tabSwitcher')?.open ?? false,
 			fuzzyFileSearchOpen: s.modals.get('fuzzyFileSearch')?.open ?? false,
-			promptComposerOpen: s.modals.get('promptComposer')?.open ?? false,
 			queueBrowserOpen: s.modals.get('queueBrowser')?.open ?? false,
 			gitLogOpen: s.modals.get('gitLog')?.open ?? false,
 			mergeSessionModalOpen: s.modals.get('mergeSession')?.open ?? false,
@@ -1827,22 +1739,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		fileExplorerExpanded,
 		onCloseFileSearch,
 		onFileSearchSelect,
-		onClosePromptComposer,
-		promptComposerInitialValue,
-		onPromptComposerSubmit,
-		onPromptComposerSend,
-		promptComposerSessionName,
-		promptComposerStagedImages,
-		setPromptComposerStagedImages,
-		onPromptImageAttachBlocked,
-		onPromptOpenLightbox,
-		promptTabReadOnlyMode,
-		onPromptToggleTabReadOnlyMode,
-		promptTabShowThinking,
-		onPromptToggleTabShowThinking,
-		promptSupportsThinking,
-		promptEnterToSend,
-		onPromptToggleEnterToSend,
 		onCloseQueueBrowser,
 		onRemoveQueueItem,
 		onSwitchQueueSession,
@@ -2071,23 +1967,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				fileExplorerExpanded={fileExplorerExpanded}
 				onCloseFileSearch={onCloseFileSearch}
 				onFileSearchSelect={onFileSearchSelect}
-				promptComposerOpen={promptComposerOpen}
-				onClosePromptComposer={onClosePromptComposer}
-				promptComposerInitialValue={promptComposerInitialValue}
-				onPromptComposerSubmit={onPromptComposerSubmit}
-				onPromptComposerSend={onPromptComposerSend}
-				promptComposerSessionName={promptComposerSessionName}
-				promptComposerStagedImages={promptComposerStagedImages}
-				setPromptComposerStagedImages={setPromptComposerStagedImages}
-				onPromptImageAttachBlocked={onPromptImageAttachBlocked}
-				onPromptOpenLightbox={onPromptOpenLightbox}
-				promptTabReadOnlyMode={promptTabReadOnlyMode}
-				onPromptToggleTabReadOnlyMode={onPromptToggleTabReadOnlyMode}
-				promptTabShowThinking={promptTabShowThinking}
-				onPromptToggleTabShowThinking={onPromptToggleTabShowThinking}
-				promptSupportsThinking={promptSupportsThinking}
-				promptEnterToSend={promptEnterToSend}
-				onPromptToggleEnterToSend={onPromptToggleEnterToSend}
 				queueBrowserOpen={queueBrowserOpen}
 				onCloseQueueBrowser={onCloseQueueBrowser}
 				onRemoveQueueItem={onRemoveQueueItem}

@@ -83,9 +83,7 @@ import {
 	useQueueProcessing,
 	// Tab export handlers (copy context, export HTML)
 	useTabExportHandlers,
-	// Prompt Composer modal handlers
-	usePromptComposerHandlers,
-	// Quick Actions modal handlers (Cmd+K)
+	// Quick Actions modal handlers (Cmd+Shift+P)
 	useQuickActionsHandlers,
 	// Session cycling (Cmd+Shift+[/])
 	useCycleSession,
@@ -248,8 +246,6 @@ function MaestroConsoleInner() {
 		setTabSwitcherOpen,
 		// Fuzzy File Search Modal
 		setFuzzyFileSearchOpen,
-		// Prompt Composer Modal
-		setPromptComposerOpen,
 		// Merge Session Modal
 		setMergeSessionModalOpen,
 		// Send to Agent Modal
@@ -715,7 +711,6 @@ function MaestroConsoleInner() {
 		handleDeleteLightboxImage,
 		handleCloseTabSwitcher,
 		handleCloseFileSearch,
-		handleClosePromptComposer,
 		handleCloseCreatePRModal,
 		handleCloseSendToAgent,
 		handleCloseQueueBrowser,
@@ -1511,18 +1506,6 @@ function MaestroConsoleInner() {
 		},
 		[handleFileClick]
 	);
-	// Prompt Composer modal handlers — extracted to usePromptComposerHandlers hook
-	const {
-		handlePromptComposerSubmit,
-		handlePromptComposerSend,
-		handlePromptToggleTabReadOnlyMode,
-		handlePromptToggleTabShowThinking,
-		handlePromptToggleEnterToSend,
-	} = usePromptComposerHandlers({
-		processInput,
-		setInputValue,
-	});
-
 	// Quick Actions modal handlers — extracted to useQuickActionsHandlers hook
 	const {
 		handleQuickActionsToggleReadOnlyMode,
@@ -1666,7 +1649,6 @@ function MaestroConsoleInner() {
 		setChatRawTextMode,
 		toggleTabStar,
 		toggleTabUnread,
-		setPromptComposerOpen,
 		openWizardModal,
 		rightPanelRef,
 		setFuzzyFileSearchOpen,
@@ -2295,21 +2277,6 @@ function MaestroConsoleInner() {
 					fileExplorerExpanded={activeSession?.fileExplorerExpanded}
 					onCloseFileSearch={handleCloseFileSearch}
 					onFileSearchSelect={handleFileSearchSelect}
-					onClosePromptComposer={handleClosePromptComposer}
-					promptComposerInitialValue={deferredInputValue}
-					onPromptComposerSubmit={handlePromptComposerSubmit}
-					onPromptComposerSend={handlePromptComposerSend}
-					promptComposerSessionName={activeSession?.name}
-					promptComposerStagedImages={canAttachImages ? stagedImages : []}
-					setPromptComposerStagedImages={canAttachImages ? setStagedImages : undefined}
-					onPromptOpenLightbox={handleSetLightboxImage}
-					promptTabReadOnlyMode={activeTab?.readOnlyMode ?? false}
-					onPromptToggleTabReadOnlyMode={handlePromptToggleTabReadOnlyMode}
-					promptTabShowThinking={activeTab?.showThinking ?? 'off'}
-					onPromptToggleTabShowThinking={handlePromptToggleTabShowThinking}
-					promptSupportsThinking={hasActiveSessionCapability('supportsThinkingDisplay')}
-					promptEnterToSend={enterToSendAI}
-					onPromptToggleEnterToSend={handlePromptToggleEnterToSend}
 					onCloseQueueBrowser={handleCloseQueueBrowser}
 					onRemoveQueueItem={handleRemoveQueueItem}
 					onSwitchQueueSession={handleSwitchQueueSession}

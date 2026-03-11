@@ -92,7 +92,6 @@ export interface ModalHandlersReturn {
 	// Utility close handlers
 	handleCloseTabSwitcher: () => void;
 	handleCloseFileSearch: () => void;
-	handleClosePromptComposer: () => void;
 	handleCloseCreatePRModal: () => void;
 	handleCloseSendToAgent: () => void;
 	handleCloseQueueBrowser: () => void;
@@ -450,11 +449,6 @@ export function useModalHandlers(
 		getModalActions().setFuzzyFileSearchOpen(false);
 	}, []);
 
-	const handleClosePromptComposer = useCallback(() => {
-		getModalActions().setPromptComposerOpen(false);
-		setTimeout(() => inputRef.current?.focus(), 0);
-	}, [inputRef]);
-
 	const handleCloseCreatePRModal = useCallback(() => {
 		getModalActions().setCreatePRModalOpen(false);
 		getModalActions().setCreatePRSession(null);
@@ -626,7 +620,6 @@ export function useModalHandlers(
 		// Utility close handlers
 		handleCloseTabSwitcher,
 		handleCloseFileSearch,
-		handleClosePromptComposer,
 		handleCloseCreatePRModal,
 		handleCloseSendToAgent,
 		handleCloseQueueBrowser,

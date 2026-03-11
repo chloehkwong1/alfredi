@@ -1,7 +1,7 @@
 /**
  * useQuickActionsHandlers — extracted from App.tsx
  *
- * Provides stable callbacks for the Quick Actions modal (Cmd+K):
+ * Provides stable callbacks for the Quick Actions modal (Cmd+Shift+P):
  *   - Toggle read-only mode
  *   - Toggle thinking mode
  *   - Refresh git/file state

@@ -332,13 +332,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 				ctx.toggleTabStar();
 				trackShortcut('toggleTabStar');
-			} else if (ctx.isShortcut(e, 'openPromptComposer')) {
-				e.preventDefault();
-				// Only open in AI mode
-				if (ctx.activeSession?.inputMode === 'ai') {
-					ctx.setPromptComposerOpen(true);
-					trackShortcut('openPromptComposer');
-				}
 			} else if (ctx.isShortcut(e, 'openWizard')) {
 				e.preventDefault();
 				ctx.openWizardModal();
