@@ -28,6 +28,10 @@ export {
 	// Maestro system prompt
 	maestroSystemPrompt,
 
+	// Output style prompts
+	outputStyleExplanatoryPrompt,
+	outputStyleLearningPrompt,
+
 	// Context management
 	contextGroomingPrompt,
 	contextTransferPrompt,

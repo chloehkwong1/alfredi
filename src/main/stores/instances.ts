@@ -17,7 +17,7 @@ import type {
 	BootstrapSettings,
 	MaestroSettings,
 	SessionsData,
-	GroupsData,
+	ProjectsData,
 	AgentConfigsData,
 	WindowState,
 	ClaudeSessionOriginsData,
@@ -27,7 +27,7 @@ import type {
 import {
 	SETTINGS_DEFAULTS,
 	SESSIONS_DEFAULTS,
-	GROUPS_DEFAULTS,
+	PROJECTS_DEFAULTS,
 	AGENT_CONFIGS_DEFAULTS,
 	WINDOW_STATE_DEFAULTS,
 	CLAUDE_SESSION_ORIGINS_DEFAULTS,
@@ -43,7 +43,7 @@ import { getCustomSyncPath } from './utils';
 let _bootstrapStore: Store<BootstrapSettings> | null = null;
 let _settingsStore: Store<MaestroSettings> | null = null;
 let _sessionsStore: Store<SessionsData> | null = null;
-let _groupsStore: Store<GroupsData> | null = null;
+let _projectsStore: Store<ProjectsData> | null = null;
 let _agentConfigsStore: Store<AgentConfigsData> | null = null;
 let _windowStateStore: Store<WindowState> | null = null;
 let _claudeSessionOriginsStore: Store<ClaudeSessionOriginsData> | null = null;
@@ -103,10 +103,10 @@ export function initializeStores(options: StoreInitOptions): {
 		defaults: SESSIONS_DEFAULTS,
 	});
 
-	_groupsStore = new Store<GroupsData>({
-		name: 'maestro-groups',
+	_projectsStore = new Store<ProjectsData>({
+		name: 'maestro-projects',
 		cwd: _syncPath,
-		defaults: GROUPS_DEFAULTS,
+		defaults: PROJECTS_DEFAULTS,
 	});
 
 	// Agent configs are ALWAYS stored in the production path, even in dev mode
@@ -158,7 +158,7 @@ export function getStoreInstances() {
 		bootstrapStore: _bootstrapStore,
 		settingsStore: _settingsStore,
 		sessionsStore: _sessionsStore,
-		groupsStore: _groupsStore,
+		projectsStore: _projectsStore,
 		agentConfigsStore: _agentConfigsStore,
 		windowStateStore: _windowStateStore,
 		claudeSessionOriginsStore: _claudeSessionOriginsStore,

@@ -139,6 +139,17 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		resumeArgs: (sessionId: string) => ['--resume', sessionId], // Resume with session ID
 		readOnlyArgs: ['--permission-mode', 'plan'], // Read-only/plan mode
 		readOnlyCliEnforced: true, // CLI enforces read-only via --permission-mode plan
+		modelArgs: (modelId: string) => ['--model', modelId], // Model selection: claude --model opus
+		configOptions: [
+			{
+				key: 'outputStyle',
+				type: 'select' as const,
+				label: 'Output Style',
+				description: 'Controls how this agent structures responses. Overrides the global default.',
+				default: 'default',
+				options: ['default', 'explanatory', 'learning'],
+			},
+		],
 	},
 	{
 		id: 'codex',

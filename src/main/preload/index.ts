@@ -13,7 +13,7 @@ import { contextBridge } from 'electron';
 import {
 	createSettingsApi,
 	createSessionsApi,
-	createGroupsApi,
+	createProjectsApi,
 	createAgentErrorApi,
 } from './settings';
 import { createContextApi } from './context';
@@ -51,8 +51,8 @@ contextBridge.exposeInMainWorld('maestro', {
 	// Sessions persistence API
 	sessions: createSessionsApi(),
 
-	// Groups persistence API
-	groups: createGroupsApi(),
+	// Projects persistence API
+	projects: createProjectsApi(),
 
 	// Process/Session API
 	process: createProcessApi(),
@@ -150,7 +150,7 @@ export {
 	// Settings and persistence
 	createSettingsApi,
 	createSessionsApi,
-	createGroupsApi,
+	createProjectsApi,
 	createAgentErrorApi,
 	// Context
 	createContextApi,
@@ -201,7 +201,7 @@ export type {
 	// From settings
 	SettingsApi,
 	SessionsApi,
-	GroupsApi,
+	ProjectsApi,
 	AgentErrorApi,
 } from './settings';
 export type {

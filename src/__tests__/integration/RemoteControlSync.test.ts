@@ -49,11 +49,9 @@ class MockWebServer {
 	private selectSessionCallback: ((sessionId: string, tabId?: string) => Promise<boolean>) | null =
 		null;
 	private executeCommandCallback:
-		| ((sessionId: string, command: string, inputMode?: 'ai' | 'terminal') => Promise<boolean>)
+		| ((sessionId: string, command: string, inputMode?: 'ai') => Promise<boolean>)
 		| null = null;
-	private switchModeCallback:
-		| ((sessionId: string, mode: 'ai' | 'terminal') => Promise<boolean>)
-		| null = null;
+	private switchModeCallback: ((sessionId: string, mode: 'ai') => Promise<boolean>) | null = null;
 	private getThemeCallback: (() => Theme | null) | null = null;
 
 	constructor() {
@@ -105,14 +103,12 @@ class MockWebServer {
 	}
 
 	setExecuteCommandCallback(
-		cb: (sessionId: string, command: string, inputMode?: 'ai' | 'terminal') => Promise<boolean>
+		cb: (sessionId: string, command: string, inputMode?: 'ai') => Promise<boolean>
 	): void {
 		this.executeCommandCallback = cb;
 	}
 
-	setSwitchModeCallback(
-		cb: (sessionId: string, mode: 'ai' | 'terminal') => Promise<boolean>
-	): void {
+	setSwitchModeCallback(cb: (sessionId: string, mode: 'ai') => Promise<boolean>): void {
 		this.switchModeCallback = cb;
 	}
 
@@ -482,7 +478,7 @@ describe('Remote Control Sync - Integration Tests', () => {
 					type: 'send_command',
 					sessionId: 'session-1',
 					command: 'npm test',
-					inputMode: 'terminal',
+					inputMode: 'ai',
 				});
 
 				await vi.waitFor(() => {

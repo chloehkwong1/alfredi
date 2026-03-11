@@ -1,14 +1,14 @@
 /**
  * Preload API for settings and persistence
  *
- * Provides the window.maestro.settings, sessions, and groups namespaces for:
+ * Provides the window.maestro.settings, sessions, and projects namespaces for:
  * - Application settings persistence
  * - Session list persistence
- * - Group list persistence
+ * - Project list persistence
  */
 
 import { ipcRenderer } from 'electron';
-import type { Group } from '../../shared/types';
+import type { Project } from '../../shared/types';
 
 /**
  * Stored session data for persistence.
@@ -40,12 +40,12 @@ export function createSessionsApi() {
 }
 
 /**
- * Creates the groups persistence API object for preload exposure
+ * Creates the projects persistence API object for preload exposure
  */
-export function createGroupsApi() {
+export function createProjectsApi() {
 	return {
-		getAll: () => ipcRenderer.invoke('groups:getAll'),
-		setAll: (groups: Group[]) => ipcRenderer.invoke('groups:setAll', groups),
+		getAll: () => ipcRenderer.invoke('projects:getAll'),
+		setAll: (projects: Project[]) => ipcRenderer.invoke('projects:setAll', projects),
 	};
 }
 
@@ -67,5 +67,5 @@ export function createAgentErrorApi() {
 
 export type SettingsApi = ReturnType<typeof createSettingsApi>;
 export type SessionsApi = ReturnType<typeof createSessionsApi>;
-export type GroupsApi = ReturnType<typeof createGroupsApi>;
+export type ProjectsApi = ReturnType<typeof createProjectsApi>;
 export type AgentErrorApi = ReturnType<typeof createAgentErrorApi>;

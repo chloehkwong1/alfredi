@@ -65,9 +65,9 @@ describe('WebServer E2E Sync Tests', () => {
 				state: 'idle',
 				inputMode: 'ai' as const,
 				cwd: '/test',
-				groupId: null,
-				groupName: null,
-				groupEmoji: null,
+				projectId: null,
+				projectName: null,
+				projectEmoji: null,
 			},
 		]);
 		server.setGetSessionDetailCallback((sessionId) => ({

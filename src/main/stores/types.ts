@@ -5,7 +5,7 @@
  * These types are used across the main process for type-safe store access.
  */
 
-import type { SshRemoteConfig, Group } from '../../shared/types';
+import type { SshRemoteConfig, Project, OutputStyle } from '../../shared/types';
 
 // ============================================================================
 // Stored Session Type (minimal interface for main process storage)
@@ -22,7 +22,7 @@ import type { SshRemoteConfig, Group } from '../../shared/types';
  */
 export interface StoredSession {
 	id: string;
-	groupId?: string;
+	projectId?: string;
 	name: string;
 	toolType: string;
 	cwd: string;
@@ -71,6 +71,8 @@ export interface MaestroSettings {
 	installationId: string | null;
 	// Standalone hands-on time tracker (migrated from globalStats.totalActiveTimeMs)
 	totalActiveTimeMs: number;
+	// Output style for Claude Code agents
+	outputStyle: OutputStyle;
 	// Allow dynamic settings keys (electron-store is a key-value store
 	// with many settings not explicitly declared above)
 	[key: string]: any;
@@ -85,11 +87,11 @@ export interface SessionsData {
 }
 
 // ============================================================================
-// Groups Store
+// Projects Store
 // ============================================================================
 
-export interface GroupsData {
-	groups: Group[];
+export interface ProjectsData {
+	projects: Project[];
 }
 
 // ============================================================================

@@ -4,7 +4,7 @@
  * Coverage:
  * - createSettingsApi: get, set, getAll
  * - createSessionsApi: getAll, setAll
- * - createGroupsApi: getAll, setAll
+ * - createProjectsApi: getAll, setAll
  * - createAgentErrorApi: clearError, retryAfterError
  */
 
@@ -22,7 +22,7 @@ vi.mock('electron', () => ({
 import {
 	createSettingsApi,
 	createSessionsApi,
-	createGroupsApi,
+	createProjectsApi,
 	createAgentErrorApi,
 } from '../../../main/preload/settings';
 
@@ -126,33 +126,33 @@ describe('Settings Preload API', () => {
 		});
 	});
 
-	describe('createGroupsApi', () => {
-		let api: ReturnType<typeof createGroupsApi>;
+	describe('createProjectsApi', () => {
+		let api: ReturnType<typeof createProjectsApi>;
 
 		beforeEach(() => {
-			api = createGroupsApi();
+			api = createProjectsApi();
 		});
 
 		describe('getAll', () => {
-			it('should invoke groups:getAll', async () => {
-				const groups = [{ id: '1', name: 'Group 1' }];
-				mockInvoke.mockResolvedValue(groups);
+			it('should invoke projects:getAll', async () => {
+				const projects = [{ id: '1', name: 'Group 1' }];
+				mockInvoke.mockResolvedValue(projects);
 
 				const result = await api.getAll();
 
-				expect(mockInvoke).toHaveBeenCalledWith('groups:getAll');
-				expect(result).toEqual(groups);
+				expect(mockInvoke).toHaveBeenCalledWith('projects:getAll');
+				expect(result).toEqual(projects);
 			});
 		});
 
 		describe('setAll', () => {
-			it('should invoke groups:setAll with groups array and return result', async () => {
-				const groups = [{ id: '1', name: 'Group 1' }];
+			it('should invoke projects:setAll with projects array and return result', async () => {
+				const projects = [{ id: '1', name: 'Group 1' }];
 				mockInvoke.mockResolvedValue(true);
 
-				const result = await api.setAll(groups);
+				const result = await api.setAll(projects);
 
-				expect(mockInvoke).toHaveBeenCalledWith('groups:setAll', groups);
+				expect(mockInvoke).toHaveBeenCalledWith('projects:setAll', projects);
 				expect(result).toBe(true);
 			});
 		});

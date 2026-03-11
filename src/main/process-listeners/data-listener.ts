@@ -26,6 +26,11 @@ export function setupDataListener(
 	const { REGEX_AI_SUFFIX, REGEX_AI_TAB_ID, REGEX_BATCH_SESSION, REGEX_SYNOPSIS_SESSION } =
 		patterns;
 
+	// Forward raw (unfiltered) PTY data for xterm.js in the persistent terminal
+	processManager.on('rawData', (sessionId: string, data: string) => {
+		safeSend('process:rawData', sessionId, data);
+	});
+
 	processManager.on('data', (sessionId: string, data: string) => {
 		safeSend('process:data', sessionId, data);
 

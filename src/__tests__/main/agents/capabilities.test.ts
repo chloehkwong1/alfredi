@@ -81,6 +81,7 @@ describe('agent-capabilities', () => {
 			expect(capabilities.supportsBatchMode).toBe(true);
 			expect(capabilities.supportsStreaming).toBe(true);
 			expect(capabilities.supportsResultMessages).toBe(true);
+			expect(capabilities.supportsClearContext).toBe(true);
 			expect(capabilities.imageResumeMode).toBeUndefined();
 		});
 
@@ -92,6 +93,7 @@ describe('agent-capabilities', () => {
 			// Terminal is not an AI agent, should have minimal capabilities
 			expect(capabilities.supportsJsonOutput).toBe(false);
 			expect(capabilities.supportsCostTracking).toBe(false);
+			expect(capabilities.supportsClearContext).toBe(false);
 		});
 
 		it('should have capabilities for codex', () => {
@@ -212,6 +214,14 @@ describe('agent-capabilities', () => {
 		it('should return false for unknown agents', () => {
 			expect(hasCapability('unknown-agent', 'supportsResume')).toBe(false);
 			expect(hasCapability('unknown-agent', 'supportsStreaming')).toBe(false);
+			expect(hasCapability('unknown-agent', 'supportsClearContext')).toBe(false);
+		});
+
+		it('should return correct supportsClearContext for agents', () => {
+			expect(hasCapability('claude-code', 'supportsClearContext')).toBe(true);
+			expect(hasCapability('terminal', 'supportsClearContext')).toBe(false);
+			expect(hasCapability('codex', 'supportsClearContext')).toBe(false);
+			expect(hasCapability('opencode', 'supportsClearContext')).toBe(false);
 		});
 
 		it('should work for all capability types', () => {
@@ -262,6 +272,7 @@ describe('agent-capabilities', () => {
 				'supportsThinkingDisplay',
 				'supportsContextMerge',
 				'supportsContextExport',
+				'supportsClearContext',
 			];
 
 			const defaultKeys = Object.keys(DEFAULT_CAPABILITIES);

@@ -1,7 +1,7 @@
 /**
  * Tests for the persistence IPC handlers
  *
- * These tests verify the settings, sessions, groups, and CLI activity
+ * These tests verify the settings, sessions, projects, and CLI activity
  * IPC handlers for application data persistence.
  */
 
@@ -14,7 +14,7 @@ import {
 	PersistenceHandlerDependencies,
 	MaestroSettings,
 	SessionsData,
-	GroupsData,
+	ProjectsData,
 } from '../../../../main/ipc/handlers/persistence';
 import type Store from 'electron-store';
 import type { WebServer } from '../../../../main/web-server';
@@ -68,7 +68,7 @@ describe('persistence IPC handlers', () => {
 		get: ReturnType<typeof vi.fn>;
 		set: ReturnType<typeof vi.fn>;
 	};
-	let mockGroupsStore: {
+	let mockProjectsStore: {
 		get: ReturnType<typeof vi.fn>;
 		set: ReturnType<typeof vi.fn>;
 	};
@@ -98,7 +98,7 @@ describe('persistence IPC handlers', () => {
 			set: vi.fn(),
 		};
 
-		mockGroupsStore = {
+		mockProjectsStore = {
 			get: vi.fn().mockReturnValue([]),
 			set: vi.fn(),
 		};
@@ -124,7 +124,7 @@ describe('persistence IPC handlers', () => {
 		const deps: PersistenceHandlerDependencies = {
 			settingsStore: mockSettingsStore as unknown as Store<MaestroSettings>,
 			sessionsStore: mockSessionsStore as unknown as Store<SessionsData>,
-			groupsStore: mockGroupsStore as unknown as Store<GroupsData>,
+			projectsStore: mockProjectsStore as unknown as Store<ProjectsData>,
 			getWebServer: getWebServerFn,
 		};
 		registerPersistenceHandlers(deps);
@@ -142,8 +142,8 @@ describe('persistence IPC handlers', () => {
 				'settings:getAll',
 				'sessions:getAll',
 				'sessions:setAll',
-				'groups:getAll',
-				'groups:setAll',
+				'projects:getAll',
+				'projects:setAll',
 				'cli:getActivity',
 			];
 
@@ -260,7 +260,7 @@ describe('persistence IPC handlers', () => {
 			const deps: PersistenceHandlerDependencies = {
 				settingsStore: mockSettingsStore as unknown as Store<MaestroSettings>,
 				sessionsStore: mockSessionsStore as unknown as Store<SessionsData>,
-				groupsStore: mockGroupsStore as unknown as Store<GroupsData>,
+				projectsStore: mockProjectsStore as unknown as Store<ProjectsData>,
 				getWebServer: () => null,
 			};
 			registerPersistenceHandlers(deps);
@@ -376,9 +376,9 @@ describe('persistence IPC handlers', () => {
 				state: 'idle',
 				inputMode: 'ai',
 				cwd: '/test',
-				groupId: null,
-				groupName: null,
-				groupEmoji: null,
+				projectId: null,
+				projectName: null,
+				projectEmoji: null,
 				parentSessionId: null,
 				worktreeBranch: null,
 			});
@@ -492,7 +492,7 @@ describe('persistence IPC handlers', () => {
 					name: 'Session 1',
 					cwd: '/test',
 					state: 'idle',
-					inputMode: 'terminal',
+					inputMode: 'ai',
 					toolType: 'claude-code',
 				},
 			];
@@ -661,61 +661,61 @@ describe('persistence IPC handlers', () => {
 		});
 	});
 
-	describe('groups:getAll', () => {
-		it('should load groups from store', async () => {
-			const mockGroups = [
+	describe('projects:getAll', () => {
+		it('should load projects from store', async () => {
+			const mockProjects = [
 				{ id: 'group-1', name: 'Group 1' },
 				{ id: 'group-2', name: 'Group 2' },
 			];
-			mockGroupsStore.get.mockReturnValue(mockGroups);
+			mockProjectsStore.get.mockReturnValue(mockProjects);
 
-			const handler = handlers.get('groups:getAll');
+			const handler = handlers.get('projects:getAll');
 			const result = await handler!({} as any);
 
-			expect(mockGroupsStore.get).toHaveBeenCalledWith('groups', []);
-			expect(result).toEqual(mockGroups);
+			expect(mockProjectsStore.get).toHaveBeenCalledWith('projects', []);
+			expect(result).toEqual(mockProjects);
 		});
 
-		it('should return empty array for missing groups', async () => {
-			mockGroupsStore.get.mockReturnValue([]);
+		it('should return empty array for missing projects', async () => {
+			mockProjectsStore.get.mockReturnValue([]);
 
-			const handler = handlers.get('groups:getAll');
+			const handler = handlers.get('projects:getAll');
 			const result = await handler!({} as any);
 
 			expect(result).toEqual([]);
 		});
 	});
 
-	describe('groups:setAll', () => {
-		it('should write groups to store', async () => {
-			const groups = [
+	describe('projects:setAll', () => {
+		it('should write projects to store', async () => {
+			const projects = [
 				{ id: 'group-1', name: 'Group 1' },
 				{ id: 'group-2', name: 'Group 2' },
 			];
 
-			const handler = handlers.get('groups:setAll');
-			const result = await handler!({} as any, groups);
+			const handler = handlers.get('projects:setAll');
+			const result = await handler!({} as any, projects);
 
-			expect(mockGroupsStore.set).toHaveBeenCalledWith('groups', groups);
+			expect(mockProjectsStore.set).toHaveBeenCalledWith('projects', projects);
 			expect(result).toBe(true);
 		});
 
-		it('should handle empty groups array', async () => {
-			const handler = handlers.get('groups:setAll');
+		it('should handle empty projects array', async () => {
+			const handler = handlers.get('projects:setAll');
 			const result = await handler!({} as any, []);
 
-			expect(mockGroupsStore.set).toHaveBeenCalledWith('groups', []);
+			expect(mockProjectsStore.set).toHaveBeenCalledWith('projects', []);
 			expect(result).toBe(true);
 		});
 
 		it('should return false on ENOSPC write error', async () => {
 			const error = new Error('ENOSPC: no space left on device') as NodeJS.ErrnoException;
 			error.code = 'ENOSPC';
-			mockGroupsStore.set.mockImplementation(() => {
+			mockProjectsStore.set.mockImplementation(() => {
 				throw error;
 			});
 
-			const handler = handlers.get('groups:setAll');
+			const handler = handlers.get('projects:setAll');
 			const result = await handler!({} as any, [{ id: 'g1', name: 'G1' }]);
 
 			expect(result).toBe(false);

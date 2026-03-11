@@ -74,6 +74,8 @@ export interface ManagedProcess {
 	sshRemoteHost?: string;
 	dataBuffer?: string;
 	dataBufferTimeout?: NodeJS.Timeout;
+	rawDataBuffer?: string;
+	rawDataBufferTimeout?: NodeJS.Timeout;
 }
 
 export interface UsageTotals {
@@ -108,6 +110,7 @@ export interface CommandResult {
  */
 export interface ProcessManagerEvents {
 	data: (sessionId: string, data: string) => void;
+	rawData: (sessionId: string, data: string) => void;
 	stderr: (sessionId: string, data: string) => void;
 	exit: (sessionId: string, code: number) => void;
 	'command-exit': (sessionId: string, code: number) => void;

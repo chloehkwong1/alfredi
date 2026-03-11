@@ -4,7 +4,7 @@ import {
 	getDefaultShell,
 	SETTINGS_DEFAULTS,
 	SESSIONS_DEFAULTS,
-	GROUPS_DEFAULTS,
+	PROJECTS_DEFAULTS,
 	AGENT_CONFIGS_DEFAULTS,
 	WINDOW_STATE_DEFAULTS,
 	CLAUDE_SESSION_ORIGINS_DEFAULTS,
@@ -149,6 +149,10 @@ describe('stores/defaults', () => {
 		it('should have null installationId by default', () => {
 			expect(SETTINGS_DEFAULTS.installationId).toBeNull();
 		});
+
+		it('should have "default" as default outputStyle', () => {
+			expect(SETTINGS_DEFAULTS.outputStyle).toBe('default');
+		});
 	});
 
 	describe('SESSIONS_DEFAULTS', () => {
@@ -157,9 +161,9 @@ describe('stores/defaults', () => {
 		});
 	});
 
-	describe('GROUPS_DEFAULTS', () => {
-		it('should have empty groups array', () => {
-			expect(GROUPS_DEFAULTS.groups).toEqual([]);
+	describe('PROJECTS_DEFAULTS', () => {
+		it('should have empty projects array', () => {
+			expect(PROJECTS_DEFAULTS.projects).toEqual([]);
 		});
 	});
 

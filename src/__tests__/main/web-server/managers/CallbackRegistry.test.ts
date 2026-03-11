@@ -235,9 +235,9 @@ describe('CallbackRegistry', () => {
 					state: 'idle',
 					inputMode: 'ai',
 					cwd: '/home/user/project',
-					groupId: null,
-					groupName: null,
-					groupEmoji: null,
+					projectId: null,
+					projectName: null,
+					projectEmoji: null,
 				},
 			];
 			registry.setGetSessionsCallback(() => sessions);

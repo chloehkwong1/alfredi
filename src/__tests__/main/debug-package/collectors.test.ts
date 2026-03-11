@@ -320,7 +320,7 @@ describe('Debug Package Collectors', () => {
 					{
 						id: 'session-1',
 						name: 'Test Session',
-						groupId: 'group-1',
+						projectId: 'project-1',
 						toolType: 'claude-code',
 						state: 'idle',
 						inputMode: 'ai',

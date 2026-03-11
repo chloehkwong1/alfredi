@@ -38,6 +38,57 @@ export class DataBufferManager {
 	}
 
 	/**
+	 * Buffer raw (unfiltered) data and emit in batches.
+	 * Same 50ms/8KB strategy as emitDataBuffered, but emits 'rawData' events
+	 * that bypass stripControlSequences for xterm.js consumption.
+	 */
+	emitRawDataBuffered(sessionId: string, data: string): void {
+		const managedProcess = this.processes.get(sessionId);
+		if (!managedProcess) {
+			this.emitter.emit('rawData', sessionId, data);
+			return;
+		}
+
+		managedProcess.rawDataBuffer = (managedProcess.rawDataBuffer || '') + data;
+
+		if (managedProcess.rawDataBuffer.length > DATA_BUFFER_SIZE_THRESHOLD) {
+			this.flushRawDataBuffer(sessionId);
+			return;
+		}
+
+		if (!managedProcess.rawDataBufferTimeout) {
+			managedProcess.rawDataBufferTimeout = setTimeout(() => {
+				this.flushRawDataBuffer(sessionId);
+			}, DATA_BUFFER_FLUSH_INTERVAL);
+		}
+	}
+
+	/**
+	 * Flush the raw data buffer for a session
+	 */
+	flushRawDataBuffer(sessionId: string): void {
+		const managedProcess = this.processes.get(sessionId);
+		if (!managedProcess) return;
+
+		if (managedProcess.rawDataBufferTimeout) {
+			clearTimeout(managedProcess.rawDataBufferTimeout);
+			managedProcess.rawDataBufferTimeout = undefined;
+		}
+
+		if (managedProcess.rawDataBuffer) {
+			try {
+				this.emitter.emit('rawData', sessionId, managedProcess.rawDataBuffer);
+			} catch (err) {
+				logger.error('[ProcessManager] Error flushing raw data buffer', 'ProcessManager', {
+					sessionId,
+					error: String(err),
+				});
+			}
+			managedProcess.rawDataBuffer = undefined;
+		}
+	}
+
+	/**
 	 * Flush the data buffer for a session
 	 */
 	flushDataBuffer(sessionId: string): void {

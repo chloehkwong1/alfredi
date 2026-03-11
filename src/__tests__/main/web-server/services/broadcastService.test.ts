@@ -369,10 +369,10 @@ describe('BroadcastService', () => {
 			const client = createMockClient('client-1', { subscribedSessionId: 'session-1' });
 			clients.set('client-1', client);
 
-			service.broadcastUserInput('session-1', 'ls -la', 'terminal');
+			service.broadcastUserInput('session-1', 'ls -la', 'ai');
 
 			const sentData = JSON.parse((client.socket.send as any).mock.calls[0][0]);
-			expect(sentData.inputMode).toBe('terminal');
+			expect(sentData.inputMode).toBe('ai');
 		});
 	});
 

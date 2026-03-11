@@ -276,6 +276,20 @@ export class AgentDetector {
 					return models;
 				}
 
+				case 'claude-code': {
+					// Claude Code accepts model aliases via --model flag
+					// Hardcoded list — update when new models release
+					const claudeModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'];
+					logger.info(
+						`Returning ${claudeModels.length} hardcoded models for ${agentId}`,
+						LOG_CONTEXT,
+						{
+							models: claudeModels,
+						}
+					);
+					return claudeModels;
+				}
+
 				default:
 					// For agents without model discovery implemented, return empty array
 					logger.debug(`No model discovery implemented for ${agentId}`, LOG_CONTEXT);

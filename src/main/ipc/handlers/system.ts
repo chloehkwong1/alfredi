@@ -456,7 +456,7 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 	const SETTINGS_FILES = [
 		'maestro-settings.json',
 		'maestro-sessions.json',
-		'maestro-groups.json',
+		'maestro-projects.json',
 		'maestro-agent-configs.json',
 		'maestro-claude-session-origins.json',
 	];

@@ -4,7 +4,7 @@ import type {
 	BootstrapSettings,
 	MaestroSettings,
 	SessionsData,
-	GroupsData,
+	ProjectsData,
 	AgentConfigsData,
 	WindowState,
 	ClaudeSessionOrigin,
@@ -13,6 +13,8 @@ import type {
 	AgentSessionOriginsData,
 	StoredSession,
 } from '../../../main/stores/types';
+import type { OutputStyle } from '../../../shared/types';
+import { OUTPUT_STYLE_OPTIONS } from '../../../shared/types';
 
 /**
  * Type-level tests to ensure type definitions are correct.
@@ -60,6 +62,7 @@ describe('stores/types', () => {
 				sshRemotes: [],
 				defaultSshRemoteId: null,
 				installationId: null,
+				outputStyle: 'default',
 			};
 
 			expect(settings.activeThemeId).toBe('dracula');
@@ -94,16 +97,16 @@ describe('stores/types', () => {
 			expect(session.toolType).toBe('claude-code');
 		});
 
-		it('should allow optional groupId', () => {
+		it('should allow optional projectId', () => {
 			const session: StoredSession = {
 				id: '1',
-				groupId: 'group-1',
+				projectId: 'project-1',
 				name: 'Test Session',
 				toolType: 'claude-code',
 				cwd: '/path/to/project',
 				projectRoot: '/path/to/project',
 			};
-			expect(session.groupId).toBe('group-1');
+			expect(session.projectId).toBe('project-1');
 		});
 
 		it('should allow additional renderer-specific fields', () => {
@@ -141,13 +144,21 @@ describe('stores/types', () => {
 		});
 	});
 
-	describe('GroupsData', () => {
-		it('should have groups array with Group items', () => {
-			const data: GroupsData = {
-				groups: [{ id: '1', name: 'Group 1', emoji: '📁', collapsed: false }],
+	describe('ProjectsData', () => {
+		it('should have projects array with Project items', () => {
+			const data: ProjectsData = {
+				projects: [
+					{
+						id: '1',
+						name: 'Project 1',
+						emoji: '📁',
+						collapsed: false,
+						rootPath: '/path/to/project',
+					},
+				],
 			};
-			expect(data.groups).toHaveLength(1);
-			expect(data.groups[0].emoji).toBe('📁');
+			expect(data.projects).toHaveLength(1);
+			expect(data.projects[0].emoji).toBe('📁');
 		});
 	});
 
@@ -249,6 +260,28 @@ describe('stores/types', () => {
 			expect(
 				(data.origins['/path/to/project']['session-2'] as ClaudeSessionOriginInfo).sessionName
 			).toBe('Auto Session');
+		});
+	});
+
+	describe('OutputStyle', () => {
+		it('should allow all valid output style values', () => {
+			const styles: OutputStyle[] = ['default', 'explanatory', 'learning'];
+			expect(styles).toHaveLength(3);
+		});
+
+		it('OUTPUT_STYLE_OPTIONS should have entries for all three styles', () => {
+			expect(OUTPUT_STYLE_OPTIONS).toHaveLength(3);
+			const ids = OUTPUT_STYLE_OPTIONS.map((o) => o.id);
+			expect(ids).toContain('default');
+			expect(ids).toContain('explanatory');
+			expect(ids).toContain('learning');
+		});
+
+		it('OUTPUT_STYLE_OPTIONS entries should have label and description', () => {
+			for (const option of OUTPUT_STYLE_OPTIONS) {
+				expect(option.label).toBeTruthy();
+				expect(option.description).toBeTruthy();
+			}
 		});
 	});
 

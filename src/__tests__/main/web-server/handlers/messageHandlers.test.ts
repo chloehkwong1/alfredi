@@ -147,7 +147,7 @@ describe('WebSocketMessageHandler', () => {
 				type: 'send_command',
 				sessionId: 'session-1',
 				command: 'ls -la',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 			});
 
 			await vi.waitFor(() => {

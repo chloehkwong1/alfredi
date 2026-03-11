@@ -80,7 +80,7 @@ import { logger } from '../../../main/utils/logger';
 describe('web-server/web-server-factory', () => {
 	let mockSettingsStore: WebServerFactoryDependencies['settingsStore'];
 	let mockSessionsStore: WebServerFactoryDependencies['sessionsStore'];
-	let mockGroupsStore: WebServerFactoryDependencies['groupsStore'];
+	let mockProjectsStore: WebServerFactoryDependencies['projectsStore'];
 	let mockMainWindow: Partial<BrowserWindow>;
 	let mockWebContents: Partial<WebContents>;
 	let mockProcessManager: { write: ReturnType<typeof vi.fn> };
@@ -126,10 +126,10 @@ describe('web-server/web-server-factory', () => {
 			}),
 		};
 
-		mockGroupsStore = {
+		mockProjectsStore = {
 			get: vi.fn((key: string, defaultValue?: any) => {
-				if (key === 'groups') {
-					return [{ id: 'group-1', name: 'Test Group', emoji: '🧪' }];
+				if (key === 'projects') {
+					return [{ id: 'project-1', name: 'Test Project', emoji: '🧪' }];
 				}
 				return defaultValue;
 			}),
@@ -152,7 +152,7 @@ describe('web-server/web-server-factory', () => {
 		deps = {
 			settingsStore: mockSettingsStore,
 			sessionsStore: mockSessionsStore,
-			groupsStore: mockGroupsStore,
+			projectsStore: mockProjectsStore,
 			getMainWindow: vi.fn().mockReturnValue(mockMainWindow as BrowserWindow),
 			getProcessManager: vi.fn().mockReturnValue(mockProcessManager),
 		};

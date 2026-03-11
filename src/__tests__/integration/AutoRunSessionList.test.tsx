@@ -5,7 +5,7 @@
  * Tests the integration between SessionList and AutoRun components:
  * - Session selection loads correct document
  * - Session deletion clears Auto Run state
- * - Group filtering doesn't affect Auto Run
+ * - Project filtering doesn't affect Auto Run
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -16,7 +16,7 @@ import { AutoRun, AutoRunHandle } from '../../renderer/components/AutoRun';
 import { LayerStackProvider } from '../../renderer/contexts/LayerStackContext';
 import type {
 	Session,
-	Group,
+	Project,
 	Theme,
 	Shortcut,
 	BatchRunState,
@@ -259,10 +259,10 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
 	...overrides,
 });
 
-// Create mock group
-const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
-	id: 'group-1',
-	name: 'Test Group',
+// Create mock project
+const createMockProject = (overrides: Partial<Project> = {}): Project => ({
+	id: 'project-1',
+	name: 'Test Project',
 	emoji: '📁',
 	collapsed: false,
 	...overrides,
@@ -353,31 +353,31 @@ const IntegrationTestWrapper = ({
 		createMockSession({
 			id: 'session-3',
 			name: 'Session 3',
-			groupId: 'group-1',
+			projectId: 'project-1',
 			autoRunFolderPath: '/test/autorun3',
 			autoRunSelectedFile: 'Phase 3',
 			autoRunContent: '# Session 3\n\n- [ ] Group Task',
 		}),
 	],
-	initialGroups = [createMockGroup({ id: 'group-1', name: 'Test Group' })],
+	initialProjects = [createMockProject({ id: 'project-1', name: 'Test Project' })],
 	initialActiveSessionId = 'session-1',
 	onSessionChange,
 	onSessionDelete,
 }: {
 	initialSessions?: Session[];
-	initialGroups?: Group[];
+	initialProjects?: Project[];
 	initialActiveSessionId?: string;
 	onSessionChange?: (sessionId: string) => void;
 	onSessionDelete?: (sessionId: string) => void;
 }) => {
 	const [sessions, setSessions] = useState<Session[]>(initialSessions);
-	const [groups, setGroups] = useState<Group[]>(initialGroups);
+	const [projects, setProjects] = useState<Project[]>(initialProjects);
 	const [activeSessionId, setActiveSessionId] = useState(initialActiveSessionId);
 	const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
 	const [leftSidebarWidth, setLeftSidebarWidth] = useState(256);
 	const [activeFocus, setActiveFocus] = useState<'sidebar' | 'main' | 'right'>('sidebar');
 	const [selectedSidebarIndex, setSelectedSidebarIndex] = useState(0);
-	const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+	const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
 	const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
 	const [draggingSessionId, setDraggingSessionId] = useState<string | null>(null);
 	const [bookmarksCollapsed, setBookmarksCollapsed] = useState(false);
@@ -423,14 +423,14 @@ const IntegrationTestWrapper = ({
 				<SessionList
 					theme={theme}
 					sessions={sessions}
-					groups={groups}
+					projects={projects}
 					sortedSessions={sessions}
 					activeSessionId={activeSessionId}
 					leftSidebarOpen={leftSidebarOpen}
 					leftSidebarWidthState={leftSidebarWidth}
 					activeFocus={activeFocus}
 					selectedSidebarIndex={selectedSidebarIndex}
-					editingGroupId={editingGroupId}
+					editingProjectId={editingProjectId}
 					editingSessionId={editingSessionId}
 					draggingSessionId={draggingSessionId}
 					shortcuts={shortcuts}
@@ -452,17 +452,17 @@ const IntegrationTestWrapper = ({
 					setUpdateCheckModalOpen={() => {}}
 					setLogViewerOpen={() => {}}
 					setProcessMonitorOpen={() => {}}
-					toggleGroup={(groupId) => {
-						setGroups((prev) =>
-							prev.map((g) => (g.id === groupId ? { ...g, collapsed: !g.collapsed } : g))
+					toggleProject={(projectId) => {
+						setProjects((prev) =>
+							prev.map((g) => (g.id === projectId ? { ...g, collapsed: !g.collapsed } : g))
 						);
 					}}
 					handleDragStart={(sessionId) => setDraggingSessionId(sessionId)}
 					handleDragOver={(e) => e.preventDefault()}
-					handleDropOnGroup={(groupId) => {
+					handleDropOnProject={(projectId) => {
 						if (draggingSessionId) {
 							setSessions((prev) =>
-								prev.map((s) => (s.id === draggingSessionId ? { ...s, groupId } : s))
+								prev.map((s) => (s.id === draggingSessionId ? { ...s, projectId } : s))
 							);
 							setDraggingSessionId(null);
 						}
@@ -470,32 +470,34 @@ const IntegrationTestWrapper = ({
 					handleDropOnUngrouped={() => {
 						if (draggingSessionId) {
 							setSessions((prev) =>
-								prev.map((s) => (s.id === draggingSessionId ? { ...s, groupId: undefined } : s))
+								prev.map((s) => (s.id === draggingSessionId ? { ...s, projectId: undefined } : s))
 							);
 							setDraggingSessionId(null);
 						}
 					}}
-					finishRenamingGroup={(groupId, newName) => {
-						setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, name: newName } : g)));
-						setEditingGroupId(null);
+					finishRenamingProject={(projectId, newName) => {
+						setProjects((prev) =>
+							prev.map((g) => (g.id === projectId ? { ...g, name: newName } : g))
+						);
+						setEditingProjectId(null);
 					}}
 					finishRenamingSession={(sessId, newName) => {
 						setSessions((prev) => prev.map((s) => (s.id === sessId ? { ...s, name: newName } : s)));
 						setEditingSessionId(null);
 					}}
-					startRenamingGroup={(groupId) => setEditingGroupId(groupId)}
+					startRenamingProject={(projectId) => setEditingProjectId(projectId)}
 					startRenamingSession={(sessId) => setEditingSessionId(sessId)}
 					showConfirmation={handleConfirmation}
-					setGroups={setGroups}
+					setProjects={setProjects}
 					setSessions={setSessions}
-					createNewGroup={() => {
-						const newGroup: Group = {
-							id: `group-${Date.now()}`,
-							name: 'New Group',
+					createNewProject={() => {
+						const newProject: Project = {
+							id: `project-${Date.now()}`,
+							name: 'New Project',
 							emoji: '📁',
 							collapsed: false,
 						};
-						setGroups((prev) => [...prev, newGroup]);
+						setProjects((prev) => [...prev, newProject]);
 					}}
 					addNewSession={() => {
 						const newSession = createMockSession({
@@ -652,14 +654,14 @@ describe('Auto Run + Session List Integration', () => {
 			});
 		});
 
-		it('session in a group loads correct Auto Run content', async () => {
+		it('session in a project loads correct Auto Run content', async () => {
 			render(<IntegrationTestWrapper />);
 
-			// Find and expand the group to see Session 3
-			const groupHeader = screen.getByText('Test Group');
-			expect(groupHeader).toBeInTheDocument();
+			// Find and expand the project to see Session 3
+			const projectHeader = screen.getByText('Test Project');
+			expect(projectHeader).toBeInTheDocument();
 
-			// Click on Session 3 which is in the group
+			// Click on Session 3 which is in the project
 			const session3Item = screen.getByText('Session 3');
 			fireEvent.click(session3Item);
 
@@ -689,7 +691,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-a"
 				/>
 			);
@@ -733,7 +735,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-configured"
 				/>
 			);
@@ -854,10 +856,10 @@ describe('Auto Run + Session List Integration', () => {
 			expect(screen.queryByText('Session 2')).not.toBeInTheDocument();
 		});
 
-		it('deleting session in group does not affect other sessions Auto Run', async () => {
+		it('deleting session in project does not affect other sessions Auto Run', async () => {
 			render(<IntegrationTestWrapper />);
 
-			// Session 3 is in a group
+			// Session 3 is in a project
 			expect(screen.getByText('Session 3')).toBeInTheDocument();
 
 			// Right-click on Session 3 to delete it
@@ -911,7 +913,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="only-session"
 				/>
 			);
@@ -936,9 +938,9 @@ describe('Auto Run + Session List Integration', () => {
 		});
 	});
 
-	describe('Group Filtering Does Not Affect Auto Run', () => {
-		it('collapsing group does not affect active session Auto Run', async () => {
-			// Start with Session 3 (which is in a group) as active
+	describe('Project Filtering Does Not Affect Auto Run', () => {
+		it('collapsing project does not affect active session Auto Run', async () => {
+			// Start with Session 3 (which is in a project) as active
 			render(<IntegrationTestWrapper initialActiveSessionId="session-3" />);
 
 			// Verify Session 3's Auto Run is showing
@@ -946,23 +948,23 @@ describe('Auto Run + Session List Integration', () => {
 				expect(screen.getByRole('textbox')).toHaveValue('# Session 3\n\n- [ ] Group Task');
 			});
 
-			// Collapse the group
-			const groupHeader = screen.getByText('Test Group');
-			// Find the collapse button (chevron) near the group header
-			const groupRow = groupHeader.closest('div[style]');
-			if (groupRow) {
-				fireEvent.click(groupRow);
+			// Collapse the project
+			const projectHeader = screen.getByText('Test Project');
+			// Find the collapse button (chevron) near the project header
+			const projectRow = projectHeader.closest('div[style]');
+			if (projectRow) {
+				fireEvent.click(projectRow);
 			}
 
 			// Auto Run should still show Session 3's content
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 3\n\n- [ ] Group Task');
 		});
 
-		it('expanding group does not affect active session Auto Run', async () => {
-			// Create wrapper with collapsed group
+		it('expanding project does not affect active session Auto Run', async () => {
+			// Create wrapper with collapsed project
 			const TestComponent = () => {
-				const [groups, setGroups] = useState([
-					createMockGroup({ id: 'group-1', name: 'Test Group', collapsed: true }),
+				const [projects, setProjects] = useState([
+					createMockProject({ id: 'project-1', name: 'Test Project', collapsed: true }),
 				]);
 				const [activeSessionId, setActiveSessionId] = useState('session-1');
 				const sessions = [
@@ -974,7 +976,7 @@ describe('Auto Run + Session List Integration', () => {
 					createMockSession({
 						id: 'session-3',
 						name: 'Session 3',
-						groupId: 'group-1',
+						projectId: 'project-1',
 						autoRunFolderPath: '/test/autorun3',
 						autoRunContent: '# Session 3\n\n- [ ] Group Task',
 					}),
@@ -994,14 +996,16 @@ describe('Auto Run + Session List Integration', () => {
 								))}
 							</div>
 							<button
-								data-testid="toggle-group"
+								data-testid="toggle-project"
 								onClick={() =>
-									setGroups((prev) => prev.map((g) => ({ ...g, collapsed: !g.collapsed })))
+									setProjects((prev) => prev.map((g) => ({ ...g, collapsed: !g.collapsed })))
 								}
 							>
-								Toggle Group
+								Toggle Project
 							</button>
-							<p data-testid="group-state">Group collapsed: {groups[0].collapsed ? 'yes' : 'no'}</p>
+							<p data-testid="project-state">
+								Project collapsed: {projects[0].collapsed ? 'yes' : 'no'}
+							</p>
 							{activeSession && activeSession.autoRunFolderPath && (
 								<AutoRun
 									theme={theme}
@@ -1027,19 +1031,19 @@ describe('Auto Run + Session List Integration', () => {
 
 			render(<TestComponent />);
 
-			// Initially Session 1 is active and group is collapsed
+			// Initially Session 1 is active and project is collapsed
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1\n\n- [ ] Task 1');
-			expect(screen.getByTestId('group-state')).toHaveTextContent('Group collapsed: yes');
+			expect(screen.getByTestId('project-state')).toHaveTextContent('Project collapsed: yes');
 
-			// Expand the group
-			fireEvent.click(screen.getByTestId('toggle-group'));
-			expect(screen.getByTestId('group-state')).toHaveTextContent('Group collapsed: no');
+			// Expand the project
+			fireEvent.click(screen.getByTestId('toggle-project'));
+			expect(screen.getByTestId('project-state')).toHaveTextContent('Project collapsed: no');
 
 			// Auto Run should still show Session 1's content
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1\n\n- [ ] Task 1');
 		});
 
-		it('toggling multiple groups does not affect active session Auto Run', async () => {
+		it('toggling multiple projects does not affect active session Auto Run', async () => {
 			const sessions = [
 				createMockSession({
 					id: 'session-1',
@@ -1049,24 +1053,24 @@ describe('Auto Run + Session List Integration', () => {
 				createMockSession({
 					id: 'session-2',
 					name: 'Session 2',
-					groupId: 'group-1',
+					projectId: 'project-1',
 				}),
 				createMockSession({
 					id: 'session-3',
 					name: 'Session 3',
-					groupId: 'group-2',
+					projectId: 'project-2',
 				}),
 			];
 
-			const groups = [
-				createMockGroup({ id: 'group-1', name: 'Group 1' }),
-				createMockGroup({ id: 'group-2', name: 'Group 2' }),
+			const projectsList = [
+				createMockProject({ id: 'project-1', name: 'Project 1' }),
+				createMockProject({ id: 'project-2', name: 'Project 2' }),
 			];
 
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={groups}
+					initialProjects={projectsList}
 					initialActiveSessionId="session-1"
 				/>
 			);
@@ -1074,18 +1078,18 @@ describe('Auto Run + Session List Integration', () => {
 			// Verify initial state
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1');
 
-			// Toggle Group 1
-			const group1Header = screen.getByText('Group 1');
-			const group1Row = group1Header.closest('div');
-			if (group1Row) fireEvent.click(group1Row);
+			// Toggle Project 1
+			const project1Header = screen.getByText('Project 1');
+			const project1Row = project1Header.closest('div');
+			if (project1Row) fireEvent.click(project1Row);
 
 			// Auto Run should still show Session 1's content
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1');
 
-			// Toggle Group 2
-			const group2Header = screen.getByText('Group 2');
-			const group2Row = group2Header.closest('div');
-			if (group2Row) fireEvent.click(group2Row);
+			// Toggle Project 2
+			const project2Header = screen.getByText('Project 2');
+			const project2Row = project2Header.closest('div');
+			if (project2Row) fireEvent.click(project2Row);
 
 			// Auto Run should still show Session 1's content
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1');
@@ -1118,7 +1122,7 @@ describe('Auto Run + Session List Integration', () => {
 			expect(textarea).toHaveValue('# Session 1\n\n- [ ] Task 1');
 		});
 
-		it('dragging session between groups does not affect Auto Run', async () => {
+		it('dragging session between projects does not affect Auto Run', async () => {
 			render(<IntegrationTestWrapper />);
 
 			// Initially showing Session 1's content
@@ -1126,35 +1130,35 @@ describe('Auto Run + Session List Integration', () => {
 
 			// Simulate dragging Session 1 (simulated by directly calling the handler)
 			// Note: In a real scenario, this would be done via drag and drop
-			// For testing, we verify the content remains stable during group changes
+			// For testing, we verify the content remains stable during project changes
 
 			// Session 1 should still show its content
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1\n\n- [ ] Task 1');
 		});
 
-		it('moving session to different group preserves Auto Run state', async () => {
+		it('moving session to different project preserves Auto Run state', async () => {
 			render(<IntegrationTestWrapper />);
 
-			// Session 1 is ungrouped, Session 3 is in group-1
+			// Session 1 is unassigned, Session 3 is in project-1
 			// Initially showing Session 1's content
 			expect(screen.getByRole('textbox')).toHaveValue('# Session 1\n\n- [ ] Task 1');
 
-			// Right-click on Session 1 to move to group
-			// Use getAllByText and find the one that's a session item (not in the group header)
+			// Right-click on Session 1 to move to project
+			// Use getAllByText and find the one that's a session item (not in the project header)
 			const session1Items = screen.getAllByText('Session 1');
-			// Find the session item (not in group context)
+			// Find the session item (not in project context)
 			const session1Item = session1Items[0];
 			fireEvent.contextMenu(session1Item);
 
-			// Find "Move to Group" option and hover
-			const moveToGroup = await screen.findByText('Move to Group');
-			fireEvent.mouseEnter(moveToGroup.parentElement!);
+			// Find "Move to Project" option and hover
+			const moveToProject = await screen.findByText('Move to Project');
+			fireEvent.mouseEnter(moveToProject.parentElement!);
 
-			// Click on "Test Group" in the submenu - there may be multiple, find in the context menu
-			const testGroupOptions = await screen.findAllByText('Test Group');
+			// Click on "Test Project" in the submenu - there may be multiple, find in the context menu
+			const testProjectOptions = await screen.findAllByText('Test Project');
 			// The last one should be in the context menu submenu
-			const testGroupOption = testGroupOptions[testGroupOptions.length - 1];
-			fireEvent.click(testGroupOption);
+			const testProjectOption = testProjectOptions[testProjectOptions.length - 1];
+			fireEvent.click(testProjectOption);
 
 			// Auto Run should still show Session 1's content
 			await waitFor(() => {
@@ -1217,7 +1221,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-2"
 				/>
 			);
@@ -1252,7 +1256,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-1"
 				/>
 			);
@@ -1273,7 +1277,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-1"
 				/>
 			);
@@ -1295,7 +1299,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-1"
 				/>
 			);
@@ -1316,7 +1320,7 @@ describe('Auto Run + Session List Integration', () => {
 			render(
 				<IntegrationTestWrapper
 					initialSessions={sessions}
-					initialGroups={[]}
+					initialProjects={[]}
 					initialActiveSessionId="session-1"
 				/>
 			);
@@ -1324,16 +1328,16 @@ describe('Auto Run + Session List Integration', () => {
 			expect(screen.getByRole('textbox')).toHaveValue(unicodeContent);
 		});
 
-		it('handles simultaneous session and group operations', async () => {
+		it('handles simultaneous session and project operations', async () => {
 			render(<IntegrationTestWrapper />);
 
 			// Perform multiple operations rapidly
 			const session1 = screen.getByText('Session 1');
 			const session2 = screen.getByText('Session 2');
-			const groupHeader = screen.getByText('Test Group');
+			const projectHeader = screen.getByText('Test Project');
 
-			// Click group, then sessions
-			fireEvent.click(groupHeader);
+			// Click project, then sessions
+			fireEvent.click(projectHeader);
 			fireEvent.click(session2);
 			fireEvent.click(session1);
 

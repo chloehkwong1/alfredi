@@ -4,7 +4,7 @@
  * This module handles IPC calls for:
  * - Settings: get/set/getAll
  * - Sessions: getAll/setAll
- * - Groups: getAll/setAll
+ * - Projects: getAll/setAll
  * - CLI activity: getActivity
  *
  * Extracted from main/index.ts to improve code organization.
@@ -19,9 +19,14 @@ import { getThemeById } from '../../themes';
 import { WebServer } from '../../web-server';
 
 // Re-export types from canonical source so existing imports from './persistence' still work
-export type { MaestroSettings, SessionsData, GroupsData } from '../../stores/types';
-import type { MaestroSettings, SessionsData, GroupsData, StoredSession } from '../../stores/types';
-import type { Group } from '../../../shared/types';
+export type { MaestroSettings, SessionsData, ProjectsData } from '../../stores/types';
+import type {
+	MaestroSettings,
+	SessionsData,
+	ProjectsData,
+	StoredSession,
+} from '../../stores/types';
+import type { Project } from '../../../shared/types';
 
 /**
  * Dependencies required for persistence handlers
@@ -29,7 +34,7 @@ import type { Group } from '../../../shared/types';
 export interface PersistenceHandlerDependencies {
 	settingsStore: Store<MaestroSettings>;
 	sessionsStore: Store<SessionsData>;
-	groupsStore: Store<GroupsData>;
+	projectsStore: Store<ProjectsData>;
 	getWebServer: () => WebServer | null;
 }
 
@@ -37,7 +42,7 @@ export interface PersistenceHandlerDependencies {
  * Register all persistence-related IPC handlers.
  */
 export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies): void {
-	const { settingsStore, sessionsStore, groupsStore, getWebServer } = deps;
+	const { settingsStore, sessionsStore, projectsStore, getWebServer } = deps;
 
 	// Settings management
 	ipcMain.handle('settings:get', async (_, key: string) => {
@@ -157,9 +162,9 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 						state: session.state,
 						inputMode: session.inputMode,
 						cwd: session.cwd,
-						groupId: session.groupId || null,
-						groupName: session.groupName || null,
-						groupEmoji: session.groupEmoji || null,
+						projectId: session.projectId || null,
+						projectName: session.projectName || null,
+						projectEmoji: session.projectEmoji || null,
 						parentSessionId: session.parentSessionId || null,
 						worktreeBranch: session.worktreeBranch || null,
 					});
@@ -188,17 +193,17 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 		return true;
 	});
 
-	// Groups persistence
-	ipcMain.handle('groups:getAll', async () => {
-		return groupsStore.get('groups', []);
+	// Projects persistence
+	ipcMain.handle('projects:getAll', async () => {
+		return projectsStore.get('projects', []);
 	});
 
-	ipcMain.handle('groups:setAll', async (_, groups: Group[]) => {
+	ipcMain.handle('projects:setAll', async (_, projects: Project[]) => {
 		try {
-			groupsStore.set('groups', groups);
+			projectsStore.set('projects', projects);
 		} catch (err) {
 			const code = (err as NodeJS.ErrnoException).code;
-			logger.warn(`Failed to persist groups: ${code || (err as Error).message}`, 'Groups');
+			logger.warn(`Failed to persist projects: ${code || (err as Error).message}`, 'Projects');
 			return false;
 		}
 		return true;

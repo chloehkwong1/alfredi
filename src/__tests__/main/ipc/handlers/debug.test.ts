@@ -60,7 +60,7 @@ describe('debug IPC handlers', () => {
 	let mockWebServer: WebServer;
 	let mockSettingsStore: Store<any>;
 	let mockSessionsStore: Store<any>;
-	let mockGroupsStore: Store<any>;
+	let mockProjectsStore: Store<any>;
 	let mockBootstrapStore: Store<any>;
 	let mockDeps: DebugHandlerDependencies;
 
@@ -88,7 +88,7 @@ describe('debug IPC handlers', () => {
 		// Setup mock stores
 		mockSettingsStore = { get: vi.fn(), set: vi.fn() } as unknown as Store<any>;
 		mockSessionsStore = { get: vi.fn(), set: vi.fn() } as unknown as Store<any>;
-		mockGroupsStore = { get: vi.fn(), set: vi.fn() } as unknown as Store<any>;
+		mockProjectsStore = { get: vi.fn(), set: vi.fn() } as unknown as Store<any>;
 		mockBootstrapStore = { get: vi.fn(), set: vi.fn() } as unknown as Store<any>;
 
 		// Setup dependencies
@@ -99,7 +99,7 @@ describe('debug IPC handlers', () => {
 			getWebServer: () => mockWebServer,
 			settingsStore: mockSettingsStore,
 			sessionsStore: mockSessionsStore,
-			groupsStore: mockGroupsStore,
+			projectsStore: mockProjectsStore,
 			bootstrapStore: mockBootstrapStore,
 		};
 
@@ -158,7 +158,7 @@ describe('debug IPC handlers', () => {
 					getWebServer: expect.any(Function),
 					settingsStore: mockSettingsStore,
 					sessionsStore: mockSessionsStore,
-					groupsStore: mockGroupsStore,
+					projectsStore: mockProjectsStore,
 					bootstrapStore: mockBootstrapStore,
 				}),
 				undefined

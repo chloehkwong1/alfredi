@@ -107,9 +107,9 @@ describe.skipIf(!runTests)('Remote Control Integration Tests', () => {
 				state: 'idle',
 				inputMode: 'ai' as const,
 				cwd: '/test/project',
-				groupId: null,
-				groupName: null,
-				groupEmoji: null,
+				projectId: null,
+				projectName: null,
+				projectEmoji: null,
 			},
 		]);
 		server.setGetSessionDetailCallback((sessionId) => ({
@@ -270,7 +270,7 @@ describe.skipIf(!runTests)('Remote Control Integration Tests', () => {
 				type: 'send_command',
 				sessionId: 'session-1',
 				command: 'ls -la',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 			});
 
 			const response = await responsePromise;

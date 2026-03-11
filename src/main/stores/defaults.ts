@@ -11,7 +11,7 @@ import { isWindows } from '../../shared/platformDetection';
 import type {
 	MaestroSettings,
 	SessionsData,
-	GroupsData,
+	ProjectsData,
 	AgentConfigsData,
 	WindowState,
 	ClaudeSessionOriginsData,
@@ -68,14 +68,15 @@ export const SETTINGS_DEFAULTS: MaestroSettings = {
 	sshRemoteHonorGitignore: false,
 	installationId: null,
 	totalActiveTimeMs: 0,
+	outputStyle: 'default',
 };
 
 export const SESSIONS_DEFAULTS: SessionsData = {
 	sessions: [],
 };
 
-export const GROUPS_DEFAULTS: GroupsData = {
-	groups: [],
+export const PROJECTS_DEFAULTS: ProjectsData = {
+	projects: [],
 };
 
 export const AGENT_CONFIGS_DEFAULTS: AgentConfigsData = {

@@ -16,7 +16,7 @@ import {
 	getEarlySettings,
 	getSettingsStore,
 	getSessionsStore,
-	getGroupsStore,
+	getProjectsStore,
 	getAgentConfigsStore,
 	getWindowStateStore,
 	getClaudeSessionOriginsStore,
@@ -170,7 +170,7 @@ if (crashReportingEnabled && !isDevelopment) {
 // Create local references to stores for use throughout this module
 // These are convenience variables - the actual stores are managed by ./stores module
 const sessionsStore = getSessionsStore();
-const groupsStore = getGroupsStore();
+const projectsStore = getProjectsStore();
 const agentConfigsStore = getAgentConfigsStore();
 const windowStateStore = getWindowStateStore();
 const claudeSessionOriginsStore = getClaudeSessionOriginsStore();
@@ -212,7 +212,7 @@ const windowManager = createWindowManager({
 const createWebServer = createWebServerFactory({
 	settingsStore: store,
 	sessionsStore,
-	groupsStore,
+	projectsStore,
 	getMainWindow: () => mainWindow,
 	getProcessManager: () => processManager,
 });
@@ -425,7 +425,7 @@ function setupIpcHandlers() {
 	registerPersistenceHandlers({
 		settingsStore: store,
 		sessionsStore,
-		groupsStore,
+		projectsStore,
 		getWebServer: () => webServer,
 	});
 

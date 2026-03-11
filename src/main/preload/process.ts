@@ -188,6 +188,16 @@ export function createProcessApi() {
 		},
 
 		/**
+		 * Subscribe to raw (unfiltered) PTY data for xterm.js
+		 * Bypasses stripControlSequences so escape sequences are preserved
+		 */
+		onRawData: (callback: (sessionId: string, data: string) => void): (() => void) => {
+			const handler = (_: unknown, sessionId: string, data: string) => callback(sessionId, data);
+			ipcRenderer.on('process:rawData', handler);
+			return () => ipcRenderer.removeListener('process:rawData', handler);
+		},
+
+		/**
 		 * Subscribe to process exit events
 		 */
 		onExit: (callback: (sessionId: string, code: number) => void): (() => void) => {

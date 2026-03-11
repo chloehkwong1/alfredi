@@ -280,7 +280,7 @@ describe('Process Preload API', () => {
 				event: unknown,
 				sessionId: string,
 				command: string,
-				inputMode?: 'ai' | 'terminal'
+				inputMode?: 'ai'
 			) => void;
 
 			mockOn.mockImplementation((channel: string, handler: typeof registeredHandler) => {

@@ -136,11 +136,17 @@ export class PtySpawner {
 				if (cleanedData.trim()) {
 					this.bufferManager.emitDataBuffered(sessionId, cleanedData);
 				}
+
+				// For terminal processes, also emit raw unfiltered data for xterm.js
+				if (isTerminal) {
+					this.bufferManager.emitRawDataBuffered(sessionId, data);
+				}
 			});
 
 			ptyProcess.onExit(({ exitCode }) => {
 				// Flush any remaining buffered data before exit
 				this.bufferManager.flushDataBuffer(sessionId);
+				this.bufferManager.flushRawDataBuffer(sessionId);
 
 				logger.debug('[ProcessManager] PTY onExit', 'ProcessManager', {
 					sessionId,

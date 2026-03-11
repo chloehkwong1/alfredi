@@ -162,7 +162,7 @@ describe('stores/instances', () => {
 			expect(instances.bootstrapStore).toBeDefined();
 			expect(instances.settingsStore).toBeDefined();
 			expect(instances.sessionsStore).toBeDefined();
-			expect(instances.groupsStore).toBeDefined();
+			expect(instances.projectsStore).toBeDefined();
 			expect(instances.agentConfigsStore).toBeDefined();
 			expect(instances.windowStateStore).toBeDefined();
 			expect(instances.claudeSessionOriginsStore).toBeDefined();
