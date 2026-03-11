@@ -11,18 +11,33 @@ export type ToolType = 'claude-code' | 'opencode' | 'codex' | 'terminal' | 'fact
  */
 export type ThinkingMode = 'off' | 'on' | 'sticky';
 
-// Session group
-export interface Group {
+/**
+ * OutputStyle controls how Claude Code agents structure their responses.
+ * - 'default': Concise coding help (current behavior)
+ * - 'explanatory': Adds educational Insights between coding help
+ * - 'learning': Collaborative mode with TODO(human) markers and Learn by Doing prompts
+ */
+export type OutputStyle = 'default' | 'explanatory' | 'learning';
+
+export const OUTPUT_STYLE_OPTIONS: { id: OutputStyle; label: string; description: string }[] = [
+	{ id: 'default', label: 'Default', description: 'Concise coding help' },
+	{ id: 'explanatory', label: 'Explanatory', description: 'Adds educational insights' },
+	{ id: 'learning', label: 'Learning', description: 'Collaborative with TODO(human) prompts' },
+];
+
+// Project (repo-aware grouping with a root directory)
+export interface Project {
 	id: string;
 	name: string;
 	emoji: string;
 	collapsed: boolean;
+	rootPath: string;
 }
 
 // Simplified session interface for CLI (subset of full Session)
 export interface SessionInfo {
 	id: string;
-	groupId?: string;
+	projectId?: string;
 	name: string;
 	toolType: ToolType;
 	cwd: string;
@@ -114,6 +129,21 @@ export interface AgentConfig {
 	path?: string;
 	requiresPty?: boolean;
 	hidden?: boolean;
+}
+
+// ============================================================================
+// Terminal Tab Types
+// ============================================================================
+
+/**
+ * A terminal tab within an agent's Right Panel terminal section.
+ * Each tab owns a persistent shell PTY identified by `{sessionId}-terminal-{id}`.
+ */
+export interface TerminalTab {
+	/** Unique identifier (used to build the PTY process ID) */
+	id: string;
+	/** Display name shown on the tab (e.g., "Terminal 1") */
+	name: string;
 }
 
 // ============================================================================

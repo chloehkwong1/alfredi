@@ -9,7 +9,7 @@
  * Agent Variables:
  *   {{AGENT_NAME}}        - Agent name
  *   {{AGENT_PATH}}        - Agent home directory path (full path to project)
- *   {{AGENT_GROUP}}       - Agent's group name (if grouped)
+ *   {{AGENT_PROJECT}}     - Agent's project name (if in a project)
  *   {{AGENT_SESSION_ID}}  - Agent session ID (for conversation continuity)
  *   {{AGENT_HISTORY_PATH}} - Path to agent's history JSON file (for task recall)
  *   {{TAB_NAME}}          - Custom tab name (alias: SESSION_NAME)
@@ -61,7 +61,7 @@ export interface TemplateSessionInfo {
 export interface TemplateContext {
 	session: TemplateSessionInfo;
 	gitBranch?: string;
-	groupName?: string;
+	projectName?: string;
 	loopNumber?: number;
 	// Auto Run document context
 	documentName?: string;
@@ -74,7 +74,7 @@ export interface TemplateContext {
 
 // List of all available template variables for documentation (alphabetically sorted)
 export const TEMPLATE_VARIABLES = [
-	{ variable: '{{AGENT_GROUP}}', description: 'Agent group name' },
+	{ variable: '{{AGENT_PROJECT}}', description: 'Agent project name' },
 	{ variable: '{{CONDUCTOR_PROFILE}}', description: "Conductor's About Me profile" },
 	{ variable: '{{AGENT_HISTORY_PATH}}', description: 'History file path (task recall)' },
 	{ variable: '{{AGENT_NAME}}', description: 'Agent name' },
@@ -111,7 +111,7 @@ export function substituteTemplateVariables(template: string, context: TemplateC
 	const {
 		session,
 		gitBranch,
-		groupName,
+		projectName,
 		loopNumber,
 		documentName,
 		documentPath,
@@ -128,7 +128,7 @@ export function substituteTemplateVariables(template: string, context: TemplateC
 		// Agent variables
 		AGENT_NAME: session.name,
 		AGENT_PATH: session.fullPath || session.projectRoot || session.cwd,
-		AGENT_GROUP: groupName || '',
+		AGENT_PROJECT: projectName || '',
 		AGENT_SESSION_ID: session.agentSessionId || '',
 		AGENT_HISTORY_PATH: historyFilePath || '',
 		TAB_NAME: session.name,

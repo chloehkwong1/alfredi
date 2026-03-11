@@ -67,7 +67,7 @@ describe('TEMPLATE_VARIABLES constant', () => {
 		const variables = TEMPLATE_VARIABLES.map((v) => v.variable);
 		expect(variables).toContain('{{AGENT_NAME}}');
 		expect(variables).toContain('{{AGENT_PATH}}');
-		expect(variables).toContain('{{AGENT_GROUP}}');
+		expect(variables).toContain('{{AGENT_PROJECT}}');
 		expect(variables).toContain('{{AGENT_SESSION_ID}}');
 		expect(variables).toContain('{{AGENT_HISTORY_PATH}}');
 		expect(variables).toContain('{{TAB_NAME}}');
@@ -170,22 +170,22 @@ describe('substituteTemplateVariables', () => {
 			expect(result).toBe('Agent: Agent Alpha');
 		});
 
-		it('should replace {{AGENT_GROUP}} with groupName', () => {
+		it('should replace {{AGENT_PROJECT}} with projectName', () => {
 			const context = createTestContext({
 				session: createTestSession(),
-				groupName: 'Backend Team',
+				projectName: 'Backend Team',
 			});
-			const result = substituteTemplateVariables('Group: {{AGENT_GROUP}}', context);
-			expect(result).toBe('Group: Backend Team');
+			const result = substituteTemplateVariables('Project: {{AGENT_PROJECT}}', context);
+			expect(result).toBe('Project: Backend Team');
 		});
 
-		it('should replace {{AGENT_GROUP}} with empty string when groupName is undefined', () => {
+		it('should replace {{AGENT_PROJECT}} with empty string when projectName is undefined', () => {
 			const context = createTestContext({
 				session: createTestSession(),
-				groupName: undefined,
+				projectName: undefined,
 			});
-			const result = substituteTemplateVariables('Group: {{AGENT_GROUP}}', context);
-			expect(result).toBe('Group: ');
+			const result = substituteTemplateVariables('Project: {{AGENT_PROJECT}}', context);
+			expect(result).toBe('Project: ');
 		});
 
 		it('should replace {{AGENT_SESSION_ID}} with agentSessionId', () => {
