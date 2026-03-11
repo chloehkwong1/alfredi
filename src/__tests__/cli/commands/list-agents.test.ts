@@ -5,29 +5,29 @@
  * Tests all functionality of the list-agents command including:
  * - Human-readable output formatting
  * - JSON output mode
- * - Group filtering
+ * - Project filtering
  * - Empty agents handling
  * - Error handling
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { SessionInfo, Group } from '../../../shared/types';
+import type { SessionInfo, Project } from '../../../shared/types';
 
 // Mock the storage service
 vi.mock('../../../cli/services/storage', () => ({
 	readSessions: vi.fn(),
-	readGroups: vi.fn(),
-	getSessionsByGroup: vi.fn(),
-	resolveGroupId: vi.fn((id: string) => id),
+	readProjects: vi.fn(),
+	getSessionsByProject: vi.fn(),
+	resolveProjectId: vi.fn((id: string) => id),
 }));
 
 // Mock the formatter
 vi.mock('../../../cli/output/formatter', () => ({
-	formatAgents: vi.fn((agents, groupName) => {
+	formatAgents: vi.fn((agents, projectName) => {
 		if (agents.length === 0) {
-			return groupName ? `No agents in group "${groupName}"` : 'No agents found';
+			return projectName ? `No agents in project "${projectName}"` : 'No agents found';
 		}
-		const header = groupName ? `Agents in "${groupName}":\n` : 'Agents:\n';
+		const header = projectName ? `Agents in "${projectName}":\n` : 'Agents:\n';
 		return header + agents.map((a: any) => `${a.name} (${a.toolType})`).join('\n');
 	}),
 	formatError: vi.fn((msg) => `Error: ${msg}`),
@@ -36,9 +36,9 @@ vi.mock('../../../cli/output/formatter', () => ({
 import { listAgents } from '../../../cli/commands/list-agents';
 import {
 	readSessions,
-	readGroups,
-	getSessionsByGroup,
-	resolveGroupId,
+	readProjects,
+	getSessionsByProject,
+	resolveProjectId,
 } from '../../../cli/services/storage';
 import { formatAgents, formatError } from '../../../cli/output/formatter';
 
@@ -52,7 +52,7 @@ describe('list-agents command', () => {
 		name: 'Test Agent',
 		toolType: 'claude-code',
 		cwd: '/path/to/project',
-		groupId: undefined,
+		projectId: undefined,
 		autoRunFolderPath: undefined,
 		...overrides,
 	});
@@ -123,7 +123,7 @@ describe('list-agents command', () => {
 					name: 'Full Agent',
 					toolType: 'terminal',
 					cwd: '/home/user/project',
-					groupId: 'group-1',
+					projectId: 'project-1',
 					autoRunFolderPath: '/home/user/playbooks',
 				}),
 			];
@@ -138,7 +138,7 @@ describe('list-agents command', () => {
 						name: 'Full Agent',
 						toolType: 'terminal',
 						cwd: '/home/user/project',
-						groupId: 'group-1',
+						projectId: 'project-1',
 						autoRunFolderPath: '/home/user/playbooks',
 					}),
 				],
@@ -215,7 +215,7 @@ describe('list-agents command', () => {
 					name: 'Complete Agent',
 					toolType: 'gemini-cli',
 					cwd: '/project',
-					groupId: 'dev-group',
+					projectId: 'dev-project',
 					autoRunFolderPath: '/project/autorun',
 				}),
 			];
@@ -230,30 +230,30 @@ describe('list-agents command', () => {
 			expect(parsed[0]).toHaveProperty('name', 'Complete Agent');
 			expect(parsed[0]).toHaveProperty('toolType', 'gemini-cli');
 			expect(parsed[0]).toHaveProperty('cwd', '/project');
-			expect(parsed[0]).toHaveProperty('groupId', 'dev-group');
+			expect(parsed[0]).toHaveProperty('projectId', 'dev-project');
 			expect(parsed[0]).toHaveProperty('autoRunFolderPath', '/project/autorun');
 		});
 	});
 
-	describe('group filtering', () => {
-		it('should filter agents by group', () => {
-			const mockGroups: Group[] = [
-				{ id: 'group-frontend', name: 'Frontend', emoji: '🎨', collapsed: false },
+	describe('project filtering', () => {
+		it('should filter agents by project', () => {
+			const mockProjects: Project[] = [
+				{ id: 'project-frontend', name: 'Frontend', emoji: '🎨', collapsed: false },
 			];
-			const mockGroupSessions: SessionInfo[] = [
-				mockSession({ id: 'fe1', name: 'React App', groupId: 'group-frontend' }),
-				mockSession({ id: 'fe2', name: 'Vue App', groupId: 'group-frontend' }),
+			const mockProjectSessions: SessionInfo[] = [
+				mockSession({ id: 'fe1', name: 'React App', projectId: 'project-frontend' }),
+				mockSession({ id: 'fe2', name: 'Vue App', projectId: 'project-frontend' }),
 			];
 
-			vi.mocked(resolveGroupId).mockReturnValue('group-frontend');
-			vi.mocked(getSessionsByGroup).mockReturnValue(mockGroupSessions);
-			vi.mocked(readGroups).mockReturnValue(mockGroups);
+			vi.mocked(resolveProjectId).mockReturnValue('project-frontend');
+			vi.mocked(getSessionsByProject).mockReturnValue(mockProjectSessions);
+			vi.mocked(readProjects).mockReturnValue(mockProjects);
 
-			listAgents({ group: 'group-frontend' });
+			listAgents({ project: 'project-frontend' });
 
-			expect(resolveGroupId).toHaveBeenCalledWith('group-frontend');
-			expect(getSessionsByGroup).toHaveBeenCalledWith('group-frontend');
-			expect(readGroups).toHaveBeenCalled();
+			expect(resolveProjectId).toHaveBeenCalledWith('project-frontend');
+			expect(getSessionsByProject).toHaveBeenCalledWith('project-frontend');
+			expect(readProjects).toHaveBeenCalled();
 			expect(formatAgents).toHaveBeenCalledWith(
 				expect.arrayContaining([
 					expect.objectContaining({ id: 'fe1' }),
@@ -263,46 +263,46 @@ describe('list-agents command', () => {
 			);
 		});
 
-		it('should resolve partial group ID', () => {
-			vi.mocked(resolveGroupId).mockReturnValue('group-full-id');
-			vi.mocked(getSessionsByGroup).mockReturnValue([]);
-			vi.mocked(readGroups).mockReturnValue([
-				{ id: 'group-full-id', name: 'Full Group', emoji: '📁', collapsed: false },
+		it('should resolve partial project ID', () => {
+			vi.mocked(resolveProjectId).mockReturnValue('project-full-id');
+			vi.mocked(getSessionsByProject).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([
+				{ id: 'project-full-id', name: 'Full Project', emoji: '📁', collapsed: false },
 			]);
 
-			listAgents({ group: 'group' });
+			listAgents({ project: 'project' });
 
-			expect(resolveGroupId).toHaveBeenCalledWith('group');
-			expect(getSessionsByGroup).toHaveBeenCalledWith('group-full-id');
+			expect(resolveProjectId).toHaveBeenCalledWith('project');
+			expect(getSessionsByProject).toHaveBeenCalledWith('project-full-id');
 		});
 
-		it('should handle empty group', () => {
-			vi.mocked(resolveGroupId).mockReturnValue('empty-group');
-			vi.mocked(getSessionsByGroup).mockReturnValue([]);
-			vi.mocked(readGroups).mockReturnValue([
-				{ id: 'empty-group', name: 'Empty Group', emoji: '📭', collapsed: false },
+		it('should handle empty project', () => {
+			vi.mocked(resolveProjectId).mockReturnValue('empty-project');
+			vi.mocked(getSessionsByProject).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([
+				{ id: 'empty-project', name: 'Empty Project', emoji: '📭', collapsed: false },
 			]);
 
-			listAgents({ group: 'empty-group' });
+			listAgents({ project: 'empty-project' });
 
-			expect(formatAgents).toHaveBeenCalledWith([], 'Empty Group');
-			expect(consoleSpy).toHaveBeenCalledWith('No agents in group "Empty Group"');
+			expect(formatAgents).toHaveBeenCalledWith([], 'Empty Project');
+			expect(consoleSpy).toHaveBeenCalledWith('No agents in project "Empty Project"');
 		});
 
-		it('should filter by group in JSON mode', () => {
-			const mockGroupSessions: SessionInfo[] = [
-				mockSession({ id: 'g1', name: 'Group Agent', groupId: 'test-group' }),
+		it('should filter by project in JSON mode', () => {
+			const mockProjectSessions: SessionInfo[] = [
+				mockSession({ id: 'g1', name: 'Project Agent', projectId: 'test-project' }),
 			];
 
-			vi.mocked(resolveGroupId).mockReturnValue('test-group');
-			vi.mocked(getSessionsByGroup).mockReturnValue(mockGroupSessions);
-			vi.mocked(readGroups).mockReturnValue([
-				{ id: 'test-group', name: 'Test Group', emoji: '🧪', collapsed: false },
+			vi.mocked(resolveProjectId).mockReturnValue('test-project');
+			vi.mocked(getSessionsByProject).mockReturnValue(mockProjectSessions);
+			vi.mocked(readProjects).mockReturnValue([
+				{ id: 'test-project', name: 'Test Project', emoji: '🧪', collapsed: false },
 			]);
 
-			listAgents({ group: 'test', json: true });
+			listAgents({ project: 'test', json: true });
 
-			expect(getSessionsByGroup).toHaveBeenCalledWith('test-group');
+			expect(getSessionsByProject).toHaveBeenCalledWith('test-project');
 			expect(formatAgents).not.toHaveBeenCalled();
 
 			const output = consoleSpy.mock.calls[0][0];
@@ -311,15 +311,15 @@ describe('list-agents command', () => {
 			expect(parsed[0].id).toBe('g1');
 		});
 
-		it('should handle group not found', () => {
-			vi.mocked(readGroups).mockReturnValue([
-				{ id: 'other-group', name: 'Other', emoji: '📁', collapsed: false },
+		it('should handle project not found', () => {
+			vi.mocked(readProjects).mockReturnValue([
+				{ id: 'other-project', name: 'Other', emoji: '📁', collapsed: false },
 			]);
-			vi.mocked(getSessionsByGroup).mockReturnValue([]);
-			// Return undefined when group is not found
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(getSessionsByProject).mockReturnValue([]);
+			// Return undefined when project is not found
+			vi.mocked(readProjects).mockReturnValue([]);
 
-			listAgents({ group: 'unknown' });
+			listAgents({ project: 'unknown' });
 
 			expect(formatAgents).toHaveBeenCalledWith([], undefined);
 		});
@@ -351,14 +351,14 @@ describe('list-agents command', () => {
 			expect(parsed.error).toBe('JSON storage error');
 		});
 
-		it('should handle group resolution errors', () => {
-			vi.mocked(resolveGroupId).mockImplementation(() => {
-				throw new Error('Ambiguous group ID');
+		it('should handle project resolution errors', () => {
+			vi.mocked(resolveProjectId).mockImplementation(() => {
+				throw new Error('Ambiguous project ID');
 			});
 
-			expect(() => listAgents({ group: 'amb' })).toThrow('process.exit(1)');
+			expect(() => listAgents({ project: 'amb' })).toThrow('process.exit(1)');
 
-			expect(formatError).toHaveBeenCalledWith('Failed to list agents: Ambiguous group ID');
+			expect(formatError).toHaveBeenCalledWith('Failed to list agents: Ambiguous project ID');
 		});
 
 		it('should handle non-Error objects thrown', () => {
@@ -387,7 +387,7 @@ describe('list-agents command', () => {
 				mockSession({
 					id: 'minimal',
 					name: 'Minimal',
-					groupId: undefined,
+					projectId: undefined,
 					autoRunFolderPath: undefined,
 				}),
 			];
@@ -398,7 +398,7 @@ describe('list-agents command', () => {
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
 
-			expect(parsed[0].groupId).toBeUndefined();
+			expect(parsed[0].projectId).toBeUndefined();
 			expect(parsed[0].autoRunFolderPath).toBeUndefined();
 		});
 

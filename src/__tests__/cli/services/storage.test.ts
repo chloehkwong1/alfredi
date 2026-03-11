@@ -4,16 +4,16 @@
  *
  * Tests all functionality of the storage service including:
  * - Platform-specific config directory detection
- * - Reading sessions, groups, history, settings, agent configs
- * - Partial ID resolution for agents and groups
- * - Session lookup by ID and group
+ * - Reading sessions, projects, history, settings, agent configs
+ * - Partial ID resolution for agents and projects
+ * - Session lookup by ID and project
  * - History entry writing
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
-import type { Group, SessionInfo, HistoryEntry } from '../../../shared/types';
+import type { Project, SessionInfo, HistoryEntry } from '../../../shared/types';
 
 // Store original env values
 const originalEnv = { ...process.env };
@@ -35,15 +35,15 @@ vi.mock('os', () => ({
 
 import {
 	readSessions,
-	readGroups,
+	readProjects,
 	readHistory,
 	readSettings,
 	readAgentConfigs,
 	getAgentCustomPath,
 	resolveAgentId,
-	resolveGroupId,
+	resolveProjectId,
 	getSessionById,
-	getSessionsByGroup,
+	getSessionsByProject,
 	getConfigDirectory,
 	addHistoryEntry,
 } from '../../../cli/services/storage';
@@ -58,9 +58,9 @@ describe('storage service', () => {
 		...overrides,
 	});
 
-	const mockGroup = (overrides: Partial<Group> = {}): Group => ({
+	const mockProject = (overrides: Partial<Project> = {}): Project => ({
 		id: 'group-123',
-		name: 'Test Group',
+		name: 'Test Project',
 		emoji: '🚀',
 		collapsed: false,
 		...overrides,
@@ -196,12 +196,12 @@ describe('storage service', () => {
 		});
 	});
 
-	describe('readGroups', () => {
-		it('should return groups from file', () => {
-			const groups = [mockGroup({ id: 'grp-1' }), mockGroup({ id: 'grp-2' })];
-			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ groups }));
+	describe('readProjects', () => {
+		it('should return projects from file', () => {
+			const projects = [mockProject({ id: 'grp-1' }), mockProject({ id: 'grp-2' })];
+			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ projects }));
 
-			const result = readGroups();
+			const result = readProjects();
 
 			expect(result).toHaveLength(2);
 			expect(result[0].id).toBe('grp-1');
@@ -214,15 +214,15 @@ describe('storage service', () => {
 				throw error;
 			});
 
-			const result = readGroups();
+			const result = readProjects();
 
 			expect(result).toEqual([]);
 		});
 
-		it('should return empty array when groups is undefined', () => {
+		it('should return empty array when projects is undefined', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({}));
 
-			const result = readGroups();
+			const result = readProjects();
 
 			expect(result).toEqual([]);
 		});
@@ -525,62 +525,65 @@ describe('storage service', () => {
 		});
 	});
 
-	describe('resolveGroupId', () => {
+	describe('resolveProjectId', () => {
 		it('should return exact match', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue(
 				JSON.stringify({
-					groups: [mockGroup({ id: 'exact-group-id' })],
+					projects: [mockProject({ id: 'exact-project-id' })],
 				})
 			);
 
-			const result = resolveGroupId('exact-group-id');
+			const result = resolveProjectId('exact-project-id');
 
-			expect(result).toBe('exact-group-id');
+			expect(result).toBe('exact-project-id');
 		});
 
 		it('should return single prefix match', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue(
 				JSON.stringify({
-					groups: [mockGroup({ id: 'unique-grp-abc' }), mockGroup({ id: 'different-grp-xyz' })],
+					projects: [
+						mockProject({ id: 'unique-grp-abc' }),
+						mockProject({ id: 'different-grp-xyz' }),
+					],
 				})
 			);
 
-			const result = resolveGroupId('unique');
+			const result = resolveProjectId('unique');
 
 			expect(result).toBe('unique-grp-abc');
 		});
 
-		it('should throw when group not found', () => {
-			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ groups: [] }));
+		it('should throw when project not found', () => {
+			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ projects: [] }));
 
-			expect(() => resolveGroupId('nonexistent')).toThrow('Group not found: nonexistent');
+			expect(() => resolveProjectId('nonexistent')).toThrow('Project not found: nonexistent');
 		});
 
 		it('should throw with match list when ambiguous', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue(
 				JSON.stringify({
-					groups: [
-						mockGroup({ id: 'test-group-1', name: 'First Group' }),
-						mockGroup({ id: 'test-group-2', name: 'Second Group' }),
+					projects: [
+						mockProject({ id: 'test-project-1', name: 'First Project' }),
+						mockProject({ id: 'test-project-2', name: 'Second Project' }),
 					],
 				})
 			);
 
-			expect(() => resolveGroupId('test')).toThrow(/Ambiguous group ID 'test'/);
+			expect(() => resolveProjectId('test')).toThrow(/Ambiguous project ID 'test'/);
 		});
 
-		it('should include group names in ambiguous error', () => {
+		it('should include project names in ambiguous error', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue(
 				JSON.stringify({
-					groups: [
-						mockGroup({ id: 'work-projects', name: 'Work' }),
-						mockGroup({ id: 'work-personal', name: 'Personal' }),
+					projects: [
+						mockProject({ id: 'work-projects', name: 'Work' }),
+						mockProject({ id: 'work-personal', name: 'Personal' }),
 					],
 				})
 			);
 
 			try {
-				resolveGroupId('work');
+				resolveProjectId('work');
 				expect.fail('Should have thrown');
 			} catch (error) {
 				expect((error as Error).message).toContain('work-projects');
@@ -590,22 +593,22 @@ describe('storage service', () => {
 			}
 		});
 
-		it('should show Unknown when group name is missing', () => {
+		it('should show Unknown when project name is missing', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue(
 				JSON.stringify({
-					groups: [
-						{ ...mockGroup({ id: 'test-1' }), name: undefined },
-						mockGroup({ id: 'test-2', name: 'Named Group' }),
+					projects: [
+						{ ...mockProject({ id: 'test-1' }), name: undefined },
+						mockProject({ id: 'test-2', name: 'Named Project' }),
 					],
 				})
 			);
 
 			try {
-				resolveGroupId('test');
+				resolveProjectId('test');
 				expect.fail('Should have thrown');
 			} catch (error) {
 				expect((error as Error).message).toContain('Unknown');
-				expect((error as Error).message).toContain('Named Group');
+				expect((error as Error).message).toContain('Named Project');
 			}
 		});
 	});
@@ -671,59 +674,62 @@ describe('storage service', () => {
 		});
 	});
 
-	describe('getSessionsByGroup', () => {
-		it('should return sessions for exact group ID', () => {
+	describe('getSessionsByProject', () => {
+		it('should return sessions for exact project ID', () => {
 			vi.mocked(fs.readFileSync).mockImplementation((filepath) => {
 				if (String(filepath).includes('sessions')) {
 					return JSON.stringify({
 						sessions: [
-							mockSession({ id: 's1', groupId: 'group-123' }),
-							mockSession({ id: 's2', groupId: 'group-456' }),
-							mockSession({ id: 's3', groupId: 'group-123' }),
+							mockSession({ id: 's1', projectId: 'project-123' }),
+							mockSession({ id: 's2', projectId: 'project-456' }),
+							mockSession({ id: 's3', projectId: 'project-123' }),
 						],
 					});
 				}
 				return JSON.stringify({
-					groups: [mockGroup({ id: 'group-123' }), mockGroup({ id: 'group-456' })],
+					projects: [mockProject({ id: 'project-123' }), mockProject({ id: 'project-456' })],
 				});
 			});
 
-			const result = getSessionsByGroup('group-123');
+			const result = getSessionsByProject('project-123');
 
 			expect(result).toHaveLength(2);
-			expect(result.every((s) => s.groupId === 'group-123')).toBe(true);
+			expect(result.every((s) => s.projectId === 'project-123')).toBe(true);
 		});
 
-		it('should return sessions for prefix group ID match', () => {
+		it('should return sessions for prefix project ID match', () => {
 			vi.mocked(fs.readFileSync).mockImplementation((filepath) => {
 				if (String(filepath).includes('sessions')) {
 					return JSON.stringify({
 						sessions: [
-							mockSession({ id: 's1', groupId: 'unique-group-123' }),
-							mockSession({ id: 's2', groupId: 'other-group' }),
+							mockSession({ id: 's1', projectId: 'unique-project-123' }),
+							mockSession({ id: 's2', projectId: 'other-project' }),
 						],
 					});
 				}
 				return JSON.stringify({
-					groups: [mockGroup({ id: 'unique-group-123' }), mockGroup({ id: 'other-group' })],
+					projects: [
+						mockProject({ id: 'unique-project-123' }),
+						mockProject({ id: 'other-project' }),
+					],
 				});
 			});
 
-			const result = getSessionsByGroup('unique');
+			const result = getSessionsByProject('unique');
 
 			expect(result).toHaveLength(1);
 			expect(result[0].id).toBe('s1');
 		});
 
-		it('should return empty array when group not found', () => {
+		it('should return empty array when project not found', () => {
 			vi.mocked(fs.readFileSync).mockImplementation((filepath) => {
 				if (String(filepath).includes('sessions')) {
 					return JSON.stringify({ sessions: [mockSession()] });
 				}
-				return JSON.stringify({ groups: [] });
+				return JSON.stringify({ projects: [] });
 			});
 
-			const result = getSessionsByGroup('nonexistent');
+			const result = getSessionsByProject('nonexistent');
 
 			expect(result).toEqual([]);
 		});
@@ -733,17 +739,17 @@ describe('storage service', () => {
 				if (String(filepath).includes('sessions')) {
 					return JSON.stringify({
 						sessions: [
-							mockSession({ id: 's1', groupId: 'test-group-1' }),
-							mockSession({ id: 's2', groupId: 'test-group-2' }),
+							mockSession({ id: 's1', projectId: 'test-project-1' }),
+							mockSession({ id: 's2', projectId: 'test-project-2' }),
 						],
 					});
 				}
 				return JSON.stringify({
-					groups: [mockGroup({ id: 'test-group-1' }), mockGroup({ id: 'test-group-2' })],
+					projects: [mockProject({ id: 'test-project-1' }), mockProject({ id: 'test-project-2' })],
 				});
 			});
 
-			const result = getSessionsByGroup('test');
+			const result = getSessionsByProject('test');
 
 			expect(result).toEqual([]);
 		});
@@ -846,17 +852,17 @@ describe('storage service', () => {
 			expect(result?.name).toBe('Test <>&"\'Session');
 		});
 
-		it('should handle unicode in group names', () => {
-			const group = mockGroup({
-				id: 'unicode-group',
-				name: '日本語グループ 🎮',
+		it('should handle unicode in project names', () => {
+			const project = mockProject({
+				id: 'unicode-project',
+				name: '日本語プロジェクト 🎮',
 				emoji: '🚀',
 			});
-			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ groups: [group] }));
+			vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({ projects: [project] }));
 
-			const result = readGroups();
+			const result = readProjects();
 
-			expect(result[0].name).toBe('日本語グループ 🎮');
+			expect(result[0].name).toBe('日本語プロジェクト 🎮');
 		});
 
 		it('should handle very long session IDs', () => {
@@ -908,7 +914,7 @@ describe('storage service', () => {
 			vi.mocked(fs.readFileSync).mockReturnValue('{}');
 
 			expect(readSessions()).toEqual([]);
-			expect(readGroups()).toEqual([]);
+			expect(readProjects()).toEqual([]);
 			expect(readHistory()).toEqual([]);
 			expect(readSettings()).toEqual({});
 			expect(readAgentConfigs()).toEqual({});

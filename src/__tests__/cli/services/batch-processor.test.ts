@@ -44,7 +44,7 @@ vi.mock('../../../cli/services/agent-spawner', () => ({
 // Mock storage
 vi.mock('../../../cli/services/storage', () => ({
 	addHistoryEntry: vi.fn(),
-	readGroups: vi.fn(),
+	readProjects: vi.fn(),
 }));
 
 // Mock cli-activity
@@ -75,7 +75,7 @@ import {
 	uncheckAllTasks,
 	writeDoc,
 } from '../../../cli/services/agent-spawner';
-import { addHistoryEntry, readGroups } from '../../../cli/services/storage';
+import { addHistoryEntry, readProjects } from '../../../cli/services/storage';
 import { registerCliActivity, unregisterCliActivity } from '../../../shared/cli-activity';
 
 describe('batch-processor', () => {
@@ -86,7 +86,7 @@ describe('batch-processor', () => {
 		toolType: 'claude-code',
 		cwd: '/path/to/project',
 		projectRoot: '/path/to/project',
-		groupId: 'group-456',
+		projectId: 'project-456',
 		...overrides,
 	});
 
@@ -114,8 +114,8 @@ describe('batch-processor', () => {
 
 		// Default mock implementations
 		vi.mocked(childProcess.execFileSync).mockReturnValue('main');
-		vi.mocked(readGroups).mockReturnValue([
-			{ id: 'group-456', name: 'Test Group', emoji: '🧪', collapsed: false },
+		vi.mocked(readProjects).mockReturnValue([
+			{ id: 'project-456', name: 'Test Project', emoji: '🧪', collapsed: false },
 		]);
 		// By default, return 0 tasks to prevent infinite loops
 		vi.mocked(readDocAndCountTasks).mockReturnValue({ content: '', taskCount: 0 });
@@ -827,9 +827,9 @@ describe('batch-processor', () => {
 			expect(firstCall[2]).toContain('Process the task in this session');
 		});
 
-		it('should include group name in template context', async () => {
-			vi.mocked(readGroups).mockReturnValue([
-				{ id: 'my-group', name: 'Development', emoji: '🚀', collapsed: false },
+		it('should include project name in template context', async () => {
+			vi.mocked(readProjects).mockReturnValue([
+				{ id: 'my-project', name: 'Development', emoji: '🚀', collapsed: false },
 			]);
 
 			let callCount = 0;
@@ -839,13 +839,13 @@ describe('batch-processor', () => {
 				return { content: '', taskCount: 0 };
 			});
 
-			const session = mockSession({ groupId: 'my-group' });
-			const playbook = mockPlaybook({ prompt: 'Group: ${group.name}' });
+			const session = mockSession({ projectId: 'my-project' });
+			const playbook = mockPlaybook({ prompt: 'Project: ${project.name}' });
 
 			await collectEvents(runPlaybook(session, playbook, '/playbooks'));
 
-			// Verify readGroups was called to get group info
-			expect(readGroups).toHaveBeenCalled();
+			// Verify readProjects was called to get project info
+			expect(readProjects).toHaveBeenCalled();
 		});
 	});
 

@@ -16,7 +16,7 @@ import {
 	emitDocumentComplete,
 	emitLoopComplete,
 	emitComplete,
-	emitGroup,
+	emitProject,
 	emitAgent,
 	emitPlaybook,
 } from '../../../cli/output/jsonl';
@@ -445,37 +445,37 @@ describe('jsonl output', () => {
 		});
 	});
 
-	describe('emitGroup', () => {
-		it('should emit group event', () => {
-			const group = {
-				id: 'group-123',
-				name: 'My Group',
+	describe('emitProject', () => {
+		it('should emit project event', () => {
+			const project = {
+				id: 'project-123',
+				name: 'My Project',
 				emoji: '🚀',
 				collapsed: false,
 			};
 
-			emitGroup(group);
+			emitProject(project);
 
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
 
-			expect(parsed.type).toBe('group');
-			expect(parsed.id).toBe('group-123');
-			expect(parsed.name).toBe('My Group');
+			expect(parsed.type).toBe('project');
+			expect(parsed.id).toBe('project-123');
+			expect(parsed.name).toBe('My Project');
 			expect(parsed.emoji).toBe('🚀');
 			expect(parsed.collapsed).toBe(false);
 			expect(parsed.timestamp).toBe(mockTimestamp);
 		});
 
-		it('should emit collapsed group', () => {
-			const group = {
-				id: 'group-456',
-				name: 'Collapsed Group',
+		it('should emit collapsed project', () => {
+			const project = {
+				id: 'project-456',
+				name: 'Collapsed Project',
 				emoji: '📁',
 				collapsed: true,
 			};
 
-			emitGroup(group);
+			emitProject(project);
 
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
@@ -484,14 +484,14 @@ describe('jsonl output', () => {
 		});
 
 		it('should handle empty emoji', () => {
-			const group = {
-				id: 'group-789',
-				name: 'No Emoji Group',
+			const project = {
+				id: 'project-789',
+				name: 'No Emoji Project',
 				emoji: '',
 				collapsed: false,
 			};
 
-			emitGroup(group);
+			emitProject(project);
 
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
@@ -522,13 +522,13 @@ describe('jsonl output', () => {
 			expect(parsed.timestamp).toBe(mockTimestamp);
 		});
 
-		it('should emit agent event with groupId', () => {
+		it('should emit agent event with projectId', () => {
 			const agent = {
 				id: 'agent-456',
 				name: 'Grouped Agent',
 				toolType: 'factory-droid',
 				cwd: '/path',
-				groupId: 'group-123',
+				projectId: 'project-123',
 			};
 
 			emitAgent(agent);
@@ -536,7 +536,7 @@ describe('jsonl output', () => {
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
 
-			expect(parsed.groupId).toBe('group-123');
+			expect(parsed.projectId).toBe('project-123');
 		});
 
 		it('should emit agent event with autoRunFolderPath', () => {
@@ -562,7 +562,7 @@ describe('jsonl output', () => {
 				name: 'Full Agent',
 				toolType: 'terminal',
 				cwd: '/home/user/project',
-				groupId: 'dev-group',
+				projectId: 'dev-project',
 				autoRunFolderPath: '/home/user/project/auto',
 			};
 
@@ -571,7 +571,7 @@ describe('jsonl output', () => {
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
 
-			expect(parsed.groupId).toBe('dev-group');
+			expect(parsed.projectId).toBe('dev-project');
 			expect(parsed.autoRunFolderPath).toBe('/home/user/project/auto');
 		});
 
@@ -713,7 +713,7 @@ describe('jsonl output', () => {
 				() => emitDocumentComplete('doc', 1),
 				() => emitLoopComplete(1, 1, 100),
 				() => emitComplete(true, 1, 100),
-				() => emitGroup({ id: 'g1', name: 'g', emoji: '', collapsed: false }),
+				() => emitProject({ id: 'g1', name: 'g', emoji: '', collapsed: false }),
 				() => emitAgent({ id: 'a1', name: 'a', toolType: 't', cwd: '/' }),
 				() =>
 					emitPlaybook({ id: 'p1', name: 'p', sessionId: 's1', documents: [], loopEnabled: false }),

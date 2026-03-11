@@ -5,19 +5,19 @@
  * Tests all functionality of the show-agent command including:
  * - Displaying agent details with history and stats
  * - JSON output mode
- * - Group name resolution
+ * - Project name resolution
  * - Usage statistics aggregation
  * - Error handling
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { SessionInfo, Group, HistoryEntry } from '../../../shared/types';
+import type { SessionInfo, Project, HistoryEntry } from '../../../shared/types';
 
 // Mock the storage service
 vi.mock('../../../cli/services/storage', () => ({
 	getSessionById: vi.fn(),
 	readHistory: vi.fn(),
-	readGroups: vi.fn(),
+	readProjects: vi.fn(),
 }));
 
 // Mock the formatter
@@ -27,7 +27,7 @@ vi.mock('../../../cli/output/formatter', () => ({
 }));
 
 import { showAgent } from '../../../cli/commands/show-agent';
-import { getSessionById, readHistory, readGroups } from '../../../cli/services/storage';
+import { getSessionById, readHistory, readProjects } from '../../../cli/services/storage';
 import { formatAgentDetail, formatError } from '../../../cli/output/formatter';
 
 describe('show-agent command', () => {
@@ -41,7 +41,7 @@ describe('show-agent command', () => {
 		toolType: 'claude-code',
 		cwd: '/path/to/project',
 		projectRoot: '/path/to/project',
-		groupId: undefined,
+		projectId: undefined,
 		autoRunFolderPath: undefined,
 		...overrides,
 	});
@@ -85,7 +85,7 @@ describe('show-agent command', () => {
 	describe('basic display', () => {
 		it('should display agent details in human-readable format', () => {
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent-123', {});
@@ -95,33 +95,35 @@ describe('show-agent command', () => {
 			expect(consoleSpy).toHaveBeenCalled();
 		});
 
-		it('should include group name when agent belongs to a group', () => {
-			const groups: Group[] = [{ id: 'group-1', name: 'Frontend', emoji: '🎨', collapsed: false }];
-			vi.mocked(getSessionById).mockReturnValue(mockSession({ groupId: 'group-1' }));
-			vi.mocked(readGroups).mockReturnValue(groups);
+		it('should include project name when agent belongs to a project', () => {
+			const projects: Project[] = [
+				{ id: 'project-1', name: 'Frontend', emoji: '🎨', collapsed: false },
+			];
+			vi.mocked(getSessionById).mockReturnValue(mockSession({ projectId: 'project-1' }));
+			vi.mocked(readProjects).mockReturnValue(projects);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent-123', {});
 
 			expect(formatAgentDetail).toHaveBeenCalledWith(
 				expect.objectContaining({
-					groupId: 'group-1',
-					groupName: 'Frontend',
+					projectId: 'project-1',
+					projectName: 'Frontend',
 				})
 			);
 		});
 
-		it('should handle agent without group', () => {
-			vi.mocked(getSessionById).mockReturnValue(mockSession({ groupId: undefined }));
-			vi.mocked(readGroups).mockReturnValue([]);
+		it('should handle agent without project', () => {
+			vi.mocked(getSessionById).mockReturnValue(mockSession({ projectId: undefined }));
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent-123', {});
 
 			expect(formatAgentDetail).toHaveBeenCalledWith(
 				expect.objectContaining({
-					groupId: undefined,
-					groupName: undefined,
+					projectId: undefined,
+					projectName: undefined,
 				})
 			);
 		});
@@ -151,7 +153,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -174,7 +176,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -194,7 +196,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -220,7 +222,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -239,7 +241,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -257,7 +259,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -277,7 +279,7 @@ describe('show-agent command', () => {
 			);
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -297,7 +299,7 @@ describe('show-agent command', () => {
 			];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -312,7 +314,7 @@ describe('show-agent command', () => {
 			const history: HistoryEntry[] = [mockHistoryEntry({ usageStats: undefined })];
 
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue(history);
 
 			showAgent('agent-123', { json: true });
@@ -327,7 +329,7 @@ describe('show-agent command', () => {
 	describe('JSON output', () => {
 		it('should output JSON when json option is true', () => {
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent-123', { json: true });
@@ -351,12 +353,12 @@ describe('show-agent command', () => {
 					toolType: 'gemini-cli',
 					cwd: '/project',
 					projectRoot: '/project/root',
-					groupId: 'group-1',
+					projectId: 'project-1',
 					autoRunFolderPath: '/project/playbooks',
 				})
 			);
-			vi.mocked(readGroups).mockReturnValue([
-				{ id: 'group-1', name: 'My Group', emoji: '🔧', collapsed: false },
+			vi.mocked(readProjects).mockReturnValue([
+				{ id: 'project-1', name: 'My Project', emoji: '🔧', collapsed: false },
 			]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
@@ -370,8 +372,8 @@ describe('show-agent command', () => {
 			expect(parsed.toolType).toBe('gemini-cli');
 			expect(parsed.cwd).toBe('/project');
 			expect(parsed.projectRoot).toBe('/project/root');
-			expect(parsed.groupId).toBe('group-1');
-			expect(parsed.groupName).toBe('My Group');
+			expect(parsed.projectId).toBe('project-1');
+			expect(parsed.projectName).toBe('My Project');
 			expect(parsed.autoRunFolderPath).toBe('/project/playbooks');
 		});
 	});
@@ -426,7 +428,7 @@ describe('show-agent command', () => {
 	describe('edge cases', () => {
 		it('should handle empty history', () => {
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent-123', { json: true });
@@ -443,7 +445,7 @@ describe('show-agent command', () => {
 
 		it('should handle partial ID lookup', () => {
 			vi.mocked(getSessionById).mockReturnValue(mockSession());
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent', {});
@@ -451,9 +453,9 @@ describe('show-agent command', () => {
 			expect(getSessionById).toHaveBeenCalledWith('agent');
 		});
 
-		it('should handle group not found for groupId', () => {
-			vi.mocked(getSessionById).mockReturnValue(mockSession({ groupId: 'missing-group' }));
-			vi.mocked(readGroups).mockReturnValue([]);
+		it('should handle project not found for projectId', () => {
+			vi.mocked(getSessionById).mockReturnValue(mockSession({ projectId: 'missing-project' }));
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('agent-123', { json: true });
@@ -461,13 +463,13 @@ describe('show-agent command', () => {
 			const output = consoleSpy.mock.calls[0][0];
 			const parsed = JSON.parse(output);
 
-			expect(parsed.groupId).toBe('missing-group');
-			expect(parsed.groupName).toBeUndefined();
+			expect(parsed.projectId).toBe('missing-project');
+			expect(parsed.projectName).toBeUndefined();
 		});
 
 		it('should pass correct sessionId to readHistory', () => {
 			vi.mocked(getSessionById).mockReturnValue(mockSession({ id: 'specific-agent' }));
-			vi.mocked(readGroups).mockReturnValue([]);
+			vi.mocked(readProjects).mockReturnValue([]);
 			vi.mocked(readHistory).mockReturnValue([]);
 
 			showAgent('specific-agent', {});

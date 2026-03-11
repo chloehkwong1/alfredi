@@ -48,7 +48,7 @@ describe('show-playbook command', () => {
 		toolType: 'claude-code',
 		cwd: '/path/to/project',
 		projectRoot: '/path/to/project',
-		groupId: undefined,
+		projectId: undefined,
 		autoRunFolderPath: '/path/to/playbooks',
 		...overrides,
 	});

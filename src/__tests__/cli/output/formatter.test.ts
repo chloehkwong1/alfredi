@@ -4,7 +4,7 @@
  * This file contains comprehensive tests for the human-readable output formatter
  * used by the Maestro CLI. It tests all formatting functions including:
  * - Color and style helpers (c, bold, dim, truncate)
- * - Group formatting (formatGroups)
+ * - Project formatting (formatProjects)
  * - Agent formatting (formatAgents, formatAgentDetail)
  * - Playbook formatting (formatPlaybooks, formatPlaybookDetail, formatPlaybooksByAgent)
  * - Run event formatting (formatRunEvent)
@@ -13,7 +13,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-	formatGroups,
+	formatProjects,
 	formatAgents,
 	formatPlaybooks,
 	formatPlaybookDetail,
@@ -25,7 +25,7 @@ import {
 	formatInfo,
 	formatWarning,
 	formatSessions,
-	type GroupDisplay,
+	type ProjectDisplay,
 	type AgentDisplay,
 	type PlaybookDisplay,
 	type PlaybookDetailDisplay,
@@ -88,37 +88,37 @@ describe('formatter', () => {
 	});
 
 	// ============================================================================
-	// formatGroups Tests
+	// formatProjects Tests
 	// ============================================================================
 
-	describe('formatGroups', () => {
-		it('should return "No groups found" for empty array', () => {
-			const result = formatGroups([]);
-			expect(result).toContain('No groups found');
+	describe('formatProjects', () => {
+		it('should return "No projects found" for empty array', () => {
+			const result = formatProjects([]);
+			expect(result).toContain('No projects found');
 		});
 
-		it('should format a single group', () => {
-			const groups: GroupDisplay[] = [{ id: 'group-123', name: 'My Project', emoji: '🚀' }];
+		it('should format a single project', () => {
+			const projects: ProjectDisplay[] = [{ id: 'project-123', name: 'My Project', emoji: '🚀' }];
 
-			const result = formatGroups(groups);
+			const result = formatProjects(projects);
 
-			expect(result).toContain('GROUPS');
+			expect(result).toContain('PROJECTS');
 			expect(result).toContain('(1)');
 			expect(result).toContain('🚀');
 			expect(result).toContain('My Project');
-			expect(result).toContain('group-123');
+			expect(result).toContain('project-123');
 		});
 
-		it('should format multiple groups', () => {
-			const groups: GroupDisplay[] = [
-				{ id: 'group-1', name: 'Frontend', emoji: '🎨' },
-				{ id: 'group-2', name: 'Backend', emoji: '⚙️' },
-				{ id: 'group-3', name: 'DevOps' }, // No emoji - should default to 📁
+		it('should format multiple projects', () => {
+			const projects: ProjectDisplay[] = [
+				{ id: 'project-1', name: 'Frontend', emoji: '🎨' },
+				{ id: 'project-2', name: 'Backend', emoji: '⚙️' },
+				{ id: 'project-3', name: 'DevOps' }, // No emoji - should default to 📁
 			];
 
-			const result = formatGroups(groups);
+			const result = formatProjects(projects);
 
-			expect(result).toContain('GROUPS');
+			expect(result).toContain('PROJECTS');
 			expect(result).toContain('(3)');
 			expect(result).toContain('🎨');
 			expect(result).toContain('Frontend');
@@ -129,9 +129,9 @@ describe('formatter', () => {
 		});
 
 		it('should use default emoji when none provided', () => {
-			const groups: GroupDisplay[] = [{ id: 'group-1', name: 'No Emoji Group' }];
+			const projects: ProjectDisplay[] = [{ id: 'project-1', name: 'No Emoji Project' }];
 
-			const result = formatGroups(groups);
+			const result = formatProjects(projects);
 			expect(result).toContain('📁');
 		});
 	});
@@ -189,7 +189,7 @@ describe('formatter', () => {
 			expect(result).toContain('Agent Two');
 		});
 
-		it('should show group name in title when provided', () => {
+		it('should show project name in title when provided', () => {
 			const agents: AgentDisplay[] = [
 				{
 					id: 'agent-1',
@@ -199,9 +199,9 @@ describe('formatter', () => {
 				},
 			];
 
-			const result = formatAgents(agents, 'My Group');
+			const result = formatAgents(agents, 'My Project');
 
-			expect(result).toContain('in My Group');
+			expect(result).toContain('in My Project');
 		});
 
 		it('should show Auto Run badge for agents with autoRunFolderPath', () => {
@@ -962,16 +962,16 @@ describe('formatter', () => {
 			expect(result).toContain('/home/user/project');
 		});
 
-		it('should show group name when provided', () => {
+		it('should show project name when provided', () => {
 			const agent: AgentDetailDisplay = {
 				...baseAgent,
-				groupName: 'My Group',
+				projectName: 'My Project',
 			};
 
 			const result = formatAgentDetail(agent);
 
-			expect(result).toContain('Group:');
-			expect(result).toContain('My Group');
+			expect(result).toContain('Project:');
+			expect(result).toContain('My Project');
 		});
 
 		it('should show auto run folder when provided', () => {
@@ -1207,9 +1207,11 @@ describe('formatter', () => {
 		});
 
 		it('should handle unicode in names', () => {
-			const groups: GroupDisplay[] = [{ id: 'group-1', name: '日本語プロジェクト', emoji: '🇯🇵' }];
+			const projects: ProjectDisplay[] = [
+				{ id: 'project-1', name: '日本語プロジェクト', emoji: '🇯🇵' },
+			];
 
-			const result = formatGroups(groups);
+			const result = formatProjects(projects);
 
 			expect(result).toContain('日本語プロジェクト');
 			expect(result).toContain('🇯🇵');
