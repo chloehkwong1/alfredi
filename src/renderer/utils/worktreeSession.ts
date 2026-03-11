@@ -30,6 +30,8 @@ export interface BuildWorktreeSessionParams {
 	defaultShowThinking: ThinkingMode;
 	/** Legacy worktreeParentPath to inherit — presence triggers legacy mode. */
 	worktreeParentPath?: string;
+	/** Explicit projectId override. Defaults to parentSession.projectId. */
+	projectId?: string;
 }
 
 export function buildWorktreeSession(params: BuildWorktreeSessionParams): Session {
@@ -53,7 +55,7 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 	return {
 		id: newId,
 		name: params.name,
-		projectId: params.parentSession.projectId,
+		projectId: params.projectId ?? params.parentSession.projectId,
 		toolType: params.parentSession.toolType,
 		state: 'idle',
 		cwd: params.path,

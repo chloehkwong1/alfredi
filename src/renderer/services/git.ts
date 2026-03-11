@@ -161,4 +161,38 @@ export const gitService = {
 			defaultValue: [],
 		});
 	},
+
+	/**
+	 * Run a lifecycle script in a worktree's working directory
+	 * @param script Shell script string to execute
+	 * @param cwd Working directory for the script
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async runWorktreeScript(
+		script: string,
+		cwd: string,
+		sshRemoteId?: string
+	): Promise<{ success: boolean; stdout?: string; stderr?: string; error?: string }> {
+		return createIpcMethod({
+			call: () => window.maestro.git.runWorktreeScript(script, cwd, sshRemoteId),
+			errorContext: 'Git runWorktreeScript',
+			defaultValue: { success: false, error: 'IPC call failed' },
+		});
+	},
+
+	/**
+	 * List git remotes for a repository
+	 * @param cwd Working directory path
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async listRemotes(cwd: string, sshRemoteId?: string): Promise<{ name: string; url: string }[]> {
+		return createIpcMethod({
+			call: async () => {
+				const result = await window.maestro.git.listRemotes(cwd, sshRemoteId);
+				return result.remotes || [];
+			},
+			errorContext: 'Git listRemotes',
+			defaultValue: [],
+		});
+	},
 };

@@ -477,7 +477,8 @@ interface MaestroAPI {
 			mainRepoCwd: string,
 			worktreePath: string,
 			branchName: string,
-			sshRemoteId?: string
+			sshRemoteId?: string,
+			baseBranch?: string
 		) => Promise<{
 			success: boolean;
 			created?: boolean;
@@ -562,6 +563,28 @@ interface MaestroAPI {
 			success: boolean;
 			error?: string;
 			hasUncommittedChanges?: boolean;
+		}>;
+		/**
+		 * Run a lifecycle script in a worktree's working directory
+		 */
+		runWorktreeScript: (
+			script: string,
+			cwd: string,
+			sshRemoteId?: string
+		) => Promise<{
+			success: boolean;
+			stdout?: string;
+			stderr?: string;
+			error?: string;
+		}>;
+		/**
+		 * List git remotes for a repository
+		 */
+		listRemotes: (
+			cwd: string,
+			sshRemoteId?: string
+		) => Promise<{
+			remotes: Array<{ name: string; url: string }>;
 		}>;
 		onWorktreeDiscovered: (
 			callback: (data: {

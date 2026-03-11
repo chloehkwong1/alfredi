@@ -4,6 +4,7 @@ import path from 'path';
 import chokidar, { FSWatcher } from 'chokidar';
 import { execFileNoThrow } from '../../utils/execFile';
 import { execGit } from '../../utils/remote-git';
+import { buildSshCommand } from '../../utils/ssh-command-builder';
 import { logger } from '../../utils/logger';
 import { isWebContentsAvailable } from '../../utils/safe-send';
 import {
@@ -540,7 +541,8 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				mainRepoCwd: string,
 				worktreePath: string,
 				branchName: string,
-				sshRemoteId?: string
+				sshRemoteId?: string,
+				baseBranch?: string
 			) => {
 				// SSH remote: dispatch to remote git operations
 				if (sshRemoteId) {
@@ -689,11 +691,12 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 					);
 				} else {
 					// Branch doesn't exist, create it with -b flag
-					createResult = await execFileNoThrow(
-						'git',
-						['worktree', 'add', '-b', branchName, worktreePath],
-						mainRepoCwd
-					);
+					// If baseBranch is specified, use it as the starting point for the new branch
+					const args = ['worktree', 'add', '-b', branchName, worktreePath];
+					if (baseBranch) {
+						args.push(baseBranch);
+					}
+					createResult = await execFileNoThrow('git', args, mainRepoCwd);
 				}
 
 				if (createResult.exitCode !== 0) {
@@ -1435,6 +1438,90 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				return { success: true, gistUrl };
 			}
 		)
+	);
+
+	// Run a lifecycle script in a worktree's working directory
+	// Supports SSH remote execution via optional sshRemoteId parameter
+	ipcMain.handle(
+		'git:runWorktreeScript',
+		createIpcHandler(
+			handlerOpts('runWorktreeScript'),
+			async (script: string, cwd: string, sshRemoteId?: string) => {
+				if (!script || !script.trim()) {
+					return { success: false, error: 'Script cannot be empty' };
+				}
+
+				if (sshRemoteId) {
+					const sshConfig = getSshRemoteById(sshRemoteId);
+					if (!sshConfig) {
+						return { success: false, error: `SSH remote not found: ${sshRemoteId}` };
+					}
+					logger.debug(
+						`${LOG_CONTEXT} runWorktreeScript via SSH: ${script.substring(0, 80)}`,
+						LOG_CONTEXT
+					);
+					const sshCommand = await buildSshCommand(sshConfig, {
+						command: 'sh',
+						args: ['-c', script],
+						cwd,
+						env: sshConfig.remoteEnv,
+					});
+					const result = await execFileNoThrow(sshCommand.command, sshCommand.args, undefined, {
+						timeout: 60_000,
+					});
+					if (result.exitCode !== 0) {
+						return {
+							success: false,
+							stdout: result.stdout,
+							stderr: result.stderr,
+							error: result.stderr || `Script exited with code ${result.exitCode}`,
+						};
+					}
+					return { success: true, stdout: result.stdout, stderr: result.stderr };
+				}
+
+				// Local execution
+				logger.debug(
+					`${LOG_CONTEXT} runWorktreeScript locally: ${script.substring(0, 80)}`,
+					LOG_CONTEXT
+				);
+				const result = await execFileNoThrow('sh', ['-c', script], cwd, {
+					timeout: 60_000,
+				});
+				if (result.exitCode !== 0) {
+					return {
+						success: false,
+						stdout: result.stdout,
+						stderr: result.stderr,
+						error: result.stderr || `Script exited with code ${result.exitCode}`,
+					};
+				}
+				return { success: true, stdout: result.stdout, stderr: result.stderr };
+			}
+		)
+	);
+
+	// List git remotes for a repository
+	// Supports SSH remote execution via optional sshRemoteId parameter
+	ipcMain.handle(
+		'git:listRemotes',
+		createIpcHandler(handlerOpts('listRemotes'), async (cwd: string, sshRemoteId?: string) => {
+			const sshRemote = getSshRemoteById(sshRemoteId);
+			const effectiveRemoteCwd = sshRemote ? cwd : undefined;
+			const result = await execGit(['remote', '-v'], cwd, sshRemote, effectiveRemoteCwd);
+
+			// Parse `git remote -v` output: each line is "name\turl (fetch|push)"
+			const seen = new Set<string>();
+			const remotes: { name: string; url: string }[] = [];
+			for (const line of result.stdout.split('\n')) {
+				const match = line.match(/^(\S+)\t(\S+)\s+\(fetch\)$/);
+				if (match && !seen.has(match[1])) {
+					seen.add(match[1]);
+					remotes.push({ name: match[1], url: match[2] });
+				}
+			}
+			return { remotes };
+		})
 	);
 
 	logger.debug(`${LOG_CONTEXT} Git IPC handlers registered`);

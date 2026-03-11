@@ -222,7 +222,8 @@ export function createGitApi() {
 			mainRepoCwd: string,
 			worktreePath: string,
 			branchName: string,
-			sshRemoteId?: string
+			sshRemoteId?: string,
+			baseBranch?: string
 		): Promise<{
 			success: boolean;
 			created?: boolean;
@@ -231,7 +232,14 @@ export function createGitApi() {
 			branchMismatch?: boolean;
 			error?: string;
 		}> =>
-			ipcRenderer.invoke('git:worktreeSetup', mainRepoCwd, worktreePath, branchName, sshRemoteId),
+			ipcRenderer.invoke(
+				'git:worktreeSetup',
+				mainRepoCwd,
+				worktreePath,
+				branchName,
+				sshRemoteId,
+				baseBranch
+			),
 
 		/**
 		 * Checkout a branch in a worktree
@@ -348,6 +356,27 @@ export function createGitApi() {
 			error?: string;
 			hasUncommittedChanges?: boolean;
 		}> => ipcRenderer.invoke('git:removeWorktree', worktreePath, force),
+
+		/**
+		 * Run a lifecycle script in a worktree's working directory
+		 * Supports SSH remote execution via optional sshRemoteId parameter
+		 */
+		runWorktreeScript: (
+			script: string,
+			cwd: string,
+			sshRemoteId?: string
+		): Promise<{ success: boolean; stdout?: string; stderr?: string; error?: string }> =>
+			ipcRenderer.invoke('git:runWorktreeScript', script, cwd, sshRemoteId),
+
+		/**
+		 * List git remotes for a repository
+		 * Supports SSH remote execution via optional sshRemoteId parameter
+		 */
+		listRemotes: (
+			cwd: string,
+			sshRemoteId?: string
+		): Promise<{ remotes: { name: string; url: string }[] }> =>
+			ipcRenderer.invoke('git:listRemotes', cwd, sshRemoteId),
 
 		/**
 		 * Subscribe to discovered worktrees

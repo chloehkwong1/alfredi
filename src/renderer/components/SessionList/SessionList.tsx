@@ -83,6 +83,7 @@ interface SessionListProps {
 	onQuickCreateWorktree?: (session: Session) => void;
 	onOpenWorktreeConfig?: (session: Session) => void;
 	onDeleteWorktree?: (session: Session) => void;
+	onRunWorktreeScript?: (session: Session) => void;
 
 	// Wizard props
 	openWizard?: () => void;
@@ -167,6 +168,7 @@ function SessionListInner(props: SessionListProps) {
 		onQuickCreateWorktree,
 		onOpenWorktreeConfig,
 		onDeleteWorktree,
+		onRunWorktreeScript,
 		showSessionJumpNumbers = false,
 		visibleSessions = [],
 		openWizard,
@@ -1177,6 +1179,14 @@ function SessionListInner(props: SessionListProps) {
 					onDeleteWorktree={
 						onDeleteWorktree && contextMenuSession.parentSessionId
 							? () => onDeleteWorktree(contextMenuSession)
+							: undefined
+					}
+					onRunWorktreeScript={
+						onRunWorktreeScript &&
+						contextMenuSession.parentSessionId &&
+						contextMenuSession.projectId &&
+						projects.find((p) => p.id === contextMenuSession.projectId)?.worktreeConfig?.runScript
+							? () => onRunWorktreeScript(contextMenuSession)
 							: undefined
 					}
 					onCreateProject={

@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import type { Session } from '../../types';
+import type { Session, Project, ProjectWorktreeConfig } from '../../types';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -37,7 +37,7 @@ export interface WorktreeHandlersReturn {
 	handleDeleteWorktreeSession: (session: Session) => void;
 	handleToggleWorktreeExpanded: (sessionId: string) => void;
 	handleCloseWorktreeConfigModal: () => void;
-	handleSaveWorktreeConfig: (config: { basePath: string; watchEnabled: boolean }) => Promise<void>;
+	handleSaveWorktreeConfig: (config: ProjectWorktreeConfig) => Promise<void>;
 	handleDisableWorktreeConfig: () => void;
 	handleCreateWorktreeFromConfig: (branchName: string, basePath: string) => Promise<void>;
 	handleCloseCreateWorktreeModal: () => void;
@@ -45,6 +45,7 @@ export interface WorktreeHandlersReturn {
 	handleCloseDeleteWorktreeModal: () => void;
 	handleConfirmDeleteWorktree: () => void;
 	handleConfirmAndDeleteWorktreeOnDisk: () => Promise<void>;
+	handleRunWorktreeScript: (session: Session) => Promise<void>;
 }
 
 // ============================================================================
@@ -88,6 +89,29 @@ function normalizePath(p: string): string {
 
 // buildWorktreeSession and BuildWorktreeSessionParams are imported from ../../utils/worktreeSession
 
+/**
+ * Look up the ProjectWorktreeConfig for a session by resolving its projectId.
+ * Falls back to session-level worktreeConfig if no project is assigned.
+ */
+function getProjectWorktreeConfig(session: Session): ProjectWorktreeConfig | undefined {
+	if (session.projectId) {
+		const projects = useSessionStore.getState().projects;
+		const project = projects.find((p) => p.id === session.projectId);
+		if (project?.worktreeConfig) return project.worktreeConfig;
+	}
+	return session.worktreeConfig as ProjectWorktreeConfig | undefined;
+}
+
+/**
+ * Look up the Project for a session by resolving its projectId.
+ * Returns undefined if the session has no project.
+ */
+function getProjectForSession(session: Session): Project | undefined {
+	if (!session.projectId) return undefined;
+	const projects = useSessionStore.getState().projects;
+	return projects.find((p) => p.id === session.projectId);
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
@@ -96,10 +120,8 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	// ---------------------------------------------------------------------------
 	// Reactive subscriptions
 	// ---------------------------------------------------------------------------
-	// Full sessions array is needed here: worktreeConfigKey derives from all sessions'
-	// worktreeConfig fields, and the git info effect iterates parent sessions. A narrower
-	// selector would require a custom equality fn that's more complex than the current approach.
 	const sessions = useSessionStore((s) => s.sessions);
+	const projects = useSessionStore((s) => s.projects);
 	const sessionsLoaded = useSessionStore((s) => s.sessionsLoaded);
 
 	// ---------------------------------------------------------------------------
@@ -111,14 +133,14 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	// Memoized values
 	// ---------------------------------------------------------------------------
 	// Stable dependency key for the worktree file-watcher effect below — only re-runs
-	// when a session's worktreeConfig actually changes (not on every sessions array mutation).
-	// Uses | delimiter to avoid false collisions (session IDs are UUIDs, paths don't contain |).
+	// when a project's worktreeConfig actually changes (not on every sessions/projects array mutation).
+	// Uses | delimiter to avoid false collisions (project IDs are UUIDs, paths don't contain |).
 	const worktreeConfigKey = useMemo(
 		() =>
-			sessions
-				.map((s) => `${s.id}|${s.worktreeConfig?.basePath}|${s.worktreeConfig?.watchEnabled}`)
+			projects
+				.map((p) => `${p.id}|${p.worktreeConfig?.basePath}|${p.worktreeConfig?.watchEnabled}`)
 				.join('\n'),
-		[sessions]
+		[projects]
 	);
 
 	// Whether any sessions still use the legacy worktreeParentPath model (for legacy scanner effect).
@@ -166,87 +188,93 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		getModalActions().setWorktreeConfigModalOpen(false);
 	}, []);
 
-	const handleSaveWorktreeConfig = useCallback(
-		async (config: { basePath: string; watchEnabled: boolean }) => {
-			const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
-			const activeSession = currentSessions.find((s) => s.id === activeSessionId);
-			if (!activeSession) return;
-			const { defaultShowThinking: showThink } = useSettingsStore.getState();
+	const handleSaveWorktreeConfig = useCallback(async (config: ProjectWorktreeConfig) => {
+		const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
+		const activeSession = currentSessions.find((s) => s.id === activeSessionId);
+		if (!activeSession) return;
+		const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
-			// Save the config first
+		// Save config: prefer project-level, fall back to session-level
+		if (activeSession.projectId) {
+			useSessionStore
+				.getState()
+				.setProjects((prev) =>
+					prev.map((p) => (p.id === activeSession.projectId ? { ...p, worktreeConfig: config } : p))
+				);
+		} else {
+			// No project — save directly to the session (legacy path)
 			useSessionStore
 				.getState()
 				.setSessions((prev) =>
 					prev.map((s) => (s.id === activeSession.id ? { ...s, worktreeConfig: config } : s))
 				);
+		}
 
-			// Scan for worktrees and create sub-agent sessions
-			const parentSshRemoteId = getSshRemoteId(activeSession);
-			try {
-				const scanResult = await window.maestro.git.scanWorktreeDirectory(
-					config.basePath,
-					parentSshRemoteId
-				);
-				const { gitSubdirs } = scanResult;
+		// Scan for worktrees and create sub-agent sessions
+		const parentSshRemoteId = getSshRemoteId(activeSession);
+		try {
+			const scanResult = await window.maestro.git.scanWorktreeDirectory(
+				config.basePath,
+				parentSshRemoteId
+			);
+			const { gitSubdirs } = scanResult;
 
-				if (gitSubdirs.length > 0) {
-					const newWorktreeSessions: Session[] = [];
+			if (gitSubdirs.length > 0) {
+				const newWorktreeSessions: Session[] = [];
 
-					for (const subdir of gitSubdirs) {
-						// Skip main/master/HEAD branches — they're typically the main repo
-						if (isSkippableBranch(subdir.branch)) continue;
+				for (const subdir of gitSubdirs) {
+					// Skip main/master/HEAD branches — they're typically the main repo
+					if (isSkippableBranch(subdir.branch)) continue;
 
-						// Check if session already exists (read latest state each iteration)
-						const latestSessions = useSessionStore.getState().sessions;
-						const existingByBranch = latestSessions.find(
-							(s) => s.parentSessionId === activeSession.id && s.worktreeBranch === subdir.branch
-						);
-						if (existingByBranch) continue;
+					// Check if session already exists (read latest state each iteration)
+					const latestSessions = useSessionStore.getState().sessions;
+					const existingByBranch = latestSessions.find(
+						(s) => s.parentSessionId === activeSession.id && s.worktreeBranch === subdir.branch
+					);
+					if (existingByBranch) continue;
 
-						// Also check by path (normalize for comparison)
-						const normalizedSubdirPath = normalizePath(subdir.path);
-						const existingByPath = latestSessions.find(
-							(s) => normalizePath(s.cwd) === normalizedSubdirPath
-						);
-						if (existingByPath) continue;
+					// Also check by path (normalize for comparison)
+					const normalizedSubdirPath = normalizePath(subdir.path);
+					const existingByPath = latestSessions.find(
+						(s) => normalizePath(s.cwd) === normalizedSubdirPath
+					);
+					if (existingByPath) continue;
 
-						const gitInfo = await fetchGitInfo(subdir.path, parentSshRemoteId);
+					const gitInfo = await fetchGitInfo(subdir.path, parentSshRemoteId);
 
-						newWorktreeSessions.push(
-							buildWorktreeSession({
-								parentSession: activeSession,
-								path: subdir.path,
-								branch: subdir.branch,
-								name: subdir.branch || subdir.name,
-								defaultShowThinking: showThink,
-								...gitInfo,
-							})
-						);
-					}
-
-					if (newWorktreeSessions.length > 0) {
-						useSessionStore.getState().setSessions((prev) => [...prev, ...newWorktreeSessions]);
-						// Expand worktrees on parent
-						useSessionStore
-							.getState()
-							.setSessions((prev) =>
-								prev.map((s) => (s.id === activeSession.id ? { ...s, worktreesExpanded: true } : s))
-							);
-						notifyToast({
-							type: 'success',
-							title: 'Worktrees Discovered',
-							message: `Found ${newWorktreeSessions.length} worktree sub-agent${
-								newWorktreeSessions.length > 1 ? 's' : ''
-							}`,
-						});
-					}
+					newWorktreeSessions.push(
+						buildWorktreeSession({
+							parentSession: activeSession,
+							path: subdir.path,
+							branch: subdir.branch,
+							name: subdir.branch || subdir.name,
+							defaultShowThinking: showThink,
+							...gitInfo,
+						})
+					);
 				}
-			} catch (err) {
-				console.error('Failed to scan for worktrees:', err);
+
+				if (newWorktreeSessions.length > 0) {
+					useSessionStore.getState().setSessions((prev) => [...prev, ...newWorktreeSessions]);
+					// Expand worktrees on parent
+					useSessionStore
+						.getState()
+						.setSessions((prev) =>
+							prev.map((s) => (s.id === activeSession.id ? { ...s, worktreesExpanded: true } : s))
+						);
+					notifyToast({
+						type: 'success',
+						title: 'Worktrees Discovered',
+						message: `Found ${newWorktreeSessions.length} worktree sub-agent${
+							newWorktreeSessions.length > 1 ? 's' : ''
+						}`,
+					});
+				}
 			}
-		},
-		[]
-	);
+		} catch (err) {
+			console.error('Failed to scan for worktrees:', err);
+		}
+	}, []);
 
 	const handleDisableWorktreeConfig = useCallback(() => {
 		const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
@@ -258,17 +286,29 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			(s) => s.parentSessionId === activeSession.id
 		).length;
 
-		useSessionStore.getState().setSessions((prev) =>
-			prev
-				// Remove all worktree children of this parent
-				.filter((s) => s.parentSessionId !== activeSession.id)
-				// Clear worktree config on the parent
-				.map((s) =>
-					s.id === activeSession.id
-						? { ...s, worktreeConfig: undefined, worktreeParentPath: undefined }
-						: s
-				)
-		);
+		// Remove worktree children and clear legacy session-level config
+		useSessionStore
+			.getState()
+			.setSessions((prev) =>
+				prev
+					.filter((s) => s.parentSessionId !== activeSession.id)
+					.map((s) =>
+						s.id === activeSession.id
+							? { ...s, worktreeConfig: undefined, worktreeParentPath: undefined }
+							: s
+					)
+			);
+
+		// Clear worktree config from the Project (if session has a project)
+		if (activeSession.projectId) {
+			useSessionStore
+				.getState()
+				.setProjects((prev) =>
+					prev.map((p) =>
+						p.id === activeSession.projectId ? { ...p, worktreeConfig: undefined } : p
+					)
+				);
+		}
 
 		const childMessage =
 			worktreeChildCount > 0
@@ -278,7 +318,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		notifyToast({
 			type: 'success',
 			title: 'Worktrees Disabled',
-			message: `Worktree configuration cleared for this agent.${childMessage}`,
+			message: `Worktree configuration cleared for this project.${childMessage}`,
 		});
 	}, []);
 
@@ -303,6 +343,9 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			// we must fall back to sessionSshRemoteConfig.remoteId. See CLAUDE.md "SSH Remote Sessions".
 			const sshRemoteId = getSshRemoteId(activeSession);
 
+			// Look up project config for defaultBaseBranch
+			const projectConfig = getProjectWorktreeConfig(activeSession);
+
 			// Mark path BEFORE creating on disk so the file watcher never races ahead of the ref.
 			// Without this, a slow fetchGitInfo (>500ms debounce) lets the chokidar event fire while
 			// the ref is still empty, causing a duplicate session from the watcher.
@@ -315,11 +358,13 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 
 			try {
 				// Create the worktree via git (pass SSH remote ID for remote sessions)
+				// Pass defaultBaseBranch from project config as the base for new branches
 				const result = await window.maestro.git.worktreeSetup(
 					activeSession.cwd,
 					worktreePath,
 					branchName,
-					sshRemoteId
+					sshRemoteId,
+					projectConfig?.defaultBaseBranch || undefined
 				);
 
 				if (!result.success) {
@@ -353,6 +398,36 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					title: 'Worktree Created',
 					message: branchName,
 				});
+
+				// Run setup script if configured (non-blocking — errors show toast but don't roll back)
+				if (projectConfig?.setupScript) {
+					try {
+						const scriptResult = await window.maestro.git.runWorktreeScript(
+							projectConfig.setupScript,
+							worktreePath,
+							sshRemoteId
+						);
+						if (scriptResult.success) {
+							notifyToast({
+								type: 'success',
+								title: 'Setup Script',
+								message: 'Setup script completed',
+							});
+						} else {
+							notifyToast({
+								type: 'error',
+								title: 'Setup Script Failed',
+								message: scriptResult.stderr || scriptResult.error || 'Unknown error',
+							});
+						}
+					} catch (scriptErr) {
+						notifyToast({
+							type: 'error',
+							title: 'Setup Script Failed',
+							message: scriptErr instanceof Error ? scriptErr.message : String(scriptErr),
+						});
+					}
+				}
 			} catch (err) {
 				recentlyCreatedWorktreePathsRef.current.delete(normalizedCreatedPath);
 				console.error('[WorktreeConfig] Failed to create worktree:', err);
@@ -377,8 +452,10 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		if (!createWtSession) return;
 		const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
-		// Determine base path: use configured path or default to parent directory
+		// Determine base path: prefer project-level config, fall back to deprecated session config, then default
+		const projectConfig = getProjectWorktreeConfig(createWtSession);
 		const basePath =
+			projectConfig?.basePath ||
 			createWtSession.worktreeConfig?.basePath ||
 			createWtSession.cwd.replace(/\/[^/]+$/, '') + '/worktrees';
 
@@ -398,11 +475,13 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 
 		try {
 			// Create the worktree via git (pass SSH remote ID for remote sessions)
+			// Pass defaultBaseBranch from project config as the base for new branches
 			const result = await window.maestro.git.worktreeSetup(
 				createWtSession.cwd,
 				worktreePath,
 				branchName,
-				sshRemoteId
+				sshRemoteId,
+				projectConfig?.defaultBaseBranch || undefined
 			);
 
 			if (!result.success) {
@@ -421,16 +500,25 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				...gitInfo,
 			});
 
-			// Single setSessions call: add child + expand parent + save config (avoids transient state + extra IPC writes)
-			const needsConfig = !createWtSession.worktreeConfig?.basePath;
+			// Save config to project if not already set
+			const needsConfig = !projectConfig?.basePath;
+			if (needsConfig && createWtSession.projectId) {
+				useSessionStore
+					.getState()
+					.setProjects((prev) =>
+						prev.map((p) =>
+							p.id === createWtSession.projectId
+								? { ...p, worktreeConfig: { basePath, watchEnabled: true } }
+								: p
+						)
+					);
+			}
+
+			// Add child session + expand parent
 			useSessionStore.getState().setSessions((prev) => [
 				...prev.map((s) => {
 					if (s.id !== createWtSession.id) return s;
-					const updates: Partial<Session> = { worktreesExpanded: true };
-					if (needsConfig) {
-						updates.worktreeConfig = { basePath, watchEnabled: true };
-					}
-					return { ...s, ...updates };
+					return { ...s, worktreesExpanded: true };
 				}),
 				worktreeSession,
 			]);
@@ -440,6 +528,36 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				title: 'Worktree Created',
 				message: branchName,
 			});
+
+			// Run setup script if configured (non-blocking — errors show toast but don't roll back)
+			if (projectConfig?.setupScript) {
+				try {
+					const scriptResult = await window.maestro.git.runWorktreeScript(
+						projectConfig.setupScript,
+						worktreePath,
+						sshRemoteId
+					);
+					if (scriptResult.success) {
+						notifyToast({
+							type: 'success',
+							title: 'Setup Script',
+							message: 'Setup script completed',
+						});
+					} else {
+						notifyToast({
+							type: 'error',
+							title: 'Setup Script Failed',
+							message: scriptResult.stderr || scriptResult.error || 'Unknown error',
+						});
+					}
+				} catch (scriptErr) {
+					notifyToast({
+						type: 'error',
+						title: 'Setup Script Failed',
+						message: scriptErr instanceof Error ? scriptErr.message : String(scriptErr),
+					});
+				}
+			}
 		} catch (err) {
 			recentlyCreatedWorktreePathsRef.current.delete(normalizedCreatedPath);
 			throw err;
@@ -463,6 +581,36 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	const handleConfirmAndDeleteWorktreeOnDisk = useCallback(async () => {
 		const deleteWtSession = useModalStore.getState().getData('deleteWorktree')?.session ?? null;
 		if (!deleteWtSession) return;
+
+		// Run archive script before deletion if configured (warns but proceeds on failure)
+		const projectConfig = getProjectWorktreeConfig(deleteWtSession);
+		if (projectConfig?.archiveScript) {
+			const sshRemoteId = getSshRemoteId(deleteWtSession);
+			try {
+				const scriptResult = await window.maestro.git.runWorktreeScript(
+					projectConfig.archiveScript,
+					deleteWtSession.cwd,
+					sshRemoteId
+				);
+				if (!scriptResult.success) {
+					notifyToast({
+						type: 'warning',
+						title: 'Archive Script Failed',
+						message:
+							scriptResult.stderr ||
+							scriptResult.error ||
+							'Unknown error — proceeding with removal',
+					});
+				}
+			} catch (scriptErr) {
+				notifyToast({
+					type: 'warning',
+					title: 'Archive Script Failed',
+					message: `${scriptErr instanceof Error ? scriptErr.message : String(scriptErr)} — proceeding with removal`,
+				});
+			}
+		}
+
 		// Remove the session AND delete the worktree from disk
 		const result = await window.maestro.git.removeWorktree(deleteWtSession.cwd, true);
 		if (!result.success) {
@@ -474,47 +622,134 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	}, []);
 
 	// ---------------------------------------------------------------------------
+	// Run script handler (explicit "Run Script" action for worktree children)
+	// ---------------------------------------------------------------------------
+
+	const handleRunWorktreeScript = useCallback(async (session: Session) => {
+		const projectConfig = getProjectWorktreeConfig(session);
+		if (!projectConfig?.runScript) {
+			notifyToast({
+				type: 'error',
+				title: 'No Run Script',
+				message: 'No run script configured for this project',
+			});
+			return;
+		}
+
+		const sshRemoteId = getSshRemoteId(session);
+		try {
+			const scriptResult = await window.maestro.git.runWorktreeScript(
+				projectConfig.runScript,
+				session.cwd,
+				sshRemoteId
+			);
+			if (scriptResult.success) {
+				notifyToast({
+					type: 'success',
+					title: 'Run Script',
+					message: 'Run script completed',
+				});
+			} else {
+				notifyToast({
+					type: 'error',
+					title: 'Run Script Failed',
+					message: scriptResult.stderr || scriptResult.error || 'Unknown error',
+				});
+			}
+		} catch (err) {
+			notifyToast({
+				type: 'error',
+				title: 'Run Script Failed',
+				message: err instanceof Error ? err.message : String(err),
+			});
+		}
+	}, []);
+
+	// ---------------------------------------------------------------------------
 	// Effects
 	// ---------------------------------------------------------------------------
 
 	// Effect 1: Startup worktree config scan
-	// Restores worktree sub-agents after app restart by scanning configured directories
+	// Migrates session-level worktreeConfig to project-level, then scans configured directories.
 	useEffect(() => {
 		if (!sessionsLoaded) return;
 
 		const scanWorktreeConfigsOnStartup = async () => {
 			const currentSessions = useSessionStore.getState().sessions;
+			const currentProjects = useSessionStore.getState().projects;
 			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
-			// Find sessions that have worktreeConfig with basePath (only parent sessions)
-			const sessionsWithWorktreeConfig = currentSessions.filter(
-				(s) => s.worktreeConfig?.basePath && !s.parentSessionId
-			);
+			// --- Migration: copy session-level worktreeConfig up to Project ---
+			// If a session has worktreeConfig but its project doesn't, migrate it.
+			const projectUpdates = new Map<string, ProjectWorktreeConfig>();
+			const sessionIdsToClear: string[] = [];
 
-			if (sessionsWithWorktreeConfig.length === 0) return;
+			for (const session of currentSessions) {
+				if (!session.worktreeConfig?.basePath || !session.projectId) continue;
+				const project = currentProjects.find((p) => p.id === session.projectId);
+				// Only migrate if the project exists and doesn't already have config
+				if (project && !project.worktreeConfig) {
+					if (!projectUpdates.has(session.projectId)) {
+						projectUpdates.set(session.projectId, {
+							basePath: session.worktreeConfig.basePath,
+							watchEnabled: session.worktreeConfig.watchEnabled,
+						});
+					}
+					sessionIdsToClear.push(session.id);
+				}
+			}
 
+			if (projectUpdates.size > 0) {
+				useSessionStore.getState().setProjects((prev) =>
+					prev.map((p) => {
+						const config = projectUpdates.get(p.id);
+						return config ? { ...p, worktreeConfig: config } : p;
+					})
+				);
+				// Clear deprecated session-level config
+				useSessionStore
+					.getState()
+					.setSessions((prev) =>
+						prev.map((s) =>
+							sessionIdsToClear.includes(s.id) ? { ...s, worktreeConfig: undefined } : s
+						)
+					);
+				console.log(
+					`[WorktreeStartup] Migrated worktreeConfig from ${sessionIdsToClear.length} session(s) to ${projectUpdates.size} project(s)`
+				);
+			}
+
+			// --- Scan projects with worktreeConfig ---
+			const projectsWithConfig = useSessionStore
+				.getState()
+				.projects.filter((p) => p.worktreeConfig?.basePath);
+
+			if (projectsWithConfig.length === 0) return;
+
+			const latestSessions = useSessionStore.getState().sessions;
 			const newWorktreeSessions: Session[] = [];
 
-			for (const parentSession of sessionsWithWorktreeConfig) {
+			for (const project of projectsWithConfig) {
+				// Find a parent session in this project (non-child) to use for SSH config and as parentSessionId
+				const parentSession = latestSessions.find(
+					(s) => s.projectId === project.id && !s.parentSessionId
+				);
+				if (!parentSession) continue;
+
 				try {
-					// Get SSH remote ID for remote git operations
 					const sshRemoteId = getSshRemoteId(parentSession);
 					const scanResult = await window.maestro.git.scanWorktreeDirectory(
-						parentSession.worktreeConfig!.basePath,
+						project.worktreeConfig!.basePath,
 						sshRemoteId
 					);
 					const { gitSubdirs } = scanResult;
 
 					for (const subdir of gitSubdirs) {
-						// Skip main/master/HEAD branches
 						if (isSkippableBranch(subdir.branch)) continue;
 
-						// Check if a session already exists for this worktree
-						// Normalize paths for comparison (backslashes + trailing slashes)
 						const normalizedSubdirPath = normalizePath(subdir.path);
-						const existingSession = currentSessions.find((s) => {
+						const existingSession = latestSessions.find((s) => {
 							const normalizedCwd = normalizePath(s.cwd);
-							// Check if same path (regardless of parent) or same branch under same parent
 							return (
 								normalizedCwd === normalizedSubdirPath ||
 								(s.parentSessionId === parentSession.id && s.worktreeBranch === subdir.branch)
@@ -522,12 +757,10 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 						});
 						if (existingSession) continue;
 
-						// Also check in sessions we're about to add
 						if (newWorktreeSessions.some((s) => normalizePath(s.cwd) === normalizedSubdirPath)) {
 							continue;
 						}
 
-						// Fetch git info (via SSH for remote sessions)
 						const gitInfo = await fetchGitInfo(subdir.path, sshRemoteId);
 
 						newWorktreeSessions.push(
@@ -543,7 +776,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					}
 				} catch (err) {
 					console.error(
-						`[WorktreeStartup] Error scanning ${parentSession.worktreeConfig!.basePath}:`,
+						`[WorktreeStartup] Error scanning ${project.worktreeConfig!.basePath}:`,
 						err
 					);
 				}
@@ -551,7 +784,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 
 			if (newWorktreeSessions.length > 0) {
 				useSessionStore.getState().setSessions((prev) => {
-					// Double-check to avoid duplicates
 					const currentPaths = new Set(prev.map((s) => normalizePath(s.cwd)));
 					const trulyNew = newWorktreeSessions.filter(
 						(s) => !currentPaths.has(normalizePath(s.cwd))
@@ -560,7 +792,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					return [...prev, ...trulyNew];
 				});
 
-				// Expand worktrees on parent sessions
 				const parentIds = new Set(newWorktreeSessions.map((s) => s.parentSessionId));
 				useSessionStore
 					.getState()
@@ -578,15 +809,32 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	// Effect 2: File watcher for worktree directories — provides immediate detection
 	// This is more efficient than polling and gives real-time results
 	useEffect(() => {
-		// Find sessions that have worktreeConfig with watchEnabled
+		// Find projects that have worktreeConfig with watchEnabled
+		const currentProjects = useSessionStore.getState().projects;
 		const currentSessions = useSessionStore.getState().sessions;
-		const watchableSessions = currentSessions.filter(
-			(s) => s.worktreeConfig?.basePath && s.worktreeConfig?.watchEnabled
+		const watchableProjects = currentProjects.filter(
+			(p) => p.worktreeConfig?.basePath && p.worktreeConfig?.watchEnabled
 		);
 
-		// Start watchers for each session
-		for (const session of watchableSessions) {
-			window.maestro.git.watchWorktreeDirectory(session.id, session.worktreeConfig!.basePath);
+		// For each project, find a parent session to use as the watcher ID
+		// (the watcher callback uses sessionId to look up the parent)
+		const watcherMap: { projectId: string; sessionId: string; basePath: string }[] = [];
+		for (const project of watchableProjects) {
+			const parentSession = currentSessions.find(
+				(s) => s.projectId === project.id && !s.parentSessionId
+			);
+			if (parentSession) {
+				watcherMap.push({
+					projectId: project.id,
+					sessionId: parentSession.id,
+					basePath: project.worktreeConfig!.basePath,
+				});
+			}
+		}
+
+		// Start watchers keyed by the parent session ID
+		for (const entry of watcherMap) {
+			window.maestro.git.watchWorktreeDirectory(entry.sessionId, entry.basePath);
 		}
 
 		// Set up listener for discovered worktrees
@@ -665,8 +913,8 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		// Cleanup: stop watchers and remove listener
 		return () => {
 			cleanup();
-			for (const session of watchableSessions) {
-				window.maestro.git.unwatchWorktreeDirectory(session.id);
+			for (const entry of watcherMap) {
+				window.maestro.git.unwatchWorktreeDirectory(entry.sessionId);
 			}
 		};
 	}, [
@@ -821,5 +1069,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		handleCloseDeleteWorktreeModal,
 		handleConfirmDeleteWorktree,
 		handleConfirmAndDeleteWorktreeOnDisk,
+		handleRunWorktreeScript,
 	};
 }

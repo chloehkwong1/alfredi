@@ -9,6 +9,7 @@ import {
 	Folder,
 	GitBranch,
 	GitPullRequest,
+	Play,
 	Trash2,
 	Edit3,
 	Eraser,
@@ -34,6 +35,7 @@ interface SessionContextMenuProps {
 	onQuickCreateWorktree?: () => void;
 	onConfigureWorktrees?: () => void;
 	onDeleteWorktree?: () => void;
+	onRunWorktreeScript?: () => void;
 	onCreateProject?: () => void;
 	onClearContext?: () => void;
 }
@@ -56,6 +58,7 @@ export function SessionContextMenu({
 	onQuickCreateWorktree,
 	onConfigureWorktrees,
 	onDeleteWorktree,
+	onRunWorktreeScript,
 	onCreateProject,
 	onClearContext,
 }: SessionContextMenuProps) {
@@ -134,7 +137,9 @@ export function SessionContextMenu({
 		((onQuickCreateWorktree && session.worktreeConfig) || onConfigureWorktrees);
 
 	const showWorktreeChildSection =
-		session.parentSessionId && session.worktreeBranch && (onCreatePR || onDeleteWorktree);
+		session.parentSessionId &&
+		session.worktreeBranch &&
+		(onCreatePR || onDeleteWorktree || onRunWorktreeScript);
 
 	return (
 		<div
@@ -361,6 +366,20 @@ export function SessionContextMenu({
 			{showWorktreeChildSection && (
 				<>
 					<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
+					{onRunWorktreeScript && (
+						<button
+							type="button"
+							onClick={() => {
+								onRunWorktreeScript();
+								onDismiss();
+							}}
+							className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+							style={{ color: theme.colors.accent }}
+						>
+							<Play className="w-3.5 h-3.5" />
+							Run Script
+						</button>
+					)}
 					{onCreatePR && (
 						<button
 							type="button"

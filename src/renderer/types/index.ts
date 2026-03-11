@@ -14,6 +14,7 @@ export type {
 	AgentErrorRecovery,
 	ToolType,
 	Project,
+	ProjectWorktreeConfig,
 	TerminalTab,
 	UsageStats,
 	BatchDocumentEntry,
@@ -567,7 +568,10 @@ export interface Session {
 	gitBranches?: string[];
 	gitTags?: string[];
 	gitRefsCacheTime?: number; // Timestamp when branches/tags were last fetched
-	// Worktree configuration (only set on parent sessions that manage worktrees)
+	/**
+	 * @deprecated Use Project.worktreeConfig (ProjectWorktreeConfig) instead.
+	 * Kept for migration — will be removed once all sessions inherit from their project.
+	 */
 	worktreeConfig?: {
 		basePath: string; // Directory where worktrees are stored
 		watchEnabled: boolean; // Whether to watch for new worktrees via chokidar

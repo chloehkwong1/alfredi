@@ -741,6 +741,7 @@ function MaestroConsoleInner() {
 		handleCloseDeleteWorktreeModal,
 		handleConfirmDeleteWorktree,
 		handleConfirmAndDeleteWorktreeOnDisk,
+		handleRunWorktreeScript,
 	} = useWorktreeHandlers();
 
 	// --- APP HANDLERS (drag, file, folder operations) ---
@@ -1963,6 +1964,7 @@ function MaestroConsoleInner() {
 		handleQuickCreateWorktree,
 		handleOpenWorktreeConfigSession,
 		handleDeleteWorktreeSession,
+		handleRunWorktreeScript,
 		handleToggleWorktreeExpanded,
 		openWizardModal,
 		handleStartTour,

@@ -25,6 +25,18 @@ export const OUTPUT_STYLE_OPTIONS: { id: OutputStyle; label: string; description
 	{ id: 'learning', label: 'Learning', description: 'Collaborative with TODO(human) prompts' },
 ];
 
+// Worktree configuration at the Project level.
+// Persists across sessions — agents inherit this from their project.
+export interface ProjectWorktreeConfig {
+	basePath: string; // Directory where worktrees are stored
+	watchEnabled: boolean; // Auto-detect worktrees created outside Maestro
+	defaultBaseBranch?: string; // Default branch to create worktrees from (e.g., "origin/main")
+	remoteOrigin?: string; // Git remote for push/pull/PRs (e.g., "origin")
+	setupScript?: string; // Runs after worktree creation (e.g., "npm install")
+	runScript?: string; // Runs on play/start action (e.g., "npm run dev")
+	archiveScript?: string; // Runs before worktree removal (e.g., "rm -rf node_modules")
+}
+
 // Project (repo-aware grouping with a root directory)
 export interface Project {
 	id: string;
@@ -32,6 +44,7 @@ export interface Project {
 	emoji: string;
 	collapsed: boolean;
 	rootPath: string;
+	worktreeConfig?: ProjectWorktreeConfig;
 }
 
 // Simplified session interface for CLI (subset of full Session)

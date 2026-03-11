@@ -1,8 +1,19 @@
-import { useState, useEffect, useRef } from 'react';
-import { X, GitBranch, FolderOpen, Plus, Loader2, AlertTriangle, Server } from 'lucide-react';
-import type { Theme, Session, GhCliStatus } from '../types';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+	X,
+	GitBranch,
+	FolderOpen,
+	Plus,
+	Loader2,
+	AlertTriangle,
+	Server,
+	Terminal,
+} from 'lucide-react';
+import type { Theme, Session, GhCliStatus, ProjectWorktreeConfig } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
+import { useSessionStore } from '../stores/sessionStore';
+import { gitService } from '../services/git';
 
 interface WorktreeConfigModalProps {
 	isOpen: boolean;
@@ -10,7 +21,7 @@ interface WorktreeConfigModalProps {
 	theme: Theme;
 	session: Session;
 	// Callbacks
-	onSaveConfig: (config: { basePath: string; watchEnabled: boolean }) => void;
+	onSaveConfig: (config: ProjectWorktreeConfig) => void;
 	onCreateWorktree: (branchName: string, basePath: string) => void;
 	onDisableConfig: () => void;
 }
@@ -29,11 +40,13 @@ async function validateDirectory(path: string, sshRemoteId?: string): Promise<bo
 }
 
 /**
- * WorktreeConfigModal - Modal for configuring worktrees on a parent session
+ * WorktreeConfigModal - Modal for configuring worktrees on a project
  *
  * Features:
  * - Set worktree base directory
  * - Toggle file watching
+ * - Configure default base branch and remote origin
+ * - Define lifecycle scripts (setup, run, archive)
  * - Create new worktree with branch name
  */
 export function WorktreeConfigModal({
@@ -49,23 +62,48 @@ export function WorktreeConfigModal({
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
+	// Resolve project from session — fall back to session-level config for sessions without a project
+	const project = useSessionStore((s) => s.projects.find((p) => p.id === session.projectId));
+	const projectConfig = project?.worktreeConfig ?? session.worktreeConfig;
+
 	// Form state
-	const [basePath, setBasePath] = useState(session.worktreeConfig?.basePath || '');
-	const [watchEnabled, setWatchEnabled] = useState(session.worktreeConfig?.watchEnabled ?? true);
+	const [basePath, setBasePath] = useState(projectConfig?.basePath || '');
+	const [watchEnabled, setWatchEnabled] = useState(projectConfig?.watchEnabled ?? true);
+	const [defaultBaseBranch, setDefaultBaseBranch] = useState(
+		projectConfig?.defaultBaseBranch || ''
+	);
+	const [remoteOrigin, setRemoteOrigin] = useState(projectConfig?.remoteOrigin || '');
+	const [setupScript, setSetupScript] = useState(projectConfig?.setupScript || '');
+	const [runScript, setRunScript] = useState(projectConfig?.runScript || '');
+	const [archiveScript, setArchiveScript] = useState(projectConfig?.archiveScript || '');
 	const [newBranchName, setNewBranchName] = useState('');
 	const [isCreating, setIsCreating] = useState(false);
 	const [isValidating, setIsValidating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-	const canDisable = !!(session.worktreeConfig?.basePath || basePath.trim());
+	const canDisable = !!(projectConfig?.basePath || basePath.trim());
+
+	// Remotes list
+	const [remotes, setRemotes] = useState<{ name: string; url: string }[]>([]);
+
+	// Branch autocomplete state
+	const [branchFilterText, setBranchFilterText] = useState('');
+	const [showBranchDropdown, setShowBranchDropdown] = useState(false);
+	const branchInputRef = useRef<HTMLInputElement>(null);
 
 	// gh CLI status
 	const [ghCliStatus, setGhCliStatus] = useState<GhCliStatus | null>(null);
 
-	// SSH remote awareness - check both runtime sshRemoteId and configured sessionSshRemoteConfig
-	// Note: sshRemoteId is only set after AI agent spawns. For terminal-only SSH sessions,
-	// we must fall back to sessionSshRemoteConfig.remoteId. See CLAUDE.md "SSH Remote Sessions".
+	// SSH remote awareness
 	const sshRemoteId = session.sshRemoteId || session.sessionSshRemoteConfig?.remoteId || undefined;
 	const isRemoteSession = !!sshRemoteId;
+
+	// Filtered branches for autocomplete
+	const filteredBranches = useMemo(() => {
+		const branches = session.gitBranches || [];
+		if (!branchFilterText) return branches.slice(0, 20);
+		const lower = branchFilterText.toLowerCase();
+		return branches.filter((b) => b.toLowerCase().includes(lower)).slice(0, 20);
+	}, [session.gitBranches, branchFilterText]);
 
 	// Register with layer stack for Escape handling
 	useEffect(() => {
@@ -82,16 +120,24 @@ export function WorktreeConfigModal({
 		}
 	}, [isOpen, registerLayer, unregisterLayer]);
 
-	// Check gh CLI status and load config on open
+	// Load config and remotes on open
 	useEffect(() => {
 		if (isOpen) {
 			checkGhCli();
-			setBasePath(session.worktreeConfig?.basePath || '');
-			setWatchEnabled(session.worktreeConfig?.watchEnabled ?? true);
+			loadRemotes();
+			// Reset form from project config
+			setBasePath(projectConfig?.basePath || '');
+			setWatchEnabled(projectConfig?.watchEnabled ?? true);
+			setDefaultBaseBranch(projectConfig?.defaultBaseBranch || '');
+			setRemoteOrigin(projectConfig?.remoteOrigin || '');
+			setSetupScript(projectConfig?.setupScript || '');
+			setRunScript(projectConfig?.runScript || '');
+			setArchiveScript(projectConfig?.archiveScript || '');
 			setNewBranchName('');
+			setBranchFilterText('');
 			setError(null);
 		}
-	}, [isOpen, session.worktreeConfig]);
+	}, [isOpen, projectConfig]);
 
 	const checkGhCli = async () => {
 		try {
@@ -102,8 +148,20 @@ export function WorktreeConfigModal({
 		}
 	};
 
+	const loadRemotes = async () => {
+		try {
+			const result = await gitService.listRemotes(session.projectRoot, sshRemoteId);
+			setRemotes(result);
+			// If no remote origin is set yet, default to first remote
+			if (!projectConfig?.remoteOrigin && result.length > 0) {
+				setRemoteOrigin(result[0].name);
+			}
+		} catch {
+			setRemotes([]);
+		}
+	};
+
 	const handleBrowse = async () => {
-		// Browse is only available for local sessions
 		if (isRemoteSession) return;
 		const result = await window.maestro.dialog.selectFolder();
 		if (result) {
@@ -117,7 +175,6 @@ export function WorktreeConfigModal({
 			return;
 		}
 
-		// Validate directory exists (via SSH for remote sessions)
 		setIsValidating(true);
 		setError(null);
 		try {
@@ -130,7 +187,15 @@ export function WorktreeConfigModal({
 				);
 				return;
 			}
-			onSaveConfig({ basePath: basePath.trim(), watchEnabled });
+			onSaveConfig({
+				basePath: basePath.trim(),
+				watchEnabled,
+				defaultBaseBranch: defaultBaseBranch.trim() || undefined,
+				remoteOrigin: remoteOrigin || undefined,
+				setupScript: setupScript.trim() || undefined,
+				runScript: runScript.trim() || undefined,
+				archiveScript: archiveScript.trim() || undefined,
+			});
 			onClose();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to validate directory');
@@ -153,9 +218,15 @@ export function WorktreeConfigModal({
 		setError(null);
 
 		try {
-			// Save config first to ensure it's persisted
-			onSaveConfig({ basePath: basePath.trim(), watchEnabled });
-			// Then create the worktree, passing the basePath
+			onSaveConfig({
+				basePath: basePath.trim(),
+				watchEnabled,
+				defaultBaseBranch: defaultBaseBranch.trim() || undefined,
+				remoteOrigin: remoteOrigin || undefined,
+				setupScript: setupScript.trim() || undefined,
+				runScript: runScript.trim() || undefined,
+				archiveScript: archiveScript.trim() || undefined,
+			});
 			await onCreateWorktree(newBranchName.trim(), basePath.trim());
 			setNewBranchName('');
 		} catch (err) {
@@ -168,13 +239,39 @@ export function WorktreeConfigModal({
 	const handleDisable = () => {
 		setBasePath('');
 		setWatchEnabled(true);
+		setDefaultBaseBranch('');
+		setRemoteOrigin('');
+		setSetupScript('');
+		setRunScript('');
+		setArchiveScript('');
 		setNewBranchName('');
 		setError(null);
 		onDisableConfig();
 		onClose();
 	};
 
+	const handleBranchSelect = (branch: string) => {
+		setDefaultBaseBranch(branch);
+		setBranchFilterText('');
+		setShowBranchDropdown(false);
+	};
+
 	if (!isOpen) return null;
+
+	// Shared input style
+	const inputStyle = {
+		borderColor: theme.colors.border,
+		color: theme.colors.textMain,
+	};
+
+	const textareaStyle = {
+		borderColor: theme.colors.border,
+		color: theme.colors.textMain,
+		resize: 'vertical' as const,
+	};
+
+	// Effective base branch for display
+	const effectiveBaseBranch = defaultBaseBranch || 'origin/main';
 
 	return (
 		<div className="fixed inset-0 z-[10000] flex items-center justify-center">
@@ -269,10 +366,7 @@ export function WorktreeConfigModal({
 								onChange={(e) => setBasePath(e.target.value)}
 								placeholder={isRemoteSession ? '/home/user/worktrees' : '/path/to/worktrees'}
 								className="flex-1 px-3 py-2 rounded border bg-transparent outline-none text-sm"
-								style={{
-									borderColor: theme.colors.border,
-									color: theme.colors.textMain,
-								}}
+								style={inputStyle}
 							/>
 							<button
 								onClick={handleBrowse}
@@ -295,6 +389,89 @@ export function WorktreeConfigModal({
 							{isRemoteSession
 								? 'Path on the remote server where worktrees will be created'
 								: 'Base directory where worktrees will be created'}
+						</p>
+					</div>
+
+					{/* Default Base Branch */}
+					<div className="relative">
+						<label
+							className="text-xs font-bold uppercase mb-1.5 block"
+							style={{ color: theme.colors.textDim }}
+						>
+							Branch new worktrees from
+						</label>
+						<input
+							ref={branchInputRef}
+							type="text"
+							value={defaultBaseBranch}
+							onChange={(e) => {
+								setDefaultBaseBranch(e.target.value);
+								setBranchFilterText(e.target.value);
+								setShowBranchDropdown(true);
+							}}
+							onFocus={() => setShowBranchDropdown(true)}
+							onBlur={() => {
+								// Delay to allow click on dropdown item
+								setTimeout(() => setShowBranchDropdown(false), 150);
+							}}
+							placeholder="origin/main"
+							className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm"
+							style={inputStyle}
+						/>
+						{/* Branch autocomplete dropdown */}
+						{showBranchDropdown && filteredBranches.length > 0 && (
+							<div
+								className="absolute left-0 right-0 mt-1 rounded border shadow-lg overflow-y-auto z-10"
+								style={{
+									backgroundColor: theme.colors.bgSidebar,
+									borderColor: theme.colors.border,
+									maxHeight: '150px',
+								}}
+							>
+								{filteredBranches.map((branch) => (
+									<button
+										key={branch}
+										type="button"
+										className="w-full text-left px-3 py-1.5 text-sm hover:bg-white/10 transition-colors"
+										style={{ color: theme.colors.textMain }}
+										onMouseDown={(e) => {
+											e.preventDefault();
+											handleBranchSelect(branch);
+										}}
+									>
+										{branch}
+									</button>
+								))}
+							</div>
+						)}
+						<p className="text-[10px] mt-1" style={{ color: theme.colors.textDim }}>
+							Default base branch for new worktrees
+						</p>
+					</div>
+
+					{/* Remote Origin */}
+					<div>
+						<label
+							className="text-xs font-bold uppercase mb-1.5 block"
+							style={{ color: theme.colors.textDim }}
+						>
+							Remote Origin
+						</label>
+						<select
+							value={remoteOrigin}
+							onChange={(e) => setRemoteOrigin(e.target.value)}
+							className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm"
+							style={inputStyle}
+						>
+							<option value="">Select a remote...</option>
+							{remotes.map((remote) => (
+								<option key={remote.name} value={remote.name}>
+									{remote.name} ({remote.url})
+								</option>
+							))}
+						</select>
+						<p className="text-[10px] mt-1" style={{ color: theme.colors.textDim }}>
+							Git remote used for push, pull, and PR operations
 						</p>
 					</div>
 
@@ -322,6 +499,82 @@ export function WorktreeConfigModal({
 						</button>
 					</div>
 
+					{/* Divider - Scripts Section */}
+					<div className="border-t pt-2" style={{ borderColor: theme.colors.border }}>
+						<div className="flex items-center gap-2 mb-1">
+							<Terminal className="w-4 h-4" style={{ color: theme.colors.accent }} />
+							<span className="text-xs font-bold uppercase" style={{ color: theme.colors.textDim }}>
+								Scripts
+							</span>
+						</div>
+						<p className="text-[10px] mb-3" style={{ color: theme.colors.textDim }}>
+							Commands that run during worktree lifecycle
+						</p>
+
+						{/* Setup Script */}
+						<div className="mb-3">
+							<label
+								className="text-xs font-medium mb-1 block"
+								style={{ color: theme.colors.textMain }}
+							>
+								Setup script
+							</label>
+							<textarea
+								value={setupScript}
+								onChange={(e) => setSetupScript(e.target.value)}
+								placeholder="e.g., npm install"
+								rows={2}
+								className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm font-mono"
+								style={textareaStyle}
+							/>
+							<p className="text-[10px] mt-0.5" style={{ color: theme.colors.textDim }}>
+								Runs when a new worktree is created
+							</p>
+						</div>
+
+						{/* Run Script */}
+						<div className="mb-3">
+							<label
+								className="text-xs font-medium mb-1 block"
+								style={{ color: theme.colors.textMain }}
+							>
+								Run script
+							</label>
+							<textarea
+								value={runScript}
+								onChange={(e) => setRunScript(e.target.value)}
+								placeholder="e.g., npm run dev"
+								rows={2}
+								className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm font-mono"
+								style={textareaStyle}
+							/>
+							<p className="text-[10px] mt-0.5" style={{ color: theme.colors.textDim }}>
+								Runs when you click the play button
+							</p>
+						</div>
+
+						{/* Archive Script */}
+						<div>
+							<label
+								className="text-xs font-medium mb-1 block"
+								style={{ color: theme.colors.textMain }}
+							>
+								Archive script
+							</label>
+							<textarea
+								value={archiveScript}
+								onChange={(e) => setArchiveScript(e.target.value)}
+								placeholder="e.g., rm -rf node_modules"
+								rows={2}
+								className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm font-mono"
+								style={textareaStyle}
+							/>
+							<p className="text-[10px] mt-0.5" style={{ color: theme.colors.textDim }}>
+								Runs before a worktree is removed
+							</p>
+						</div>
+					</div>
+
 					{/* Divider */}
 					<div className="border-t" style={{ borderColor: theme.colors.border }} />
 
@@ -333,6 +586,12 @@ export function WorktreeConfigModal({
 						>
 							Create New Worktree
 						</label>
+						{defaultBaseBranch && (
+							<p className="text-[10px] mb-1.5" style={{ color: theme.colors.textDim }}>
+								Branching from:{' '}
+								<span style={{ color: theme.colors.accent }}>{effectiveBaseBranch}</span>
+							</p>
+						)}
 						<div className="flex gap-2">
 							<input
 								type="text"
@@ -345,10 +604,7 @@ export function WorktreeConfigModal({
 								}}
 								placeholder="feature-xyz"
 								className="flex-1 px-3 py-2 rounded border bg-transparent outline-none text-sm"
-								style={{
-									borderColor: theme.colors.border,
-									color: theme.colors.textMain,
-								}}
+								style={inputStyle}
 								disabled={!basePath || isCreating}
 							/>
 							<button
