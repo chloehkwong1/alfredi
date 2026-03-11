@@ -146,7 +146,6 @@ interface MainPanelProps {
 	terminalOutputRef: React.RefObject<HTMLDivElement>;
 
 	// Functions
-	toggleInputMode: () => void;
 	processInput: () => void;
 	handleInterrupt: () => void;
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -176,8 +175,9 @@ interface MainPanelProps {
 		updates: { name?: string | null; starred?: boolean }
 	) => void;
 	onToggleTabReadOnlyMode?: () => void;
-	onToggleTabSaveToHistory?: () => void;
 	onToggleTabShowThinking?: () => void;
+	onTabModelChange?: (modelId: string) => void;
+	onToggleTabOutputStyle?: () => void;
 	onToggleUnreadFilter?: () => void;
 	onOpenTabSearch?: () => void;
 	// Bulk tab close operations
@@ -214,8 +214,6 @@ interface MainPanelProps {
 	onAtBottomChange?: (isAtBottom: boolean) => void;
 	// Input blur handler for persisting AI input state
 	onInputBlur?: () => void;
-	// Prompt composer modal
-	onOpenPromptComposer?: () => void;
 	// Replay a user message (AI mode)
 	onReplayMessage?: (text: string, images?: string[]) => void;
 	// File tree for linking file references in AI responses
@@ -370,7 +368,6 @@ export const MainPanel = React.memo(
 			inputRef,
 			logsEndRef,
 			terminalOutputRef,
-			toggleInputMode,
 			processInput,
 			handleInterrupt,
 			handleInputKeyDown,
@@ -536,6 +533,10 @@ export const MainPanel = React.memo(
 			}
 
 			const remoteId = activeSession.sessionSshRemoteConfig.remoteId;
+			if (!window.maestro.sshRemote) {
+				setSshRemoteName(null);
+				return;
+			}
 			window.maestro.sshRemote
 				.getConfigs()
 				.then((result) => {
@@ -617,6 +618,29 @@ export const MainPanel = React.memo(
 
 		// Get agent capabilities for conditional feature rendering
 		const { hasCapability } = useAgentCapabilities(activeSession?.toolType);
+
+		// Model selector: fetch available models for the active agent
+		const [availableModels, setAvailableModels] = useState<string[]>([]);
+		const activeToolType = activeSession?.toolType;
+		const supportsModelSelection = hasCapability('supportsModelSelection');
+		useEffect(() => {
+			if (!activeToolType || !supportsModelSelection) {
+				setAvailableModels([]);
+				return;
+			}
+			let cancelled = false;
+			window.maestro.agents
+				.getModels(activeToolType, false)
+				.then((models) => {
+					if (!cancelled) setAvailableModels(models);
+				})
+				.catch(() => {
+					if (!cancelled) setAvailableModels([]);
+				});
+			return () => {
+				cancelled = true;
+			};
+		}, [activeToolType, supportsModelSelection]);
 
 		// Expose methods to parent via ref
 		useImperativeHandle(
@@ -760,10 +784,7 @@ export const MainPanel = React.memo(
 		const handleViewGitDiff = async () => {
 			if (!activeSession || !activeSession.isGitRepo) return;
 
-			const cwd =
-				activeSession.inputMode === 'terminal'
-					? activeSession.shellCwd || activeSession.cwd
-					: activeSession.cwd;
+			const cwd = activeSession.cwd;
 			const diff = await gitService.getDiff(cwd, undefined, filePreviewSshRemoteId);
 
 			if (diff.diff) {
@@ -1688,11 +1709,7 @@ export const MainPanel = React.memo(
 											onInterrupt={handleInterrupt}
 											onScrollPositionChange={props.onScrollPositionChange}
 											onAtBottomChange={props.onAtBottomChange}
-											initialScrollTop={
-												activeSession.inputMode === 'ai'
-													? activeTab?.scrollTop
-													: activeSession.terminalScrollTop
-											}
+											initialScrollTop={activeTab?.scrollTop}
 											markdownEditMode={chatRawTextMode}
 											setMarkdownEditMode={useSettingsStore.getState().setChatRawTextMode}
 											onReplayMessage={props.onReplayMessage}
@@ -1725,14 +1742,8 @@ export const MainPanel = React.memo(
 											theme={theme}
 											inputValue={inputValue}
 											setInputValue={setInputValue}
-											enterToSend={
-												activeSession.inputMode === 'terminal' ? enterToSendTerminal : enterToSendAI
-											}
-											setEnterToSend={
-												activeSession.inputMode === 'terminal'
-													? useSettingsStore.getState().setEnterToSendTerminal
-													: useSettingsStore.getState().setEnterToSendAI
-											}
+											enterToSend={enterToSendAI}
+											setEnterToSend={useSettingsStore.getState().setEnterToSendAI}
 											stagedImages={stagedImages}
 											setStagedImages={setStagedImages}
 											setLightboxImage={setLightboxImage}
@@ -1767,7 +1778,6 @@ export const MainPanel = React.memo(
 											handleInputKeyDown={handleInputKeyDown}
 											handlePaste={handlePaste}
 											handleDrop={handleDrop}
-											toggleInputMode={toggleInputMode}
 											processInput={processInput}
 											handleInterrupt={handleInterrupt}
 											onInputFocus={handleInputFocus}
@@ -1780,12 +1790,16 @@ export const MainPanel = React.memo(
 											onOpenQueueBrowser={onOpenQueueBrowser}
 											tabReadOnlyMode={activeTab?.readOnlyMode ?? false}
 											onToggleTabReadOnlyMode={props.onToggleTabReadOnlyMode}
-											tabSaveToHistory={activeTab?.saveToHistory ?? false}
-											onToggleTabSaveToHistory={props.onToggleTabSaveToHistory}
 											tabShowThinking={activeTab?.showThinking ?? 'off'}
 											onToggleTabShowThinking={props.onToggleTabShowThinking}
 											supportsThinking={hasCapability('supportsThinkingDisplay')}
-											onOpenPromptComposer={props.onOpenPromptComposer}
+											// Model selector (per-tab)
+											currentModelId={activeTab?.modelId || availableModels[0] || undefined}
+											availableModels={availableModels}
+											onModelChange={props.onTabModelChange}
+											// Output style selector (per-tab)
+											tabOutputStyle={activeTab?.outputStyle ?? 'default'}
+											onToggleOutputStyle={props.onToggleTabOutputStyle}
 											shortcuts={shortcuts}
 											showFlashNotification={showFlashNotification}
 											// Context warning sash props (Phase 6) - use tab-level context usage

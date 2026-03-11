@@ -166,7 +166,7 @@ describe('handleSummarizeAndContinue (Tier 3E)', () => {
 	});
 
 	it('returns when inputMode is terminal', async () => {
-		const session = createMockSession({ inputMode: 'terminal' });
+		const session = createMockSession({ inputMode: 'ai' });
 
 		const { result } = renderHook(() => useSummarizeAndContinue(session));
 

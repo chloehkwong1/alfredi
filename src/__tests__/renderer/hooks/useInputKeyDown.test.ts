@@ -209,7 +209,7 @@ describe('Tab completion navigation', () => {
 	beforeEach(() => {
 		mockInputContext.tabCompletionOpen = true;
 		mockInputContext.selectedTabCompletionIndex = 0;
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 	});
 
 	it('navigates down with ArrowDown', () => {
@@ -294,7 +294,7 @@ describe('Tab completion navigation', () => {
 	});
 
 	it('cycles filter types with Tab in git repos', () => {
-		setActiveSession({ inputMode: 'terminal', isGitRepo: true });
+		setActiveSession({ inputMode: 'ai', isGitRepo: true });
 		mockInputContext.tabCompletionFilter = 'all';
 		const deps = createMockDeps({ tabCompletionSuggestions: suggestions });
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -309,7 +309,7 @@ describe('Tab completion navigation', () => {
 	});
 
 	it('cycles filter types backwards with Shift+Tab in git repos', () => {
-		setActiveSession({ inputMode: 'terminal', isGitRepo: true });
+		setActiveSession({ inputMode: 'ai', isGitRepo: true });
 		mockInputContext.tabCompletionFilter = 'history';
 		const deps = createMockDeps({ tabCompletionSuggestions: suggestions });
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -323,7 +323,7 @@ describe('Tab completion navigation', () => {
 	});
 
 	it('accepts selection on Tab in non-git repos', () => {
-		setActiveSession({ inputMode: 'terminal', isGitRepo: false });
+		setActiveSession({ inputMode: 'ai', isGitRepo: false });
 		mockInputContext.selectedTabCompletionIndex = 0;
 		const deps = createMockDeps({ tabCompletionSuggestions: suggestions });
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -457,7 +457,7 @@ describe('@ mention completion', () => {
 	});
 
 	it('does not activate in terminal mode', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const deps = createMockDeps({ atMentionSuggestions: mentions });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('ArrowDown');
@@ -551,7 +551,7 @@ describe('Slash command autocomplete', () => {
 	});
 
 	it('filters out aiOnly commands in terminal mode', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		// Only /run is aiOnly, so it should be filtered out
 		// Input is '/r' which only matches /run
 		const deps = createMockDeps({ inputValue: '/r', allSlashCommands: commands });
@@ -671,7 +671,7 @@ describe('Enter-to-send', () => {
 	});
 
 	it('uses enterToSendTerminal setting in terminal mode', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		useSettingsStore.setState({ enterToSendTerminal: true } as any);
 		const deps = createMockDeps();
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -685,7 +685,7 @@ describe('Enter-to-send', () => {
 	});
 
 	it('does not send on Enter+Meta when enterToSendTerminal is true', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		useSettingsStore.setState({ enterToSendTerminal: true } as any);
 		const deps = createMockDeps();
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -727,7 +727,7 @@ describe('Escape key', () => {
 
 describe('Command history', () => {
 	it('opens command history on ArrowUp in terminal mode', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const deps = createMockDeps({ inputValue: 'git st' });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('ArrowUp');
@@ -775,7 +775,7 @@ describe('Tab completion trigger', () => {
 	});
 
 	it('auto-completes single suggestion in terminal mode', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const suggestions = [{ value: 'src/', type: 'folder' as const, label: 'src/' }] as any;
 		const deps = createMockDeps({
 			inputValue: 'sr',
@@ -793,7 +793,7 @@ describe('Tab completion trigger', () => {
 	});
 
 	it('opens dropdown for multiple suggestions', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const suggestions = [
 			{ value: 'src/', type: 'folder', label: 'src/' },
 			{ value: 'scripts/', type: 'folder', label: 'scripts/' },
@@ -815,7 +815,7 @@ describe('Tab completion trigger', () => {
 	});
 
 	it('does nothing for empty input', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const deps = createMockDeps({ inputValue: '' });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('Tab');
@@ -828,7 +828,7 @@ describe('Tab completion trigger', () => {
 	});
 
 	it('does nothing for whitespace-only input', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const deps = createMockDeps({ inputValue: '   ' });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('Tab');
@@ -841,7 +841,7 @@ describe('Tab completion trigger', () => {
 	});
 
 	it('does nothing when no suggestions', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const deps = createMockDeps({
 			inputValue: 'zzz',
 			getTabCompletionSuggestions: vi.fn().mockReturnValue([]),
@@ -874,7 +874,7 @@ describe('Tab completion trigger', () => {
 	});
 
 	it('does not trigger when slash command open', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		mockInputContext.slashCommandOpen = true;
 		const deps = createMockDeps({
 			inputValue: '/he',
@@ -943,7 +943,7 @@ describe('Tab completion navigation — additional', () => {
 	beforeEach(() => {
 		mockInputContext.tabCompletionOpen = true;
 		mockInputContext.selectedTabCompletionIndex = 0;
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 	});
 
 	it('Enter with out-of-bounds index closes dropdown without setting input', () => {
@@ -975,7 +975,7 @@ describe('Tab completion navigation — additional', () => {
 	});
 
 	it('Shift+Tab in git repo wraps backwards from all to file', () => {
-		setActiveSession({ inputMode: 'terminal', isGitRepo: true });
+		setActiveSession({ inputMode: 'ai', isGitRepo: true });
 		mockInputContext.tabCompletionFilter = 'all';
 		const deps = createMockDeps({ tabCompletionSuggestions: suggestions });
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -1177,7 +1177,7 @@ describe('Enter-to-send — additional', () => {
 	});
 
 	it('terminal mode with enterToSendTerminal=false requires Cmd+Enter', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		useSettingsStore.setState({ enterToSendTerminal: false } as any);
 		const deps = createMockDeps();
 		const { result } = renderHook(() => useInputKeyDown(deps));
@@ -1261,7 +1261,7 @@ describe('Escape key — additional', () => {
 
 describe('Command history — additional', () => {
 	it('opens with empty filter when inputValue is empty in terminal mode', () => {
-		setActiveSession({ inputMode: 'terminal' });
+		setActiveSession({ inputMode: 'ai' });
 		const deps = createMockDeps({ inputValue: '' });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('ArrowUp');

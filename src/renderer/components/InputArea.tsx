@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo, startTransition } from 'react';
 import {
-	Terminal,
 	Cpu,
-	Keyboard,
 	ImageIcon,
 	X,
 	ArrowUp,
@@ -12,17 +10,15 @@ import {
 	Folder,
 	GitBranch,
 	Tag,
-	PenLine,
 	Brain,
 	Wand2,
 	Pin,
+	BookOpen,
 } from 'lucide-react';
 import type { Session, Theme, BatchRunState, Shortcut, ThinkingMode, ThinkingItem } from '../types';
-import {
-	formatShortcutKeys,
-	formatEnterToSend,
-	formatEnterToSendTooltip,
-} from '../utils/shortcutFormatter';
+import type { OutputStyle } from '../../shared/types';
+import { OUTPUT_STYLE_OPTIONS } from '../../shared/types';
+import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import type { TabCompletionSuggestion, TabCompletionFilter } from '../hooks';
 import type {
 	SummarizeProgress,
@@ -75,7 +71,6 @@ interface InputAreaProps {
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 	handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 	handleDrop: (e: React.DragEvent<HTMLElement>) => void;
-	toggleInputMode: () => void;
 	processInput: () => void;
 	handleInterrupt: () => void;
 	onInputFocus: () => void;
@@ -118,11 +113,6 @@ interface InputAreaProps {
 	// Read-only mode toggle (per-tab)
 	tabReadOnlyMode?: boolean;
 	onToggleTabReadOnlyMode?: () => void;
-	// Save to History toggle (per-tab)
-	tabSaveToHistory?: boolean;
-	onToggleTabSaveToHistory?: () => void;
-	// Prompt composer modal
-	onOpenPromptComposer?: () => void;
 	// Shortcuts for displaying keyboard hints
 	shortcuts?: Record<string, Shortcut>;
 	// Flash notification callback
@@ -156,6 +146,13 @@ interface InputAreaProps {
 	// Wizard thinking toggle
 	wizardShowThinking?: boolean;
 	onToggleWizardShowThinking?: () => void;
+	// Model selector (per-tab)
+	currentModelId?: string;
+	availableModels?: string[];
+	onModelChange?: (modelId: string) => void;
+	// Output style selector (per-tab, Claude Code only)
+	tabOutputStyle?: OutputStyle;
+	onToggleOutputStyle?: () => void;
 }
 
 export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
@@ -184,7 +181,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		handleInputKeyDown,
 		handlePaste,
 		handleDrop,
-		toggleInputMode,
 		processInput,
 		handleInterrupt,
 		onInputFocus,
@@ -214,9 +210,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		onOpenQueueBrowser,
 		tabReadOnlyMode = false,
 		onToggleTabReadOnlyMode,
-		tabSaveToHistory = false,
-		onToggleTabSaveToHistory,
-		onOpenPromptComposer,
 		shortcuts,
 		showFlashNotification,
 		tabShowThinking = 'off',
@@ -247,6 +240,13 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		// Wizard thinking toggle
 		wizardShowThinking = false,
 		onToggleWizardShowThinking,
+		// Model selector (per-tab)
+		currentModelId,
+		availableModels = [],
+		onModelChange,
+		// Output style selector (per-tab, Claude Code only)
+		tabOutputStyle = 'default',
+		onToggleOutputStyle,
 	} = props;
 
 	const setCommandHistoryFilterRef = React.useCallback((el: HTMLInputElement | null) => {
@@ -257,6 +257,69 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 
 	// Get agent capabilities for conditional feature rendering
 	const { hasCapability } = useAgentCapabilities(session.toolType);
+
+	// Model selector: derive display name and cycle handler
+	const modelDisplayName = useMemo(() => {
+		if (!currentModelId) return null;
+		// Extract short display name from model ID
+		// e.g., "claude-sonnet-4-20250514" -> "Sonnet 4"
+		// e.g., "claude-opus-4-20250514" -> "Opus 4"
+		// e.g., "anthropic/claude-3.5-sonnet" -> "3.5 Sonnet"
+		const id = currentModelId.toLowerCase();
+		// Handle bare aliases (e.g., "sonnet", "opus", "haiku")
+		if (id === 'sonnet') return 'Sonnet';
+		if (id === 'opus') return 'Opus';
+		if (id === 'haiku') return 'Haiku';
+		// Try common patterns with version numbers
+		// Handles both dot and hyphen separators: "opus-4-6" -> "Opus 4.6", "opus-4" -> "Opus 4"
+		const opusMatch = id.match(/opus[- ]?(\d+)(?:[.-](\d+))?/);
+		if (opusMatch) return `Opus ${opusMatch[1]}${opusMatch[2] ? `.${opusMatch[2]}` : ''}`;
+		const sonnetMatch = id.match(/sonnet[- ]?(\d+)(?:[.-](\d+))?/);
+		if (sonnetMatch) return `Sonnet ${sonnetMatch[1]}${sonnetMatch[2] ? `.${sonnetMatch[2]}` : ''}`;
+		const haikuMatch = id.match(/haiku[- ]?(\d+)(?:[.-](\d+))?/);
+		if (haikuMatch) return `Haiku ${haikuMatch[1]}${haikuMatch[2] ? `.${haikuMatch[2]}` : ''}`;
+
+		// For "claude-3.5-sonnet" style
+		const versionModelMatch = id.match(/(\d+(?:\.\d+)?)[- ](sonnet|opus|haiku)/);
+		if (versionModelMatch) {
+			const name = versionModelMatch[2].charAt(0).toUpperCase() + versionModelMatch[2].slice(1);
+			return `${name} ${versionModelMatch[1]}`;
+		}
+		// Fallback: use last meaningful segment
+		const parts = currentModelId.split(/[/\-_]/);
+		// Remove date-like suffixes (e.g., "20250514")
+		const meaningful = parts.filter(
+			(p) => !/^\d{8}$/.test(p) && p !== 'claude' && p !== 'anthropic'
+		);
+		return meaningful.slice(-2).join(' ').slice(0, 16) || currentModelId.slice(0, 16);
+	}, [currentModelId]);
+
+	const handleModelCycle = useMemo(() => {
+		if (!onModelChange || availableModels.length <= 1) return undefined;
+		return () => {
+			const currentIndex = currentModelId ? availableModels.indexOf(currentModelId) : -1;
+			const nextIndex = (currentIndex + 1) % availableModels.length;
+			onModelChange(availableModels[nextIndex]);
+		};
+	}, [onModelChange, availableModels, currentModelId]);
+
+	// Whether the current model is non-default (not the first in the list)
+	const isNonDefaultModel = useMemo(() => {
+		if (!currentModelId || availableModels.length <= 1) return false;
+		return availableModels.indexOf(currentModelId) > 0;
+	}, [currentModelId, availableModels]);
+
+	// Output style display name and accent state
+	const outputStyleLabel = useMemo(() => {
+		const option = OUTPUT_STYLE_OPTIONS.find((o) => o.id === tabOutputStyle);
+		if (!option) return 'Default';
+		// Short labels for pill display
+		if (option.id === 'explanatory') return 'Explain';
+		if (option.id === 'learning') return 'Learn';
+		return option.label;
+	}, [tabOutputStyle]);
+
+	const isNonDefaultOutputStyle = tabOutputStyle !== 'default';
 
 	// PERF: Memoize activeTab lookup to avoid O(n) search on every render
 	const activeTab = useMemo(
@@ -295,23 +358,12 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		};
 	}, [tabReadOnlyMode, isAutoModeActive, session.inputMode]);
 
-	// Filter slash commands based on input and current mode
-	const isTerminalMode = session.inputMode === 'terminal';
-
 	// thinkingItems is now passed directly from App.tsx (pre-filtered) for better performance
 
-	// Get the appropriate command history based on current mode
-	// Fall back to legacy commandHistory for sessions created before the split
+	// Get AI command history
 	const legacyHistory: string[] = (session as any).commandHistory || [];
-	const shellHistory: string[] = session.shellCommandHistory || [];
 	const aiHistory: string[] = session.aiCommandHistory || [];
-	const currentCommandHistory: string[] = isTerminalMode
-		? shellHistory.length > 0
-			? shellHistory
-			: legacyHistory
-		: aiHistory.length > 0
-			? aiHistory
-			: legacyHistory;
+	const currentCommandHistory: string[] = aiHistory.length > 0 ? aiHistory : legacyHistory;
 
 	// Use the slash commands passed from App.tsx (already includes custom + Claude commands)
 	// PERF: Memoize both the lowercase conversion and filtered results to avoid
@@ -319,14 +371,12 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 	const inputValueLower = useMemo(() => inputValue.toLowerCase(), [inputValue]);
 	const filteredSlashCommands = useMemo(() => {
 		return slashCommands.filter((cmd) => {
-			// Check if command is only available in terminal mode
-			if (cmd.terminalOnly && !isTerminalMode) return false;
-			// Check if command is only available in AI mode
-			if (cmd.aiOnly && isTerminalMode) return false;
+			// Skip terminal-only commands (terminal mode removed)
+			if (cmd.terminalOnly) return false;
 			// Check if command matches input
 			return cmd.command.toLowerCase().startsWith(inputValueLower);
 		});
-	}, [slashCommands, isTerminalMode, inputValueLower]);
+	}, [slashCommands, inputValueLower]);
 
 	// Ensure selectedSlashCommandIndex is valid for the filtered list
 	const safeSelectedIndex = Math.min(
@@ -416,8 +466,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 				processInput={processInput}
 				stagedImages={stagedImages}
 				setStagedImages={setStagedImages}
-				onOpenPromptComposer={onOpenPromptComposer}
-				toggleInputMode={toggleInputMode}
 				confidence={wizardState.confidence}
 				canAttachImages={canAttachImages}
 				isBusy={wizardState.isWaiting || session.state === 'busy'}
@@ -548,7 +596,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 							type="text"
 							className="w-full bg-transparent outline-none text-sm p-2 border-b"
 							style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
-							placeholder={isTerminalMode ? 'Filter commands...' : 'Filter messages...'}
+							placeholder={'Filter messages...'}
 							value={commandHistoryFilter}
 							onChange={(e) => {
 								setCommandHistoryFilter(e.target.value);
@@ -618,149 +666,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 						})}
 						{filteredCommandHistory.length === 0 && (
 							<div className="px-3 py-4 text-center text-sm opacity-50">
-								{isTerminalMode ? 'No matching commands' : 'No matching messages'}
-							</div>
-						)}
-					</div>
-				</div>
-			)}
-
-			{/* Tab Completion Dropdown - Terminal mode only */}
-			{tabCompletionOpen && isTerminalMode && (
-				<div
-					className="absolute bottom-full left-0 right-0 mb-2 border rounded-lg shadow-2xl max-h-64 overflow-hidden"
-					style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
-				>
-					<div
-						className="px-3 py-2 border-b flex items-center justify-between"
-						style={{ borderColor: theme.colors.border }}
-					>
-						<span className="text-xs opacity-60" style={{ color: theme.colors.textDim }}>
-							Tab Completion
-						</span>
-						{/* Filter buttons - only show in git repos */}
-						{session.isGitRepo && setTabCompletionFilter && (
-							<div className="flex gap-1">
-								{(['all', 'history', 'branch', 'tag', 'file'] as const).map((filterType) => {
-									const isActive = tabCompletionFilter === filterType;
-									const Icon =
-										filterType === 'history'
-											? History
-											: filterType === 'branch'
-												? GitBranch
-												: filterType === 'tag'
-													? Tag
-													: filterType === 'file'
-														? File
-														: null;
-									const label =
-										filterType === 'all'
-											? 'All'
-											: filterType === 'history'
-												? 'History'
-												: filterType === 'branch'
-													? 'Branches'
-													: filterType === 'tag'
-														? 'Tags'
-														: 'Files';
-									return (
-										<button
-											key={filterType}
-											onClick={(e) => {
-												e.stopPropagation();
-												setTabCompletionFilter(filterType);
-												setSelectedTabCompletionIndex?.(0);
-											}}
-											className={`px-2 py-0.5 text-[10px] rounded flex items-center gap-1 transition-colors ${
-												isActive ? 'font-medium' : 'opacity-60 hover:opacity-100'
-											}`}
-											style={{
-												backgroundColor: isActive ? theme.colors.accent + '30' : 'transparent',
-												color: isActive ? theme.colors.accent : theme.colors.textDim,
-												border: isActive
-													? `1px solid ${theme.colors.accent}50`
-													: '1px solid transparent',
-											}}
-										>
-											{Icon && <Icon className="w-3 h-3" />}
-											{label}
-										</button>
-									);
-								})}
-							</div>
-						)}
-					</div>
-					<div className="overflow-y-auto max-h-56 scrollbar-thin">
-						{tabCompletionSuggestions.length > 0 ? (
-							tabCompletionSuggestions.map((suggestion, idx) => {
-								const isSelected = idx === selectedTabCompletionIndex;
-								const IconComponent =
-									suggestion.type === 'history'
-										? History
-										: suggestion.type === 'branch'
-											? GitBranch
-											: suggestion.type === 'tag'
-												? Tag
-												: suggestion.type === 'folder'
-													? Folder
-													: File;
-								const typeLabel = suggestion.type;
-
-								return (
-									<button
-										type="button"
-										key={`${suggestion.type}-${suggestion.value}`}
-										ref={(el) => (tabCompletionItemRefs.current[idx] = el)}
-										className={`w-full px-3 py-2 text-left text-sm font-mono flex items-center gap-2 ${isSelected ? 'ring-1 ring-inset' : ''}`}
-										style={
-											{
-												backgroundColor: isSelected ? theme.colors.bgActivity : 'transparent',
-												'--tw-ring-color': theme.colors.accent,
-												color: theme.colors.textMain,
-											} as React.CSSProperties
-										}
-										onClick={() => {
-											setInputValue(suggestion.value);
-											setTabCompletionOpen?.(false);
-											inputRef.current?.focus();
-										}}
-										onMouseEnter={() => setSelectedTabCompletionIndex?.(idx)}
-									>
-										<IconComponent
-											className="w-3.5 h-3.5 flex-shrink-0"
-											style={{
-												color:
-													suggestion.type === 'history'
-														? theme.colors.accent
-														: suggestion.type === 'branch'
-															? theme.colors.success
-															: suggestion.type === 'tag'
-																? theme.colors.accentText
-																: suggestion.type === 'folder'
-																	? theme.colors.warning
-																	: theme.colors.textDim,
-											}}
-										/>
-										<span className="flex-1 truncate">{suggestion.displayText}</span>
-										<span className="text-[10px] opacity-40 flex-shrink-0">{typeLabel}</span>
-									</button>
-								);
-							})
-						) : (
-							<div
-								className="px-3 py-4 text-center text-sm opacity-50"
-								style={{ color: theme.colors.textDim }}
-							>
-								No matching{' '}
-								{tabCompletionFilter === 'all'
-									? 'suggestions'
-									: tabCompletionFilter === 'history'
-										? 'history'
-										: tabCompletionFilter === 'branch'
-											? 'branches'
-											: tabCompletionFilter === 'tag'
-												? 'tags'
-												: 'files'}
+								{'No matching messages'}
 							</div>
 						)}
 					</div>
@@ -768,7 +674,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 			)}
 
 			{/* @ Mention Dropdown (AI mode file picker) */}
-			{atMentionOpen && !isTerminalMode && atMentionSuggestions.length > 0 && (
+			{atMentionOpen && atMentionSuggestions.length > 0 && (
 				<div
 					className="absolute bottom-full left-4 right-4 mb-1 rounded-lg border shadow-lg overflow-hidden z-50"
 					style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
@@ -851,24 +757,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 						}}
 					>
 						<div className="flex items-start">
-							{/* Terminal mode prefix */}
-							{isTerminalMode && (
-								<span
-									className="text-sm font-mono font-bold select-none pl-3 pt-3"
-									style={{ color: theme.colors.accent }}
-								>
-									$
-								</span>
-							)}
 							<textarea
 								ref={inputRef}
-								className={`flex-1 bg-transparent text-sm outline-none ${isTerminalMode ? 'pl-1.5' : 'pl-3'} pt-3 pr-3 resize-none min-h-[3.5rem] scrollbar-thin`}
+								className="flex-1 bg-transparent text-sm outline-none pl-3 pt-3 pr-3 resize-none min-h-[3.5rem] scrollbar-thin"
 								style={{ color: theme.colors.textMain, maxHeight: '11rem' }}
-								placeholder={
-									isTerminalMode
-										? 'Run shell command...'
-										: `Talking to ${session.name} powered by ${getProviderDisplayName(session.toolType)}`
-								}
+								placeholder={`Talking to ${session.name} powered by ${getProviderDisplayName(session.toolType)}`}
 								value={inputValue}
 								onFocus={onInputFocus}
 								onBlur={onInputBlur}
@@ -893,9 +786,8 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 											setSlashCommandOpen(false);
 										}
 
-										// @ mention file completion (AI mode only)
+										// @ mention file completion
 										if (
-											!isTerminalMode &&
 											setAtMentionOpen &&
 											setAtMentionFilter &&
 											setAtMentionStartIndex &&
@@ -944,41 +836,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 
 						<div className="flex justify-between items-center px-2 pb-2 pt-1">
 							<div className="flex gap-1 items-center">
-								{session.inputMode === 'terminal' && (
-									<div
-										className="text-xs font-mono opacity-60 px-2"
-										style={{ color: theme.colors.textDim }}
-									>
-										{/* For SSH sessions, show hostname:remoteCwd; for local sessions, show shellCwd */}
-										{(() => {
-											const isRemote = !!(
-												session.sshRemoteId || session.sessionSshRemoteConfig?.enabled
-											);
-											const path = isRemote
-												? session.remoteCwd ||
-													session.sessionSshRemoteConfig?.workingDirOverride ||
-													session.cwd
-												: session.shellCwd || session.cwd;
-											const displayPath =
-												path?.replace(/^\/Users\/[^\/]+/, '~').replace(/^\/home\/[^\/]+/, '~') ||
-												'~';
-											// For SSH sessions, prefix with hostname (uppercase)
-											if (isRemote && session.sshRemote?.name) {
-												return `${session.sshRemote.name.toUpperCase()}:${displayPath}`;
-											}
-											return displayPath;
-										})()}
-									</div>
-								)}
-								{session.inputMode === 'ai' && onOpenPromptComposer && (
-									<button
-										onClick={onOpenPromptComposer}
-										className="p-1 hover:bg-white/10 rounded opacity-50 hover:opacity-100"
-										title={`Open Prompt Composer${shortcuts?.openPromptComposer ? ` (${formatShortcutKeys(shortcuts.openPromptComposer.keys)})` : ''}`}
-									>
-										<PenLine className="w-4 h-4" />
-									</button>
-								)}
 								{session.inputMode === 'ai' && canAttachImages && (
 									<button
 										onClick={() => document.getElementById('image-file-input')?.click()}
@@ -1018,28 +875,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 							</div>
 
 							<div className="flex items-center gap-2">
-								{/* Save to History toggle - AI mode only */}
-								{session.inputMode === 'ai' && onToggleTabSaveToHistory && (
-									<button
-										onClick={onToggleTabSaveToHistory}
-										className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-											tabSaveToHistory ? '' : 'opacity-40 hover:opacity-70'
-										}`}
-										style={{
-											backgroundColor: tabSaveToHistory
-												? `${theme.colors.accent}25`
-												: 'transparent',
-											color: tabSaveToHistory ? theme.colors.accent : theme.colors.textDim,
-											border: tabSaveToHistory
-												? `1px solid ${theme.colors.accent}50`
-												: '1px solid transparent',
-										}}
-										title={`Save to History (${formatShortcutKeys(['Meta', 's'])}) - Synopsis added after each completion`}
-									>
-										<History className="w-3 h-3" />
-										<span>History</span>
-									</button>
-								)}
 								{/* Read-only mode toggle - AI mode only, if agent supports it */}
 								{/* User can freely toggle read-only during Auto Run */}
 								{session.inputMode === 'ai' &&
@@ -1106,14 +941,55 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 										{tabShowThinking === 'sticky' && <Pin className="w-2.5 h-2.5" />}
 									</button>
 								)}
-								<button
-									onClick={() => setEnterToSend(!enterToSend)}
-									className="flex items-center gap-1 text-[10px] opacity-50 hover:opacity-100 px-2 py-1 rounded hover:bg-white/5"
-									title={formatEnterToSendTooltip(enterToSend)}
-								>
-									<Keyboard className="w-3 h-3" />
-									{formatEnterToSend(enterToSend)}
-								</button>
+								{/* Model selector pill - AI mode only, when multiple models available */}
+								{session.inputMode === 'ai' &&
+									handleModelCycle &&
+									modelDisplayName &&
+									availableModels.length > 1 && (
+										<button
+											onClick={handleModelCycle}
+											className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
+												isNonDefaultModel ? '' : 'opacity-40 hover:opacity-70'
+											}`}
+											style={{
+												backgroundColor: isNonDefaultModel
+													? `${theme.colors.accent}25`
+													: 'transparent',
+												color: isNonDefaultModel ? theme.colors.accent : theme.colors.textDim,
+												border: isNonDefaultModel
+													? `1px solid ${theme.colors.accent}50`
+													: '1px solid transparent',
+											}}
+											title={`${currentModelId} — Click to switch model`}
+										>
+											<Cpu className="w-3 h-3" />
+											<span>{modelDisplayName}</span>
+										</button>
+									)}
+								{/* Output style selector pill - AI mode only, Claude Code agents only */}
+								{session.inputMode === 'ai' &&
+									session.toolType === 'claude-code' &&
+									onToggleOutputStyle && (
+										<button
+											onClick={onToggleOutputStyle}
+											className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
+												isNonDefaultOutputStyle ? '' : 'opacity-40 hover:opacity-70'
+											}`}
+											style={{
+												backgroundColor: isNonDefaultOutputStyle
+													? `${theme.colors.accent}25`
+													: 'transparent',
+												color: isNonDefaultOutputStyle ? theme.colors.accent : theme.colors.textDim,
+												border: isNonDefaultOutputStyle
+													? `1px solid ${theme.colors.accent}50`
+													: '1px solid transparent',
+											}}
+											title={`Output Style: ${OUTPUT_STYLE_OPTIONS.find((o) => o.id === tabOutputStyle)?.description ?? 'Default'} — Click to cycle`}
+										>
+											<BookOpen className="w-3 h-3" />
+											<span>{outputStyleLabel}</span>
+										</button>
+									)}
 							</div>
 						</div>
 					</div>
@@ -1131,27 +1007,22 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 					)}
 				</div>
 
-				{/* Mode Toggle & Send/Interrupt Button - Right Side */}
+				{/* Mode Indicator & Send/Interrupt Button - Right Side */}
 				<div className="flex flex-col gap-2">
-					<button
-						type="button"
-						onClick={toggleInputMode}
-						className="p-2 rounded-lg border transition-all"
+					<div
+						className="p-2 rounded-lg border"
 						style={{
 							backgroundColor: theme.colors.bgMain,
 							borderColor: theme.colors.border,
 							color: theme.colors.textDim,
 						}}
-						title={`Toggle Mode (${formatShortcutKeys(['Meta', 'j'])})`}
 					>
-						{session.inputMode === 'terminal' ? (
-							<Terminal className="w-4 h-4" />
-						) : wizardState?.isActive ? (
+						{wizardState?.isActive ? (
 							<Wand2 className="w-4 h-4" style={{ color: theme.colors.accent }} />
 						) : (
 							<Cpu className="w-4 h-4" />
 						)}
-					</button>
+					</div>
 					{/* Send button - always visible. Stop button is now in ThinkingStatusPill */}
 					<button
 						type="button"
@@ -1161,7 +1032,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 							backgroundColor: theme.colors.accent,
 							color: theme.colors.accentForeground,
 						}}
-						title={session.inputMode === 'terminal' ? 'Run command (Enter)' : 'Send message'}
+						title="Send message"
 					>
 						<ArrowUp className="w-4 h-4" />
 					</button>

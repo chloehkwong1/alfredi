@@ -309,22 +309,9 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 		// Intentionally only depend on activeTab?.id, NOT inputValue
 	}, [activeTab?.id]);
 
-	// Sync terminal input when switching sessions
+	// Track session switches for input syncing
 	useEffect(() => {
 		if (activeSession && activeSession.id !== prevActiveSessionIdRef.current) {
-			const prevSessionId = prevActiveSessionIdRef.current;
-
-			// Save terminal input to the previous session (including empty string to persist cleared input)
-			if (prevSessionId) {
-				setSessions((prev) =>
-					prev.map((s) =>
-						s.id === prevSessionId ? { ...s, terminalDraftInput: terminalInputValue } : s
-					)
-				);
-			}
-
-			// Load terminal input from the new session
-			setTerminalInputValue(activeSession.terminalDraftInput ?? '');
 			prevActiveSessionIdRef.current = activeSession.id;
 		}
 	}, [activeSession?.id]);
@@ -335,7 +322,7 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 
 	const debouncedInputForTabCompletion = useDebouncedValue(tabCompletionOpen ? inputValue : '', 50);
 	const tabCompletionSuggestions = useMemo(() => {
-		if (!tabCompletionOpen || !activeSessionId || activeSessionInputMode !== 'terminal') {
+		if (!tabCompletionOpen || !activeSessionId) {
 			return [];
 		}
 		return getTabCompletionSuggestions(debouncedInputForTabCompletion, tabCompletionFilter);
@@ -398,8 +385,6 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 		customAICommands: allCustomCommands,
 		setSlashCommandOpen,
 		syncAiInputToSession,
-		syncTerminalInputToSession,
-		isAiMode,
 		sessionsRef,
 		getBatchState,
 		activeBatchRunState,

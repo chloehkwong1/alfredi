@@ -51,7 +51,7 @@ function makeSession(overrides: Partial<Session> & { id: string; name: string })
 	return {
 		id: overrides.id,
 		name: overrides.name,
-		groupId: overrides.groupId,
+		projectId: overrides.projectId,
 		bookmarked: overrides.bookmarked ?? false,
 		parentSessionId: overrides.parentSessionId,
 		worktreesExpanded: overrides.worktreesExpanded,
@@ -77,9 +77,7 @@ function makeSession(overrides: Partial<Session> & { id: string; name: string })
 		fileExplorerExpanded: [],
 		fileExplorerScrollPos: 0,
 		fileTreeAutoRefreshInterval: 180,
-		shellCwd: '/tmp',
 		aiCommandHistory: [],
-		shellCommandHistory: [],
 		executionQueue: [],
 		activeTimeMs: 0,
 		aiTabs: [],
@@ -94,9 +92,9 @@ function makeSession(overrides: Partial<Session> & { id: string; name: string })
 	} as Session;
 }
 
-/** Build a minimal Group object. */
-function makeGroup(id: string, name: string, collapsed = false) {
-	return { id, name, collapsed } as any;
+/** Build a minimal Project object. */
+function makeProject(id: string, name: string, collapsed = false) {
+	return { id, name, collapsed, rootPath: '/test/project', emoji: '' } as any;
 }
 
 /** Create default deps for the hook. */
@@ -113,7 +111,7 @@ function makeDeps(overrides: Partial<UseCycleSessionDeps> = {}): UseCycleSession
 
 const defaultSessionStoreState = {
 	sessions: [],
-	groups: [],
+	projects: [],
 	activeSessionId: '',
 	cyclePosition: -1,
 };
@@ -471,14 +469,14 @@ describe('useCycleSession', () => {
 	// =========================================================================
 	describe('group sessions', () => {
 		it('sessions within a group are sorted alphabetically', () => {
-			const grp = makeGroup('grp-1', 'MyGroup');
-			const sessC = makeSession({ id: 'c', name: 'Charlie', groupId: 'grp-1' });
-			const sessA = makeSession({ id: 'a', name: 'Alice', groupId: 'grp-1' });
-			const sessB = makeSession({ id: 'b', name: 'Bob', groupId: 'grp-1' });
+			const grp = makeProject('grp-1', 'MyGroup');
+			const sessC = makeSession({ id: 'c', name: 'Charlie', projectId: 'grp-1' });
+			const sessA = makeSession({ id: 'a', name: 'Alice', projectId: 'grp-1' });
+			const sessB = makeSession({ id: 'b', name: 'Bob', projectId: 'grp-1' });
 
 			useSessionStore.setState({
 				sessions: [sessC, sessA, sessB],
-				groups: [grp],
+				projects: [grp],
 				activeSessionId: 'a',
 				cyclePosition: -1,
 			} as any);
@@ -505,15 +503,15 @@ describe('useCycleSession', () => {
 		});
 
 		it('multiple groups are sorted alphabetically between themselves', () => {
-			const grpB = makeGroup('grp-b', 'Bees');
-			const grpA = makeGroup('grp-a', 'Ants');
+			const grpB = makeProject('grp-b', 'Bees');
+			const grpA = makeProject('grp-a', 'Ants');
 
-			const sessA1 = makeSession({ id: 'a1', name: 'Ant-One', groupId: 'grp-a' });
-			const sessB1 = makeSession({ id: 'b1', name: 'Bee-One', groupId: 'grp-b' });
+			const sessA1 = makeSession({ id: 'a1', name: 'Ant-One', projectId: 'grp-a' });
+			const sessB1 = makeSession({ id: 'b1', name: 'Bee-One', projectId: 'grp-b' });
 
 			useSessionStore.setState({
 				sessions: [sessB1, sessA1],
-				groups: [grpB, grpA], // intentionally unordered
+				projects: [grpB, grpA], // intentionally unordered
 				activeSessionId: 'a1',
 				cyclePosition: -1,
 			} as any);
@@ -540,16 +538,16 @@ describe('useCycleSession', () => {
 	// =========================================================================
 	describe('collapsed groups are skipped', () => {
 		it('sessions in a collapsed group are excluded from the visual order', () => {
-			const collapsedGrp = makeGroup('grp-collapsed', 'Hidden', true);
-			const openGrp = makeGroup('grp-open', 'Visible', false);
+			const collapsedGrp = makeProject('grp-collapsed', 'Hidden', true);
+			const openGrp = makeProject('grp-open', 'Visible', false);
 
-			const sessHidden = makeSession({ id: 'h', name: 'Hidden', groupId: 'grp-collapsed' });
-			const sessA = makeSession({ id: 'a', name: 'Alpha', groupId: 'grp-open' });
-			const sessB = makeSession({ id: 'b', name: 'Beta', groupId: 'grp-open' });
+			const sessHidden = makeSession({ id: 'h', name: 'Hidden', projectId: 'grp-collapsed' });
+			const sessA = makeSession({ id: 'a', name: 'Alpha', projectId: 'grp-open' });
+			const sessB = makeSession({ id: 'b', name: 'Beta', projectId: 'grp-open' });
 
 			useSessionStore.setState({
 				sessions: [sessHidden, sessA, sessB],
-				groups: [collapsedGrp, openGrp],
+				projects: [collapsedGrp, openGrp],
 				activeSessionId: 'a',
 				cyclePosition: -1,
 			} as any);
@@ -576,12 +574,12 @@ describe('useCycleSession', () => {
 		});
 
 		it('all sessions are skipped when all groups are collapsed and ungrouped is collapsed', () => {
-			const collapsedGrp = makeGroup('grp-1', 'G1', true);
-			const sessA = makeSession({ id: 'a', name: 'Alpha', groupId: 'grp-1' });
+			const collapsedGrp = makeProject('grp-1', 'G1', true);
+			const sessA = makeSession({ id: 'a', name: 'Alpha', projectId: 'grp-1' });
 
 			useSessionStore.setState({
 				sessions: [sessA],
-				groups: [collapsedGrp],
+				projects: [collapsedGrp],
 				activeSessionId: 'a',
 				cyclePosition: -1,
 			} as any);
@@ -608,13 +606,13 @@ describe('useCycleSession', () => {
 	// =========================================================================
 	describe('ungroupedCollapsed', () => {
 		it('ungrouped sessions are skipped when ungroupedCollapsed is true', () => {
-			const grp = makeGroup('grp-1', 'Group', false);
-			const sessInGroup = makeSession({ id: 'g', name: 'Grouped', groupId: 'grp-1' });
+			const grp = makeProject('grp-1', 'Group', false);
+			const sessInGroup = makeSession({ id: 'g', name: 'Grouped', projectId: 'grp-1' });
 			const sessUngrouped = makeSession({ id: 'u', name: 'Ungrouped' });
 
 			useSessionStore.setState({
 				sessions: [sessInGroup, sessUngrouped],
-				groups: [grp],
+				projects: [grp],
 				activeSessionId: 'g',
 				cyclePosition: -1,
 			} as any);
@@ -636,13 +634,13 @@ describe('useCycleSession', () => {
 		});
 
 		it('ungrouped sessions are included when ungroupedCollapsed is false', () => {
-			const grp = makeGroup('grp-1', 'Group', false);
-			const sessInGroup = makeSession({ id: 'g', name: 'Grouped', groupId: 'grp-1' });
+			const grp = makeProject('grp-1', 'Group', false);
+			const sessInGroup = makeSession({ id: 'g', name: 'Grouped', projectId: 'grp-1' });
 			const sessUngrouped = makeSession({ id: 'u', name: 'Zed-Ungrouped' });
 
 			useSessionStore.setState({
 				sessions: [sessInGroup, sessUngrouped],
-				groups: [grp],
+				projects: [grp],
 				activeSessionId: 'g',
 				cyclePosition: -1,
 			} as any);
@@ -701,20 +699,20 @@ describe('useCycleSession', () => {
 	describe('current item not visible', () => {
 		it('selects first visible item when active session is not in visual order', () => {
 			// Active session is in a collapsed group → not in visual order
-			const collapsedGrp = makeGroup('grp-hidden', 'Hidden', true);
-			const openGrp = makeGroup('grp-open', 'Open', false);
+			const collapsedGrp = makeProject('grp-hidden', 'Hidden', true);
+			const openGrp = makeProject('grp-open', 'Open', false);
 
 			const sessHidden = makeSession({
 				id: 'hidden',
 				name: 'Hidden',
-				groupId: 'grp-hidden',
+				projectId: 'grp-hidden',
 			});
-			const sessFirst = makeSession({ id: 'first', name: 'First', groupId: 'grp-open' });
-			const sessSecond = makeSession({ id: 'second', name: 'Second', groupId: 'grp-open' });
+			const sessFirst = makeSession({ id: 'first', name: 'First', projectId: 'grp-open' });
+			const sessSecond = makeSession({ id: 'second', name: 'Second', projectId: 'grp-open' });
 
 			useSessionStore.setState({
 				sessions: [sessHidden, sessFirst, sessSecond],
-				groups: [collapsedGrp, openGrp],
+				projects: [collapsedGrp, openGrp],
 				activeSessionId: 'hidden',
 				cyclePosition: -1,
 			} as any);
@@ -743,7 +741,7 @@ describe('useCycleSession', () => {
 			// Suppose 'invisible' is active but not in any expanded section
 			useSessionStore.setState({
 				sessions: [sessA, sessB],
-				groups: [],
+				projects: [],
 				activeSessionId: 'invisible',
 				cyclePosition: -1,
 			} as any);

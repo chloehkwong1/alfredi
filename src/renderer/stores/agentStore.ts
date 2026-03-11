@@ -68,7 +68,7 @@ export interface AgentStoreActions {
 	 */
 	startNewSessionAfterError: (
 		sessionId: string,
-		options?: { saveToHistory?: boolean; showThinking?: 'off' | 'on' | 'sticky' }
+		options?: { showThinking?: 'off' | 'on' | 'sticky' }
 	) => void;
 
 	/**
@@ -192,7 +192,6 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 		// Create a new tab in the session
 		updateSession(sessionId, (s) => {
 			const result = createTab(s, {
-				saveToHistory: options?.saveToHistory,
 				showThinking: options?.showThinking,
 			});
 			if (!result) return s;
@@ -225,9 +224,8 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
 		get().clearAgentError(sessionId);
 
-		// Switch to terminal mode for re-auth (clear activeFileTabId to prevent orphaned file preview)
+		// Focus the session for re-auth
 		useSessionStore.getState().setActiveSessionId(sessionId);
-		updateSession(sessionId, (s) => ({ ...s, inputMode: 'terminal', activeFileTabId: null }));
 	},
 
 	processQueuedItem: async (sessionId, item, deps) => {

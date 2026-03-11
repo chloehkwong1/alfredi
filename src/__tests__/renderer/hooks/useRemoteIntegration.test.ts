@@ -55,9 +55,9 @@ describe('useRemoteIntegration', () => {
 	const originalMaestro = { ...window.maestro };
 
 	let onRemoteCommandHandler:
-		| ((sessionId: string, command: string, inputMode?: 'ai' | 'terminal') => void)
+		| ((sessionId: string, command: string, inputMode?: 'ai') => void)
 		| undefined;
-	let onRemoteSwitchModeHandler: ((sessionId: string, mode: 'ai' | 'terminal') => void) | undefined;
+	let onRemoteSwitchModeHandler: ((sessionId: string, mode: 'ai') => void) | undefined;
 	let onRemoteInterruptHandler: ((sessionId: string) => void) | undefined;
 	let onRemoteSelectSessionHandler: ((sessionId: string, tabId?: string) => void) | undefined;
 	let onRemoteSelectTabHandler: ((sessionId: string, tabId: string) => void) | undefined;
@@ -284,73 +284,30 @@ describe('useRemoteIntegration', () => {
 			dispatchEventSpy.mockRestore();
 		});
 
-		it('syncs input mode when web provides different mode', () => {
+		it('dispatches remote command event', () => {
 			const session = createMockSession({ id: 'session-1', state: 'idle', inputMode: 'ai' });
 			const deps = createDeps({ sessions: [session] });
 
-			renderHook(() => useRemoteIntegration(deps));
-
-			act(() => {
-				onRemoteCommandHandler?.('session-1', 'ls -la', 'terminal');
-			});
-
-			expect(deps.setSessions).toHaveBeenCalled();
-		});
-
-		it('clears activeFileTabId when remote command syncs to terminal mode', () => {
-			const session = createMockSession({
-				id: 'session-1',
-				state: 'idle',
-				inputMode: 'ai',
-				activeFileTabId: 'file-tab-1',
-			});
-			const deps = createDeps({ sessions: [session] });
+			const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
 
 			renderHook(() => useRemoteIntegration(deps));
 
 			act(() => {
-				onRemoteCommandHandler?.('session-1', 'ls -la', 'terminal');
+				onRemoteCommandHandler?.('session-1', 'ls -la', 'ai');
 			});
 
-			const updater = deps.setSessions.mock.calls[0][0];
-			const result = typeof updater === 'function' ? updater([session]) : updater;
-			expect(result[0].inputMode).toBe('terminal');
-			expect(result[0].activeFileTabId).toBeNull();
+			expect(dispatchSpy).toHaveBeenCalledWith(
+				expect.objectContaining({
+					type: 'maestro:remoteCommand',
+				})
+			);
+
+			dispatchSpy.mockRestore();
 		});
 	});
 
 	describe('remote mode switching', () => {
-		it('updates session mode when switch mode received', () => {
-			const session = createMockSession({ id: 'session-1', inputMode: 'ai' });
-			const deps = createDeps({ sessions: [session] });
-
-			renderHook(() => useRemoteIntegration(deps));
-
-			act(() => {
-				onRemoteSwitchModeHandler?.('session-1', 'terminal');
-			});
-
-			expect(deps.setSessions).toHaveBeenCalled();
-			const updater = deps.setSessions.mock.calls[0][0];
-			const result = typeof updater === 'function' ? updater([session]) : updater;
-			expect(result[0].inputMode).toBe('terminal');
-		});
-
-		it('ignores switch mode when session not found', () => {
-			const deps = createDeps({ sessions: [] });
-
-			renderHook(() => useRemoteIntegration(deps));
-
-			act(() => {
-				onRemoteSwitchModeHandler?.('nonexistent', 'terminal');
-			});
-
-			const updater = deps.setSessions.mock.calls[0][0];
-			const result = typeof updater === 'function' ? updater([]) : updater;
-			expect(result).toEqual([]);
-		});
-
-		it('ignores switch mode when session already in mode', () => {
+		it('is a no-op since terminal mode was removed', () => {
 			const session = createMockSession({ id: 'session-1', inputMode: 'ai' });
 			const deps = createDeps({ sessions: [session] });
 
@@ -360,49 +317,8 @@ describe('useRemoteIntegration', () => {
 				onRemoteSwitchModeHandler?.('session-1', 'ai');
 			});
 
-			const updater = deps.setSessions.mock.calls[0][0];
-			const result = typeof updater === 'function' ? updater([session]) : updater;
-			expect(result).toEqual([session]);
-		});
-
-		it('clears activeFileTabId when switching to terminal mode', () => {
-			const session = createMockSession({
-				id: 'session-1',
-				inputMode: 'ai',
-				activeFileTabId: 'file-tab-1',
-			});
-			const deps = createDeps({ sessions: [session] });
-
-			renderHook(() => useRemoteIntegration(deps));
-
-			act(() => {
-				onRemoteSwitchModeHandler?.('session-1', 'terminal');
-			});
-
-			const updater = deps.setSessions.mock.calls[0][0];
-			const result = typeof updater === 'function' ? updater([session]) : updater;
-			expect(result[0].inputMode).toBe('terminal');
-			expect(result[0].activeFileTabId).toBeNull();
-		});
-
-		it('preserves activeFileTabId when switching to ai mode', () => {
-			const session = createMockSession({
-				id: 'session-1',
-				inputMode: 'terminal',
-				activeFileTabId: 'file-tab-1',
-			});
-			const deps = createDeps({ sessions: [session] });
-
-			renderHook(() => useRemoteIntegration(deps));
-
-			act(() => {
-				onRemoteSwitchModeHandler?.('session-1', 'ai');
-			});
-
-			const updater = deps.setSessions.mock.calls[0][0];
-			const result = typeof updater === 'function' ? updater([session]) : updater;
-			expect(result[0].inputMode).toBe('ai');
-			expect(result[0].activeFileTabId).toBe('file-tab-1');
+			// Mode switching is now a no-op — setSessions should not be called
+			expect(deps.setSessions).not.toHaveBeenCalled();
 		});
 	});
 
@@ -433,8 +349,8 @@ describe('useRemoteIntegration', () => {
 			expect(mockProcess.interrupt).not.toHaveBeenCalled();
 		});
 
-		it('interrupts terminal process when session is in terminal mode', async () => {
-			const session = createMockSession({ id: 'session-1', state: 'busy', inputMode: 'terminal' });
+		it('interrupts AI process for session', async () => {
+			const session = createMockSession({ id: 'session-1', state: 'busy', inputMode: 'ai' });
 			const deps = createDeps({ sessions: [session] });
 
 			renderHook(() => useRemoteIntegration(deps));
@@ -443,7 +359,7 @@ describe('useRemoteIntegration', () => {
 				await onRemoteInterruptHandler?.('session-1');
 			});
 
-			expect(mockProcess.interrupt).toHaveBeenCalledWith('session-1-terminal');
+			expect(mockProcess.interrupt).toHaveBeenCalledWith('session-1-ai');
 		});
 	});
 

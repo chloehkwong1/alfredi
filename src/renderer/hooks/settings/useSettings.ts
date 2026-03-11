@@ -24,6 +24,7 @@ import type {
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../../types';
+import type { OutputStyle } from '../../../shared/types';
 import { useSettingsStore, loadAllSettings } from '../../stores/settingsStore';
 import type { DocumentGraphLayoutType } from '../../stores/settingsStore';
 
@@ -74,9 +75,6 @@ export interface UseSettingsReturn {
 	setEnterToSendAI: (value: boolean) => void;
 	enterToSendTerminal: boolean;
 	setEnterToSendTerminal: (value: boolean) => void;
-	defaultSaveToHistory: boolean;
-	setDefaultSaveToHistory: (value: boolean) => void;
-
 	// Default thinking toggle (three states: 'off' | 'on' | 'sticky')
 	defaultShowThinking: ThinkingMode;
 	setDefaultShowThinking: (value: ThinkingMode) => void;
@@ -250,6 +248,10 @@ export interface UseSettingsReturn {
 	// Message alignment
 	userMessageAlignment: 'left' | 'right';
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
+
+	// Output Style - controls how Claude Code agents structure responses
+	outputStyle: OutputStyle;
+	setOutputStyle: (value: OutputStyle) => void;
 
 	// Encore Features - optional features disabled by default
 	encoreFeatures: EncoreFeatureFlags;

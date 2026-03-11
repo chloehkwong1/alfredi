@@ -117,8 +117,8 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 				return; // Let the modal handle keys
 			}
 
-			// Handle tab completion dropdown (terminal mode only)
-			if (tabCompletionOpen && activeSession?.inputMode === 'terminal') {
+			// Handle tab completion dropdown
+			if (tabCompletionOpen) {
 				if (e.key === 'ArrowDown') {
 					e.preventDefault();
 					const newIndex = Math.min(
@@ -204,10 +204,8 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 
 			// Handle slash command autocomplete
 			if (slashCommandOpen) {
-				const isTerminalMode = activeSession?.inputMode === 'terminal';
 				const filteredCommands = allSlashCommands.filter((cmd) => {
-					if ('terminalOnly' in cmd && cmd.terminalOnly && !isTerminalMode) return false;
-					if ('aiOnly' in cmd && cmd.aiOnly && isTerminalMode) return false;
+					if ('terminalOnly' in cmd && cmd.terminalOnly) return false;
 					return cmd.command.toLowerCase().startsWith(inputValue.toLowerCase());
 				});
 
@@ -237,8 +235,7 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 			const enterToSendTerminal = settings.enterToSendTerminal;
 
 			if (e.key === 'Enter') {
-				const currentEnterToSend =
-					activeSession?.inputMode === 'terminal' ? enterToSendTerminal : enterToSendAI;
+				const currentEnterToSend = enterToSendAI;
 
 				if (currentEnterToSend && !e.shiftKey && !e.metaKey) {
 					e.preventDefault();
@@ -251,17 +248,10 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 				e.preventDefault();
 				inputRef.current?.blur();
 				terminalOutputRef.current?.focus();
-			} else if (e.key === 'ArrowUp') {
-				if (activeSession?.inputMode === 'terminal') {
-					e.preventDefault();
-					setCommandHistoryOpen(true);
-					setCommandHistoryFilter(inputValue);
-					setCommandHistorySelectedIndex(0);
-				}
 			} else if (e.key === 'Tab') {
 				e.preventDefault();
 
-				if (activeSession?.inputMode === 'terminal' && !slashCommandOpen) {
+				if (!slashCommandOpen) {
 					if (inputValue.trim()) {
 						const suggestions = getTabCompletionSuggestions(inputValue);
 						if (suggestions.length > 0) {

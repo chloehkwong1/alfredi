@@ -75,7 +75,7 @@ const tabSearchIconContent = (
  * 1) Files tab - show file explorer
  * 2) Left panel hamburger menu - show menu options
  * 3) Remote control - LIVE/OFFLINE toggle, QR code, Cloudflare tunnel
- * 4) Left panel agent list - explain agents and groups
+ * 4) Left panel agent list - explain agents and projects
  * 5) Main terminal area + tabs - explain AI Terminal and tab usage
  * 6) Agent Sessions button - browse previous conversations
  * 7) Input area - explain messaging the AI
@@ -121,11 +121,11 @@ export const tourSteps: TourStepConfig[] = [
 	},
 	{
 		id: 'session-list',
-		title: 'Agents & Groups',
+		title: 'Agents & Projects',
 		description:
-			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into groups for easy management. Press {{focusSidebar}} to focus the agent list.',
+			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into projects for easy management. Press {{focusSidebar}} to focus the agent list.',
 		descriptionGeneric:
-			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into groups for easy management. Press {{focusSidebar}} to focus the agent list.',
+			'The agent list shows all your AI coding agents. Each agent is backed by a provider like Claude Code, Codex, or OpenCode. You can run multiple agents simultaneously on different projects and quickly switch between them. A red indicator dot marks unread messages.\n\nOrganize agents into projects for easy management. Press {{focusSidebar}} to focus the agent list.',
 		wide: true,
 		selector: '[data-tour="session-list"]',
 		position: 'right',

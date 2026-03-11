@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuickActionsModal } from '../../../renderer/components/QuickActionsModal';
 import { formatShortcutKeys } from '../../../renderer/utils/shortcutFormatter';
-import type { Session, Group, Theme, Shortcut } from '../../../renderer/types';
+import type { Session, Project, Theme, Shortcut } from '../../../renderer/types';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
 // Add missing window.maestro.devtools and debug mocks
@@ -136,10 +136,10 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
 	...overrides,
 });
 
-// Create mock group
-const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
-	id: 'group-1',
-	name: 'Test Group',
+// Create mock project
+const createMockProject = (overrides: Partial<Project> = {}): Project => ({
+	id: 'project-1',
+	name: 'Test Project',
 	emoji: '📁',
 	collapsed: false,
 	...overrides,
@@ -153,18 +153,18 @@ const createDefaultProps = (
 	sessions: [createMockSession()],
 	setSessions: vi.fn(),
 	activeSessionId: 'session-1',
-	groups: [],
-	setGroups: vi.fn(),
+	projects: [],
+	setProjects: vi.fn(),
 	shortcuts: mockShortcuts,
 	setQuickActionOpen: vi.fn(),
 	setActiveSessionId: vi.fn(),
 	setRenameInstanceModalOpen: vi.fn(),
 	setRenameInstanceValue: vi.fn(),
-	setRenameGroupModalOpen: vi.fn(),
-	setRenameGroupId: vi.fn(),
-	setRenameGroupValue: vi.fn(),
-	setRenameGroupEmoji: vi.fn(),
-	setCreateGroupModalOpen: vi.fn(),
+	setRenameProjectModalOpen: vi.fn(),
+	setRenameProjectId: vi.fn(),
+	setRenameProjectValue: vi.fn(),
+	setRenameProjectEmoji: vi.fn(),
+	setCreateProjectModalOpen: vi.fn(),
 	setLeftSidebarOpen: vi.fn(),
 	setRightPanelOpen: vi.fn(),
 	setActiveRightTab: vi.fn(),
@@ -328,20 +328,20 @@ describe('QuickActionsModal', () => {
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 
-		it('auto-expands collapsed group when jumping to session in group', () => {
-			const session = createMockSession({ groupId: 'group-1' });
-			const group = createMockGroup({ collapsed: true });
+		it('auto-expands collapsed project when jumping to session in project', () => {
+			const session = createMockSession({ projectId: 'project-1' });
+			const project = createMockProject({ collapsed: true });
 			const props = createDefaultProps({
 				sessions: [session],
-				groups: [group],
+				projects: [project],
 			});
 			render(<QuickActionsModal {...props} />);
 
 			fireEvent.click(screen.getByText('Jump to: Test Session'));
 
-			expect(props.setGroups).toHaveBeenCalled();
-			const setGroupsFn = props.setGroups.mock.calls[0][0];
-			const result = setGroupsFn([group]);
+			expect(props.setProjects).toHaveBeenCalled();
+			const setProjectsFn = props.setProjects.mock.calls[0][0];
+			const result = setProjectsFn([project]);
 			expect(result[0].collapsed).toBe(false);
 		});
 
@@ -681,7 +681,7 @@ describe('QuickActionsModal', () => {
 		it('handles View Git Diff with shell cwd when in terminal mode', async () => {
 			const { gitService } = await import('../../../renderer/services/git');
 			const props = createDefaultProps({
-				sessions: [createMockSession({ inputMode: 'terminal', shellCwd: '/different/path' })],
+				sessions: [createMockSession({ inputMode: 'ai' })],
 			});
 			render(<QuickActionsModal {...props} />);
 
@@ -994,79 +994,79 @@ describe('QuickActionsModal', () => {
 		});
 	});
 
-	describe('Move to group mode', () => {
-		it('switches to move-to-group mode', () => {
+	describe('Move to project mode', () => {
+		it('switches to move-to-project mode', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
+			fireEvent.click(screen.getByText('Move to Project...'));
 
 			expect(screen.getByText('← Back to main menu')).toBeInTheDocument();
-			expect(screen.getByText('📁 No Group (Root)')).toBeInTheDocument();
+			expect(screen.getByText('📁 No Project')).toBeInTheDocument();
 		});
 
-		it('shows groups in move-to-group mode', () => {
-			const group = createMockGroup({ name: 'My Group', emoji: '🚀' });
-			const props = createDefaultProps({ groups: [group] });
+		it('shows projects in move-to-project mode', () => {
+			const project = createMockProject({ name: 'My Project', emoji: '🚀' });
+			const props = createDefaultProps({ projects: [project] });
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
+			fireEvent.click(screen.getByText('Move to Project...'));
 
-			expect(screen.getByText('🚀 My Group')).toBeInTheDocument();
+			expect(screen.getByText('🚀 My Project')).toBeInTheDocument();
 		});
 
-		it('shows create new group option in move mode', () => {
+		it('shows create new project option in move mode', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
+			fireEvent.click(screen.getByText('Move to Project...'));
 
-			expect(screen.getByText('+ Create New Group')).toBeInTheDocument();
+			expect(screen.getByText('+ Create New Project')).toBeInTheDocument();
 		});
 
 		it('handles back to main menu', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
+			fireEvent.click(screen.getByText('Move to Project...'));
 			fireEvent.click(screen.getByText('← Back to main menu'));
 
-			expect(screen.getByText('Move to Group...')).toBeInTheDocument();
+			expect(screen.getByText('Move to Project...')).toBeInTheDocument();
 		});
 
-		it('handles move to group action', () => {
-			const group = createMockGroup();
-			const props = createDefaultProps({ groups: [group] });
+		it('handles move to project action', () => {
+			const project = createMockProject();
+			const props = createDefaultProps({ projects: [project] });
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
-			fireEvent.click(screen.getByText('📁 Test Group'));
+			fireEvent.click(screen.getByText('Move to Project...'));
+			fireEvent.click(screen.getByText('📁 Test Project'));
 
 			expect(props.setSessions).toHaveBeenCalled();
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 
-		it('handles move to no group', () => {
+		it('handles move to no project', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
-			fireEvent.click(screen.getByText('📁 No Group (Root)'));
+			fireEvent.click(screen.getByText('Move to Project...'));
+			fireEvent.click(screen.getByText('📁 No Project'));
 
 			expect(props.setSessions).toHaveBeenCalled();
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 
-		it('changes placeholder when in move-to-group mode', () => {
+		it('changes placeholder when in move-to-project mode', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Move to Group...'));
+			fireEvent.click(screen.getByText('Move to Project...'));
 
 			expect(screen.getByPlaceholderText('Move Test Session to...')).toBeInTheDocument();
 		});
 
-		it('clears search when entering move-to-group mode', () => {
+		it('clears search when entering move-to-project mode', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
@@ -1074,60 +1074,60 @@ describe('QuickActionsModal', () => {
 			const input = screen.getByPlaceholderText('Type a command or jump to agent...');
 			fireEvent.change(input, { target: { value: 'group' } });
 
-			// Click move to group (should be visible with 'group' search)
-			fireEvent.click(screen.getByText('Move to Group...'));
+			// Click move to project (should be visible with 'project' search)
+			fireEvent.click(screen.getByText('Move to Project...'));
 
-			// Search should be cleared when entering move-to-group mode
+			// Search should be cleared when entering move-to-project mode
 			const newInput = screen.getByPlaceholderText('Move Test Session to...');
 			expect(newInput).toHaveValue('');
 		});
 	});
 
-	describe('Group actions', () => {
-		it('renders Rename Group action when session is in a group', () => {
-			const session = createMockSession({ groupId: 'group-1' });
-			const group = createMockGroup();
+	describe('Project actions', () => {
+		it('renders Rename Project action when session is in a project', () => {
+			const session = createMockSession({ projectId: 'project-1' });
+			const project = createMockProject();
 			const props = createDefaultProps({
 				sessions: [session],
-				groups: [group],
+				projects: [project],
 			});
 			render(<QuickActionsModal {...props} />);
 
-			expect(screen.getByText('Rename Group')).toBeInTheDocument();
+			expect(screen.getByText('Rename Project')).toBeInTheDocument();
 		});
 
-		it('does not render Rename Group when session has no group', () => {
+		it('does not render Rename Project when session has no project', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			expect(screen.queryByText('Rename Group')).not.toBeInTheDocument();
+			expect(screen.queryByText('Rename Project')).not.toBeInTheDocument();
 		});
 
-		it('handles Rename Group action', () => {
-			const session = createMockSession({ groupId: 'group-1' });
-			const group = createMockGroup();
+		it('handles Rename Project action', () => {
+			const session = createMockSession({ projectId: 'project-1' });
+			const project = createMockProject();
 			const props = createDefaultProps({
 				sessions: [session],
-				groups: [group],
+				projects: [project],
 			});
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Rename Group'));
+			fireEvent.click(screen.getByText('Rename Project'));
 
-			expect(props.setRenameGroupId).toHaveBeenCalledWith('group-1');
-			expect(props.setRenameGroupValue).toHaveBeenCalledWith('Test Group');
-			expect(props.setRenameGroupEmoji).toHaveBeenCalledWith('📁');
-			expect(props.setRenameGroupModalOpen).toHaveBeenCalledWith(true);
+			expect(props.setRenameProjectId).toHaveBeenCalledWith('project-1');
+			expect(props.setRenameProjectValue).toHaveBeenCalledWith('Test Project');
+			expect(props.setRenameProjectEmoji).toHaveBeenCalledWith('📁');
+			expect(props.setRenameProjectModalOpen).toHaveBeenCalledWith(true);
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 
-		it('handles Create New Group action', () => {
+		it('handles Create New Project action', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
-			fireEvent.click(screen.getByText('Create New Group'));
+			fireEvent.click(screen.getByText('Create New Project'));
 
-			expect(props.setCreateGroupModalOpen).toHaveBeenCalledWith(true);
+			expect(props.setCreateProjectModalOpen).toHaveBeenCalledWith(true);
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
 		});
 	});
@@ -1140,8 +1140,8 @@ describe('QuickActionsModal', () => {
 			expect(screen.getByPlaceholderText('Type a command or jump to agent...')).toBeInTheDocument();
 		});
 
-		it('starts in move-to-group mode when initialMode is set', () => {
-			const props = createDefaultProps({ initialMode: 'move-to-group' });
+		it('starts in move-to-project mode when initialMode is set', () => {
+			const props = createDefaultProps({ initialMode: 'move-to-project' });
 			render(<QuickActionsModal {...props} />);
 
 			expect(screen.getByText('← Back to main menu')).toBeInTheDocument();

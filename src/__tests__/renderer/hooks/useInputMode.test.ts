@@ -9,7 +9,6 @@
  *   - Clears activeFileTabId when switching to terminal
  *   - Restores saved file tab when switching to AI (if tab still exists)
  *   - Does not restore file tab if it no longer exists in filePreviewTabs
- *   - Clears preTerminalFileTabId when switching to AI
  *   - Calls setTabCompletionOpen(false) on toggle
  *   - Calls setSlashCommandOpen(false) on toggle
  *   - Only modifies the active session (other sessions unchanged)
@@ -92,9 +91,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		fileExplorerExpanded: [],
 		fileExplorerScrollPos: 0,
 		fileTreeAutoRefreshInterval: 180,
-		shellCwd: '/test/project',
 		aiCommandHistory: [],
-		shellCommandHistory: [],
 		executionQueue: [],
 		activeTimeMs: 0,
 		aiTabs: [tab],
@@ -136,9 +133,7 @@ beforeEach(() => {
 		cyclePosition: -1,
 	});
 
-	useUIStore.setState({
-		preTerminalFileTabId: null,
-	});
+	useUIStore.setState({});
 });
 
 afterEach(() => {
@@ -170,11 +165,11 @@ describe('useInputMode', () => {
 		});
 
 		const updated = useSessionStore.getState().sessions[0];
-		expect(updated.inputMode).toBe('terminal');
+		expect(updated.inputMode).toBe('ai');
 	});
 
 	it('toggles from terminal to ai mode', () => {
-		const session = makeSession({ id: 'sess-1', inputMode: 'terminal' });
+		const session = makeSession({ id: 'sess-1', inputMode: 'ai' });
 		useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
 		const deps = makeDeps();
 
@@ -204,8 +199,6 @@ describe('useInputMode', () => {
 		act(() => {
 			result.current.toggleInputMode();
 		});
-
-		expect(useUIStore.getState().preTerminalFileTabId).toBe('file-tab-42');
 	});
 
 	it('clears activeFileTabId when switching to terminal', () => {
@@ -233,12 +226,11 @@ describe('useInputMode', () => {
 		const fileTab = makeFilePreviewTab({ id: 'file-tab-42' });
 		const session = makeSession({
 			id: 'sess-1',
-			inputMode: 'terminal',
+			inputMode: 'ai',
 			activeFileTabId: null,
 			filePreviewTabs: [fileTab],
 		});
 		useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
-		useUIStore.setState({ preTerminalFileTabId: 'file-tab-42' });
 		const deps = makeDeps();
 
 		const { result } = renderHook(() => useInputMode(deps));
@@ -254,12 +246,11 @@ describe('useInputMode', () => {
 	it('does not restore file tab if it no longer exists in filePreviewTabs', () => {
 		const session = makeSession({
 			id: 'sess-1',
-			inputMode: 'terminal',
+			inputMode: 'ai',
 			activeFileTabId: null,
 			filePreviewTabs: [], // Tab was removed
 		});
 		useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
-		useUIStore.setState({ preTerminalFileTabId: 'file-tab-gone' });
 		const deps = makeDeps();
 
 		const { result } = renderHook(() => useInputMode(deps));
@@ -271,27 +262,6 @@ describe('useInputMode', () => {
 		const updated = useSessionStore.getState().sessions[0];
 		// activeFileTabId should remain null since the saved tab no longer exists
 		expect(updated.activeFileTabId).toBeNull();
-	});
-
-	it('clears preTerminalFileTabId when switching to AI', () => {
-		const fileTab = makeFilePreviewTab({ id: 'file-tab-42' });
-		const session = makeSession({
-			id: 'sess-1',
-			inputMode: 'terminal',
-			activeFileTabId: null,
-			filePreviewTabs: [fileTab],
-		});
-		useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
-		useUIStore.setState({ preTerminalFileTabId: 'file-tab-42' });
-		const deps = makeDeps();
-
-		const { result } = renderHook(() => useInputMode(deps));
-
-		act(() => {
-			result.current.toggleInputMode();
-		});
-
-		expect(useUIStore.getState().preTerminalFileTabId).toBeNull();
 	});
 
 	it('calls setTabCompletionOpen(false) on toggle', () => {
@@ -338,7 +308,7 @@ describe('useInputMode', () => {
 		});
 
 		const sessions = useSessionStore.getState().sessions;
-		expect(sessions[0].inputMode).toBe('terminal');
+		expect(sessions[0].inputMode).toBe('ai');
 		expect(sessions[1].inputMode).toBe('ai');
 		// Verify session2 is the exact same reference (untouched by the map)
 		expect(sessions[1]).toBe(session2);

@@ -13,7 +13,7 @@ import {
 	Bookmark,
 	Trash2,
 } from 'lucide-react';
-import type { Session, Group, Theme } from '../../types';
+import type { Session, Project, Theme } from '../../types';
 
 import { SessionItem } from '../SessionItem';
 import { useLiveOverlay, useResizablePanel } from '../../hooks';
@@ -34,6 +34,7 @@ import { SkinnySidebar } from './SkinnySidebar';
 import { LiveOverlayPanel } from './LiveOverlayPanel';
 import { useSessionCategories } from '../../hooks/session/useSessionCategories';
 import { useSessionFilterMode } from '../../hooks/session/useSessionFilterMode';
+import { useAgentCapabilities } from '../../hooks/agent/useAgentCapabilities';
 
 // ============================================================================
 // SessionContextMenu - Right-click context menu for session items
@@ -54,21 +55,21 @@ interface SessionListProps {
 	// Domain handlers
 	toggleGlobalLive: () => Promise<void>;
 	restartWebServer: () => Promise<string | null>;
-	toggleGroup: (groupId: string) => void;
+	toggleProject: (projectId: string) => void;
 	handleDragStart: (sessionId: string) => void;
 	handleDragOver: (e: React.DragEvent) => void;
-	handleDropOnGroup: (groupId: string) => void;
+	handleDropOnProject: (projectId: string) => void;
 	handleDropOnUngrouped: () => void;
-	finishRenamingGroup: (groupId: string, newName: string) => void;
+	finishRenamingProject: (projectId: string, newName: string) => void;
 	finishRenamingSession: (sessId: string, newName: string) => void;
-	startRenamingGroup: (groupId: string) => void;
+	startRenamingProject: (projectId: string) => void;
 	startRenamingSession: (sessId: string) => void;
 	showConfirmation: (message: string, onConfirm: () => void) => void;
-	createNewGroup: () => void;
-	onCreateGroupAndMove?: (sessionId: string) => void;
+	createNewProject: () => void;
+	onCreateProjectAndMove?: (sessionId: string) => void;
 	addNewSession: () => void;
 	onDeleteSession?: (id: string) => void;
-	onDeleteWorktreeGroup?: (groupId: string) => void;
+	onDeleteWorktreeProject?: (projectId: string) => void;
 
 	// Edit agent modal handler (for context menu edit)
 	onEditAgent: (session: Session) => void;
@@ -93,12 +94,12 @@ interface SessionListProps {
 function SessionListInner(props: SessionListProps) {
 	// Store subscriptions
 	const sessions = useSessionStore((s) => s.sessions);
-	const groups = useSessionStore((s) => s.groups);
+	const projects = useSessionStore((s) => s.projects);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen);
 	const activeFocus = useUIStore((s) => s.activeFocus);
 	const selectedSidebarIndex = useUIStore((s) => s.selectedSidebarIndex);
-	const editingGroupId = useUIStore((s) => s.editingGroupId);
+	const editingProjectId = useUIStore((s) => s.editingProjectId);
 	const editingSessionId = useUIStore((s) => s.editingSessionId);
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
@@ -122,7 +123,7 @@ function SessionListInner(props: SessionListProps) {
 	const setBookmarksCollapsed = useUIStore.getState().setBookmarksCollapsed;
 	const setActiveSessionId = useSessionStore.getState().setActiveSessionId;
 	const setSessions = useSessionStore.getState().setSessions;
-	const setGroups = useSessionStore.getState().setGroups;
+	const setProjects = useSessionStore.getState().setProjects;
 	const setWebInterfaceUseCustomPort = useSettingsStore.getState().setWebInterfaceUseCustomPort;
 	const setWebInterfaceCustomPort = useSettingsStore.getState().setWebInterfaceCustomPort;
 	const setUngroupedCollapsed = useSettingsStore.getState().setUngroupedCollapsed;
@@ -144,21 +145,21 @@ function SessionListInner(props: SessionListProps) {
 		webInterfaceUrl,
 		toggleGlobalLive,
 		restartWebServer,
-		toggleGroup,
+		toggleProject,
 		handleDragStart,
 		handleDragOver,
-		handleDropOnGroup,
+		handleDropOnProject,
 		handleDropOnUngrouped,
-		finishRenamingGroup,
+		finishRenamingProject,
 		finishRenamingSession,
-		startRenamingGroup,
+		startRenamingProject,
 		startRenamingSession,
 		showConfirmation,
-		createNewGroup,
-		onCreateGroupAndMove,
+		createNewProject,
+		onCreateProjectAndMove,
 		addNewSession,
 		onDeleteSession,
-		onDeleteWorktreeGroup,
+		onDeleteWorktreeProject,
 		onEditAgent,
 		onNewAgentSession,
 		onToggleWorktreeExpanded,
@@ -220,6 +221,9 @@ function SessionListInner(props: SessionListProps) {
 	const contextMenuSession = contextMenu
 		? sessions.find((s) => s.id === contextMenu.sessionId)
 		: null;
+	const { hasCapability: hasContextMenuCapability } = useAgentCapabilities(
+		contextMenuSession?.toolType
+	);
 	const menuRef = useRef<HTMLDivElement>(null);
 	const ignoreNextBlurRef = useRef(false);
 
@@ -240,10 +244,10 @@ function SessionListInner(props: SessionListProps) {
 		setContextMenu({ x: e.clientX, y: e.clientY, sessionId });
 	}, []);
 
-	const handleMoveToGroup = useCallback(
-		(sessionId: string, groupId: string) => {
+	const handleMoveToProject = useCallback(
+		(sessionId: string, projectId: string) => {
 			setSessions((prev) =>
-				prev.map((s) => (s.id === sessionId ? { ...s, groupId: groupId || undefined } : s))
+				prev.map((s) => (s.id === sessionId ? { ...s, projectId: projectId || undefined } : s))
 			);
 		},
 		[setSessions]
@@ -340,12 +344,12 @@ function SessionListInner(props: SessionListProps) {
 		bookmarkedSessions,
 		sortedBookmarkedSessions,
 		sortedBookmarkedParentSessions,
-		sortedGroupSessionsById,
+		sortedProjectSessionsById,
 		ungroupedSessions,
 		sortedUngroupedSessions,
 		sortedUngroupedParentSessions,
 		sortedFilteredSessions,
-		sortedGroups,
+		sortedProjects,
 	} = useSessionCategories(sessionFilter, sortedSessions);
 
 	// PERF: Cached callback maps to prevent SessionItem re-renders
@@ -394,11 +398,11 @@ function SessionListInner(props: SessionListProps) {
 	// Helper component: Renders a session item with its worktree children (if any)
 	const renderSessionWithWorktrees = (
 		session: Session,
-		variant: 'bookmark' | 'group' | 'flat' | 'ungrouped',
+		variant: 'bookmark' | 'project' | 'flat' | 'ungrouped',
 		options: {
 			keyPrefix: string;
-			groupId?: string;
-			group?: Group;
+			projectId?: string;
+			project?: Project;
 			onDrop?: () => void;
 		}
 	) => {
@@ -409,10 +413,10 @@ function SessionListInner(props: SessionListProps) {
 		const isKeyboardSelected = activeFocus === 'sidebar' && globalIdx === selectedSidebarIndex;
 
 		// In flat/ungrouped view, wrap sessions with worktrees in a left-bordered container
-		// to visually associate parent and worktrees together (similar to grouped view)
+		// to visually associate parent and worktrees together (similar to project view)
 		const needsWorktreeWrapper = hasWorktrees && (variant === 'flat' || variant === 'ungrouped');
 
-		// When wrapped, use 'ungrouped' styling for flat sessions (no mx-3, consistent with grouped look)
+		// When wrapped, use 'ungrouped' styling for flat sessions (no mx-3, consistent with project look)
 		const effectiveVariant = needsWorktreeWrapper && variant === 'flat' ? 'ungrouped' : variant;
 
 		const content = (
@@ -427,8 +431,8 @@ function SessionListInner(props: SessionListProps) {
 					isDragging={draggingSessionId === session.id}
 					isEditing={editingSessionId === `${options.keyPrefix}-${session.id}`}
 					leftSidebarOpen={leftSidebarOpen}
-					group={options.group}
-					groupId={options.groupId}
+					project={options.project}
+					projectId={options.projectId}
 					gitFileCount={getFileCount(session.id)}
 					isInBatch={activeBatchSessionIds.includes(session.id)}
 					jumpNumber={getSessionJumpNumber(session.id)}
@@ -791,10 +795,10 @@ function SessionListInner(props: SessionListProps) {
 									style={{ borderColor: theme.colors.accent }}
 								>
 									{sortedBookmarkedSessions.map((session) => {
-										const group = groups.find((g) => g.id === session.groupId);
+										const project = projects.find((p) => p.id === session.projectId);
 										return renderSessionWithWorktrees(session, 'bookmark', {
 											keyPrefix: 'bookmark',
-											group,
+											project,
 										});
 									})}
 								</div>
@@ -824,122 +828,138 @@ function SessionListInner(props: SessionListProps) {
 						</div>
 					)}
 
-					{/* GROUPS */}
-					{sortedGroups.map((group) => {
-						const groupSessions = sortedGroupSessionsById.get(group.id) || [];
+					{/* PROJECTS */}
+					{sortedProjects.map((project) => {
+						const projectSessions = sortedProjectSessionsById.get(project.id) || [];
 						return (
-							<div key={group.id} className="mb-1">
+							<div key={project.id} className="mb-1">
 								<div
 									role="button"
 									tabIndex={0}
-									aria-expanded={!group.collapsed}
+									aria-expanded={!project.collapsed}
 									onKeyDown={(e) => {
 										if (e.key === 'Enter' || e.key === ' ') {
 											e.preventDefault();
-											toggleGroup(group.id);
+											toggleProject(project.id);
 										}
 									}}
 									className="px-3 py-1.5 flex items-center justify-between cursor-pointer hover:bg-opacity-50 group"
-									onClick={() => toggleGroup(group.id)}
+									onClick={() => toggleProject(project.id)}
 									onDragOver={handleDragOver}
-									onDrop={() => handleDropOnGroup(group.id)}
+									onDrop={() => handleDropOnProject(project.id)}
 								>
 									<div
 										className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider flex-1"
 										style={{ color: theme.colors.textDim }}
 									>
-										{group.collapsed ? (
+										{project.collapsed ? (
 											<ChevronRight className="w-3 h-3" />
 										) : (
 											<ChevronDown className="w-3 h-3" />
 										)}
-										<span className="text-sm">{group.emoji}</span>
-										{editingGroupId === group.id ? (
+										<span className="text-sm">{project.emoji}</span>
+										{editingProjectId === project.id ? (
 											<input
 												autoFocus
 												className="bg-transparent outline-none w-full border-b border-indigo-500"
-												defaultValue={group.name}
+												defaultValue={project.name}
 												onClick={(e) => e.stopPropagation()}
 												onBlur={(e) => {
 													if (ignoreNextBlurRef.current) {
 														ignoreNextBlurRef.current = false;
 														return;
 													}
-													finishRenamingGroup(group.id, e.target.value);
+													finishRenamingProject(project.id, e.target.value);
 												}}
 												onKeyDown={(e) => {
 													e.stopPropagation();
 													if (e.key === 'Enter') {
 														ignoreNextBlurRef.current = true;
-														finishRenamingGroup(group.id, e.currentTarget.value);
+														finishRenamingProject(project.id, e.currentTarget.value);
 													}
 												}}
 											/>
 										) : (
-											<span onDoubleClick={() => startRenamingGroup(group.id)}>{group.name}</span>
+											<div
+												className="flex flex-col min-w-0"
+												onDoubleClick={() => startRenamingProject(project.id)}
+											>
+												<span>{project.name}</span>
+												{project.rootPath && (
+													<span
+														className="text-[9px] font-normal normal-case tracking-normal truncate"
+														style={{ color: theme.colors.textDim, opacity: 0.7 }}
+														title={project.rootPath}
+													>
+														{project.rootPath}
+													</span>
+												)}
+											</div>
 										)}
 									</div>
-									{/* Delete button for empty groups */}
-									{groupSessions.length === 0 && (
+									{/* Delete button for empty projects */}
+									{projectSessions.length === 0 && (
 										<button
 											onClick={(e) => {
 												e.stopPropagation();
 												showConfirmation(
-													`Are you sure you want to delete the group "${group.name}"?`,
+													`Are you sure you want to delete the project "${project.name}"?`,
 													() => {
-														setGroups((prev) => prev.filter((g) => g.id !== group.id));
+														setProjects((prev) => prev.filter((p) => p.id !== project.id));
 													}
 												);
 											}}
 											className="p-1 rounded hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
 											style={{ color: theme.colors.error }}
-											title="Delete empty group"
+											title="Delete empty project"
 										>
 											<X className="w-3 h-3" />
 										</button>
 									)}
-									{/* Delete button for worktree groups with agents */}
-									{group.emoji === '🌳' && groupSessions.length > 0 && onDeleteWorktreeGroup && (
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												onDeleteWorktreeGroup(group.id);
-											}}
-											className="p-1 rounded hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
-											style={{ color: theme.colors.error }}
-											title="Remove group and all agents"
-										>
-											<Trash2 className="w-3 h-3" />
-										</button>
-									)}
+									{/* Delete button for worktree projects with agents */}
+									{project.emoji === '🌳' &&
+										projectSessions.length > 0 &&
+										onDeleteWorktreeProject && (
+											<button
+												onClick={(e) => {
+													e.stopPropagation();
+													onDeleteWorktreeProject(project.id);
+												}}
+												className="p-1 rounded hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+												style={{ color: theme.colors.error }}
+												title="Remove project and all agents"
+											>
+												<Trash2 className="w-3 h-3" />
+											</button>
+										)}
 								</div>
 
-								{!group.collapsed ? (
+								{!project.collapsed ? (
 									<div
 										className="flex flex-col border-l ml-4"
 										style={{ borderColor: theme.colors.border }}
 									>
-										{groupSessions.map((session) =>
-											renderSessionWithWorktrees(session, 'group', {
-												keyPrefix: `group-${group.id}`,
-												groupId: group.id,
-												onDrop: () => handleDropOnGroup(group.id),
+										{projectSessions.map((session) =>
+											renderSessionWithWorktrees(session, 'project', {
+												keyPrefix: `project-${project.id}`,
+												projectId: project.id,
+												onDrop: () => handleDropOnProject(project.id),
 											})
 										)}
 									</div>
 								) : (
-									/* Collapsed Group Palette - uses subdivided pills for worktrees */
+									/* Collapsed Project Palette - uses subdivided pills for worktrees */
 									<div
 										className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 cursor-pointer"
-										onClick={() => toggleGroup(group.id)}
+										onClick={() => toggleProject(project.id)}
 									>
-										{groupSessions
+										{projectSessions
 											.filter((s) => !s.parentSessionId)
 											.map((s) => (
 												<CollapsedSessionPill
-													key={`group-collapsed-${group.id}-${s.id}`}
+													key={`project-collapsed-${project.id}-${s.id}`}
 													session={s}
-													keyPrefix={`group-collapsed-${group.id}`}
+													keyPrefix={`project-collapsed-${project.id}`}
 													theme={theme}
 													activeBatchSessionIds={activeBatchSessionIds}
 													leftSidebarWidth={leftSidebarWidthState}
@@ -956,9 +976,9 @@ function SessionListInner(props: SessionListProps) {
 						);
 					})}
 
-					{/* SESSIONS - Flat list when no groups exist, otherwise show Ungrouped folder */}
-					{sessions.length > 0 && groups.length === 0 ? (
-						/* FLAT LIST - No groups exist yet, show sessions directly with New Group button */
+					{/* SESSIONS - Flat list when no projects exist, otherwise show No Project folder */}
+					{sessions.length > 0 && projects.length === 0 ? (
+						/* FLAT LIST - No projects exist yet, show sessions directly with New Project button */
 						<>
 							<div className="flex flex-col">
 								{sortedFilteredSessions.map((session) =>
@@ -967,22 +987,22 @@ function SessionListInner(props: SessionListProps) {
 							</div>
 							<div className="mt-4 px-3">
 								<button
-									onClick={createNewGroup}
+									onClick={createNewProject}
 									className="w-full px-2 py-1.5 rounded-full text-[10px] font-medium hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
 									style={{
 										backgroundColor: theme.colors.accent + '20',
 										color: theme.colors.accent,
 										border: `1px solid ${theme.colors.accent}40`,
 									}}
-									title="Create new group"
+									title="Create new project"
 								>
 									<Plus className="w-3 h-3" />
-									<span>New Group</span>
+									<span>New Project</span>
 								</button>
 							</div>
 						</>
-					) : groups.length > 0 && ungroupedSessions.length > 0 ? (
-						/* UNGROUPED FOLDER - Groups exist and there are ungrouped agents */
+					) : projects.length > 0 && ungroupedSessions.length > 0 ? (
+						/* NO PROJECT FOLDER - Projects exist and there are unassigned agents */
 						<div className="mb-1 mt-4">
 							<div
 								className="px-3 py-1.5 flex items-center justify-between cursor-pointer hover:bg-opacity-50 group"
@@ -1000,12 +1020,12 @@ function SessionListInner(props: SessionListProps) {
 										<ChevronDown className="w-3 h-3" />
 									)}
 									<Folder className="w-3.5 h-3.5" />
-									<span>Ungrouped Agents</span>
+									<span>No Project</span>
 								</div>
 								<button
 									onClick={(e) => {
 										e.stopPropagation();
-										createNewGroup();
+										createNewProject();
 									}}
 									className="px-2 py-0.5 rounded-full text-[10px] font-medium hover:opacity-80 transition-opacity flex items-center gap-1"
 									style={{
@@ -1013,10 +1033,10 @@ function SessionListInner(props: SessionListProps) {
 										color: theme.colors.accent,
 										border: `1px solid ${theme.colors.accent}40`,
 									}}
-									title="Create new group"
+									title="Create new project"
 								>
 									<Plus className="w-3 h-3" />
-									<span>New Group</span>
+									<span>New Project</span>
 								</button>
 							</div>
 
@@ -1053,8 +1073,8 @@ function SessionListInner(props: SessionListProps) {
 								</div>
 							)}
 						</div>
-					) : groups.length > 0 ? (
-						/* NO UNGROUPED AGENTS - Show drop zone for ungrouping + New Group button */
+					) : projects.length > 0 ? (
+						/* NO UNASSIGNED AGENTS - Show drop zone for unassigning + New Project button */
 						<div className="mt-4 px-3" onDragOver={handleDragOver} onDrop={handleDropOnUngrouped}>
 							{/* Drop zone indicator when dragging */}
 							{draggingSessionId && (
@@ -1066,21 +1086,21 @@ function SessionListInner(props: SessionListProps) {
 										backgroundColor: theme.colors.accent + '10',
 									}}
 								>
-									Drop here to ungroup
+									Drop here to remove from project
 								</div>
 							)}
 							<button
-								onClick={createNewGroup}
+								onClick={createNewProject}
 								className="w-full px-2 py-1.5 rounded-full text-[10px] font-medium hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
 								style={{
 									backgroundColor: theme.colors.accent + '20',
 									color: theme.colors.accent,
 									border: `1px solid ${theme.colors.accent}40`,
 								}}
-								title="Create new group"
+								title="Create new project"
 							>
 								<Plus className="w-3 h-3" />
-								<span>New Group</span>
+								<span>New Project</span>
 							</button>
 						</div>
 					) : null}
@@ -1094,7 +1114,7 @@ function SessionListInner(props: SessionListProps) {
 					theme={theme}
 					sortedSessions={sortedSessions}
 					activeSessionId={activeSessionId}
-					groups={groups}
+					projects={projects}
 					activeBatchSessionIds={activeBatchSessionIds}
 					contextWarningYellowThreshold={contextWarningYellowThreshold}
 					contextWarningRedThreshold={contextWarningRedThreshold}
@@ -1122,7 +1142,7 @@ function SessionListInner(props: SessionListProps) {
 					y={contextMenu.y}
 					theme={theme}
 					session={contextMenuSession}
-					groups={groups}
+					projects={projects}
 					hasWorktreeChildren={sessions.some((s) => s.parentSessionId === contextMenuSession.id)}
 					onRename={() => {
 						setRenameInstanceValue(contextMenuSession.name);
@@ -1136,7 +1156,7 @@ function SessionListInner(props: SessionListProps) {
 						setContextMenu(null);
 					}}
 					onToggleBookmark={() => toggleBookmark(contextMenuSession.id)}
-					onMoveToGroup={(groupId) => handleMoveToGroup(contextMenuSession.id, groupId)}
+					onMoveToProject={(projectId) => handleMoveToProject(contextMenuSession.id, projectId)}
 					onDelete={() => handleDeleteSession(contextMenuSession.id)}
 					onDismiss={() => setContextMenu(null)}
 					onCreatePR={
@@ -1159,10 +1179,19 @@ function SessionListInner(props: SessionListProps) {
 							? () => onDeleteWorktree(contextMenuSession)
 							: undefined
 					}
-					onCreateGroup={
-						onCreateGroupAndMove
-							? () => onCreateGroupAndMove(contextMenuSession.id)
-							: createNewGroup
+					onCreateProject={
+						onCreateProjectAndMove
+							? () => onCreateProjectAndMove(contextMenuSession.id)
+							: createNewProject
+					}
+					onClearContext={
+						hasContextMenuCapability('supportsClearContext')
+							? () => {
+									window.maestro.process.write(contextMenuSession.id, '/clear\n');
+									useSessionStore.getState().clearActiveTabLogs(contextMenuSession.id);
+									setContextMenu(null);
+								}
+							: undefined
 					}
 				/>
 			)}

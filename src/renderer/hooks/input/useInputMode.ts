@@ -1,16 +1,14 @@
 /**
- * useInputMode — extracted from App.tsx (Tier 3A)
+ * useInputMode — legacy hook stub (Tier 3A)
  *
- * Provides toggle between AI and terminal input modes:
- *   - Saves/restores file preview tab when switching to/from terminal
- *   - Closes dropdown menus (tab completion, slash command) on switch
+ * Previously toggled between AI and terminal input modes.
+ * With the persistent terminal in the Right Panel, MainPanel is always AI mode.
+ * This hook is retained as a no-op to avoid breaking call sites that depend on it.
  *
- * Reads from: sessionStore, uiStore
+ * TODO: Remove this hook and all call-site references in a follow-up cleanup.
  */
 
 import { useCallback } from 'react';
-import { useSessionStore } from '../../stores/sessionStore';
-import { useUIStore } from '../../stores/uiStore';
 
 // ============================================================================
 // Dependencies interface
@@ -28,7 +26,7 @@ export interface UseInputModeDeps {
 // ============================================================================
 
 export interface UseInputModeReturn {
-	/** Toggle between 'ai' and 'terminal' input modes */
+	/** No-op: terminal mode has been removed. MainPanel is always AI mode. */
 	toggleInputMode: () => void;
 }
 
@@ -36,43 +34,10 @@ export interface UseInputModeReturn {
 // Hook implementation
 // ============================================================================
 
-export function useInputMode(deps: UseInputModeDeps): UseInputModeReturn {
-	const { setTabCompletionOpen, setSlashCommandOpen } = deps;
-
+export function useInputMode(_deps: UseInputModeDeps): UseInputModeReturn {
 	const toggleInputMode = useCallback(() => {
-		const { setSessions, activeSessionId } = useSessionStore.getState();
-
-		setSessions((prev) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				const newMode = s.inputMode === 'ai' ? 'terminal' : 'ai';
-
-				if (newMode === 'terminal') {
-					// Switching to terminal mode: save current file tab (if any) and clear it
-					useUIStore.getState().setPreTerminalFileTabId(s.activeFileTabId);
-					return {
-						...s,
-						inputMode: newMode,
-						activeFileTabId: null,
-					};
-				} else {
-					// Switching to AI mode: restore previous file tab if it still exists
-					const savedFileTabId = useUIStore.getState().preTerminalFileTabId;
-					const fileTabStillExists =
-						savedFileTabId && s.filePreviewTabs?.some((t) => t.id === savedFileTabId);
-					useUIStore.getState().setPreTerminalFileTabId(null);
-					return {
-						...s,
-						inputMode: newMode,
-						...(fileTabStillExists && { activeFileTabId: savedFileTabId }),
-					};
-				}
-			})
-		);
-		// Close any open dropdowns when switching modes
-		setTabCompletionOpen(false);
-		setSlashCommandOpen(false);
-	}, [setTabCompletionOpen, setSlashCommandOpen]);
+		// No-op: terminal mode removed. The persistent terminal lives in the Right Panel.
+	}, []);
 
 	return { toggleInputMode };
 }

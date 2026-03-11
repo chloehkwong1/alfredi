@@ -54,11 +54,7 @@ const selectSessions = (s: ReturnType<typeof useSessionStore.getState>) => s.ses
 // ============================================================================
 
 export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandlersReturn {
-	const {
-		sessionsRef,
-		toggleGlobalLive,
-		isLiveMode,
-	} = deps;
+	const { sessionsRef, toggleGlobalLive, isLiveMode } = deps;
 
 	// --- Store subscriptions ---
 	const sessions = useSessionStore(selectSessions);
@@ -88,12 +84,11 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 				command: string;
 				inputMode?: 'ai' | 'terminal';
 			}>;
-			const { sessionId, command, inputMode: webInputMode } = customEvent.detail;
+			const { sessionId, command } = customEvent.detail;
 
 			console.log('[Remote] Processing remote command via event:', {
 				sessionId,
 				command: command.substring(0, 50),
-				webInputMode,
 			});
 
 			// Find the session directly from sessionsRef (not from React state which may be stale)
@@ -103,90 +98,12 @@ export function useRemoteHandlers(deps: UseRemoteHandlersDeps): UseRemoteHandler
 				return;
 			}
 
-			// Use web's inputMode if provided, otherwise fall back to session state
-			const effectiveInputMode = webInputMode || session.inputMode;
-
 			console.log('[Remote] Found session:', {
 				id: session.id,
 				agentSessionId: session.agentSessionId || 'none',
 				state: session.state,
-				sessionInputMode: session.inputMode,
-				effectiveInputMode,
 				toolType: session.toolType,
 			});
-
-			// Handle terminal mode commands
-			if (effectiveInputMode === 'terminal') {
-				console.log('[Remote] Terminal mode - using runCommand for clean output');
-
-				// Add user message to shell logs and set state to busy
-				setSessions((prev) =>
-					prev.map((s) => {
-						if (s.id !== sessionId) return s;
-						return {
-							...s,
-							state: 'busy' as SessionState,
-							busySource: 'terminal',
-							shellLogs: [
-								...s.shellLogs,
-								{
-									id: generateId(),
-									timestamp: Date.now(),
-									source: 'user',
-									text: command,
-								},
-							],
-						};
-					})
-				);
-
-				// Use runCommand for clean stdout/stderr capture (same as desktop)
-				// When SSH is enabled for the session, the command runs on the remote host
-				const isRemote = !!session.sshRemoteId || !!session.sessionSshRemoteConfig?.enabled;
-				const commandCwd = isRemote
-					? session.remoteCwd || session.sessionSshRemoteConfig?.workingDirOverride || session.cwd
-					: session.shellCwd || session.cwd;
-				try {
-					await window.maestro.process.runCommand({
-						sessionId: sessionId,
-						command: command,
-						cwd: commandCwd,
-						sessionSshRemoteConfig: session.sessionSshRemoteConfig,
-					});
-					console.log('[Remote] Terminal command completed successfully');
-				} catch (error: unknown) {
-					captureException(error, {
-						extra: {
-							sessionId,
-							toolType: session.toolType,
-							mode: 'terminal',
-							operation: 'remote-command',
-						},
-					});
-					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-					setSessions((prev) =>
-						prev.map((s) => {
-							if (s.id !== sessionId) return s;
-							return {
-								...s,
-								state: 'idle' as SessionState,
-								busySource: undefined,
-								thinkingStartTime: undefined,
-								shellLogs: [
-									...s.shellLogs,
-									{
-										id: generateId(),
-										timestamp: Date.now(),
-										source: 'system',
-										text: `Error: Failed to run command - ${errorMessage}`,
-									},
-								],
-							};
-						})
-					);
-				}
-				return;
-			}
 
 			// Handle AI mode for batch-mode agents (Claude Code, Codex, OpenCode)
 			const supportedBatchAgents: ToolType[] = ['claude-code', 'codex', 'opencode'];

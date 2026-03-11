@@ -17,7 +17,7 @@ const createMockParentSession = (overrides: Partial<Session> = {}): Session =>
 	({
 		id: 'parent-1',
 		name: 'Parent Agent',
-		groupId: 'group-1',
+		projectId: 'project-1',
 		toolType: 'claude-code',
 		state: 'idle',
 		cwd: '/projects/main',
@@ -58,7 +58,7 @@ describe('buildWorktreeSession', () => {
 		expect(session.cwd).toBe('/worktrees/feature-x');
 		expect(session.fullPath).toBe('/worktrees/feature-x');
 		expect(session.projectRoot).toBe('/worktrees/feature-x');
-		expect(session.groupId).toBe('group-1');
+		expect(session.projectId).toBe('project-1');
 		expect(session.toolType).toBe('claude-code');
 		expect(session.state).toBe('idle');
 		expect(session.isGitRepo).toBe(true);
@@ -75,7 +75,7 @@ describe('buildWorktreeSession', () => {
 	});
 
 	it('should create a legacy session when worktreeParentPath is provided', () => {
-		const parent = createMockParentSession({ inputMode: 'terminal' });
+		const parent = createMockParentSession({ inputMode: 'ai' });
 		const session = buildWorktreeSession({
 			parentSession: parent,
 			path: '/worktrees/legacy',
@@ -89,7 +89,7 @@ describe('buildWorktreeSession', () => {
 		expect(session.parentSessionId).toBeUndefined();
 		expect(session.worktreeBranch).toBeUndefined();
 		expect(session.worktreeParentPath).toBe('/projects');
-		expect(session.inputMode).toBe('terminal'); // inherited directly
+		expect(session.inputMode).toBe('ai'); // inherited directly
 		expect(session.customContextWindow).toBeUndefined();
 		expect(session.nudgeMessage).toBeUndefined();
 		expect(session.autoRunFolderPath).toBeUndefined();
@@ -105,7 +105,7 @@ describe('buildWorktreeSession', () => {
 			defaultShowThinking: 'off',
 		});
 
-		expect(session.inputMode).toBe('terminal');
+		expect(session.inputMode).toBe('ai');
 	});
 
 	it('should handle null branch', () => {

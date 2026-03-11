@@ -540,7 +540,6 @@ describe('useSymphonyContribution', () => {
 			expect(session.fileExplorerScrollPos).toBe(0);
 			expect(session.fileTreeAutoRefreshInterval).toBe(180);
 			expect(session.aiCommandHistory).toEqual([]);
-			expect(session.shellCommandHistory).toEqual([]);
 			expect(session.executionQueue).toEqual([]);
 			expect(session.activeTimeMs).toBe(0);
 			expect(session.closedTabHistory).toEqual([]);

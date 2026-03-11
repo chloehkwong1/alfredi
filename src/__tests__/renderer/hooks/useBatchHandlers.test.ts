@@ -148,7 +148,7 @@ beforeEach(() => {
 	useSessionStore.setState({
 		sessions: [],
 		activeSessionId: '',
-		groups: [],
+		projects: [],
 		sessionsLoaded: false,
 		initialLoadComplete: false,
 	});
@@ -221,12 +221,14 @@ describe('useBatchHandlers', () => {
 			expect(result.current).toHaveProperty('handleSyncAutoRunStats');
 		});
 
-		it('calls useBatchProcessor with sessions and groups from stores', () => {
+		it('calls useBatchProcessor with sessions and projects from stores', () => {
 			const session = createMockSession();
 			useSessionStore.setState({
 				sessions: [session],
 				activeSessionId: 'session-1',
-				groups: [{ id: 'g1', name: 'Group 1' }],
+				projects: [
+					{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
+				],
 			});
 
 			renderHook(() => useBatchHandlers(createDeps()));
@@ -234,7 +236,9 @@ describe('useBatchHandlers', () => {
 			expect(useBatchProcessor).toHaveBeenCalled();
 			const callArgs = vi.mocked(useBatchProcessor).mock.calls[0][0];
 			expect(callArgs.sessions).toEqual([session]);
-			expect(callArgs.groups).toEqual([{ id: 'g1', name: 'Group 1' }]);
+			expect(callArgs.projects).toEqual([
+				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
+			]);
 		});
 
 		it('passes spawnAgentForSession as onSpawnAgent', () => {
@@ -367,7 +371,13 @@ describe('useBatchHandlers', () => {
 
 	describe('handleStopBatchRun', () => {
 		it('opens confirm modal and stops batch on confirm', () => {
-			const session = createMockSession({ id: 'session-1', name: 'My Agent' });
+			const session = createMockSession({
+				id: 'session-1',
+				name: 'My Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
 			const { result } = renderHook(() => useBatchHandlers(createDeps()));
@@ -390,7 +400,13 @@ describe('useBatchHandlers', () => {
 		});
 
 		it('uses active session when no targetSessionId provided', () => {
-			const session = createMockSession({ id: 'session-1', name: 'My Agent' });
+			const session = createMockSession({
+				id: 'session-1',
+				name: 'My Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
 			const { result } = renderHook(() => useBatchHandlers(createDeps()));
@@ -850,7 +866,13 @@ describe('useBatchHandlers', () => {
 
 	describe('onComplete callback', () => {
 		it('sends toast notification on completion', () => {
-			const session = createMockSession({ id: 'session-1', name: 'My Agent' });
+			const session = createMockSession({
+				id: 'session-1',
+				name: 'My Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 			useSettingsStore.setState({
 				firstAutoRunCompleted: true,
@@ -1012,12 +1034,14 @@ describe('useBatchHandlers', () => {
 			expect(mockRecordAutoRunComplete).not.toHaveBeenCalled();
 		});
 
-		it('includes group name in toast notification', () => {
-			const session = createMockSession({ id: 'session-1', groupId: 'g1' });
+		it('includes project name in toast notification', () => {
+			const session = createMockSession({ id: 'session-1', projectId: 'g1' });
 			useSessionStore.setState({
 				sessions: [session],
 				activeSessionId: 'session-1',
-				groups: [{ id: 'g1', name: 'My Group' }],
+				projects: [
+					{ id: 'g1', name: 'My Project', emoji: '', collapsed: false, rootPath: '/test/project' },
+				],
 			});
 			useSettingsStore.setState({
 				firstAutoRunCompleted: true,
@@ -1062,7 +1086,13 @@ describe('useBatchHandlers', () => {
 
 	describe('onPRResult callback', () => {
 		it('handles successful PR result', () => {
-			const session = createMockSession({ id: 'session-1', name: 'My Agent' });
+			const session = createMockSession({
+				id: 'session-1',
+				name: 'My Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
 			renderHook(() => useBatchHandlers(createDeps()));
@@ -1081,7 +1111,13 @@ describe('useBatchHandlers', () => {
 		});
 
 		it('handles failed PR result', () => {
-			const session = createMockSession({ id: 'session-1', name: 'My Agent' });
+			const session = createMockSession({
+				id: 'session-1',
+				name: 'My Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
 			renderHook(() => useBatchHandlers(createDeps()));
@@ -1099,8 +1135,8 @@ describe('useBatchHandlers', () => {
 			});
 		});
 
-		it('uses Ungrouped as group name when session has no group', () => {
-			const session = createMockSession({ id: 'session-1', groupId: undefined });
+		it('uses Unassigned as project name when session has no project', () => {
+			const session = createMockSession({ id: 'session-1', projectId: undefined });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
 			renderHook(() => useBatchHandlers(createDeps()));
@@ -1224,7 +1260,13 @@ describe('useBatchHandlers', () => {
 
 	describe('handleStopBatchRun edge cases', () => {
 		it('does NOT call stopBatchRun when user cancels confirmation', () => {
-			const session = createMockSession({ id: 'session-1', name: 'My Agent' });
+			const session = createMockSession({
+				id: 'session-1',
+				name: 'My Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
 
 			const { result } = renderHook(() => useBatchHandlers(createDeps()));
@@ -1263,9 +1305,27 @@ describe('useBatchHandlers', () => {
 		});
 
 		it('prioritizes targetSessionId over activeSession and activeBatchSessionIds', () => {
-			const session1 = createMockSession({ id: 'session-1', name: 'Agent One' });
-			const session2 = createMockSession({ id: 'session-2', name: 'Agent Two' });
-			const session3 = createMockSession({ id: 'session-3', name: 'Agent Three' });
+			const session1 = createMockSession({
+				id: 'session-1',
+				name: 'Agent One',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
+			const session2 = createMockSession({
+				id: 'session-2',
+				name: 'Agent Two',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
+			const session3 = createMockSession({
+				id: 'session-3',
+				name: 'Agent Three',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({
 				sessions: [session1, session2, session3],
 				activeSessionId: 'session-2',
@@ -1291,8 +1351,20 @@ describe('useBatchHandlers', () => {
 		});
 
 		it('falls back to activeSession when no targetSessionId is provided', () => {
-			const session1 = createMockSession({ id: 'session-1', name: 'Active Agent' });
-			const session2 = createMockSession({ id: 'session-2', name: 'Batch Agent' });
+			const session1 = createMockSession({
+				id: 'session-1',
+				name: 'Active Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
+			const session2 = createMockSession({
+				id: 'session-2',
+				name: 'Batch Agent',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({
 				sessions: [session1, session2],
 				activeSessionId: 'session-1',
@@ -1433,37 +1505,6 @@ describe('useBatchHandlers', () => {
 			expect(window.maestro.app.confirmQuit).not.toHaveBeenCalled();
 			const quitModal = useModalStore.getState().modals.get('quitConfirm');
 			expect(quitModal?.open).toBe(true);
-		});
-
-		it('shows modal for busy session with busySource=terminal for non-terminal agent type', () => {
-			// A non-terminal agent (e.g. claude-code) that is busy with source 'ai' should block quit.
-			// But busySource='terminal' on a non-terminal agent should also be checked.
-			// Per the code: filter is s.state === 'busy' && s.busySource === 'ai' && s.toolType !== 'terminal'
-			// So busySource='terminal' actually does NOT count as a busy agent.
-			const session = createMockSession({
-				id: 'session-1',
-				state: 'busy',
-				busySource: 'terminal' as any,
-				toolType: 'claude-code',
-			});
-			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
-			mockGetBatchState.mockReturnValue(createDefaultBatchState({ isRunning: false }));
-
-			let quitCallback: () => void = () => {};
-			(window.maestro.app.onQuitConfirmationRequest as any).mockImplementation((cb: () => void) => {
-				quitCallback = cb;
-				return vi.fn();
-			});
-
-			renderHook(() => useBatchHandlers(createDeps()));
-
-			act(() => {
-				quitCallback();
-			});
-
-			// busySource is 'terminal' not 'ai', so agent is NOT in busyAgents filter
-			// No active auto-runs either, so quit should be confirmed
-			expect(window.maestro.app.confirmQuit).toHaveBeenCalled();
 		});
 
 		it('confirms quit immediately when there are no sessions at all', () => {

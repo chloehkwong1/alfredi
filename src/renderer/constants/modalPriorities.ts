@@ -35,11 +35,11 @@ export const MODAL_PRIORITIES = {
 	/** Rename tab modal */
 	RENAME_TAB: 875,
 
-	/** Rename group modal */
-	RENAME_GROUP: 850,
+	/** Rename project modal */
+	RENAME_PROJECT: 850,
 
-	/** Create new group modal */
-	CREATE_GROUP: 800,
+	/** Create new project modal */
+	CREATE_PROJECT: 800,
 
 	/** Wizard exit confirmation dialog - appears above wizard when exiting mid-flow */
 	WIZARD_EXIT_CONFIRM: 770,

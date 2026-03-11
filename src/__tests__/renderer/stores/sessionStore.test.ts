@@ -5,16 +5,16 @@ import {
 	selectActiveSession,
 	selectSessionById,
 	selectBookmarkedSessions,
-	selectSessionsByGroup,
-	selectUngroupedSessions,
-	selectGroupById,
+	selectSessionsByProject,
+	selectUnprojectSessions,
+	selectProjectById,
 	selectSessionCount,
 	selectIsReady,
 	selectIsAnySessionBusy,
 	getSessionState,
 	getSessionActions,
 } from '../../../renderer/stores/sessionStore';
-import type { Session, Group, FilePreviewTab } from '../../../renderer/types';
+import type { Session, Project, FilePreviewTab } from '../../../renderer/types';
 
 // ============================================================================
 // Test Helpers
@@ -81,12 +81,13 @@ function createMockFilePreviewTab(overrides: Partial<FilePreviewTab> = {}): File
 	};
 }
 
-function createMockGroup(overrides: Partial<Group> = {}): Group {
+function createMockProject(overrides: Partial<Project> = {}): Project {
 	return {
-		id: overrides.id ?? `group-${Math.random().toString(36).slice(2, 8)}`,
-		name: overrides.name ?? 'Test Group',
+		id: overrides.id ?? `project-${Math.random().toString(36).slice(2, 8)}`,
+		name: overrides.name ?? 'Test Project',
 		emoji: overrides.emoji ?? '📁',
 		collapsed: overrides.collapsed ?? false,
+		rootPath: overrides.rootPath ?? '/test/project',
 	};
 }
 
@@ -97,7 +98,7 @@ function createMockGroup(overrides: Partial<Group> = {}): Group {
 function resetStore() {
 	useSessionStore.setState({
 		sessions: [],
-		groups: [],
+		projects: [],
 		activeSessionId: '',
 		sessionsLoaded: false,
 		initialLoadComplete: false,
@@ -124,7 +125,7 @@ describe('sessionStore', () => {
 			const state = useSessionStore.getState();
 
 			expect(state.sessions).toEqual([]);
-			expect(state.groups).toEqual([]);
+			expect(state.projects).toEqual([]);
 			expect(state.activeSessionId).toBe('');
 			expect(state.sessionsLoaded).toBe(false);
 			expect(state.initialLoadComplete).toBe(false);
@@ -274,91 +275,91 @@ describe('sessionStore', () => {
 	});
 
 	// ========================================================================
-	// Groups
+	// Projects
 	// ========================================================================
 
-	describe('groups', () => {
-		it('sets groups with a direct value', () => {
-			const groups = [createMockGroup({ id: 'g1' }), createMockGroup({ id: 'g2' })];
-			useSessionStore.getState().setGroups(groups);
+	describe('projects', () => {
+		it('sets projects with a direct value', () => {
+			const projects = [createMockProject({ id: 'g1' }), createMockProject({ id: 'g2' })];
+			useSessionStore.getState().setProjects(projects);
 
-			expect(useSessionStore.getState().groups).toEqual(groups);
+			expect(useSessionStore.getState().projects).toEqual(projects);
 		});
 
-		it('sets groups with an updater function', () => {
-			useSessionStore.getState().setGroups([createMockGroup({ id: 'g1' })]);
-			useSessionStore.getState().setGroups((prev) => [...prev, createMockGroup({ id: 'g2' })]);
+		it('sets projects with an updater function', () => {
+			useSessionStore.getState().setProjects([createMockProject({ id: 'g1' })]);
+			useSessionStore.getState().setProjects((prev) => [...prev, createMockProject({ id: 'g2' })]);
 
-			expect(useSessionStore.getState().groups).toHaveLength(2);
+			expect(useSessionStore.getState().projects).toHaveLength(2);
 		});
 
-		it('skips no-op setGroups when same reference returned', () => {
-			const groups = [createMockGroup({ id: 'g1' })];
-			useSessionStore.getState().setGroups(groups);
+		it('skips no-op setProjects when same reference returned', () => {
+			const projects = [createMockProject({ id: 'g1' })];
+			useSessionStore.getState().setProjects(projects);
 
 			const stateBefore = useSessionStore.getState();
-			useSessionStore.getState().setGroups((prev) => prev);
+			useSessionStore.getState().setProjects((prev) => prev);
 			const stateAfter = useSessionStore.getState();
 
-			expect(stateAfter.groups).toBe(stateBefore.groups);
+			expect(stateAfter.projects).toBe(stateBefore.projects);
 		});
 
-		it('adds a group', () => {
-			useSessionStore.getState().addGroup(createMockGroup({ id: 'g1', name: 'My Group' }));
+		it('adds a project', () => {
+			useSessionStore.getState().addProject(createMockProject({ id: 'g1', name: 'My Project' }));
 
-			expect(useSessionStore.getState().groups).toHaveLength(1);
-			expect(useSessionStore.getState().groups[0].name).toBe('My Group');
+			expect(useSessionStore.getState().projects).toHaveLength(1);
+			expect(useSessionStore.getState().projects[0].name).toBe('My Project');
 		});
 
-		it('removes a group by ID', () => {
+		it('removes a project by ID', () => {
 			useSessionStore
 				.getState()
-				.setGroups([createMockGroup({ id: 'g1' }), createMockGroup({ id: 'g2' })]);
+				.setProjects([createMockProject({ id: 'g1' }), createMockProject({ id: 'g2' })]);
 
-			useSessionStore.getState().removeGroup('g1');
+			useSessionStore.getState().removeProject('g1');
 
-			expect(useSessionStore.getState().groups).toHaveLength(1);
-			expect(useSessionStore.getState().groups[0].id).toBe('g2');
+			expect(useSessionStore.getState().projects).toHaveLength(1);
+			expect(useSessionStore.getState().projects[0].id).toBe('g2');
 		});
 
-		it('skips removeGroup if ID not found', () => {
-			const groups = [createMockGroup({ id: 'g1' })];
-			useSessionStore.getState().setGroups(groups);
+		it('skips removeProject if ID not found', () => {
+			const projects = [createMockProject({ id: 'g1' })];
+			useSessionStore.getState().setProjects(projects);
 
 			const stateBefore = useSessionStore.getState();
-			useSessionStore.getState().removeGroup('nonexistent');
+			useSessionStore.getState().removeProject('nonexistent');
 			const stateAfter = useSessionStore.getState();
 
-			expect(stateAfter.groups).toBe(stateBefore.groups);
+			expect(stateAfter.projects).toBe(stateBefore.projects);
 		});
 
-		it('updates a group by ID', () => {
-			useSessionStore.getState().setGroups([createMockGroup({ id: 'g1', name: 'Old Name' })]);
+		it('updates a project by ID', () => {
+			useSessionStore.getState().setProjects([createMockProject({ id: 'g1', name: 'Old Name' })]);
 
-			useSessionStore.getState().updateGroup('g1', { name: 'New Name' });
+			useSessionStore.getState().updateProject('g1', { name: 'New Name' });
 
-			expect(useSessionStore.getState().groups[0].name).toBe('New Name');
+			expect(useSessionStore.getState().projects[0].name).toBe('New Name');
 		});
 
-		it('skips updateGroup if ID not found', () => {
-			const groups = [createMockGroup({ id: 'g1' })];
-			useSessionStore.getState().setGroups(groups);
+		it('skips updateProject if ID not found', () => {
+			const projects = [createMockProject({ id: 'g1' })];
+			useSessionStore.getState().setProjects(projects);
 
 			const stateBefore = useSessionStore.getState();
-			useSessionStore.getState().updateGroup('nonexistent', { name: 'x' });
+			useSessionStore.getState().updateProject('nonexistent', { name: 'x' });
 			const stateAfter = useSessionStore.getState();
 
-			expect(stateAfter.groups).toBe(stateBefore.groups);
+			expect(stateAfter.projects).toBe(stateBefore.projects);
 		});
 
-		it('toggles group collapsed state', () => {
-			useSessionStore.getState().setGroups([createMockGroup({ id: 'g1', collapsed: false })]);
+		it('toggles project collapsed state', () => {
+			useSessionStore.getState().setProjects([createMockProject({ id: 'g1', collapsed: false })]);
 
-			useSessionStore.getState().toggleGroupCollapsed('g1');
-			expect(useSessionStore.getState().groups[0].collapsed).toBe(true);
+			useSessionStore.getState().toggleProjectCollapsed('g1');
+			expect(useSessionStore.getState().projects[0].collapsed).toBe(true);
 
-			useSessionStore.getState().toggleGroupCollapsed('g1');
-			expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
+			useSessionStore.getState().toggleProjectCollapsed('g1');
+			expect(useSessionStore.getState().projects[0].collapsed).toBe(false);
 		});
 	});
 
@@ -532,48 +533,50 @@ describe('sessionStore', () => {
 			});
 		});
 
-		describe('selectSessionsByGroup', () => {
-			it('returns sessions belonging to a group', () => {
+		describe('selectSessionsByProject', () => {
+			it('returns sessions belonging to a project', () => {
 				useSessionStore
 					.getState()
 					.setSessions([
-						createMockSession({ id: 'a', groupId: 'g1' }),
-						createMockSession({ id: 'b', groupId: 'g2' }),
-						createMockSession({ id: 'c', groupId: 'g1' }),
+						createMockSession({ id: 'a', projectId: 'g1' }),
+						createMockSession({ id: 'b', projectId: 'g2' }),
+						createMockSession({ id: 'c', projectId: 'g1' }),
 					]);
 
-				const group1 = selectSessionsByGroup('g1')(useSessionStore.getState());
-				expect(group1).toHaveLength(2);
-				expect(group1.map((s) => s.id)).toEqual(['a', 'c']);
+				const project1 = selectSessionsByProject('g1')(useSessionStore.getState());
+				expect(project1).toHaveLength(2);
+				expect(project1.map((s) => s.id)).toEqual(['a', 'c']);
 			});
 		});
 
-		describe('selectUngroupedSessions', () => {
-			it('returns sessions without a group and not worktree children', () => {
+		describe('selectUnprojectSessions', () => {
+			it('returns sessions without a project and not worktree children', () => {
 				useSessionStore.getState().setSessions([
-					createMockSession({ id: 'a' }), // ungrouped
-					createMockSession({ id: 'b', groupId: 'g1' }), // grouped
+					createMockSession({ id: 'a' }), // unassigned
+					createMockSession({ id: 'b', projectId: 'g1' }), // in project
 					createMockSession({ id: 'c', parentSessionId: 'a' }), // worktree child
-					createMockSession({ id: 'd' }), // ungrouped
+					createMockSession({ id: 'd' }), // unassigned
 				]);
 
-				const ungrouped = selectUngroupedSessions(useSessionStore.getState());
-				expect(ungrouped).toHaveLength(2);
-				expect(ungrouped.map((s) => s.id)).toEqual(['a', 'd']);
+				const unassigned = selectUnprojectSessions(useSessionStore.getState());
+				expect(unassigned).toHaveLength(2);
+				expect(unassigned.map((s) => s.id)).toEqual(['a', 'd']);
 			});
 		});
 
-		describe('selectGroupById', () => {
-			it('returns the group with the given ID', () => {
-				useSessionStore.getState().setGroups([createMockGroup({ id: 'g1', name: 'Group One' })]);
+		describe('selectProjectById', () => {
+			it('returns the project with the given ID', () => {
+				useSessionStore
+					.getState()
+					.setProjects([createMockProject({ id: 'g1', name: 'Project One' })]);
 
-				const group = selectGroupById('g1')(useSessionStore.getState());
-				expect(group?.name).toBe('Group One');
+				const project = selectProjectById('g1')(useSessionStore.getState());
+				expect(project?.name).toBe('Project One');
 			});
 
 			it('returns undefined if not found', () => {
-				const group = selectGroupById('nope')(useSessionStore.getState());
-				expect(group).toBeUndefined();
+				const project = selectProjectById('nope')(useSessionStore.getState());
+				expect(project).toBeUndefined();
 			});
 		});
 
@@ -681,9 +684,9 @@ describe('sessionStore', () => {
 
 			const initialRenderCount = renderCount;
 
-			// Change unrelated state (groups)
+			// Change unrelated state (projects)
 			act(() => {
-				useSessionStore.getState().setGroups([createMockGroup({ id: 'g1' })]);
+				useSessionStore.getState().setProjects([createMockProject({ id: 'g1' })]);
 			});
 
 			// Should not have re-rendered (selector isolation)
@@ -702,15 +705,15 @@ describe('sessionStore', () => {
 
 		it('works with multiple selectors in the same component', () => {
 			useSessionStore.getState().setSessions([createMockSession({ id: 'a' })]);
-			useSessionStore.getState().setGroups([createMockGroup({ id: 'g1' })]);
+			useSessionStore.getState().setProjects([createMockProject({ id: 'g1' })]);
 
 			const { result } = renderHook(() => ({
 				sessionCount: useSessionStore((s) => s.sessions.length),
-				groupCount: useSessionStore((s) => s.groups.length),
+				projectCount: useSessionStore((s) => s.projects.length),
 			}));
 
 			expect(result.current.sessionCount).toBe(1);
-			expect(result.current.groupCount).toBe(1);
+			expect(result.current.projectCount).toBe(1);
 		});
 	});
 
@@ -723,7 +726,7 @@ describe('sessionStore', () => {
 			const actionsBefore = useSessionStore.getState();
 
 			useSessionStore.getState().setSessions([createMockSession({ id: 'a' })]);
-			useSessionStore.getState().setGroups([createMockGroup({ id: 'g1' })]);
+			useSessionStore.getState().setProjects([createMockProject({ id: 'g1' })]);
 			useSessionStore.getState().setActiveSessionId('a');
 
 			const actionsAfter = useSessionStore.getState();
@@ -733,12 +736,12 @@ describe('sessionStore', () => {
 			expect(actionsAfter.removeSession).toBe(actionsBefore.removeSession);
 			expect(actionsAfter.updateSession).toBe(actionsBefore.updateSession);
 			expect(actionsAfter.setActiveSessionId).toBe(actionsBefore.setActiveSessionId);
-			expect(actionsAfter.setGroups).toBe(actionsBefore.setGroups);
+			expect(actionsAfter.setProjects).toBe(actionsBefore.setProjects);
 			expect(actionsAfter.toggleBookmark).toBe(actionsBefore.toggleBookmark);
 		});
 
 		it('extracted actions still mutate state correctly', () => {
-			const { setSessions, setActiveSessionId, setGroups } = useSessionStore.getState();
+			const { setSessions, setActiveSessionId, setProjects } = useSessionStore.getState();
 
 			setSessions([createMockSession({ id: 'a' })]);
 			expect(useSessionStore.getState().sessions).toHaveLength(1);
@@ -746,8 +749,8 @@ describe('sessionStore', () => {
 			setActiveSessionId('a');
 			expect(useSessionStore.getState().activeSessionId).toBe('a');
 
-			setGroups([createMockGroup({ id: 'g1' })]);
-			expect(useSessionStore.getState().groups).toHaveLength(1);
+			setProjects([createMockProject({ id: 'g1' })]);
+			expect(useSessionStore.getState().projects).toHaveLength(1);
 		});
 
 		it('extracted actions work with updater functions', () => {
@@ -834,27 +837,27 @@ describe('sessionStore', () => {
 			expect(selectBookmarkedSessions(useSessionStore.getState())).toHaveLength(0);
 		});
 
-		it('handles group lifecycle: create → add sessions → collapse → remove', () => {
-			// Create group
-			useSessionStore.getState().addGroup(createMockGroup({ id: 'g1', name: 'Backend' }));
+		it('handles project lifecycle: create → add sessions → collapse → remove', () => {
+			// Create project
+			useSessionStore.getState().addProject(createMockProject({ id: 'g1', name: 'Backend' }));
 
-			// Add sessions to group
+			// Add sessions to project
 			useSessionStore
 				.getState()
-				.addSession(createMockSession({ id: 'a', groupId: 'g1', name: 'API' }));
+				.addSession(createMockSession({ id: 'a', projectId: 'g1', name: 'API' }));
 			useSessionStore
 				.getState()
-				.addSession(createMockSession({ id: 'b', groupId: 'g1', name: 'DB' }));
+				.addSession(createMockSession({ id: 'b', projectId: 'g1', name: 'DB' }));
 
-			expect(selectSessionsByGroup('g1')(useSessionStore.getState())).toHaveLength(2);
+			expect(selectSessionsByProject('g1')(useSessionStore.getState())).toHaveLength(2);
 
 			// Collapse
-			useSessionStore.getState().toggleGroupCollapsed('g1');
-			expect(useSessionStore.getState().groups[0].collapsed).toBe(true);
+			useSessionStore.getState().toggleProjectCollapsed('g1');
+			expect(useSessionStore.getState().projects[0].collapsed).toBe(true);
 
-			// Remove group (sessions keep their groupId — that's handled by business logic)
-			useSessionStore.getState().removeGroup('g1');
-			expect(useSessionStore.getState().groups).toHaveLength(0);
+			// Remove project (sessions keep their projectId — that's handled by business logic)
+			useSessionStore.getState().removeProject('g1');
+			expect(useSessionStore.getState().projects).toHaveLength(0);
 		});
 
 		it('handles concurrent updates from setSessions updater (batching pattern)', () => {
@@ -885,7 +888,7 @@ describe('sessionStore', () => {
 					createMockSession({ id: 'restored-1' }),
 					createMockSession({ id: 'restored-2' }),
 				]);
-			useSessionStore.getState().setGroups([createMockGroup({ id: 'g1' })]);
+			useSessionStore.getState().setProjects([createMockProject({ id: 'g1' })]);
 
 			// Step 2: Mark as loaded
 			useSessionStore.getState().setSessionsLoaded(true);
@@ -1646,6 +1649,228 @@ describe('sessionStore', () => {
 		it('is available via getSessionActions()', () => {
 			const actions = getSessionActions();
 			expect(typeof actions.addLogToTab).toBe('function');
+		});
+	});
+
+	describe('clearActiveTabLogs', () => {
+		it('clears logs on the active tab only', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				aiTabs: [
+					{
+						id: 'tab-1',
+						agentSessionId: null,
+						name: null,
+						starred: false,
+						logs: [
+							{ id: 'log-1', timestamp: Date.now(), source: 'assistant', text: 'Hello' },
+							{ id: 'log-2', timestamp: Date.now(), source: 'user', text: 'Hi' },
+						],
+						inputValue: '',
+						stagedImages: [],
+						createdAt: Date.now(),
+						state: 'idle',
+					},
+					{
+						id: 'tab-2',
+						agentSessionId: null,
+						name: null,
+						starred: false,
+						logs: [{ id: 'log-3', timestamp: Date.now(), source: 'assistant', text: 'Other tab' }],
+						inputValue: '',
+						stagedImages: [],
+						createdAt: Date.now(),
+						state: 'idle',
+					},
+				],
+				activeTabId: 'tab-1',
+			});
+
+			useSessionStore.getState().setSessions([session]);
+			useSessionStore.getState().clearActiveTabLogs('session-1');
+
+			const sessions = useSessionStore.getState().sessions;
+			// Active tab logs should be cleared
+			expect(sessions[0].aiTabs[0].logs).toHaveLength(0);
+			// Other tab logs should be untouched
+			expect(sessions[0].aiTabs[1].logs).toHaveLength(1);
+			expect(sessions[0].aiTabs[1].logs[0].text).toBe('Other tab');
+		});
+
+		it('is a no-op for an invalid session ID', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				aiTabs: [
+					{
+						id: 'tab-1',
+						agentSessionId: null,
+						name: null,
+						starred: false,
+						logs: [{ id: 'log-1', timestamp: Date.now(), source: 'user', text: 'Keep me' }],
+						inputValue: '',
+						stagedImages: [],
+						createdAt: Date.now(),
+						state: 'idle',
+					},
+				],
+				activeTabId: 'tab-1',
+			});
+
+			useSessionStore.getState().setSessions([session]);
+			useSessionStore.getState().clearActiveTabLogs('non-existent');
+
+			const sessions = useSessionStore.getState().sessions;
+			expect(sessions[0].aiTabs[0].logs).toHaveLength(1);
+			expect(sessions[0].aiTabs[0].logs[0].text).toBe('Keep me');
+		});
+
+		it('is available via getSessionActions()', () => {
+			const actions = getSessionActions();
+			expect(typeof actions.clearActiveTabLogs).toBe('function');
+		});
+	});
+
+	// ========================================================================
+	// Terminal Tab Actions
+	// ========================================================================
+
+	describe('addTerminalTab', () => {
+		it('creates a tab with incremented name', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				terminalTabs: [{ id: 'tab-1', name: 'Terminal 1' }],
+				activeTerminalTabId: 'tab-1',
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			const newTab = useSessionStore.getState().addTerminalTab('session-1');
+
+			expect(newTab).not.toBeNull();
+			expect(newTab!.name).toBe('Terminal 2');
+			const updated = useSessionStore.getState().sessions[0];
+			expect(updated.terminalTabs).toHaveLength(2);
+			expect(updated.activeTerminalTabId).toBe(newTab!.id);
+		});
+
+		it('initializes default tab when terminalTabs is undefined', () => {
+			const session = createMockSession({ id: 'session-1' });
+			// Ensure terminalTabs is undefined
+			delete (session as any).terminalTabs;
+			useSessionStore.getState().setSessions([session]);
+
+			const newTab = useSessionStore.getState().addTerminalTab('session-1');
+
+			expect(newTab).not.toBeNull();
+			// Default "Terminal 1" is created internally, so new tab is "Terminal 2"
+			expect(newTab!.name).toBe('Terminal 2');
+			const updated = useSessionStore.getState().sessions[0];
+			expect(updated.terminalTabs).toHaveLength(2);
+		});
+
+		it('returns null and does not add when at max (5) tabs', () => {
+			const tabs = Array.from({ length: 5 }, (_, i) => ({
+				id: `tab-${i}`,
+				name: `Terminal ${i + 1}`,
+			}));
+			const session = createMockSession({
+				id: 'session-1',
+				terminalTabs: tabs,
+				activeTerminalTabId: 'tab-0',
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			const result = useSessionStore.getState().addTerminalTab('session-1');
+
+			expect(result).toBeNull();
+			expect(useSessionStore.getState().sessions[0].terminalTabs).toHaveLength(5);
+		});
+
+		it('is a no-op for non-existent session', () => {
+			useSessionStore.getState().setSessions([]);
+			const result = useSessionStore.getState().addTerminalTab('no-such-session');
+			expect(result).toBeNull();
+		});
+	});
+
+	describe('removeTerminalTab', () => {
+		it('removes tab and selects next available', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				terminalTabs: [
+					{ id: 'tab-1', name: 'Terminal 1' },
+					{ id: 'tab-2', name: 'Terminal 2' },
+					{ id: 'tab-3', name: 'Terminal 3' },
+				],
+				activeTerminalTabId: 'tab-2',
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			useSessionStore.getState().removeTerminalTab('session-1', 'tab-2');
+
+			const updated = useSessionStore.getState().sessions[0];
+			expect(updated.terminalTabs).toHaveLength(2);
+			expect(updated.terminalTabs!.find((t) => t.id === 'tab-2')).toBeUndefined();
+			// Should select tab-3 (same index position) or tab-1
+			expect(['tab-1', 'tab-3']).toContain(updated.activeTerminalTabId);
+		});
+
+		it('prevents removing the last tab', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				terminalTabs: [{ id: 'tab-1', name: 'Terminal 1' }],
+				activeTerminalTabId: 'tab-1',
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			useSessionStore.getState().removeTerminalTab('session-1', 'tab-1');
+
+			const updated = useSessionStore.getState().sessions[0];
+			expect(updated.terminalTabs).toHaveLength(1);
+			expect(updated.terminalTabs![0].id).toBe('tab-1');
+		});
+
+		it('does not change active tab when removing a non-active tab', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				terminalTabs: [
+					{ id: 'tab-1', name: 'Terminal 1' },
+					{ id: 'tab-2', name: 'Terminal 2' },
+				],
+				activeTerminalTabId: 'tab-1',
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			useSessionStore.getState().removeTerminalTab('session-1', 'tab-2');
+
+			const updated = useSessionStore.getState().sessions[0];
+			expect(updated.terminalTabs).toHaveLength(1);
+			expect(updated.activeTerminalTabId).toBe('tab-1');
+		});
+	});
+
+	describe('setActiveTerminalTab', () => {
+		it('updates the active terminal tab ID', () => {
+			const session = createMockSession({
+				id: 'session-1',
+				terminalTabs: [
+					{ id: 'tab-1', name: 'Terminal 1' },
+					{ id: 'tab-2', name: 'Terminal 2' },
+				],
+				activeTerminalTabId: 'tab-1',
+			});
+			useSessionStore.getState().setSessions([session]);
+
+			useSessionStore.getState().setActiveTerminalTab('session-1', 'tab-2');
+
+			const updated = useSessionStore.getState().sessions[0];
+			expect(updated.activeTerminalTabId).toBe('tab-2');
+		});
+
+		it('is available via getSessionActions()', () => {
+			const actions = getSessionActions();
+			expect(typeof actions.addTerminalTab).toBe('function');
+			expect(typeof actions.removeTerminalTab).toBe('function');
+			expect(typeof actions.setActiveTerminalTab).toBe('function');
 		});
 	});
 });

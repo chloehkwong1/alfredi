@@ -29,6 +29,7 @@ import type {
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../types';
+import type { OutputStyle } from '../../shared/types';
 import { DEFAULT_CUSTOM_THEME_COLORS } from '../constants/themes';
 import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS } from '../constants/shortcuts';
 // keyboardMastery constants removed (gamification stripped)
@@ -149,6 +150,7 @@ export interface SettingsStoreState {
 	defaultShowThinking: ThinkingMode;
 	leftSidebarWidth: number;
 	rightPanelWidth: number;
+	rightPanelSplitRatio: number;
 	markdownEditMode: boolean;
 	chatRawTextMode: boolean;
 	showHiddenFiles: boolean;
@@ -195,6 +197,7 @@ export interface SettingsStoreState {
 	autoScrollAiMode: boolean;
 	userMessageAlignment: 'left' | 'right';
 	encoreFeatures: EncoreFeatureFlags;
+	outputStyle: OutputStyle;
 	useNativeTitleBar: boolean;
 	autoHideMenuBar: boolean;
 }
@@ -221,6 +224,7 @@ export interface SettingsStoreActions {
 	setDefaultShowThinking: (value: ThinkingMode) => void;
 	setLeftSidebarWidth: (value: number) => void;
 	setRightPanelWidth: (value: number) => void;
+	setRightPanelSplitRatio: (value: number) => void;
 	setMarkdownEditMode: (value: boolean) => void;
 	setChatRawTextMode: (value: boolean) => void;
 	setShowHiddenFiles: (value: boolean) => void;
@@ -258,6 +262,7 @@ export interface SettingsStoreActions {
 	setAutoScrollAiMode: (value: boolean) => void;
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
+	setOutputStyle: (value: OutputStyle) => void;
 	setUseNativeTitleBar: (value: boolean) => void;
 	setAutoHideMenuBar: (value: boolean) => void;
 
@@ -336,6 +341,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	defaultShowThinking: 'off',
 	leftSidebarWidth: 256,
 	rightPanelWidth: 384,
+	rightPanelSplitRatio: 0.33,
 	markdownEditMode: false,
 	chatRawTextMode: false,
 	showHiddenFiles: true,
@@ -382,6 +388,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	autoScrollAiMode: false,
 	userMessageAlignment: 'right',
 	encoreFeatures: DEFAULT_ENCORE_FEATURES,
+	outputStyle: 'default',
 	useNativeTitleBar: false,
 	autoHideMenuBar: false,
 
@@ -489,6 +496,12 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setRightPanelWidth: (value) => {
 		set({ rightPanelWidth: value });
 		window.maestro.settings.set('rightPanelWidth', value);
+	},
+
+	setRightPanelSplitRatio: (value) => {
+		const clamped = Math.max(0.15, Math.min(0.85, value));
+		set({ rightPanelSplitRatio: clamped });
+		window.maestro.settings.set('rightPanelSplitRatio', clamped);
 	},
 
 	setMarkdownEditMode: (value) => {
@@ -681,6 +694,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setEncoreFeatures: (value) => {
 		set({ encoreFeatures: value });
 		window.maestro.settings.set('encoreFeatures', value);
+	},
+
+	setOutputStyle: (value) => {
+		set({ outputStyle: value });
+		window.maestro.settings.set('outputStyle', value);
 	},
 
 	setUseNativeTitleBar: (value) => {
@@ -1121,6 +1139,11 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['rightPanelWidth'] !== undefined)
 			patch.rightPanelWidth = allSettings['rightPanelWidth'] as number;
 
+		if (allSettings['rightPanelSplitRatio'] !== undefined) {
+			const ratio = allSettings['rightPanelSplitRatio'] as number;
+			patch.rightPanelSplitRatio = Math.max(0.15, Math.min(0.85, ratio));
+		}
+
 		if (allSettings['markdownEditMode'] !== undefined)
 			patch.markdownEditMode = allSettings['markdownEditMode'] as boolean;
 
@@ -1419,6 +1442,13 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['autoHideMenuBar'] !== undefined)
 			patch.autoHideMenuBar = allSettings['autoHideMenuBar'] as boolean;
 
+		if (allSettings['outputStyle'] !== undefined) {
+			const validStyles = ['default', 'explanatory', 'learning'];
+			if (validStyles.includes(allSettings['outputStyle'] as string)) {
+				patch.outputStyle = allSettings['outputStyle'] as OutputStyle;
+			}
+		}
+
 		// Apply the entire patch in one setState call
 		patch.settingsLoaded = true;
 		useSettingsStore.setState(patch);
@@ -1460,6 +1490,7 @@ export function getSettingsActions() {
 		setDefaultShowThinking: state.setDefaultShowThinking,
 		setLeftSidebarWidth: state.setLeftSidebarWidth,
 		setRightPanelWidth: state.setRightPanelWidth,
+		setRightPanelSplitRatio: state.setRightPanelSplitRatio,
 		setMarkdownEditMode: state.setMarkdownEditMode,
 		setChatRawTextMode: state.setChatRawTextMode,
 		setShowHiddenFiles: state.setShowHiddenFiles,
@@ -1516,6 +1547,7 @@ export function getSettingsActions() {
 		setFileTabAutoRefreshEnabled: state.setFileTabAutoRefreshEnabled,
 		setAutoScrollAiMode: state.setAutoScrollAiMode,
 		setEncoreFeatures: state.setEncoreFeatures,
+		setOutputStyle: state.setOutputStyle,
 		setUseNativeTitleBar: state.setUseNativeTitleBar,
 		setAutoHideMenuBar: state.setAutoHideMenuBar,
 	};

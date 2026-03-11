@@ -11,8 +11,9 @@ import {
 	GitPullRequest,
 	Trash2,
 	Edit3,
+	Eraser,
 } from 'lucide-react';
-import type { Group, Session, Theme } from '../../types';
+import type { Project, Session, Theme } from '../../types';
 import { useClickOutside, useContextMenuPosition } from '../../hooks';
 
 interface SessionContextMenuProps {
@@ -20,20 +21,21 @@ interface SessionContextMenuProps {
 	y: number;
 	theme: Theme;
 	session: Session;
-	groups: Group[];
+	projects: Project[];
 	hasWorktreeChildren: boolean;
 	onRename: () => void;
 	onEdit: () => void;
 	onDuplicate: () => void;
 	onToggleBookmark: () => void;
-	onMoveToGroup: (groupId: string) => void;
+	onMoveToProject: (projectId: string) => void;
 	onDelete: () => void;
 	onDismiss: () => void;
 	onCreatePR?: () => void;
 	onQuickCreateWorktree?: () => void;
 	onConfigureWorktrees?: () => void;
 	onDeleteWorktree?: () => void;
-	onCreateGroup?: () => void;
+	onCreateProject?: () => void;
+	onClearContext?: () => void;
 }
 
 export function SessionContextMenu({
@@ -41,23 +43,24 @@ export function SessionContextMenu({
 	y,
 	theme,
 	session,
-	groups,
+	projects,
 	hasWorktreeChildren,
 	onRename,
 	onEdit,
 	onDuplicate,
 	onToggleBookmark,
-	onMoveToGroup,
+	onMoveToProject,
 	onDelete,
 	onDismiss,
 	onCreatePR,
 	onQuickCreateWorktree,
 	onConfigureWorktrees,
 	onDeleteWorktree,
-	onCreateGroup,
+	onCreateProject,
+	onClearContext,
 }: SessionContextMenuProps) {
 	const menuRef = useRef<HTMLDivElement>(null);
-	const moveToGroupRef = useRef<HTMLDivElement>(null);
+	const moveToProjectRef = useRef<HTMLDivElement>(null);
 	const submenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [showMoveSubmenu, setShowMoveSubmenu] = useState(false);
 	const [submenuPosition, setSubmenuPosition] = useState<{
@@ -92,17 +95,17 @@ export function SessionContextMenu({
 
 	const { left, top, ready } = useContextMenuPosition(menuRef, x, y);
 
-	const handleMoveToGroupHover = () => {
+	const handleMoveToProjectHover = () => {
 		if (submenuTimeoutRef.current) {
 			clearTimeout(submenuTimeoutRef.current);
 			submenuTimeoutRef.current = null;
 		}
 		setShowMoveSubmenu(true);
 
-		if (moveToGroupRef.current) {
-			const rect = moveToGroupRef.current.getBoundingClientRect();
+		if (moveToProjectRef.current) {
+			const rect = moveToProjectRef.current.getBoundingClientRect();
 			const itemHeight = 28;
-			const submenuHeight = (groups.length + 1) * itemHeight + 16 + (groups.length > 0 ? 8 : 0);
+			const submenuHeight = (projects.length + 1) * itemHeight + 16 + (projects.length > 0 ? 8 : 0);
 			const submenuWidth = 160;
 			const spaceBelow = window.innerHeight - rect.top;
 			const spaceRight = window.innerWidth - rect.right;
@@ -114,7 +117,7 @@ export function SessionContextMenu({
 		}
 	};
 
-	const handleMoveToGroupLeave = () => {
+	const handleMoveToProjectLeave = () => {
 		if (submenuTimeoutRef.current) {
 			clearTimeout(submenuTimeoutRef.current);
 		}
@@ -185,6 +188,21 @@ export function SessionContextMenu({
 				Duplicate...
 			</button>
 
+			{onClearContext && (
+				<button
+					type="button"
+					onClick={() => {
+						onClearContext();
+						onDismiss();
+					}}
+					className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+					style={{ color: theme.colors.textMain }}
+				>
+					<Eraser className="w-3.5 h-3.5" />
+					Clear Context
+				</button>
+			)}
+
 			{!session.parentSessionId && (
 				<button
 					type="button"
@@ -202,17 +220,17 @@ export function SessionContextMenu({
 
 			{!session.parentSessionId && (
 				<div
-					ref={moveToGroupRef}
+					ref={moveToProjectRef}
 					className="relative"
 					tabIndex={0}
-					onMouseEnter={handleMoveToGroupHover}
-					onMouseLeave={handleMoveToGroupLeave}
-					onFocus={handleMoveToGroupHover}
-					onBlur={handleMoveToGroupLeave}
+					onMouseEnter={handleMoveToProjectHover}
+					onMouseLeave={handleMoveToProjectLeave}
+					onFocus={handleMoveToProjectHover}
+					onBlur={handleMoveToProjectLeave}
 					onKeyDown={(e) => {
 						if (e.key === 'Enter' || e.key === ' ') {
 							e.preventDefault();
-							handleMoveToGroupHover();
+							handleMoveToProjectHover();
 						} else if (e.key === 'Escape' && showMoveSubmenu) {
 							e.stopPropagation();
 							setShowMoveSubmenu(false);
@@ -226,7 +244,7 @@ export function SessionContextMenu({
 					>
 						<span className="flex items-center gap-2">
 							<FolderInput className="w-3.5 h-3.5" />
-							Move to Group
+							Move to Project
 						</span>
 						<ChevronRight className="w-3 h-3" />
 					</button>
@@ -247,58 +265,58 @@ export function SessionContextMenu({
 							<button
 								type="button"
 								onClick={() => {
-									onMoveToGroup('');
+									onMoveToProject('');
 									onDismiss();
 								}}
-								className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2 ${!session.groupId ? 'opacity-50' : ''}`}
+								className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2 ${!session.projectId ? 'opacity-50' : ''}`}
 								style={{ color: theme.colors.textMain }}
-								disabled={!session.groupId}
+								disabled={!session.projectId}
 							>
 								<Folder className="w-3.5 h-3.5" />
-								Ungrouped
-								{!session.groupId && <span className="text-[10px] opacity-50">(current)</span>}
+								No Project
+								{!session.projectId && <span className="text-[10px] opacity-50">(current)</span>}
 							</button>
 
-							{groups.length > 0 && (
+							{projects.length > 0 && (
 								<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 							)}
 
-							{groups.map((group) => (
+							{projects.map((project) => (
 								<button
 									type="button"
-									key={group.id}
+									key={project.id}
 									onClick={() => {
-										onMoveToGroup(group.id);
+										onMoveToProject(project.id);
 										onDismiss();
 									}}
-									className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2 ${session.groupId === group.id ? 'opacity-50' : ''}`}
+									className={`w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2 ${session.projectId === project.id ? 'opacity-50' : ''}`}
 									style={{ color: theme.colors.textMain }}
-									disabled={session.groupId === group.id}
+									disabled={session.projectId === project.id}
 								>
-									<span>{group.emoji}</span>
-									<span className="truncate">{group.name}</span>
-									{session.groupId === group.id && (
+									<span>{project.emoji}</span>
+									<span className="truncate">{project.name}</span>
+									{session.projectId === project.id && (
 										<span className="text-[10px] opacity-50">(current)</span>
 									)}
 								</button>
 							))}
 
-							{onCreateGroup && (
+							{onCreateProject && (
 								<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 							)}
 
-							{onCreateGroup && (
+							{onCreateProject && (
 								<button
 									type="button"
 									onClick={() => {
-										onCreateGroup();
+										onCreateProject();
 										onDismiss();
 									}}
 									className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
 									style={{ color: theme.colors.accent }}
 								>
 									<FolderPlus className="w-3.5 h-3.5" />
-									Create New Group
+									Create New Project
 								</button>
 							)}
 						</div>

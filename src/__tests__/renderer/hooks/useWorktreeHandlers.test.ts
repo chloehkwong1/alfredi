@@ -57,7 +57,7 @@ const mockParentSession = {
 	fullPath: '/projects/myapp',
 	projectRoot: '/projects/myapp',
 	toolType: 'claude-code' as const,
-	groupId: 'group-1',
+	projectId: 'project-1',
 	inputMode: 'ai' as const,
 	state: 'idle',
 	worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true },
@@ -103,7 +103,7 @@ function createChildSession(overrides: Partial<Session> = {}): any {
 		fullPath: '/projects/worktrees/feature-1',
 		projectRoot: '/projects/worktrees/feature-1',
 		toolType: 'claude-code' as const,
-		groupId: 'group-1',
+		projectId: 'project-1',
 		inputMode: 'ai' as const,
 		state: 'idle',
 		parentSessionId: 'parent-1',
@@ -890,7 +890,7 @@ describe('handleToggleWorktreeExpanded', () => {
 // ============================================================================
 
 describe('Session inheritance via buildWorktreeSession', () => {
-	it('created session inherits toolType, groupId, customPath, customArgs from parent', async () => {
+	it('created session inherits toolType, projectId, customPath, customArgs from parent', async () => {
 		useSessionStore.setState({
 			sessions: [mockParentSession],
 			activeSessionId: 'parent-1',
@@ -914,7 +914,7 @@ describe('Session inheritance via buildWorktreeSession', () => {
 		const child = useSessionStore.getState().sessions.find((s) => s.worktreeBranch === 'feature-1');
 		expect(child).toBeDefined();
 		expect(child?.toolType).toBe('claude-code');
-		expect(child?.groupId).toBe('group-1');
+		expect(child?.projectId).toBe('project-1');
 		expect(child?.customPath).toBe('/usr/local/bin/claude');
 		expect(child?.customArgs).toEqual(['--arg1']);
 		expect(child?.customEnvVars).toEqual({ KEY: 'val' });

@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import {
 	Wand2,
-	Bot,
+	FolderPlus,
 	Menu,
 	Settings,
 	Info,
@@ -20,7 +20,6 @@ interface EmptyStateViewProps {
 	theme: Theme;
 	shortcuts: Record<string, Shortcut>;
 	onNewAgent: () => void;
-	onOpenWizard: () => void;
 	onOpenSettings: () => void;
 	onOpenAbout: () => void;
 	onCheckForUpdates: () => void;
@@ -31,7 +30,6 @@ export function EmptyStateView({
 	theme,
 	shortcuts,
 	onNewAgent,
-	onOpenWizard,
 	onOpenSettings,
 	onOpenAbout,
 	onCheckForUpdates,
@@ -97,33 +95,6 @@ export function EmptyStateView({
 							}}
 						>
 							<div className="p-1">
-								<button
-									onClick={() => {
-										onOpenWizard();
-										setMenuOpen(false);
-									}}
-									className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-								>
-									<Wand2 className="w-5 h-5" style={{ color: theme.colors.accent }} />
-									<div className="flex-1">
-										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-											New Agent Wizard
-										</div>
-										<div className="text-xs" style={{ color: theme.colors.textDim }}>
-											Get started with AI
-										</div>
-									</div>
-									<span
-										className="text-xs font-mono px-1.5 py-0.5 rounded"
-										style={{
-											backgroundColor: theme.colors.bgActivity,
-											color: theme.colors.textDim,
-										}}
-									>
-										{shortcuts.openWizard ? formatShortcutKeys(shortcuts.openWizard.keys) : '⇧⌘N'}
-									</span>
-								</button>
-
 								{onStartTour && (
 									<button
 										onClick={() => {
@@ -192,7 +163,7 @@ export function EmptyStateView({
 
 								<button
 									onClick={() => {
-										window.maestro.shell.openExternal('https://runmaestro.ai');
+										window.maestro.shell.openExternal('https://alfredi.ai');
 										setMenuOpen(false);
 									}}
 									className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
@@ -200,10 +171,10 @@ export function EmptyStateView({
 									<Globe className="w-5 h-5" style={{ color: theme.colors.textDim }} />
 									<div className="flex-1">
 										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-											Maestro Website
+											Alfredi Website
 										</div>
 										<div className="text-xs" style={{ color: theme.colors.textDim }}>
-											Visit runmaestro.ai
+											Visit alfredi.ai
 										</div>
 									</div>
 									<ExternalLink className="w-4 h-4" style={{ color: theme.colors.textDim }} />
@@ -211,7 +182,7 @@ export function EmptyStateView({
 
 								<button
 									onClick={() => {
-										window.maestro.shell.openExternal('https://docs.runmaestro.ai');
+										window.maestro.shell.openExternal('https://docs.alfredi.ai');
 										setMenuOpen(false);
 									}}
 									className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
@@ -222,7 +193,7 @@ export function EmptyStateView({
 											Documentation
 										</div>
 										<div className="text-xs" style={{ color: theme.colors.textDim }}>
-											See usage docs on docs.runmaestro.ai
+											See usage docs on docs.alfredi.ai
 										</div>
 									</div>
 									<ExternalLink className="w-4 h-4" style={{ color: theme.colors.textDim }} />
@@ -238,7 +209,7 @@ export function EmptyStateView({
 									<Info className="w-5 h-5" style={{ color: theme.colors.textDim }} />
 									<div className="flex-1">
 										<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-											About Maestro
+											About Alfredi
 										</div>
 										<div className="text-xs" style={{ color: theme.colors.textDim }}>
 											Version, Credits, Stats
@@ -255,23 +226,15 @@ export function EmptyStateView({
 			<div className="flex-1 flex flex-col items-center justify-center px-4">
 				<WelcomeContent theme={theme} showGetStarted />
 
-				{/* Action Buttons */}
-				<div className="flex items-center gap-4 mt-8">
+				{/* Action Button */}
+				<div className="flex items-center justify-center mt-8">
 					<button
 						onClick={onNewAgent}
 						className="flex items-center justify-center gap-3 px-8 py-4 rounded-lg text-base font-bold transition-colors hover:opacity-90 min-w-[180px]"
 						style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
 					>
-						<Bot className="w-5 h-5" />
-						New Agent
-					</button>
-					<button
-						onClick={onOpenWizard}
-						className="flex items-center justify-center gap-3 px-8 py-4 rounded-lg text-base font-bold transition-colors hover:opacity-90 min-w-[180px]"
-						style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
-					>
-						<Wand2 className="w-5 h-5" />
-						Wizard
+						<FolderPlus className="w-5 h-5" />
+						New Project
 					</button>
 				</div>
 			</div>

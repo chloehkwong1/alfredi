@@ -39,8 +39,12 @@ vi.mock('../../../renderer/components/RenameSessionModal', () => ({
 	RenameSessionModal: () => null,
 }));
 vi.mock('../../../renderer/components/RenameTabModal', () => ({ RenameTabModal: () => null }));
-vi.mock('../../../renderer/components/CreateGroupModal', () => ({ CreateGroupModal: () => null }));
-vi.mock('../../../renderer/components/RenameGroupModal', () => ({ RenameGroupModal: () => null }));
+vi.mock('../../../renderer/components/CreateProjectModal', () => ({
+	CreateProjectModal: () => null,
+}));
+vi.mock('../../../renderer/components/RenameProjectModal', () => ({
+	RenameProjectModal: () => null,
+}));
 vi.mock('../../../renderer/components/WorktreeConfigModal', () => ({
 	WorktreeConfigModal: () => null,
 }));
@@ -218,15 +222,15 @@ function createDefaultProps(overrides: Record<string, unknown> = {}) {
 		renameTabInitialName: '',
 		onCloseRenameTabModal: vi.fn(),
 		onRenameTab: vi.fn(),
-		// Group modals
-		createGroupModalOpen: false,
-		onCloseCreateGroupModal: vi.fn(),
-		renameGroupId: null,
-		renameGroupValue: '',
-		setRenameGroupValue: vi.fn(),
-		renameGroupEmoji: '',
-		setRenameGroupEmoji: vi.fn(),
-		onCloseRenameGroupModal: vi.fn(),
+		// Project modals
+		createProjectModalOpen: false,
+		onCloseCreateProjectModal: vi.fn(),
+		renameProjectId: null,
+		renameProjectValue: '',
+		setRenameProjectValue: vi.fn(),
+		renameProjectEmoji: '',
+		setRenameProjectEmoji: vi.fn(),
+		onCloseRenameProjectModal: vi.fn(),
 		// Worktree modals
 		onCloseWorktreeConfigModal: vi.fn(),
 		onSaveWorktreeConfig: vi.fn(),
@@ -249,11 +253,11 @@ function createDefaultProps(overrides: Record<string, unknown> = {}) {
 		addNewSession: vi.fn(),
 		setRenameInstanceValue: vi.fn(),
 		setRenameInstanceModalOpen: vi.fn(),
-		setRenameGroupId: vi.fn(),
-		setRenameGroupValueForQuickActions: vi.fn(),
-		setRenameGroupEmojiForQuickActions: vi.fn(),
-		setRenameGroupModalOpenForQuickActions: vi.fn(),
-		setCreateGroupModalOpenForQuickActions: vi.fn(),
+		setRenameProjectId: vi.fn(),
+		setRenameProjectValueForQuickActions: vi.fn(),
+		setRenameProjectEmojiForQuickActions: vi.fn(),
+		setRenameProjectModalOpenForQuickActions: vi.fn(),
+		setCreateProjectModalOpenForQuickActions: vi.fn(),
 		setLeftSidebarOpen: vi.fn(),
 		setRightPanelOpen: vi.fn(),
 		toggleInputMode: vi.fn(),
@@ -548,7 +552,7 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 				'editAgentModalOpen',
 				'renameSessionModalOpen',
 				'renameTabModalOpen',
-				'renameGroupModalOpen',
+				'renameProjectModalOpen',
 				'worktreeConfigModalOpen',
 				'createWorktreeModalOpen',
 				'createPRModalOpen',
@@ -574,10 +578,10 @@ describe('AppModals (Tier 1B self-sourcing)', () => {
 			unmount();
 		});
 
-		it('still accepts createGroupModalOpen as a prop (no ModalId exists)', () => {
-			// createGroupModalOpen has no ModalId, so remains as a prop
-			const props = createDefaultProps({ createGroupModalOpen: true });
-			expect(props).toHaveProperty('createGroupModalOpen', true);
+		it('still accepts createProjectModalOpen as a prop (no ModalId exists)', () => {
+			// createProjectModalOpen has no ModalId, so remains as a prop
+			const props = createDefaultProps({ createProjectModalOpen: true });
+			expect(props).toHaveProperty('createProjectModalOpen', true);
 
 			const { unmount } = render(<AppModals {...props} />);
 			unmount();

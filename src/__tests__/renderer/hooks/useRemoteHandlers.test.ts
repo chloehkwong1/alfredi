@@ -80,8 +80,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		cwd: '/test',
 		projectRoot: '/test',
 		shellLogs: [],
-		shellCwd: '/test',
-		terminalDraftInput: '',
 		...overrides,
 	} as Session;
 }
@@ -358,7 +356,7 @@ describe('useRemoteHandlers', () => {
 		});
 
 		it('dispatches terminal commands via runCommand', async () => {
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createMockDeps({
 				sessionsRef: { current: [session] },
 			});
@@ -378,7 +376,7 @@ describe('useRemoteHandlers', () => {
 						detail: {
 							sessionId: 'session-1',
 							command: 'ls -la',
-							inputMode: 'terminal',
+							inputMode: 'ai',
 						},
 					})
 				);
@@ -551,7 +549,7 @@ describe('useRemoteHandlers', () => {
 
 		it('uses SSH remote CWD for terminal commands on remote sessions', async () => {
 			const session = createMockSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				sshRemoteId: 'remote-1',
 				remoteCwd: '/remote/path',
 				sessionSshRemoteConfig: {
@@ -576,7 +574,7 @@ describe('useRemoteHandlers', () => {
 						detail: {
 							sessionId: 'session-1',
 							command: 'pwd',
-							inputMode: 'terminal',
+							inputMode: 'ai',
 						},
 					})
 				);
@@ -590,7 +588,7 @@ describe('useRemoteHandlers', () => {
 		});
 
 		it('sets session state to busy when dispatching terminal command', async () => {
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createMockDeps({
 				sessionsRef: { current: [session] },
 			});
@@ -608,7 +606,7 @@ describe('useRemoteHandlers', () => {
 						detail: {
 							sessionId: 'session-1',
 							command: 'ls',
-							inputMode: 'terminal',
+							inputMode: 'ai',
 						},
 					})
 				);
@@ -617,13 +615,13 @@ describe('useRemoteHandlers', () => {
 			const sessions = useSessionStore.getState().sessions;
 			const updatedSession = sessions.find((s) => s.id === 'session-1');
 			expect(updatedSession?.state).toBe('busy');
-			expect(updatedSession?.busySource).toBe('terminal');
+			expect(updatedSession?.busySource).toBe('ai');
 		});
 
 		it('handles terminal command errors gracefully', async () => {
 			(window.maestro.process.runCommand as any).mockRejectedValue(new Error('Connection refused'));
 
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createMockDeps({
 				sessionsRef: { current: [session] },
 			});
@@ -641,7 +639,7 @@ describe('useRemoteHandlers', () => {
 						detail: {
 							sessionId: 'session-1',
 							command: 'ls',
-							inputMode: 'terminal',
+							inputMode: 'ai',
 						},
 					})
 				);
@@ -686,7 +684,7 @@ describe('useRemoteHandlers', () => {
 		}
 
 		it('appends user command text to shellLogs', async () => {
-			const session = createMockSession({ inputMode: 'terminal', shellLogs: [] });
+			const session = createMockSession({ inputMode: 'ai', shellLogs: [] });
 			const deps = createMockDeps({ sessionsRef: { current: [session] } });
 
 			renderHook(() => useRemoteHandlers(deps));
@@ -695,7 +693,7 @@ describe('useRemoteHandlers', () => {
 			await act(async () => {
 				await handler(
 					new CustomEvent('maestro:remoteCommand', {
-						detail: { sessionId: 'session-1', command: 'echo hello', inputMode: 'terminal' },
+						detail: { sessionId: 'session-1', command: 'echo hello', inputMode: 'ai' },
 					})
 				);
 			});
@@ -709,7 +707,7 @@ describe('useRemoteHandlers', () => {
 
 		it('falls back to workingDirOverride when remoteCwd is undefined on SSH session', async () => {
 			const session = createMockSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				sshRemoteId: 'remote-1',
 				remoteCwd: undefined,
 				cwd: '/local/path',
@@ -727,7 +725,7 @@ describe('useRemoteHandlers', () => {
 			await act(async () => {
 				await handler(
 					new CustomEvent('maestro:remoteCommand', {
-						detail: { sessionId: 'session-1', command: 'pwd', inputMode: 'terminal' },
+						detail: { sessionId: 'session-1', command: 'pwd', inputMode: 'ai' },
 					})
 				);
 			});
@@ -737,11 +735,10 @@ describe('useRemoteHandlers', () => {
 			);
 		});
 
-		it('falls back to session.cwd when no SSH config and no shellCwd', async () => {
+		it('uses session.cwd when no SSH config', async () => {
 			const session = createMockSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				cwd: '/my/project',
-				shellCwd: undefined,
 			} as any);
 			const deps = createMockDeps({ sessionsRef: { current: [session] } });
 
@@ -751,7 +748,7 @@ describe('useRemoteHandlers', () => {
 			await act(async () => {
 				await handler(
 					new CustomEvent('maestro:remoteCommand', {
-						detail: { sessionId: 'session-1', command: 'ls', inputMode: 'terminal' },
+						detail: { sessionId: 'session-1', command: 'ls', inputMode: 'ai' },
 					})
 				);
 			});
@@ -764,7 +761,7 @@ describe('useRemoteHandlers', () => {
 		it('handles non-Error thrown value in terminal command error path', async () => {
 			(window.maestro.process.runCommand as any).mockRejectedValue('string error value');
 
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createMockDeps({ sessionsRef: { current: [session] } });
 
 			renderHook(() => useRemoteHandlers(deps));
@@ -773,7 +770,7 @@ describe('useRemoteHandlers', () => {
 			await act(async () => {
 				await handler(
 					new CustomEvent('maestro:remoteCommand', {
-						detail: { sessionId: 'session-1', command: 'bad-cmd', inputMode: 'terminal' },
+						detail: { sessionId: 'session-1', command: 'bad-cmd', inputMode: 'ai' },
 					})
 				);
 			});
@@ -788,7 +785,7 @@ describe('useRemoteHandlers', () => {
 		it('passes sessionSshRemoteConfig to runCommand', async () => {
 			const sshConfig = { enabled: true, remoteId: 'remote-1' };
 			const session = createMockSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				sshRemoteId: 'remote-1',
 				remoteCwd: '/remote',
 				sessionSshRemoteConfig: sshConfig,
@@ -801,7 +798,7 @@ describe('useRemoteHandlers', () => {
 			await act(async () => {
 				await handler(
 					new CustomEvent('maestro:remoteCommand', {
-						detail: { sessionId: 'session-1', command: 'ls', inputMode: 'terminal' },
+						detail: { sessionId: 'session-1', command: 'ls', inputMode: 'ai' },
 					})
 				);
 			});
@@ -1159,7 +1156,7 @@ describe('useRemoteHandlers', () => {
 
 		it('uses web-provided inputMode over session inputMode', async () => {
 			// Session is in terminal mode, but web sends AI mode
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' } as any);
 			const deps = createMockDeps({ sessionsRef: { current: [session] } });
 
@@ -1180,7 +1177,7 @@ describe('useRemoteHandlers', () => {
 		});
 
 		it('falls back to session.inputMode when web inputMode is not provided', async () => {
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createMockDeps({ sessionsRef: { current: [session] } });
 
 			renderHook(() => useRemoteHandlers(deps));

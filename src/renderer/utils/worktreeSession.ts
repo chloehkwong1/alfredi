@@ -27,7 +27,6 @@ export interface BuildWorktreeSessionParams {
 	gitBranches?: string[];
 	gitTags?: string[];
 	gitRefsCacheTime?: number;
-	defaultSaveToHistory: boolean;
 	defaultShowThinking: ThinkingMode;
 	/** Legacy worktreeParentPath to inherit — presence triggers legacy mode. */
 	worktreeParentPath?: string;
@@ -48,14 +47,13 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		stagedImages: [],
 		createdAt: Date.now(),
 		state: 'idle',
-		saveToHistory: params.defaultSaveToHistory,
 		showThinking: params.defaultShowThinking,
 	};
 
 	return {
 		id: newId,
 		name: params.name,
-		groupId: params.parentSession.groupId,
+		projectId: params.parentSession.projectId,
 		toolType: params.parentSession.toolType,
 		state: 'idle',
 		cwd: params.path,
@@ -73,14 +71,7 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		// Inherit SSH configuration from parent session
 		sessionSshRemoteConfig: params.parentSession.sessionSshRemoteConfig,
 		aiLogs: [],
-		shellLogs: [
-			{
-				id: generateId(),
-				timestamp: Date.now(),
-				source: 'system',
-				text: isLegacy ? 'Shell Session Ready.' : 'Worktree Session Ready.',
-			},
-		],
+		shellLogs: [],
 		workLog: [],
 		contextUsage: 0,
 		// Legacy: inherits inputMode directly from parent

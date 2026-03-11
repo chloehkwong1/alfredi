@@ -141,7 +141,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				// NOTE: Must use e.code for Alt key combos on macOS because e.key produces special characters
 				const isTabSwitcherShortcut =
 					e.altKey && (e.metaKey || e.ctrlKey) && !e.shiftKey && codeKeyLower === 't';
-				// Allow toggleMode (Cmd+J) to switch to terminal view from file preview
+				// Allow toggleMode (Cmd+J) to focus the persistent terminal from file preview
 				const isToggleModeShortcut = ctx.isShortcut(e, 'toggleMode');
 				// Allow font size shortcuts (Cmd+=/+, Cmd+-, Cmd+0) even when modals/overlays are open
 				const isFontSizeShortcut =
@@ -192,7 +192,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			}
 
 			// Skip all keyboard handling when editing a session or group name in the sidebar
-			if (ctx.editingSessionId || ctx.editingGroupId) {
+			if (ctx.editingSessionId || ctx.editingProjectId) {
 				return;
 			}
 
@@ -237,7 +237,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 			} else if (ctx.isShortcut(e, 'moveToGroup')) {
 				if (ctx.activeSession) {
-					ctx.setQuickActionInitialMode('move-to-group');
+					ctx.setQuickActionInitialMode('move-to-project');
 					ctx.setQuickActionOpen(true);
 					trackShortcut('moveToGroup');
 				}
@@ -262,17 +262,28 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				ctx.handleNavForward();
 				trackShortcut('navForward');
 			} else if (ctx.isShortcut(e, 'toggleMode')) {
-				// Disable mode toggle for wizard tabs - they have a unique input that doesn't support CLI switchover
-				const activeTab = ctx.activeSession?.aiTabs?.find(
-					(t: AITab) => t.id === ctx.activeSession?.activeTabId
-				);
-				if (activeTab?.wizardState?.isActive) return;
+				// Focus the persistent terminal in the Right Panel
 				e.preventDefault();
-				ctx.toggleInputMode();
-				// Auto-focus the input so user can start typing immediately
-				ctx.setActiveFocus('main');
-				setTimeout(() => ctx.inputRef.current?.focus(), FOCUS_AFTER_RENDER_DELAY_MS);
+				// Toggle focus between main panel and the persistent terminal
+				if (ctx.activeFocus === 'right') {
+					ctx.setActiveFocus('main');
+					setTimeout(() => ctx.inputRef.current?.focus(), FOCUS_AFTER_RENDER_DELAY_MS);
+				} else {
+					ctx.setActiveFocus('right');
+					// Ensure right panel is open
+					ctx.setRightPanelOpen(true);
+				}
 				trackShortcut('toggleMode');
+			} else if (ctx.isShortcut(e, 'clearContext')) {
+				if (ctx.activeFocus === 'right') {
+					// Let the persistent terminal handle Cmd+K (clear scrollback)
+					return;
+				}
+				e.preventDefault();
+				if (ctx.activeSession && ctx.hasActiveSessionCapability('supportsClearContext')) {
+					ctx.clearContext();
+					trackShortcut('clearContext');
+				}
 			} else if (ctx.isShortcut(e, 'quickAction')) {
 				e.preventDefault();
 				// Only open quick actions if there are agents
@@ -468,7 +479,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				if (ctx.isTabShortcut(e, 'newTab')) {
 					e.preventDefault();
 					const result = ctx.createTab(ctx.activeSession, {
-						saveToHistory: ctx.defaultSaveToHistory,
 						showThinking: ctx.defaultShowThinking,
 					});
 					if (result) {
@@ -580,21 +590,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 						})
 					);
 					trackShortcut('toggleReadOnlyMode');
-				}
-				if (ctx.isTabShortcut(e, 'toggleSaveToHistory')) {
-					e.preventDefault();
-					ctx.setSessions((prev: Session[]) =>
-						prev.map((s: Session) => {
-							if (s.id !== ctx.activeSession!.id) return s;
-							return {
-								...s,
-								aiTabs: s.aiTabs.map((tab: AITab) =>
-									tab.id === s.activeTabId ? { ...tab, saveToHistory: !tab.saveToHistory } : tab
-								),
-							};
-						})
-					);
-					trackShortcut('toggleSaveToHistory');
 				}
 				if (ctx.isTabShortcut(e, 'toggleShowThinking')) {
 					e.preventDefault();

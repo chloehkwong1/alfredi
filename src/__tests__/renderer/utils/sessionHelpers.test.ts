@@ -279,7 +279,7 @@ describe('sessionHelpers', () => {
 			expect(result!.spawnConfig.prompt).toBe(initialContext);
 		});
 
-		it('includes group ID when provided', async () => {
+		it('includes project ID when provided', async () => {
 			mockAgentsApi.get.mockResolvedValue(createMockAgentConfig());
 
 			const result = await createSessionForAgent({
@@ -287,11 +287,11 @@ describe('sessionHelpers', () => {
 				projectRoot: '/test/project',
 				name: 'Test Session',
 				initialContext: 'Context',
-				groupId: 'group-123',
+				projectId: 'project-123',
 			});
 
 			expect(result).not.toBeNull();
-			expect(result!.session.groupId).toBe('group-123');
+			expect(result!.session.projectId).toBe('project-123');
 		});
 
 		it('respects saveToHistory option', async () => {

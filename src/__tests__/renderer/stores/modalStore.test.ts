@@ -408,7 +408,7 @@ describe('modalStore', () => {
 				'quitConfirm',
 				'renameInstance',
 				'renameTab',
-				'renameGroup',
+				'renameProject',
 				'agentSessions',
 				'queueBrowser',
 				'batchRunner',
@@ -675,15 +675,15 @@ describe('modalStore', () => {
 
 			// Open two modals with data
 			openModal('settings', { tab: 'general' });
-			openModal('renameGroup', { groupId: 'g1', value: 'Group 1', emoji: '🚀' });
+			openModal('renameProject', { projectId: 'p1', value: 'Project 1', emoji: '🚀' });
 
 			// Update one modal's data
 			updateModalData('settings', { tab: 'theme' });
 
 			// Other modal's data should be unchanged
-			expect(getData('renameGroup')).toEqual({
-				groupId: 'g1',
-				value: 'Group 1',
+			expect(getData('renameProject')).toEqual({
+				projectId: 'p1',
+				value: 'Project 1',
 				emoji: '🚀',
 			});
 
@@ -691,9 +691,9 @@ describe('modalStore', () => {
 			closeModal('settings');
 
 			// Other modal should still have its data
-			expect(getData('renameGroup')).toEqual({
-				groupId: 'g1',
-				value: 'Group 1',
+			expect(getData('renameProject')).toEqual({
+				projectId: 'p1',
+				value: 'Project 1',
 				emoji: '🚀',
 			});
 		});
@@ -740,18 +740,18 @@ describe('modalStore', () => {
 			});
 		});
 
-		it('rename group flow with emoji update', () => {
+		it('rename project flow with emoji update', () => {
 			const { openModal, updateModalData, getData } = useModalStore.getState();
 
-			// Open rename group modal with initial data
-			openModal('renameGroup', { groupId: 'group-1', value: 'Old Name', emoji: '📁' });
+			// Open rename project modal with initial data
+			openModal('renameProject', { projectId: 'project-1', value: 'Old Name', emoji: '📁' });
 
 			// User updates the name and emoji
-			updateModalData('renameGroup', { value: 'Work Projects' });
-			updateModalData('renameGroup', { emoji: '💼' });
+			updateModalData('renameProject', { value: 'Work Projects' });
+			updateModalData('renameProject', { emoji: '💼' });
 
-			const data = getData('renameGroup');
-			expect(data?.groupId).toBe('group-1');
+			const data = getData('renameProject');
+			expect(data?.projectId).toBe('project-1');
 			expect(data?.value).toBe('Work Projects');
 			expect(data?.emoji).toBe('💼');
 		});
@@ -967,20 +967,20 @@ describe('modalStore', () => {
 			expect(state.getData('renameInstance')?.value).toBe('My Session');
 		});
 
-		it('setRenameGroupId + setRenameGroupValue + setRenameGroupEmoji + setRenameGroupModalOpen preserves data', () => {
+		it('setRenameProjectId + setRenameProjectValue + setRenameProjectEmoji + setRenameProjectModalOpen preserves data', () => {
 			const actions = getModalActions();
 
 			// Call sequence from QuickActionsModal.tsx
-			actions.setRenameGroupId('group-789');
-			actions.setRenameGroupValue('Work Projects');
-			actions.setRenameGroupEmoji('💼');
-			actions.setRenameGroupModalOpen(true);
+			actions.setRenameProjectId('project-789');
+			actions.setRenameProjectValue('Work Projects');
+			actions.setRenameProjectEmoji('💼');
+			actions.setRenameProjectModalOpen(true);
 
 			const state = useModalStore.getState();
-			expect(state.isOpen('renameGroup')).toBe(true);
-			expect(state.getData('renameGroup')?.groupId).toBe('group-789');
-			expect(state.getData('renameGroup')?.value).toBe('Work Projects');
-			expect(state.getData('renameGroup')?.emoji).toBe('💼');
+			expect(state.isOpen('renameProject')).toBe(true);
+			expect(state.getData('renameProject')?.projectId).toBe('project-789');
+			expect(state.getData('renameProject')?.value).toBe('Work Projects');
+			expect(state.getData('renameProject')?.emoji).toBe('💼');
 		});
 
 		it('close then reopen rename tab with new data works correctly', () => {

@@ -25,7 +25,6 @@ export interface InlineGeneratedDocument {
 }
 export interface PreviousUIState {
 	readOnlyMode: boolean;
-	saveToHistory: boolean;
 	showThinking: ThinkingMode;
 }
 export interface InlineWizardState {

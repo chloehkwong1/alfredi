@@ -9,7 +9,7 @@
  *   - fetchGitInfoInBackground: async git info fetch for SSH remote sessions
  *
  * Effects:
- *   - Session & group loading on mount (with React Strict Mode guard)
+ *   - Session & project loading on mount (with React Strict Mode guard)
  *   - Sets initialLoadComplete + sessionsLoaded flags for splash coordination
  */
 
@@ -46,7 +46,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 	// useCallback/useEffect without appearing in dependency arrays. Zustand
 	// store actions returned by getState() are stable singletons that never
 	// change, so the empty deps array is intentional.
-	const { setSessions, setGroups, setActiveSessionId, setSessionsLoaded } = useMemo(
+	const { setSessions, setProjects, setActiveSessionId, setSessionsLoaded } = useMemo(
 		() => useSessionStore.getState(),
 		[]
 	);
@@ -316,7 +316,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 		}
 	}, []);
 
-	// --- Session & group loading effect ---
+	// --- Session & project loading effect ---
 	// Use a ref to prevent duplicate execution in React Strict Mode
 	const sessionLoadStarted = useRef(false);
 	useEffect(() => {
@@ -325,10 +325,10 @@ export function useSessionRestoration(): SessionRestorationReturn {
 		}
 		sessionLoadStarted.current = true;
 
-		const loadSessionsAndGroups = async () => {
+		const loadSessionsAndProjects = async () => {
 			try {
 				const savedSessions = await window.maestro.sessions.getAll();
-				const savedGroups = await window.maestro.groups.getAll();
+				const savedProjects = await window.maestro.projects.getAll();
 
 				// Handle sessions
 				if (savedSessions && savedSessions.length > 0) {
@@ -359,16 +359,16 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					setSessions([]);
 				}
 
-				// Handle groups
-				if (savedGroups && savedGroups.length > 0) {
-					setGroups(savedGroups);
+				// Handle projects
+				if (savedProjects && savedProjects.length > 0) {
+					setProjects(savedProjects);
 				} else {
-					setGroups([]);
+					setProjects([]);
 				}
 			} catch (e) {
-				console.error('Failed to load sessions/groups:', e);
+				console.error('Failed to load sessions/projects:', e);
 				setSessions([]);
-				setGroups([]);
+				setProjects([]);
 			} finally {
 				// Mark initial load as complete to enable persistence
 				initialLoadComplete.current = true;
@@ -377,7 +377,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 				setSessionsLoaded(true);
 			}
 		};
-		loadSessionsAndGroups();
+		loadSessionsAndProjects();
 	}, []);
 
 	return {

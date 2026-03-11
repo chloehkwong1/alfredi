@@ -31,8 +31,6 @@ const createMockSession = (overrides: Partial<Session> = {}): Session =>
 		scrollPosition: 0,
 		inputHistory: [],
 		inputHistoryIndex: -1,
-		shellCommandHistory: [],
-		shellCwd: '/project',
 		...overrides,
 	}) as Session;
 
@@ -90,18 +88,14 @@ describe('useTabCompletion', () => {
 
 	describe('getSuggestions - basic behavior', () => {
 		it('returns empty array for empty input', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status', 'npm install'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			expect(result.current.getSuggestions('')).toEqual([]);
 		});
 
 		it('returns empty array for whitespace-only input', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status', 'npm install'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			expect(result.current.getSuggestions('   ')).toEqual([]);
@@ -116,9 +110,7 @@ describe('useTabCompletion', () => {
 
 	describe('getSuggestions - shell history', () => {
 		it('matches history commands that start with input (filter: all)', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status', 'git commit', 'npm install', 'git push'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git');
@@ -131,9 +123,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('matches history commands that contain input (filter: history)', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status', 'npm install', 'yarn add git-hooks'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git', 'history');
@@ -145,9 +135,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('shows all history items when filter is history and input is empty-ish', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['command1', 'command2', 'command3'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			// With filter: history, empty string-like match shows all
@@ -158,9 +146,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('is case-insensitive for history matching', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['GIT STATUS', 'git commit'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git');
@@ -170,9 +156,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('deduplicates history entries', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status', 'git status', 'git status'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git');
@@ -259,7 +243,6 @@ describe('useTabCompletion', () => {
 				isGitRepo: true,
 				gitBranches: ['main', 'develop'],
 				gitTags: ['v1.0.0'],
-				shellCommandHistory: ['git status'],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 
@@ -330,7 +313,6 @@ describe('useTabCompletion', () => {
 				isGitRepo: true,
 				gitBranches: ['main'],
 				gitTags: ['v1.0.0', 'v2.0.0'],
-				shellCommandHistory: ['git status'],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 
@@ -459,7 +441,6 @@ describe('useTabCompletion', () => {
 			const session = createMockSession({
 				isGitRepo: true,
 				gitBranches: ['main'],
-				shellCommandHistory: ['git status'],
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -487,7 +468,6 @@ describe('useTabCompletion', () => {
 		it('uses full tree when shell is at project root', () => {
 			const session = createMockSession({
 				cwd: '/project',
-				shellCwd: '/project',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -501,7 +481,6 @@ describe('useTabCompletion', () => {
 		it('filters tree when shell is in subdirectory', () => {
 			const session = createMockSession({
 				cwd: '/project',
-				shellCwd: '/project/src',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -517,7 +496,6 @@ describe('useTabCompletion', () => {
 		it('returns empty files when shell is outside project', () => {
 			const session = createMockSession({
 				cwd: '/project',
-				shellCwd: '/other/path',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -533,7 +511,6 @@ describe('useTabCompletion', () => {
 		it('handles missing cwd gracefully', () => {
 			const session = createMockSession({
 				cwd: undefined as any,
-				shellCwd: '/project/src',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -543,10 +520,9 @@ describe('useTabCompletion', () => {
 			expect(Array.isArray(suggestions)).toBe(true);
 		});
 
-		it('handles missing shellCwd gracefully', () => {
+		it('handles missing cwd gracefully', () => {
 			const session = createMockSession({
 				cwd: '/project',
-				shellCwd: undefined as any,
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -558,7 +534,6 @@ describe('useTabCompletion', () => {
 		it('returns empty when subdirectory not found in tree', () => {
 			const session = createMockSession({
 				cwd: '/project',
-				shellCwd: '/project/nonexistent',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -574,7 +549,6 @@ describe('useTabCompletion', () => {
 		it('handles trailing slashes in paths', () => {
 			const session = createMockSession({
 				cwd: '/project/',
-				shellCwd: '/project/',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -588,7 +562,6 @@ describe('useTabCompletion', () => {
 		it('handles deep nested shell directory', () => {
 			const session = createMockSession({
 				cwd: '/project',
-				shellCwd: '/project/src/components',
 				fileTree: createFileTree(),
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -606,7 +579,6 @@ describe('useTabCompletion', () => {
 				isGitRepo: true,
 				gitBranches: ['main'],
 				gitTags: ['v1.0.0'],
-				shellCommandHistory: ['make build'],
 				fileTree: [
 					{ name: 'Makefile', type: 'file' },
 					{ name: 'modules', type: 'folder', children: [] },
@@ -672,7 +644,6 @@ describe('useTabCompletion', () => {
 			const session = createMockSession({
 				isGitRepo: true,
 				gitBranches: ['main'],
-				shellCommandHistory: ['git checkout main'],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 
@@ -689,7 +660,6 @@ describe('useTabCompletion', () => {
 				isGitRepo: true,
 				gitBranches: ['main'],
 				gitTags: ['v1.0.0'],
-				shellCommandHistory: ['history command'],
 				fileTree: [{ name: 'file.txt', type: 'file' }],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -705,7 +675,6 @@ describe('useTabCompletion', () => {
 			const session = createMockSession({
 				isGitRepo: true,
 				gitBranches: ['main'],
-				shellCommandHistory: ['git status'],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 
@@ -719,7 +688,6 @@ describe('useTabCompletion', () => {
 				isGitRepo: true,
 				gitBranches: ['main', 'develop'],
 				gitTags: ['v1.0.0'],
-				shellCommandHistory: ['git status'],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 
@@ -734,7 +702,6 @@ describe('useTabCompletion', () => {
 				isGitRepo: true,
 				gitBranches: ['main'],
 				gitTags: ['v1.0.0', 'v2.0.0'],
-				shellCommandHistory: ['git status'],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 
@@ -748,7 +715,6 @@ describe('useTabCompletion', () => {
 			const session = createMockSession({
 				isGitRepo: true,
 				gitBranches: ['main'],
-				shellCommandHistory: ['git status'],
 				fileTree: [
 					{ name: 'src', type: 'folder', children: [] },
 					{ name: 'package.json', type: 'file' },
@@ -766,7 +732,6 @@ describe('useTabCompletion', () => {
 			const session = createMockSession({
 				isGitRepo: true,
 				gitBranches: ['main'],
-				shellCommandHistory: ['make build'],
 				fileTree: [{ name: 'Makefile', type: 'file' }],
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
@@ -801,9 +766,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('handles empty shell history', () => {
-			const session = createMockSession({
-				shellCommandHistory: [],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git');
@@ -813,9 +776,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('handles undefined shell history', () => {
-			const session = createMockSession({
-				shellCommandHistory: undefined as any,
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git');
@@ -889,9 +850,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('handles input with multiple spaces', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git  commit -m "message"'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git  c');
@@ -899,9 +858,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('handles input with leading/trailing spaces', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			// trim() is called, so leading space alone shouldn't matter
@@ -952,9 +909,7 @@ describe('useTabCompletion', () => {
 
 	describe('suggestion structure', () => {
 		it('history suggestions have correct structure', () => {
-			const session = createMockSession({
-				shellCommandHistory: ['git status'],
-			});
+			const session = createMockSession({});
 			const { result } = renderHook(() => useTabCompletion(session));
 
 			const suggestions = result.current.getSuggestions('git');
@@ -1047,9 +1002,7 @@ describe('useTabCompletion', () => {
 		});
 
 		it('updates getSuggestions when session changes', () => {
-			let session = createMockSession({
-				shellCommandHistory: ['command1'],
-			});
+			let session = createMockSession({});
 			const { result, rerender } = renderHook(({ s }) => useTabCompletion(s), {
 				initialProps: { s: session },
 			});
@@ -1057,9 +1010,7 @@ describe('useTabCompletion', () => {
 			const firstResult = result.current.getSuggestions('command');
 
 			// Change session
-			session = createMockSession({
-				shellCommandHistory: ['command1', 'command2'],
-			});
+			session = createMockSession({});
 			rerender({ s: session });
 
 			const secondResult = result.current.getSuggestions('command');
@@ -1104,7 +1055,6 @@ describe('useTabCompletion', () => {
 
 			const session = createMockSession({
 				fileTree: largeTree,
-				shellCwd: '/project',
 			});
 			const { result } = renderHook(() => useTabCompletion(session));
 

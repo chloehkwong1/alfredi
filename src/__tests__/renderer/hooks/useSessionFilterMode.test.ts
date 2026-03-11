@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useSessionFilterMode } from '../../../renderer/hooks/session/useSessionFilterMode';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import type { Session, Group } from '../../../renderer/types';
+import type { Session, Project } from '../../../renderer/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -38,19 +38,20 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 	} as Session;
 }
 
-function makeGroup(overrides: Partial<Group> = {}): Group {
+function makeProject(overrides: Partial<Project> = {}): Project {
 	idCounter++;
 	return {
 		id: `g${idCounter}`,
-		name: `Group ${idCounter}`,
+		name: `Project ${idCounter}`,
 		emoji: '📁',
 		collapsed: false,
+		rootPath: '/test/project',
 		...overrides,
 	};
 }
 
-function resetStores(sessions: Session[] = [], groups: Group[] = []) {
-	useSessionStore.setState({ sessions, groups } as any);
+function resetStores(sessions: Session[] = [], projects: Project[] = []) {
+	useSessionStore.setState({ sessions, projects } as any);
 	useUIStore.setState({
 		sessionFilterOpen: false,
 		bookmarksCollapsed: false,
@@ -93,9 +94,9 @@ describe('useSessionFilterMode', () => {
 	// Filter open behavior
 	// -----------------------------------------------------------------------
 	describe('when filter opens', () => {
-		it('collapses all groups on first open (default behavior)', () => {
-			const g1 = makeGroup({ id: 'g1', collapsed: false });
-			const g2 = makeGroup({ id: 'g2', collapsed: false });
+		it('collapses all projects on first open (default behavior)', () => {
+			const g1 = makeProject({ id: 'g1', collapsed: false });
+			const g2 = makeProject({ id: 'g2', collapsed: false });
 			resetStores([], [g1, g2]);
 
 			renderHook(() => useSessionFilterMode());
@@ -105,8 +106,8 @@ describe('useSessionFilterMode', () => {
 				useUIStore.setState({ sessionFilterOpen: true });
 			});
 
-			const groups = useSessionStore.getState().groups;
-			expect(groups.every((g) => g.collapsed)).toBe(true);
+			const projects = useSessionStore.getState().projects;
+			expect(projects.every((g) => g.collapsed)).toBe(true);
 		});
 
 		it('expands bookmarks on first open', () => {
@@ -126,9 +127,9 @@ describe('useSessionFilterMode', () => {
 	// Filter close behavior
 	// -----------------------------------------------------------------------
 	describe('when filter closes', () => {
-		it('restores original group collapse states', () => {
-			const g1 = makeGroup({ id: 'g1', collapsed: false });
-			const g2 = makeGroup({ id: 'g2', collapsed: true });
+		it('restores original project collapse states', () => {
+			const g1 = makeProject({ id: 'g1', collapsed: false });
+			const g2 = makeProject({ id: 'g2', collapsed: true });
 			resetStores([], [g1, g2]);
 
 			renderHook(() => useSessionFilterMode());
@@ -138,8 +139,8 @@ describe('useSessionFilterMode', () => {
 				useUIStore.setState({ sessionFilterOpen: true });
 			});
 
-			// Verify groups are collapsed during filter
-			expect(useSessionStore.getState().groups.every((g) => g.collapsed)).toBe(true);
+			// Verify projects are collapsed during filter
+			expect(useSessionStore.getState().projects.every((g) => g.collapsed)).toBe(true);
 
 			// Close filter
 			act(() => {
@@ -147,9 +148,9 @@ describe('useSessionFilterMode', () => {
 			});
 
 			// Original states restored
-			const groups = useSessionStore.getState().groups;
-			const g1State = groups.find((g) => g.id === 'g1');
-			const g2State = groups.find((g) => g.id === 'g2');
+			const projects = useSessionStore.getState().projects;
+			const g1State = projects.find((g) => g.id === 'g1');
+			const g2State = projects.find((g) => g.id === 'g2');
 			expect(g1State?.collapsed).toBe(false);
 			expect(g2State?.collapsed).toBe(true);
 		});
@@ -179,9 +180,9 @@ describe('useSessionFilterMode', () => {
 	// Filter mode preferences (persist across open/close)
 	// -----------------------------------------------------------------------
 	describe('filter mode preferences', () => {
-		it('remembers user changes to group states across filter open/close cycles', () => {
-			const g1 = makeGroup({ id: 'g1', collapsed: false });
-			const g2 = makeGroup({ id: 'g2', collapsed: false });
+		it('remembers user changes to project collapse states across filter open/close cycles', () => {
+			const g1 = makeProject({ id: 'g1', collapsed: false });
+			const g2 = makeProject({ id: 'g2', collapsed: false });
 			resetStores([], [g1, g2]);
 
 			renderHook(() => useSessionFilterMode());
@@ -190,14 +191,14 @@ describe('useSessionFilterMode', () => {
 			act(() => {
 				useUIStore.setState({ sessionFilterOpen: true });
 			});
-			expect(useSessionStore.getState().groups.every((g) => g.collapsed)).toBe(true);
+			expect(useSessionStore.getState().projects.every((g) => g.collapsed)).toBe(true);
 
 			// User manually expands g1 during filter mode
 			act(() => {
 				useSessionStore.setState({
-					groups: useSessionStore
+					projects: useSessionStore
 						.getState()
-						.groups.map((g) => (g.id === 'g1' ? { ...g, collapsed: false } : g)),
+						.projects.map((g) => (g.id === 'g1' ? { ...g, collapsed: false } : g)),
 				} as any);
 			});
 
@@ -211,21 +212,21 @@ describe('useSessionFilterMode', () => {
 				useUIStore.setState({ sessionFilterOpen: true });
 			});
 
-			const groups = useSessionStore.getState().groups;
-			expect(groups.find((g) => g.id === 'g1')?.collapsed).toBe(false);
-			expect(groups.find((g) => g.id === 'g2')?.collapsed).toBe(true);
+			const projects = useSessionStore.getState().projects;
+			expect(projects.find((g) => g.id === 'g1')?.collapsed).toBe(false);
+			expect(projects.find((g) => g.id === 'g2')?.collapsed).toBe(true);
 		});
 	});
 
 	// -----------------------------------------------------------------------
 	// Auto-expand groups when filtering
 	// -----------------------------------------------------------------------
-	describe('auto-expand groups during filtering', () => {
-		it('expands groups containing matching sessions', () => {
-			const g1 = makeGroup({ id: 'g1', collapsed: true });
-			const g2 = makeGroup({ id: 'g2', collapsed: true });
-			const s1 = makeSession({ name: 'API Work', groupId: 'g1' });
-			const s2 = makeSession({ name: 'UI Work', groupId: 'g2' });
+	describe('auto-expand projects during filtering', () => {
+		it('expands projects containing matching sessions', () => {
+			const g1 = makeProject({ id: 'g1', collapsed: true });
+			const g2 = makeProject({ id: 'g2', collapsed: true });
+			const s1 = makeSession({ name: 'API Work', projectId: 'g1' });
+			const s2 = makeSession({ name: 'UI Work', projectId: 'g2' });
 			resetStores([s1, s2], [g1, g2]);
 
 			// Open filter first
@@ -240,9 +241,9 @@ describe('useSessionFilterMode', () => {
 				result.current.setSessionFilter('api');
 			});
 
-			const groups = useSessionStore.getState().groups;
-			expect(groups.find((g) => g.id === 'g1')?.collapsed).toBe(false); // has match
-			expect(groups.find((g) => g.id === 'g2')?.collapsed).toBe(true); // no match
+			const projects = useSessionStore.getState().projects;
+			expect(projects.find((g) => g.id === 'g1')?.collapsed).toBe(false); // has match
+			expect(projects.find((g) => g.id === 'g2')?.collapsed).toBe(true); // no match
 		});
 
 		it('expands bookmarks when matching bookmarked sessions exist', () => {
@@ -264,9 +265,9 @@ describe('useSessionFilterMode', () => {
 			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
 		});
 
-		it('collapses all groups when filter is cleared but input is still open', () => {
-			const g1 = makeGroup({ id: 'g1', collapsed: false });
-			resetStores([makeSession({ name: 'Test', groupId: 'g1' })], [g1]);
+		it('collapses all projects when filter is cleared but input is still open', () => {
+			const g1 = makeProject({ id: 'g1', collapsed: false });
+			resetStores([makeSession({ name: 'Test', projectId: 'g1' })], [g1]);
 
 			// Open filter
 			act(() => {
@@ -283,14 +284,14 @@ describe('useSessionFilterMode', () => {
 				result.current.setSessionFilter('');
 			});
 
-			expect(useSessionStore.getState().groups[0].collapsed).toBe(true);
+			expect(useSessionStore.getState().projects[0].collapsed).toBe(true);
 		});
 
-		it('matches AI tab names for group expansion', () => {
-			const g1 = makeGroup({ id: 'g1', collapsed: true });
+		it('matches AI tab names for project expansion', () => {
+			const g1 = makeProject({ id: 'g1', collapsed: true });
 			const s1 = makeSession({
 				name: 'Agent 1',
-				groupId: 'g1',
+				projectId: 'g1',
 				aiTabs: [{ name: 'refactoring-session' } as any],
 			});
 			resetStores([s1], [g1]);
@@ -306,7 +307,7 @@ describe('useSessionFilterMode', () => {
 				result.current.setSessionFilter('refactoring');
 			});
 
-			expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
+			expect(useSessionStore.getState().projects[0].collapsed).toBe(false);
 		});
 	});
 });

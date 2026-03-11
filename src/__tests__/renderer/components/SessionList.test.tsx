@@ -5,7 +5,7 @@
  * - Branding header with LIVE mode toggle
  * - Session filter input
  * - Bookmarks section
- * - Groups with sessions
+ * - Projects with sessions
  * - Ungrouped sessions
  * - Context menu for session actions
  * - Collapsed/expanded sidebar modes
@@ -14,7 +14,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { SessionList } from '../../../renderer/components/SessionList';
-import type { Session, Group, Theme } from '../../../renderer/types';
+import type { Session, Project, Theme } from '../../../renderer/types';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore, DEFAULT_AUTO_RUN_STATS } from '../../../renderer/stores/settingsStore';
@@ -177,8 +177,8 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
 	...overrides,
 });
 
-// Create mock group
-const createMockGroup = (overrides: Partial<Group> = {}): Group => ({
+// Create mock project
+const createMockProject = (overrides: Partial<Project> = {}): Project => ({
 	id: `group-${Math.random().toString(36).substr(2, 9)}`,
 	name: 'Test Group',
 	emoji: '📁',
@@ -196,20 +196,20 @@ const createDefaultProps = (overrides: Partial<Parameters<typeof SessionList>[0]
 	visibleSessions: [] as Session[],
 	toggleGlobalLive: vi.fn(),
 	restartWebServer: vi.fn().mockResolvedValue(null),
-	toggleGroup: vi.fn(),
+	toggleProject: vi.fn(),
 	handleDragStart: vi.fn(),
 	handleDragOver: vi.fn(),
-	handleDropOnGroup: vi.fn(),
+	handleDropOnProject: vi.fn(),
 	handleDropOnUngrouped: vi.fn(),
-	finishRenamingGroup: vi.fn(),
+	finishRenamingProject: vi.fn(),
 	finishRenamingSession: vi.fn(),
-	startRenamingGroup: vi.fn(),
+	startRenamingProject: vi.fn(),
 	startRenamingSession: vi.fn(),
 	showConfirmation: vi.fn(),
-	createNewGroup: vi.fn(),
-	onCreateGroupAndMove: vi.fn(),
+	createNewProject: vi.fn(),
+	onCreateProjectAndMove: vi.fn(),
 	addNewSession: vi.fn(),
-	onDeleteWorktreeGroup: vi.fn(),
+	onDeleteWorktreeProject: vi.fn(),
 	onEditAgent: vi.fn(),
 	onNewAgentSession: vi.fn(),
 	onToggleWorktreeExpanded: vi.fn(),
@@ -235,16 +235,15 @@ describe('SessionList', () => {
 			leftSidebarOpen: true,
 			activeFocus: 'main' as const,
 			selectedSidebarIndex: -1,
-			editingGroupId: null,
+			editingProjectId: null,
 			editingSessionId: null,
 			draggingSessionId: null,
 			bookmarksCollapsed: false,
 			sessionFilterOpen: false,
-			groupChatsExpanded: false,
 		});
 		useSessionStore.setState({
 			sessions: [],
-			groups: [],
+			projects: [],
 			activeSessionId: '',
 		});
 		useSettingsStore.setState({
@@ -735,16 +734,16 @@ describe('SessionList', () => {
 	});
 
 	// ============================================================================
-	// Groups Section Tests
+	// Projects Section Tests
 	// ============================================================================
 
-	describe('Groups Section', () => {
-		it('renders groups with their sessions', () => {
-			const group = createMockGroup({ id: 'g1', name: 'My Group', emoji: '🚀' });
-			const sessions = [createMockSession({ id: 's1', name: 'Session in Group', groupId: 'g1' })];
+	describe('Projects Section', () => {
+		it('renders projects with their sessions', () => {
+			const group = createMockProject({ id: 'g1', name: 'My Group', emoji: '🚀' });
+			const sessions = [createMockSession({ id: 's1', name: 'Session in Group', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -757,31 +756,31 @@ describe('SessionList', () => {
 			expect(screen.getByText('Session in Group')).toBeInTheDocument();
 		});
 
-		it('toggles group collapse on click', () => {
-			const toggleGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'My Group', collapsed: false });
-			const sessions = [createMockSession({ id: 's1', name: 'Session', groupId: 'g1' })];
+		it('toggles project collapse on click', () => {
+			const toggleProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'My Group', collapsed: false });
+			const sessions = [createMockSession({ id: 's1', name: 'Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: sessions,
-				toggleGroup,
+				toggleProject,
 			});
 			render(<SessionList {...props} />);
 
-			// Click on group header
+			// Click on project header
 			fireEvent.click(screen.getByText('My Group'));
-			expect(toggleGroup).toHaveBeenCalledWith('g1');
+			expect(toggleProject).toHaveBeenCalledWith('g1');
 		});
 
-		it('shows delete button for empty groups on hover', () => {
-			const group = createMockGroup({ id: 'g1', name: 'Empty Group' });
+		it('shows delete button for empty projects on hover', () => {
+			const group = createMockProject({ id: 'g1', name: 'Empty Group' });
 			useSessionStore.setState({
 				sessions: [],
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -789,96 +788,96 @@ describe('SessionList', () => {
 			});
 			render(<SessionList {...props} />);
 
-			// Empty group should have delete button (visible on hover)
-			expect(screen.getByTitle('Delete empty group')).toBeInTheDocument();
+			// Empty project should have delete button (visible on hover)
+			expect(screen.getByTitle('Delete empty project')).toBeInTheDocument();
 		});
 
-		it('creates new group when button clicked', () => {
-			const createNewGroup = vi.fn();
+		it('creates new project when button clicked', () => {
+			const createNewProject = vi.fn();
 			const sessions = [createMockSession({ id: 's1', name: 'Test Session' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [],
+				projects: [],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: sessions,
-				createNewGroup,
+				createNewProject,
 			});
 			render(<SessionList {...props} />);
 
-			fireEvent.click(screen.getByText('New Group'));
-			expect(createNewGroup).toHaveBeenCalled();
+			fireEvent.click(screen.getByText('New Project'));
+			expect(createNewProject).toHaveBeenCalled();
 		});
 
-		it('shows New Group button when no groups exist (flat list mode)', () => {
-			const createNewGroup = vi.fn();
+		it('shows New Project button when no projects exist (flat list mode)', () => {
+			const createNewProject = vi.fn();
 			const sessions = [createMockSession({ id: 's1', name: 'Test Session' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [],
+				projects: [],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: sessions,
-				createNewGroup,
+				createNewProject,
 			});
 			render(<SessionList {...props} />);
 
-			// New Group button should be visible even with no groups
-			expect(screen.getByText('New Group')).toBeInTheDocument();
+			// New Project button should be visible even with no projects
+			expect(screen.getByText('New Project')).toBeInTheDocument();
 		});
 
-		it('shows New Group button inline with Ungrouped Agents header when ungrouped sessions exist', () => {
-			const createNewGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'My Group' });
+		it('shows New Project button inline with Ungrouped Agents header when ungrouped sessions exist', () => {
+			const createNewProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'My Group' });
 			const sessions = [createMockSession({ id: 's1', name: 'Ungrouped Session' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: sessions,
-				createNewGroup,
+				createNewProject,
 			});
 			render(<SessionList {...props} />);
 
-			// Both Ungrouped Agents header and New Group button should be visible
+			// Both Ungrouped Agents header and New Project button should be visible
 			expect(screen.getByText('Ungrouped Agents')).toBeInTheDocument();
-			expect(screen.getByText('New Group')).toBeInTheDocument();
+			expect(screen.getByText('New Project')).toBeInTheDocument();
 
 			// The button should be inline - verify they share the same parent row
 			const ungroupedHeader = screen.getByText('Ungrouped Agents');
-			const newGroupButton = screen.getByText('New Group');
+			const newGroupButton = screen.getByText('New Project');
 			// Both should be within the same clickable header row (grandparent for text, parent for button)
 			const headerRow = ungroupedHeader.closest('.flex.items-center.justify-between');
 			expect(headerRow).not.toBeNull();
 			expect(headerRow?.contains(newGroupButton)).toBe(true);
 		});
 
-		it('shows standalone New Group button when groups exist with no ungrouped sessions', () => {
-			const createNewGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
-			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', groupId: 'g1' })];
+		it('shows standalone New Project button when projects exist with no ungrouped sessions', () => {
+			const createNewProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
+			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: sessions,
-				createNewGroup,
+				createNewProject,
 			});
 			render(<SessionList {...props} />);
 
-			// New Group button should be visible
-			expect(screen.getByText('New Group')).toBeInTheDocument();
+			// New Project button should be visible
+			expect(screen.getByText('New Project')).toBeInTheDocument();
 			// Ungrouped Agents header should NOT be visible (no ungrouped sessions)
 			expect(screen.queryByText('Ungrouped Agents')).not.toBeInTheDocument();
 
 			// Button should be standalone (full-width style)
-			const newGroupButton = screen.getByText('New Group').closest('button');
+			const newGroupButton = screen.getByText('New Project').closest('button');
 			expect(newGroupButton).toHaveClass('w-full');
 		});
 	});
@@ -888,11 +887,11 @@ describe('SessionList', () => {
 	// ============================================================================
 
 	describe('Ungrouped Sessions', () => {
-		it('does not show Ungrouped header when no groups exist', () => {
+		it('does not show Ungrouped header when no projects exist', () => {
 			const sessions = [createMockSession({ id: 's1', name: 'Direct Session' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [],
+				projects: [],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -905,12 +904,12 @@ describe('SessionList', () => {
 			expect(screen.queryByText('Ungrouped')).not.toBeInTheDocument();
 		});
 
-		it('renders ungrouped section with sessions when groups exist', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+		it('renders ungrouped section with sessions when projects exist', () => {
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [createMockSession({ id: 's1', name: 'Ungrouped Session' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -922,12 +921,12 @@ describe('SessionList', () => {
 			expect(screen.getByText('Ungrouped Session')).toBeInTheDocument();
 		});
 
-		it('hides Ungrouped Agents folder when all sessions are in groups', () => {
-			const group = createMockGroup({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
-			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', groupId: 'g1' })];
+		it('hides Ungrouped Agents folder when all sessions are in projects', () => {
+			const group = createMockProject({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
+			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -935,7 +934,7 @@ describe('SessionList', () => {
 			});
 			render(<SessionList {...props} />);
 
-			// The session should be visible in the group
+			// The session should be visible in the project
 			expect(screen.getByText('Grouped Session')).toBeInTheDocument();
 			// But the Ungrouped Agents folder should NOT be visible
 			expect(screen.queryByText('Ungrouped Agents')).not.toBeInTheDocument();
@@ -1337,33 +1336,33 @@ describe('SessionList', () => {
 			expect(handleDragStart).toHaveBeenCalledWith('s1');
 		});
 
-		it('calls handleDropOnGroup when dropping on group', () => {
-			const handleDropOnGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'Drop Target' });
+		it('calls handleDropOnProject when dropping on project', () => {
+			const handleDropOnProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'Drop Target' });
 			useSessionStore.setState({
 				sessions: [],
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: [],
-				handleDropOnGroup,
+				handleDropOnProject,
 			});
 			render(<SessionList {...props} />);
 
 			const groupHeader = screen.getByText('Drop Target');
 			fireEvent.drop(groupHeader);
 
-			expect(handleDropOnGroup).toHaveBeenCalledWith('g1');
+			expect(handleDropOnProject).toHaveBeenCalledWith('g1');
 		});
 
-		it('shows drop zone for ungrouping when dragging and all sessions are grouped', () => {
+		it('shows drop zone for ungrouping when dragging and all sessions are in projects', () => {
 			const handleDropOnUngrouped = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
-			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', groupId: 'g1' })];
+			const group = createMockProject({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
+			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -1381,11 +1380,11 @@ describe('SessionList', () => {
 
 		it('calls handleDropOnUngrouped when dropping on ungroup zone', () => {
 			const handleDropOnUngrouped = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
-			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', groupId: 'g1' })];
+			const group = createMockProject({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
+			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -1579,19 +1578,19 @@ describe('SessionList', () => {
 	});
 
 	// ============================================================================
-	// Group Renaming Tests
+	// Project Renaming Tests
 	// ============================================================================
 
-	describe('Group Renaming', () => {
-		it('shows rename input when editingGroupId matches', () => {
-			const group = createMockGroup({ id: 'g1', name: 'Original Name' });
+	describe('Project Renaming', () => {
+		it('shows rename input when editingProjectId matches', () => {
+			const group = createMockProject({ id: 'g1', name: 'Original Name' });
 			useSessionStore.setState({
 				sessions: [],
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
-				editingGroupId: 'g1',
+				editingProjectId: 'g1',
 			});
 			const props = createDefaultProps({
 				sortedSessions: [],
@@ -1602,20 +1601,20 @@ describe('SessionList', () => {
 			expect(input).toBeInTheDocument();
 		});
 
-		it('calls finishRenamingGroup on blur', () => {
-			const finishRenamingGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'Original' });
+		it('calls finishRenamingProject on blur', () => {
+			const finishRenamingProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'Original' });
 			useSessionStore.setState({
 				sessions: [],
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
-				editingGroupId: 'g1',
+				editingProjectId: 'g1',
 			});
 			const props = createDefaultProps({
 				sortedSessions: [],
-				finishRenamingGroup,
+				finishRenamingProject,
 			});
 			render(<SessionList {...props} />);
 
@@ -1623,23 +1622,23 @@ describe('SessionList', () => {
 			fireEvent.change(input, { target: { value: 'New Name' } });
 			fireEvent.blur(input);
 
-			expect(finishRenamingGroup).toHaveBeenCalledWith('g1', 'New Name');
+			expect(finishRenamingProject).toHaveBeenCalledWith('g1', 'New Name');
 		});
 
-		it('calls finishRenamingGroup on Enter', () => {
-			const finishRenamingGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'Original' });
+		it('calls finishRenamingProject on Enter', () => {
+			const finishRenamingProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'Original' });
 			useSessionStore.setState({
 				sessions: [],
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
-				editingGroupId: 'g1',
+				editingProjectId: 'g1',
 			});
 			const props = createDefaultProps({
 				sortedSessions: [],
-				finishRenamingGroup,
+				finishRenamingProject,
 			});
 			render(<SessionList {...props} />);
 
@@ -1647,7 +1646,7 @@ describe('SessionList', () => {
 			fireEvent.change(input, { target: { value: 'New Name' } });
 			fireEvent.keyDown(input, { key: 'Enter' });
 
-			expect(finishRenamingGroup).toHaveBeenCalledWith('g1', 'New Name');
+			expect(finishRenamingProject).toHaveBeenCalledWith('g1', 'New Name');
 		});
 	});
 
@@ -1656,15 +1655,15 @@ describe('SessionList', () => {
 	// ============================================================================
 
 	describe('Session Renaming', () => {
-		// Note: Tests using "ungrouped-" prefix for editingSessionId require at least one group
-		// to be present, since the Ungrouped section only renders when groups exist.
+		// Note: Tests using "ungrouped-" prefix for editingSessionId require at least one project
+		// to be present, since the Ungrouped section only renders when projects exist.
 
 		it('shows rename input when editingSessionId matches ungrouped session', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [createMockSession({ id: 's1', name: 'Original Session' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -1680,12 +1679,12 @@ describe('SessionList', () => {
 		});
 
 		it('calls finishRenamingSession on blur', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const finishRenamingSession = vi.fn();
 			const sessions = [createMockSession({ id: 's1', name: 'Original' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -1705,12 +1704,12 @@ describe('SessionList', () => {
 		});
 
 		it('starts renaming on double-click', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const startRenamingSession = vi.fn();
 			const sessions = [createMockSession({ id: 's1', name: 'Double Click Me' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -1724,12 +1723,12 @@ describe('SessionList', () => {
 		});
 
 		it('calls finishRenamingSession on Enter key', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const finishRenamingSession = vi.fn();
 			const sessions = [createMockSession({ id: 's1', name: 'Original' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -1749,11 +1748,11 @@ describe('SessionList', () => {
 		});
 
 		it('stops click propagation when clicking rename input', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [createMockSession({ id: 's1', name: 'Original' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -1802,13 +1801,13 @@ describe('SessionList', () => {
 	});
 
 	// ============================================================================
-	// Move to Group Submenu Tests
+	// Move to Project Submenu Tests
 	// ============================================================================
 
-	describe('Move to Group Submenu', () => {
-		it('shows move to group submenu on hover', () => {
-			// Use a collapsed group so the group name doesn't appear in the main view
-			const group = createMockGroup({
+	describe('Move to Project Submenu', () => {
+		it('shows move to project submenu on hover', () => {
+			// Use a collapsed project so the project name doesn't appear in the main view
+			const group = createMockProject({
 				id: 'g1',
 				name: 'Submenu Target',
 				emoji: '📁',
@@ -1817,7 +1816,7 @@ describe('SessionList', () => {
 			const sessions = [createMockSession({ id: 's1', name: 'Move Me' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -1828,14 +1827,14 @@ describe('SessionList', () => {
 			// Open context menu
 			fireEvent.contextMenu(screen.getByText('Move Me'), { clientX: 100, clientY: 100 });
 
-			expect(screen.getByText('Move to Group')).toBeInTheDocument();
+			expect(screen.getByText('Move to Project')).toBeInTheDocument();
 
-			// Hover over Move to Group - find the parent div
-			const moveToGroupButton = screen.getByText('Move to Group');
+			// Hover over Move to Project - find the parent div
+			const moveToGroupButton = screen.getByText('Move to Project');
 			const parentDiv = moveToGroupButton.closest('.relative');
 			fireEvent.mouseEnter(parentDiv!);
 
-			// Submenu should show group name - there may be multiple since it appears in groups section too
+			// Submenu should show project name - there may be multiple since it appears in groups section too
 			const submenuTargets = screen.getAllByText('Submenu Target');
 			expect(submenuTargets.length).toBeGreaterThan(0);
 			// The "Ungrouped" option in the submenu should be visible (may appear multiple times)
@@ -1843,13 +1842,13 @@ describe('SessionList', () => {
 			expect(ungroupedElements.length).toBeGreaterThan(0);
 		});
 
-		it('moves session to group when submenu item clicked', () => {
+		it('moves session to project when submenu item clicked', () => {
 			// Use unique name that won't appear in the groups section
-			const group = createMockGroup({ id: 'g1', name: 'Click Target', collapsed: true });
+			const group = createMockProject({ id: 'g1', name: 'Click Target', collapsed: true });
 			const sessions = [createMockSession({ id: 's1', name: 'Move Me To Group' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const setSessions = vi.spyOn(useSessionStore.getState(), 'setSessions');
@@ -1861,14 +1860,14 @@ describe('SessionList', () => {
 			// Open context menu
 			fireEvent.contextMenu(screen.getByText('Move Me To Group'), { clientX: 100, clientY: 100 });
 
-			expect(screen.getByText('Move to Group')).toBeInTheDocument();
+			expect(screen.getByText('Move to Project')).toBeInTheDocument();
 
-			// Hover and click group - find within context menu
-			const moveToGroupButton = screen.getByText('Move to Group');
+			// Hover and click project - find within context menu
+			const moveToGroupButton = screen.getByText('Move to Project');
 			const parentDiv = moveToGroupButton.closest('.relative');
 			fireEvent.mouseEnter(parentDiv!);
 
-			// Get all elements with the group name, click the one in the submenu (inside fixed positioned menu)
+			// Get all elements with the project name, click the one in the submenu (inside fixed positioned menu)
 			const groupButtons = screen.getAllByText('Click Target');
 			// The submenu item should be in a button within the fixed positioned context menu
 			const submenuButton = groupButtons.find((el) => el.closest('button')?.closest('.absolute'));
@@ -1939,16 +1938,16 @@ describe('SessionList', () => {
 	});
 
 	// ============================================================================
-	// Collapsed Group Palette Tests
+	// Collapsed Project Palette Tests
 	// ============================================================================
 
-	describe('Collapsed Group Palette', () => {
-		it('shows collapsed palette when group is collapsed', () => {
-			const group = createMockGroup({ id: 'g1', name: 'Collapsed', collapsed: true });
-			const sessions = [createMockSession({ id: 's1', name: 'In Group', groupId: 'g1' })];
+	describe('Collapsed Project Palette', () => {
+		it('shows collapsed palette when project is collapsed', () => {
+			const group = createMockProject({ id: 'g1', name: 'Collapsed', collapsed: true });
+			const sessions = [createMockSession({ id: 's1', name: 'In Group', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -1961,18 +1960,18 @@ describe('SessionList', () => {
 			expect(indicators.length).toBeGreaterThan(0);
 		});
 
-		it('expands group when collapsed palette clicked', () => {
-			const toggleGroup = vi.fn();
-			const group = createMockGroup({ id: 'g1', name: 'Collapsed', collapsed: true });
-			const sessions = [createMockSession({ id: 's1', name: 'In Group', groupId: 'g1' })];
+		it('expands project when collapsed palette clicked', () => {
+			const toggleProject = vi.fn();
+			const group = createMockProject({ id: 'g1', name: 'Collapsed', collapsed: true });
+			const sessions = [createMockSession({ id: 's1', name: 'In Group', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
 				sortedSessions: sessions,
-				toggleGroup,
+				toggleProject,
 			});
 			const { container } = render(<SessionList {...props} />);
 
@@ -1980,15 +1979,15 @@ describe('SessionList', () => {
 			const palette = container.querySelector('.ml-8.mr-3.mt-1.mb-2.flex');
 			fireEvent.click(palette!);
 
-			expect(toggleGroup).toHaveBeenCalledWith('g1');
+			expect(toggleProject).toHaveBeenCalledWith('g1');
 		});
 
 		it('selects session when indicator clicked in collapsed palette', () => {
-			const group = createMockGroup({ id: 'g1', name: 'Collapsed', collapsed: true });
-			const sessions = [createMockSession({ id: 's1', name: 'In Group', groupId: 'g1' })];
+			const group = createMockProject({ id: 'g1', name: 'Collapsed', collapsed: true });
+			const sessions = [createMockSession({ id: 's1', name: 'In Group', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const setActiveSessionId = vi.spyOn(useSessionStore.getState(), 'setActiveSessionId');
@@ -1999,7 +1998,7 @@ describe('SessionList', () => {
 
 			// Find the outer pill container (has flex-1 and rounded-full)
 			const pillContainer = container.querySelector('.flex-1.flex.rounded-full');
-			// The click handler is on the inner segment (group/segment div with flex-1)
+			// The click handler is on the inner segment (project/segment div with flex-1)
 			const indicator = pillContainer?.querySelector('.flex-1.h-full');
 			fireEvent.click(indicator!);
 
@@ -2013,12 +2012,12 @@ describe('SessionList', () => {
 
 	describe('Tooltips', () => {
 		it('shows tooltip on collapsed indicator hover', () => {
-			const group = createMockGroup({ id: 'g1', name: 'Group', collapsed: true });
+			const group = createMockProject({ id: 'g1', name: 'Group', collapsed: true });
 			const sessions = [
 				createMockSession({
 					id: 's1',
 					name: 'Tooltip Session',
-					groupId: 'g1',
+					projectId: 'g1',
 					contextUsage: 50,
 					usageStats: {
 						totalCostUsd: 1.25,
@@ -2031,7 +2030,7 @@ describe('SessionList', () => {
 			];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -2484,12 +2483,12 @@ describe('SessionList', () => {
 	// ============================================================================
 
 	describe('Skinny Mode Tooltips', () => {
-		it('shows group name in skinny mode tooltip when session is in group', () => {
-			const group = createMockGroup({ id: 'g1', name: 'My Group', emoji: '📁' });
-			const sessions = [createMockSession({ id: 's1', name: 'Session in Group', groupId: 'g1' })];
+		it('shows project name in skinny mode tooltip when session is in project', () => {
+			const group = createMockProject({ id: 'g1', name: 'My Group', emoji: '📁' });
+			const sessions = [createMockSession({ id: 's1', name: 'Session in Group', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({ leftSidebarOpen: false });
 			const props = createDefaultProps({
@@ -2501,7 +2500,7 @@ describe('SessionList', () => {
 			const sessionDot = container.querySelector('.w-8.h-8.rounded-full');
 			expect(sessionDot).toBeInTheDocument();
 
-			// Tooltip should contain group name (CSS uppercase class transforms display)
+			// Tooltip should contain project name (CSS uppercase class transforms display)
 			expect(screen.getByText('My Group')).toBeInTheDocument();
 		});
 
@@ -2578,18 +2577,18 @@ describe('SessionList', () => {
 	// ============================================================================
 
 	describe('Ungrouped Collapsed Palette', () => {
-		// Note: "Ungrouped" header only shows when at least one group exists.
-		// These tests need a group defined to make the Ungrouped section visible.
+		// Note: "Ungrouped" header only shows when at least one project exists.
+		// These tests need a project defined to make the Ungrouped section visible.
 
 		it('toggles ungrouped section collapse', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [
 				createMockSession({ id: 's1', name: 'Ungrouped 1' }),
 				createMockSession({ id: 's2', name: 'Ungrouped 2' }),
 			];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -2604,7 +2603,7 @@ describe('SessionList', () => {
 		});
 
 		it('shows tooltip with session details on ungrouped collapsed indicator hover', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [
 				createMockSession({
 					id: 's1',
@@ -2615,7 +2614,7 @@ describe('SessionList', () => {
 			];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -2638,7 +2637,7 @@ describe('SessionList', () => {
 		});
 
 		it('clears tooltip position on mouse leave from ungrouped collapsed indicator', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [
 				createMockSession({
 					id: 's1',
@@ -2647,7 +2646,7 @@ describe('SessionList', () => {
 			];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -2674,11 +2673,11 @@ describe('SessionList', () => {
 		});
 
 		it('selects session when clicking indicator in ungrouped collapsed palette', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [createMockSession({ id: 's1', name: 'Click Me' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const setActiveSessionId = vi.spyOn(useSessionStore.getState(), 'setActiveSessionId');
@@ -2700,11 +2699,11 @@ describe('SessionList', () => {
 		});
 
 		it('expands ungrouped section when clicking collapsed palette container', () => {
-			const emptyGroup = createMockGroup({ id: 'g-empty', name: 'Other Group' });
+			const emptyGroup = createMockProject({ id: 'g-empty', name: 'Other Group' });
 			const sessions = [createMockSession({ id: 's1', name: 'Session 1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [emptyGroup],
+				projects: [emptyGroup],
 			});
 			useUIStore.setState({ leftSidebarOpen: true });
 			const props = createDefaultProps({
@@ -2731,12 +2730,12 @@ describe('SessionList', () => {
 	// ============================================================================
 
 	describe('Session Filter State Management', () => {
-		it('saves group states when opening filter and restores on close', async () => {
-			const group = createMockGroup({ id: 'g1', name: 'Test Group', collapsed: false });
-			const sessions = [createMockSession({ id: 's1', name: 'Session', groupId: 'g1' })];
+		it('saves project states when opening filter and restores on close', async () => {
+			const group = createMockProject({ id: 'g1', name: 'Test Group', collapsed: false });
+			const sessions = [createMockSession({ id: 's1', name: 'Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -2753,7 +2752,7 @@ describe('SessionList', () => {
 			const sidebar = container.firstChild as HTMLElement;
 			fireEvent.keyDown(sidebar, { key: 'f', metaKey: true });
 
-			// Filter should collapse all groups by default
+			// Filter should collapse all projects by default
 			await waitFor(() => {
 				expect(setGroups).toHaveBeenCalled();
 			});
@@ -2796,12 +2795,12 @@ describe('SessionList', () => {
 			expect(screen.queryByText('Project B')).not.toBeInTheDocument();
 		});
 
-		it('expands groups with matching sessions when filtering', () => {
-			const group = createMockGroup({ id: 'g1', name: 'Collapsed Group', collapsed: true });
-			const sessions = [createMockSession({ id: 's1', name: 'Matching Session', groupId: 'g1' })];
+		it('expands projects with matching sessions when filtering', () => {
+			const group = createMockProject({ id: 'g1', name: 'Collapsed Group', collapsed: true });
+			const sessions = [createMockSession({ id: 's1', name: 'Matching Session', projectId: 'g1' })];
 			useSessionStore.setState({
 				sessions: sessions,
-				groups: [group],
+				projects: [group],
 			});
 			useUIStore.setState({
 				leftSidebarOpen: true,
@@ -2824,7 +2823,7 @@ describe('SessionList', () => {
 			const input = screen.getByPlaceholderText('Filter agents...');
 			fireEvent.change(input, { target: { value: 'Matching' } });
 
-			// Groups with matches should be expanded
+			// Projects with matches should be expanded
 			expect(setGroups).toHaveBeenCalled();
 		});
 
@@ -2863,7 +2862,6 @@ describe('SessionList', () => {
 	// ============================================================================
 	// Git Status Context Integration Tests
 	// ============================================================================
-	// Note: Git polling (visibility changes, shellCwd, etc.) is now handled by
 	// GitStatusProvider via useGitStatusPolling hook. SessionList consumes data
 	// from GitStatusContext. These tests verify SessionList displays context data.
 

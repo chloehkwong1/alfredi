@@ -23,8 +23,8 @@ export interface Toast {
 	type: 'success' | 'info' | 'warning' | 'error';
 	title: string;
 	message: string;
-	group?: string; // Maestro group name
-	project?: string; // Maestro session name (the agent name in Left Bar)
+	project?: string; // Maestro project name (the project grouping in Left Bar)
+	agentName?: string; // Maestro session name (the agent name in Left Bar)
 	duration?: number;
 	taskDuration?: number; // How long the task took in ms
 	agentSessionId?: string; // Claude Code session UUID for traceability
@@ -206,8 +206,8 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 		window.maestro.logger.toast(toast.title, {
 			type: toast.type,
 			message: toast.message,
-			group: toast.group,
 			project: toast.project,
+			agentName: toast.agentName,
 			taskDuration: toast.taskDuration,
 			agentSessionId: toast.agentSessionId,
 			tabName: toast.tabName,
@@ -243,7 +243,7 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 	// OS desktop notification
 	if (config.osNotificationsEnabled) {
 		if (typeof window !== 'undefined' && window.maestro?.notification?.show) {
-			const notifTitle = toast.project || toast.title;
+			const notifTitle = toast.agentName || toast.title;
 
 			const tabLabel =
 				toast.tabName || (toast.agentSessionId ? toast.agentSessionId.slice(0, 8) : null);
@@ -255,8 +255,8 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 				: toast.message.slice(0, 80);
 
 			const bodyParts: string[] = [];
-			if (toast.group) {
-				bodyParts.push(toast.group);
+			if (toast.project) {
+				bodyParts.push(toast.project);
 			}
 			if (tabLabel) {
 				bodyParts.push(tabLabel);

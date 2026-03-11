@@ -5,13 +5,15 @@
  *   - addNewSession (opens modal)
  *   - createNewSession (core creation logic)
  *   - deleteSession (opens confirmation modal)
- *   - deleteWorktreeGroup (removes group + all agents)
+ *   - deleteWorktreeProject (removes project + all agents)
  *   - startRenamingSession / finishRenamingSession
  *   - toggleBookmark
  *   - handleDragStart / handleDragOver
- *   - handleCreateGroupAndMove / handleGroupCreated
+ *   - handleCreateProjectAndMove / handleProjectCreated
  *
  * Reads from: sessionStore, settingsStore, uiStore, modalStore
+ *
+ * NOTE: "group" terminology in comments/user-facing strings has been renamed to "project".
  */
 
 import { useCallback, useState } from 'react';
@@ -25,6 +27,7 @@ import { generateId } from '../../utils/ids';
 import { validateNewSession } from '../../utils/sessionValidation';
 import { gitService } from '../../services/git';
 import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
+import { getPersistentTerminalId } from '../terminal/usePersistentTerminal';
 
 // ============================================================================
 // Dependencies interface
@@ -39,8 +42,8 @@ export interface UseSessionCrudDeps {
 	showConfirmation: (message: string, onConfirm: () => void) => void;
 	/** Ref to main input element (for auto-focus after session creation) */
 	inputRef: React.RefObject<HTMLTextAreaElement | null>;
-	/** Open the create-group modal (from group modal state) */
-	setCreateGroupModalOpen: (open: boolean) => void;
+	/** Open the create-project modal (from project modal state) */
+	setCreateProjectModalOpen: (open: boolean) => void;
 }
 
 // ============================================================================
@@ -70,8 +73,8 @@ export interface UseSessionCrudReturn {
 	) => Promise<void>;
 	/** Opens the delete agent confirmation modal */
 	deleteSession: (id: string) => void;
-	/** Deletes entire worktree group and all its agents */
-	deleteWorktreeGroup: (groupId: string) => void;
+	/** Deletes entire worktree project and all its agents */
+	deleteWorktreeProject: (projectId: string) => void;
 	/** Opens rename UI for a session */
 	startRenamingSession: (editKey: string) => void;
 	/** Completes session rename */
@@ -82,12 +85,12 @@ export interface UseSessionCrudReturn {
 	handleDragStart: (sessionId: string) => void;
 	/** Allows drop */
 	handleDragOver: (e: React.DragEvent) => void;
-	/** Opens create group modal with pending session to move */
-	handleCreateGroupAndMove: (sessionId: string) => void;
-	/** Callback when a group is created — moves pending session to it */
-	handleGroupCreated: (groupId: string) => void;
-	/** The session ID pending move to a newly created group */
-	pendingMoveToGroupSessionId: string | null;
+	/** Opens create project modal with pending session to move */
+	handleCreateProjectAndMove: (sessionId: string) => void;
+	/** Callback when a project is created — moves pending session to it */
+	handleProjectCreated: (projectId: string) => void;
+	/** The session ID pending move to a newly created project */
+	pendingMoveToProjectSessionId: string | null;
 }
 
 // ============================================================================
@@ -100,16 +103,16 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 		setRemovedWorktreePaths,
 		showConfirmation,
 		inputRef,
-		setCreateGroupModalOpen,
+		setCreateProjectModalOpen,
 	} = deps;
 
 	// --- Store actions (stable via getState) ---
-	const { setSessions, setActiveSessionId, setGroups } = useSessionStore.getState();
+	const { setSessions, setActiveSessionId, setProjects } = useSessionStore.getState();
 	const { setEditingSessionId, setDraggingSessionId, setActiveFocus } = useUIStore.getState();
 	const { setNewInstanceModalOpen, setDeleteAgentSession } = getModalActions();
 
 	// --- Local state ---
-	const [pendingMoveToGroupSessionId, setPendingMoveToGroupSessionId] = useState<string | null>(
+	const [pendingMoveToProjectSessionId, setPendingMoveToProjectSessionId] = useState<string | null>(
 		null
 	);
 
@@ -199,7 +202,6 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					stagedImages: [],
 					createdAt: Date.now(),
 					state: 'idle',
-					saveToHistory: currentDefaults.defaultSaveToHistory,
 					showThinking: currentDefaults.defaultShowThinking,
 				};
 
@@ -216,17 +218,10 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					gitTags,
 					gitRefsCacheTime,
 					aiLogs: [],
-					shellLogs: [
-						{
-							id: generateId(),
-							timestamp: Date.now(),
-							source: 'system',
-							text: 'Shell Session Ready.',
-						},
-					],
+					shellLogs: [],
 					workLog: [],
 					contextUsage: 0,
-					inputMode: agentId === 'terminal' ? 'terminal' : 'ai',
+					inputMode: 'ai',
 					aiPid,
 					terminalPid: 0,
 					port: 3000 + Math.floor(Math.random() * 100),
@@ -236,9 +231,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					fileExplorerExpanded: [],
 					fileExplorerScrollPos: 0,
 					fileTreeAutoRefreshInterval: 180,
-					shellCwd: workingDir,
 					aiCommandHistory: [],
-					shellCommandHistory: [],
 					executionQueue: [],
 					activeTimeMs: 0,
 					aiTabs: [initialTab],
@@ -291,24 +284,24 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 	);
 
 	// ========================================================================
-	// deleteWorktreeGroup — removes group + all agents
+	// deleteWorktreeProject — removes project + all agents
 	// ========================================================================
-	const deleteWorktreeGroup = useCallback(
-		(groupId: string) => {
-			const currentGroups = useSessionStore.getState().groups;
+	const deleteWorktreeProject = useCallback(
+		(projectId: string) => {
+			const currentProjects = useSessionStore.getState().projects;
 			const currentSessions = useSessionStore.getState().sessions;
-			const group = currentGroups.find((g) => g.id === groupId);
-			if (!group) return;
+			const project = currentProjects.find((g) => g.id === projectId);
+			if (!project) return;
 
-			const groupSessions = currentSessions.filter((s) => s.groupId === groupId);
-			const sessionCount = groupSessions.length;
+			const projectSessions = currentSessions.filter((s) => s.projectId === projectId);
+			const sessionCount = projectSessions.length;
 
 			showConfirmation(
-				`Are you sure you want to remove the group "${group.name}" and all ${sessionCount} agent${
+				`Are you sure you want to remove the project "${project.name}" and all ${sessionCount} agent${
 					sessionCount !== 1 ? 's' : ''
 				} in it? This action cannot be undone.`,
 				async () => {
-					for (const session of groupSessions) {
+					for (const session of projectSessions) {
 						try {
 							await (window as any).maestro.process.kill(`${session.id}-ai`);
 						} catch (error) {
@@ -320,13 +313,18 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 							console.error('Failed to kill terminal process:', error);
 						}
 						try {
+							await (window as any).maestro.process.kill(getPersistentTerminalId(session.id));
+						} catch (error) {
+							console.error('Failed to kill persistent terminal process:', error);
+						}
+						try {
 							await (window as any).maestro.playbooks.deleteAll(session.id);
 						} catch (error) {
 							console.error('Failed to delete playbooks:', error);
 						}
 					}
 
-					const pathsToTrack = groupSessions
+					const pathsToTrack = projectSessions
 						.filter((s) => s.worktreeParentPath && s.cwd)
 						.map((s) => s.cwd);
 
@@ -334,11 +332,11 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 						setRemovedWorktreePaths((prev) => new Set([...prev, ...pathsToTrack]));
 					}
 
-					const sessionIdsToRemove = new Set(groupSessions.map((s) => s.id));
+					const sessionIdsToRemove = new Set(projectSessions.map((s) => s.id));
 					const latestSessions = useSessionStore.getState().sessions;
 					const newSessions = latestSessions.filter((s) => !sessionIdsToRemove.has(s.id));
 					setSessions(newSessions);
-					setGroups((prev) => prev.filter((g) => g.id !== groupId));
+					setProjects((prev) => prev.filter((g) => g.id !== projectId));
 
 					setTimeout(() => flushSessionPersistence(), 0);
 
@@ -351,8 +349,8 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 
 					notifyToast({
 						type: 'success',
-						title: 'Group Removed',
-						message: `Removed "${group.name}" and ${sessionCount} agent${
+						title: 'Project Removed',
+						message: `Removed "${project.name}" and ${sessionCount} agent${
 							sessionCount !== 1 ? 's' : ''
 						}`,
 					});
@@ -362,7 +360,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 		[
 			showConfirmation,
 			setSessions,
-			setGroups,
+			setProjects,
 			setActiveSessionId,
 			setRemovedWorktreePaths,
 			flushSessionPersistence,
@@ -438,40 +436,40 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 	}, []);
 
 	// ========================================================================
-	// Group + move handlers
+	// Project + move handlers
 	// ========================================================================
-	const handleCreateGroupAndMove = useCallback(
+	const handleCreateProjectAndMove = useCallback(
 		(sessionId: string) => {
-			setPendingMoveToGroupSessionId(sessionId);
-			setCreateGroupModalOpen(true);
+			setPendingMoveToProjectSessionId(sessionId);
+			setCreateProjectModalOpen(true);
 		},
-		[setCreateGroupModalOpen]
+		[setCreateProjectModalOpen]
 	);
 
-	const handleGroupCreated = useCallback(
-		(groupId: string) => {
-			if (pendingMoveToGroupSessionId) {
+	const handleProjectCreated = useCallback(
+		(projectId: string) => {
+			if (pendingMoveToProjectSessionId) {
 				setSessions((prev) =>
-					prev.map((s) => (s.id === pendingMoveToGroupSessionId ? { ...s, groupId } : s))
+					prev.map((s) => (s.id === pendingMoveToProjectSessionId ? { ...s, projectId } : s))
 				);
-				setPendingMoveToGroupSessionId(null);
+				setPendingMoveToProjectSessionId(null);
 			}
 		},
-		[pendingMoveToGroupSessionId, setSessions]
+		[pendingMoveToProjectSessionId, setSessions]
 	);
 
 	return {
 		addNewSession,
 		createNewSession,
 		deleteSession,
-		deleteWorktreeGroup,
+		deleteWorktreeProject,
 		startRenamingSession,
 		finishRenamingSession,
 		toggleBookmark,
 		handleDragStart,
 		handleDragOver,
-		handleCreateGroupAndMove,
-		handleGroupCreated,
-		pendingMoveToGroupSessionId,
+		handleCreateProjectAndMove,
+		handleProjectCreated,
+		pendingMoveToProjectSessionId,
 	};
 }

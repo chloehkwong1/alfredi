@@ -4,7 +4,7 @@
  * Provides session cycling functionality (Cmd+Shift+[/]):
  *   - Cycles through sessions in visual sidebar order
  *   - Handles bookmarks (sessions appearing in both locations)
- *   - Handles worktree children, collapsed groups, collapsed sidebar
+ *   - Handles worktree children, collapsed projects, collapsed sidebar
  *
  * Reads from: sessionStore, uiStore, settingsStore
  */
@@ -43,7 +43,7 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 
 	// --- Reactive subscriptions ---
 	const sessions = useSessionStore((s) => s.sessions);
-	const groups = useSessionStore((s) => s.groups);
+	const projects = useSessionStore((s) => s.projects);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
@@ -112,23 +112,25 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 					bookmarkedSessions.forEach(addSessionWithWorktrees);
 				}
 
-				// Groups (sorted alphabetically), with each group's sessions
-				const sortedGroups = [...groups].sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-				for (const group of sortedGroups) {
-					if (!group.collapsed) {
-						const groupSessions = sessions
-							.filter((s) => s.groupId === group.id && !s.parentSessionId)
+				// Projects (sorted alphabetically), with each project's sessions
+				const sortedProjects = [...projects].sort((a, b) =>
+					compareNamesIgnoringEmojis(a.name, b.name)
+				);
+				for (const project of sortedProjects) {
+					if (!project.collapsed) {
+						const projectSessions = sessions
+							.filter((s) => s.projectId === project.id && !s.parentSessionId)
 							.sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-						groupSessions.forEach(addSessionWithWorktrees);
+						projectSessions.forEach(addSessionWithWorktrees);
 					}
 				}
 
-				// Ungrouped sessions (sorted alphabetically) - only if not collapsed
+				// Unassigned sessions (sorted alphabetically) - only if not collapsed
 				if (!ungroupedCollapsed) {
-					const ungroupedSessions = sessions
-						.filter((s) => !s.groupId && !s.parentSessionId)
+					const unassignedSessions = sessions
+						.filter((s) => !s.projectId && !s.parentSessionId)
 						.sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-					ungroupedSessions.forEach(addSessionWithWorktrees);
+					unassignedSessions.forEach(addSessionWithWorktrees);
 				}
 			} else {
 				// Sidebar collapsed: cycle through all sessions in their sorted order
@@ -178,7 +180,7 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 		},
 		[
 			sessions,
-			groups,
+			projects,
 			activeSessionId,
 			leftSidebarOpen,
 			bookmarksCollapsed,

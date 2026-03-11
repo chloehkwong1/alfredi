@@ -2,10 +2,14 @@ import React, { useRef, useImperativeHandle, forwardRef, useState, useCallback, 
 import {
 	PanelRightClose,
 	PanelRightOpen,
+	FolderTree,
 	Loader2,
 	GitBranch,
 	Skull,
 	AlertTriangle,
+	Terminal,
+	Plus,
+	X,
 } from 'lucide-react';
 import type { Session, Theme, RightPanelTab, BatchRunState } from '../types';
 import type { FileTreeChanges } from '../utils/fileExplorer';
@@ -17,6 +21,12 @@ import { useUIStore } from '../stores/uiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
 import { useSessionStore } from '../stores/sessionStore';
+import XTerminal from './XTerminal';
+import {
+	usePersistentTerminal,
+	getTerminalProcessId,
+} from '../hooks/terminal/usePersistentTerminal';
+import type { TerminalTab } from '../../shared/types';
 
 export interface RightPanelHandle {}
 
@@ -92,6 +102,80 @@ interface RightPanelProps {
 	onOpenLastDocumentGraph?: () => void;
 }
 
+// ============================================================================
+// TerminalTabInstance — one persistent PTY + XTerminal per tab
+// Rendered in the DOM always (hidden when inactive) to preserve scrollback.
+// ============================================================================
+
+interface TerminalTabInstanceProps {
+	sessionId: string;
+	tabId: string;
+	cwd: string;
+	enabled: boolean;
+	visible: boolean;
+	fontFamily: string;
+	fontSize: number;
+	themeColors: import('../types').ThemeColors;
+	onReady?: (tabId: string, ready: boolean) => void;
+}
+
+function TerminalTabInstance({
+	sessionId,
+	tabId,
+	cwd,
+	enabled,
+	visible,
+	fontFamily,
+	fontSize,
+	themeColors,
+	onReady,
+}: TerminalTabInstanceProps) {
+	const persistentTerminal = usePersistentTerminal({
+		sessionId,
+		tabId,
+		cwd,
+		enabled,
+	});
+
+	const xtermRef = useRef<import('./XTerminal').XTerminalHandle>(null);
+
+	// Bridge XTerminal imperative handle to the hook's terminalRef
+	React.useEffect(() => {
+		if (xtermRef.current) {
+			const handle = xtermRef.current;
+			persistentTerminal.terminalRef.current = {
+				write: (data: string) => handle.write(data),
+			} as any;
+		}
+		return () => {
+			persistentTerminal.terminalRef.current = null;
+		};
+	});
+
+	// Report readiness to parent
+	React.useEffect(() => {
+		onReady?.(tabId, persistentTerminal.isReady);
+	}, [tabId, persistentTerminal.isReady, onReady]);
+
+	return (
+		<div
+			style={{
+				width: '100%',
+				height: '100%',
+				display: visible ? 'block' : 'none',
+			}}
+		>
+			<XTerminal
+				ref={xtermRef}
+				sessionId={getTerminalProcessId(sessionId, tabId)}
+				fontFamily={fontFamily}
+				fontSize={fontSize}
+				themeColors={themeColors}
+			/>
+		</div>
+	);
+}
+
 export const RightPanel = memo(
 	forwardRef<RightPanelHandle, RightPanelProps>(function RightPanel(props, ref) {
 		// === State from stores (direct subscriptions — no prop drilling) ===
@@ -99,17 +183,26 @@ export const RightPanel = memo(
 			(s) => s.sessions.find((x) => x.id === s.activeSessionId) ?? null
 		);
 		const setSessions = useSessionStore((s) => s.setSessions);
+		const addTerminalTab = useSessionStore((s) => s.addTerminalTab);
+		const removeTerminalTab = useSessionStore((s) => s.removeTerminalTab);
+		const setActiveTerminalTab = useSessionStore((s) => s.setActiveTerminalTab);
 
 		const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
 		const activeRightTab = useUIStore((s) => s.activeRightTab);
+		const activeRightTopTab = useUIStore((s) => s.activeRightTopTab);
 		const activeFocus = useUIStore((s) => s.activeFocus);
 		const setRightPanelOpen = useUIStore((s) => s.setRightPanelOpen);
 		const setActiveFocus = useUIStore((s) => s.setActiveFocus);
+		const setActiveRightTopTab = useUIStore((s) => s.setActiveRightTopTab);
 
 		const rightPanelWidth = useSettingsStore((s) => s.rightPanelWidth);
+		const rightPanelSplitRatio = useSettingsStore((s) => s.rightPanelSplitRatio);
 		const shortcuts = useSettingsStore((s) => s.shortcuts);
 		const showHiddenFiles = useSettingsStore((s) => s.showHiddenFiles);
+		const fontFamily = useSettingsStore((s) => s.fontFamily);
+		const fontSize = useSettingsStore((s) => s.fontSize);
 		const setRightPanelWidth = useSettingsStore((s) => s.setRightPanelWidth);
+		const setRightPanelSplitRatio = useSettingsStore((s) => s.setRightPanelSplitRatio);
 		const setShowHiddenFiles = useSettingsStore((s) => s.setShowHiddenFiles);
 
 		const fileTreeFilter = useFileExplorerStore((s) => s.fileTreeFilter);
@@ -157,10 +250,76 @@ export const RightPanel = memo(
 		// Kill confirmation modal for force-killing during Auto Run stop
 		const [showKillConfirm, setShowKillConfirm] = useState(false);
 
+		// ---- Terminal tabs ----
+		// Ensure session always has at least one terminal tab (lazy init)
+		const terminalTabs: TerminalTab[] = React.useMemo(() => {
+			if (session?.terminalTabs && session.terminalTabs.length > 0) {
+				return session.terminalTabs;
+			}
+			return [{ id: 'default', name: 'Terminal 1' }];
+		}, [session?.terminalTabs]);
+
+		const activeTerminalTabId = session?.activeTerminalTabId ?? terminalTabs[0]?.id ?? 'default';
+
+		// Initialize default tab in store on first render when session has no tabs
+		React.useEffect(() => {
+			if (session && (!session.terminalTabs || session.terminalTabs.length === 0)) {
+				addTerminalTab(session.id);
+			}
+		}, [session?.id]); // Only run when session identity changes
+
+		// Track which tabs are ready (PTY spawned)
+		const [tabReadyMap, setTabReadyMap] = useState<Record<string, boolean>>({});
+		const handleTabReady = useCallback((tabId: string, ready: boolean) => {
+			setTabReadyMap((prev) => ({ ...prev, [tabId]: ready }));
+		}, []);
+
+		const MAX_TERMINAL_TABS = 5;
+
+		// ------------------------------------------------------------------
+		// Vertical split drag handler
+		// ------------------------------------------------------------------
+		const splitDragRef = useRef(false);
+		const panelHeightRef = useRef(0);
+
+		const onSplitDragStart = useCallback(
+			(e: React.MouseEvent) => {
+				e.preventDefault();
+				splitDragRef.current = true;
+				const panelEl = panelRef.current;
+				if (panelEl) {
+					// Subtract the header height (h-10 = 40px) from the available space
+					panelHeightRef.current = panelEl.clientHeight - 40;
+				}
+
+				const onMouseMove = (ev: MouseEvent) => {
+					if (!splitDragRef.current || !panelEl) return;
+					const panelRect = panelEl.getBoundingClientRect();
+					// Offset by header height (40px)
+					const relativeY = ev.clientY - panelRect.top - 40;
+					const ratio = relativeY / panelHeightRef.current;
+					setRightPanelSplitRatio(ratio);
+				};
+
+				const onMouseUp = () => {
+					splitDragRef.current = false;
+					document.removeEventListener('mousemove', onMouseMove);
+					document.removeEventListener('mouseup', onMouseUp);
+				};
+
+				document.addEventListener('mousemove', onMouseMove);
+				document.addEventListener('mouseup', onMouseUp);
+			},
+			[panelRef, setRightPanelSplitRatio]
+		);
+
 		// Expose methods to parent
 		useImperativeHandle(ref, () => ({}), []);
 
 		if (!session) return null;
+
+		const topHeightPercent = rightPanelSplitRatio * 100;
+		const bottomHeightPercent = (1 - rightPanelSplitRatio) * 100;
 
 		return (
 			<div
@@ -178,7 +337,7 @@ export const RightPanel = memo(
 				onClick={() => setActiveFocus('right')}
 				onFocus={() => setActiveFocus('right')}
 			>
-				{/* Resize Handle */}
+				{/* Resize Handle (horizontal — adjusts panel width) */}
 				{rightPanelOpen && (
 					<div
 						className="absolute top-0 left-0 w-3 h-full cursor-col-resize border-l-4 border-transparent hover:border-blue-500 transition-colors z-20"
@@ -186,26 +345,47 @@ export const RightPanel = memo(
 					/>
 				)}
 
-				{/* Tab Header */}
-				<div className="flex border-b h-16" style={{ borderColor: theme.colors.border }}>
-					{(['files'] as const).map((tab) => (
+				{/* Top Tab Header */}
+				<div className="flex border-b h-10 shrink-0" style={{ borderColor: theme.colors.border }}>
+					{/* Explorer tab */}
+					<button
+						onClick={() => setActiveRightTopTab('explorer')}
+						className="flex items-center gap-1.5 px-3 text-xs font-bold border-b-2 transition-colors"
+						style={{
+							borderColor: activeRightTopTab === 'explorer' ? theme.colors.accent : 'transparent',
+							color:
+								activeRightTopTab === 'explorer' ? theme.colors.textMain : theme.colors.textDim,
+						}}
+						data-tour="files-tab"
+					>
+						<FolderTree className="w-3.5 h-3.5" />
+						Explorer
+					</button>
+
+					{/* File preview tabs from the session */}
+					{session.filePreviewTabs?.map((tab) => (
 						<button
-							key={tab}
-							onClick={() => setActiveRightTab(tab)}
-							className="flex-1 text-xs font-bold border-b-2 transition-colors"
+							key={tab.id}
+							onClick={() => setActiveRightTopTab(tab.id)}
+							className="flex items-center gap-1 px-2 text-xs border-b-2 transition-colors max-w-[120px] truncate"
 							style={{
-								borderColor: activeRightTab === tab ? theme.colors.accent : 'transparent',
-								color: activeRightTab === tab ? theme.colors.textMain : theme.colors.textDim,
+								borderColor: activeRightTopTab === tab.id ? theme.colors.accent : 'transparent',
+								color: activeRightTopTab === tab.id ? theme.colors.textMain : theme.colors.textDim,
 							}}
-							data-tour={`${tab}-tab`}
+							title={tab.name + tab.extension}
 						>
-							{tab.charAt(0).toUpperCase() + tab.slice(1)}
+							{tab.name}
+							{tab.extension}
 						</button>
 					))}
 
+					{/* Spacer */}
+					<div className="flex-1" />
+
+					{/* Collapse panel button */}
 					<button
 						onClick={() => setRightPanelOpen(!rightPanelOpen)}
-						className="flex items-center justify-center p-2 rounded hover:bg-white/5 transition-colors w-12 shrink-0"
+						className="flex items-center justify-center p-2 rounded hover:bg-white/5 transition-colors w-10 shrink-0"
 						title={`${rightPanelOpen ? 'Collapse' : 'Expand'} Right Panel (${formatShortcutKeys(shortcuts.toggleRightPanel.keys)})`}
 					>
 						{rightPanelOpen ? (
@@ -216,71 +396,176 @@ export const RightPanel = memo(
 					</button>
 				</div>
 
-				{/* Tab Content */}
+				{/* ====== Top Section: File Explorer / File Preview ====== */}
 				<div
-					ref={fileTreeContainerRef}
-					className="flex-1 px-4 pb-4 overflow-y-auto overflow-x-hidden min-w-[24rem] outline-none scrollbar-thin"
-					tabIndex={-1}
-					onClick={(e) => {
-						setActiveFocus('right');
-						// Skip when the filter input is focused — otherwise the container steals focus from it
-						if (activeRightTab === 'files' && e.target !== fileTreeFilterInputRef.current) {
-							fileTreeContainerRef.current?.focus();
-						}
-					}}
-					onScroll={(e) => {
-						// Only track scroll position for file explorer tab
-						if (activeRightTab === 'files') {
-							const scrollTop = e.currentTarget.scrollTop;
-							setSessions((prev) =>
-								prev.map((s) =>
-									s.id === session.id ? { ...s, fileExplorerScrollPos: scrollTop } : s
-								)
-							);
-						}
-					}}
+					className="overflow-hidden flex flex-col min-w-[24rem]"
+					style={{ height: `${topHeightPercent}%` }}
 				>
-					<div data-tour="files-panel" className="h-full">
-						<FileExplorerPanel
-							session={session}
-							theme={theme}
-							fileTreeFilter={fileTreeFilter}
-							setFileTreeFilter={setFileTreeFilter}
-							fileTreeFilterOpen={fileTreeFilterOpen}
-							setFileTreeFilterOpen={setFileTreeFilterOpen}
-							filteredFileTree={filteredFileTree}
-							selectedFileIndex={selectedFileIndex}
-							setSelectedFileIndex={setSelectedFileIndex}
-							activeFocus={activeFocus}
-							activeRightTab={activeRightTab}
-							setActiveFocus={setActiveFocus}
-							fileTreeFilterInputRef={fileTreeFilterInputRef}
-							toggleFolder={toggleFolder}
-							handleFileClick={handleFileClick}
-							expandAllFolders={expandAllFolders}
-							collapseAllFolders={collapseAllFolders}
-							updateSessionWorkingDirectory={updateSessionWorkingDirectory}
-							refreshFileTree={refreshFileTree}
-							setSessions={setSessions}
-							onAutoRefreshChange={onAutoRefreshChange}
-							onShowFlash={onShowFlash}
-							showHiddenFiles={showHiddenFiles}
-							setShowHiddenFiles={setShowHiddenFiles}
-							onFocusFileInGraph={onFocusFileInGraph}
-							lastGraphFocusFile={lastGraphFocusFile}
-							onOpenLastDocumentGraph={onOpenLastDocumentGraph}
-						/>
-					</div>
+					{activeRightTopTab === 'explorer' ? (
+						<div
+							ref={fileTreeContainerRef}
+							className="flex-1 px-4 pb-4 overflow-y-auto overflow-x-hidden outline-none scrollbar-thin"
+							tabIndex={-1}
+							onClick={(e) => {
+								setActiveFocus('right');
+								if (activeRightTab === 'files' && e.target !== fileTreeFilterInputRef.current) {
+									fileTreeContainerRef.current?.focus();
+								}
+							}}
+							onScroll={(e) => {
+								if (activeRightTab === 'files') {
+									const scrollTop = e.currentTarget.scrollTop;
+									setSessions((prev) =>
+										prev.map((s) =>
+											s.id === session.id ? { ...s, fileExplorerScrollPos: scrollTop } : s
+										)
+									);
+								}
+							}}
+						>
+							<div data-tour="files-panel" className="h-full">
+								<FileExplorerPanel
+									session={session}
+									theme={theme}
+									fileTreeFilter={fileTreeFilter}
+									setFileTreeFilter={setFileTreeFilter}
+									fileTreeFilterOpen={fileTreeFilterOpen}
+									setFileTreeFilterOpen={setFileTreeFilterOpen}
+									filteredFileTree={filteredFileTree}
+									selectedFileIndex={selectedFileIndex}
+									setSelectedFileIndex={setSelectedFileIndex}
+									activeFocus={activeFocus}
+									activeRightTab={activeRightTab}
+									setActiveFocus={setActiveFocus}
+									fileTreeFilterInputRef={fileTreeFilterInputRef}
+									toggleFolder={toggleFolder}
+									handleFileClick={handleFileClick}
+									expandAllFolders={expandAllFolders}
+									collapseAllFolders={collapseAllFolders}
+									updateSessionWorkingDirectory={updateSessionWorkingDirectory}
+									refreshFileTree={refreshFileTree}
+									setSessions={setSessions}
+									onAutoRefreshChange={onAutoRefreshChange}
+									onShowFlash={onShowFlash}
+									showHiddenFiles={showHiddenFiles}
+									setShowHiddenFiles={setShowHiddenFiles}
+									onFocusFileInGraph={onFocusFileInGraph}
+									lastGraphFocusFile={lastGraphFocusFile}
+									onOpenLastDocumentGraph={onOpenLastDocumentGraph}
+								/>
+							</div>
+						</div>
+					) : (
+						/* File preview tab content — placeholder for now; FilePreview will be wired in a later section */
+						<div
+							className="flex-1 flex items-center justify-center"
+							style={{ color: theme.colors.textDim }}
+						>
+							<span className="text-xs">File preview</span>
+						</div>
+					)}
 				</div>
 
-				{/* Batch Run Progress - shown at bottom of all tabs (only for current session) */}
-				{currentSessionBatchState && currentSessionBatchState.isRunning && (
-					<BatchRunProgress
-						theme={theme}
-						currentSessionBatchState={currentSessionBatchState}
-						setShowKillConfirm={setShowKillConfirm}
-					/>
-				)}
+				{/* ====== Draggable Split Divider ====== */}
+				<div
+					className="h-1 shrink-0 cursor-row-resize relative group"
+					style={{ backgroundColor: theme.colors.border }}
+					onMouseDown={onSplitDragStart}
+				>
+					{/* Wider invisible hit target */}
+					<div className="absolute -top-1 -bottom-1 left-0 right-0" />
+					{/* Visual indicator on hover */}
+					<div className="absolute top-0 left-0 right-0 h-full transition-colors group-hover:bg-blue-500" />
+				</div>
+
+				{/* ====== Bottom Section: Persistent Terminal ====== */}
+				<div
+					className="overflow-hidden relative flex flex-col"
+					style={{ height: `${bottomHeightPercent}%` }}
+				>
+					{/* Terminal tab bar */}
+					<div
+						className="flex items-center h-8 shrink-0 border-b overflow-x-auto"
+						style={{ borderColor: theme.colors.border }}
+					>
+						{terminalTabs.map((tab) => (
+							<button
+								key={tab.id}
+								className="flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors"
+								style={{
+									color:
+										tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
+									borderColor: tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
+									backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
+								}}
+								onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
+							>
+								<Terminal className="w-3 h-3" />
+								<span>{tab.name}</span>
+								{/* Loading spinner for this tab */}
+								{!tabReadyMap[tab.id] && (
+									<Loader2
+										className="w-3 h-3 animate-spin"
+										style={{ color: theme.colors.textDim }}
+									/>
+								)}
+								{/* Close button — hidden when only one tab */}
+								{terminalTabs.length > 1 && (
+									<span
+										className="ml-0.5 rounded hover:bg-white/10 p-0.5"
+										onClick={(e) => {
+											e.stopPropagation();
+											if (session) removeTerminalTab(session.id, tab.id);
+										}}
+									>
+										<X className="w-3 h-3" />
+									</span>
+								)}
+							</button>
+						))}
+						{/* Add tab button */}
+						{terminalTabs.length < MAX_TERMINAL_TABS && (
+							<button
+								className="flex items-center justify-center w-7 h-full shrink-0 transition-colors"
+								style={{ color: theme.colors.textDim }}
+								title="New terminal tab"
+								onClick={() => session && addTerminalTab(session.id)}
+							>
+								<Plus className="w-3.5 h-3.5" />
+							</button>
+						)}
+					</div>
+
+					{/* Terminal instances — all rendered, only active visible */}
+					<div className="flex-1 overflow-hidden relative">
+						{session &&
+							terminalTabs.map((tab) => (
+								<TerminalTabInstance
+									key={tab.id}
+									sessionId={session.id}
+									tabId={tab.id}
+									cwd={session.fullPath ?? ''}
+									enabled={rightPanelOpen}
+									visible={tab.id === activeTerminalTabId}
+									fontFamily={fontFamily}
+									fontSize={fontSize}
+									themeColors={theme.colors}
+									onReady={handleTabReady}
+								/>
+							))}
+					</div>
+
+					{/* Batch Run Progress — overlays the terminal area */}
+					{currentSessionBatchState && currentSessionBatchState.isRunning && (
+						<div className="absolute bottom-0 left-0 right-0 z-10">
+							<BatchRunProgress
+								theme={theme}
+								currentSessionBatchState={currentSessionBatchState}
+								setShowKillConfirm={setShowKillConfirm}
+							/>
+						</div>
+					)}
+				</div>
 
 				{/* Kill confirmation modal */}
 				{showKillConfirm && (
@@ -307,7 +592,7 @@ export const RightPanel = memo(
 
 /**
  * Batch Run Progress indicator extracted for clarity.
- * Shows Auto Run progress at the bottom of the right panel.
+ * Shows Auto Run progress overlaying the terminal area in the right panel.
  */
 function BatchRunProgress({
 	theme,

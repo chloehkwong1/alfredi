@@ -19,8 +19,6 @@ export interface UseRemoteIntegrationDeps {
 	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Active session ID setter */
 	setActiveSessionId: (id: string) => void;
-	/** Default value for saveToHistory on new tabs */
-	defaultSaveToHistory: boolean;
 	/** Default value for showThinking on new tabs */
 	defaultShowThinking: ThinkingMode;
 }
@@ -58,7 +56,6 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 		activeSessionIdRef,
 		setSessions,
 		setActiveSessionId,
-		defaultSaveToHistory,
 		defaultShowThinking,
 	} = deps;
 
@@ -104,22 +101,6 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 				}
 				console.log('[useRemoteIntegration] Session state check passed:', targetSession.state);
 
-				// If web provided an inputMode, sync the session state before executing
-				// This ensures the renderer uses the same mode the web intended
-				if (inputMode && targetSession.inputMode !== inputMode) {
-					setSessions((prev) =>
-						prev.map((s) =>
-							s.id === sessionId
-								? {
-										...s,
-										inputMode,
-										...(inputMode === 'terminal' && { activeFileTabId: null }),
-									}
-								: s
-						)
-					);
-				}
-
 				// Switch to the target session (for visual feedback)
 				setActiveSessionId(sessionId);
 				console.log('[useRemoteIntegration] Switched active session to:', sessionId);
@@ -146,41 +127,19 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 		};
 	}, [sessionsRef, setSessions, setActiveSessionId]);
 
-	// Handle remote mode switches from web interface
-	// This allows web mode switches to go through the same code path as desktop
+	// Handle remote mode switches from web interface (no-op: terminal mode removed)
 	useEffect(() => {
 		const unsubscribeSwitchMode = window.maestro.process.onRemoteSwitchMode(
-			(sessionId: string, mode: 'ai' | 'terminal') => {
-				// Find the session and update its mode
-				setSessions((prev) => {
-					const session = prev.find((s) => s.id === sessionId);
-					if (!session) {
-						return prev;
-					}
-
-					// Only switch if mode is different
-					if (session.inputMode === mode) {
-						return prev;
-					}
-
-					return prev.map((s) => {
-						if (s.id !== sessionId) return s;
-						// Clear activeFileTabId when switching to terminal mode to prevent
-						// orphaned file preview without tab bar
-						return {
-							...s,
-							inputMode: mode,
-							...(mode === 'terminal' && { activeFileTabId: null }),
-						};
-					});
-				});
+			(_sessionId: string, _mode: 'ai' | 'terminal') => {
+				// No-op: terminal mode has been removed from MainPanel.
+				// The persistent terminal lives in the Right Panel.
 			}
 		);
 
 		return () => {
 			unsubscribeSwitchMode();
 		};
-	}, [setSessions]);
+	}, []);
 
 	// Handle remote interrupts from web interface
 	// This allows web interrupts to go through the same code path as desktop (handleInterrupt)
@@ -194,9 +153,7 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 				}
 
 				// Use the same logic as handleInterrupt
-				const currentMode = session.inputMode;
-				const targetSessionId =
-					currentMode === 'ai' ? `${session.id}-ai` : `${session.id}-terminal`;
+				const targetSessionId = `${session.id}-ai`;
 
 				try {
 					// Send interrupt signal (Ctrl+C)
@@ -291,7 +248,6 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 
 						// Use createTab helper
 						const result = createTab(s, {
-							saveToHistory: defaultSaveToHistory,
 							showThinking: defaultShowThinking,
 						});
 						if (!result) return s;
@@ -433,7 +389,7 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 			unsubscribeReorderTab();
 			unsubscribeToggleBookmark();
 		};
-	}, [sessionsRef, activeSessionIdRef, setSessions, setActiveSessionId, defaultSaveToHistory]);
+	}, [sessionsRef, activeSessionIdRef, setSessions, setActiveSessionId]);
 
 	// Broadcast tab changes to web clients when tabs, activeTabId, or tab properties change
 	// PERFORMANCE FIX: This effect was previously missing its dependency array, causing it to

@@ -1322,14 +1322,16 @@ export function EditAgentModal({
 			}
 
 			// Load SSH remote configurations
-			window.maestro.sshRemote
-				.getConfigs()
-				.then((result) => {
-					if (result.success && result.configs) {
-						setSshRemotes(result.configs);
-					}
-				})
-				.catch((err) => console.error('Failed to load SSH remotes:', err));
+			if (window.maestro.sshRemote) {
+				window.maestro.sshRemote
+					.getConfigs()
+					.then((result) => {
+						if (result.success && result.configs) {
+							setSshRemotes(result.configs);
+						}
+					})
+					.catch((err) => console.error('Failed to load SSH remotes:', err));
+			}
 
 			// Load per-session config (stored on the session/agent instance)
 			// When provider changed, clear provider-specific overrides

@@ -1395,7 +1395,7 @@ The following modals all contain similar session creation logic that should be e
 const worktreeSession: Session = {
   id: newId,
   name: branchName,
-  groupId: parentSession.groupId,
+  projectId: parentSession.projectId,
   toolType: parentSession.toolType,
   state: 'idle',
   cwd: worktreePath,

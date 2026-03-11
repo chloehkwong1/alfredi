@@ -1530,16 +1530,16 @@ describe('tabHelpers', () => {
 			expect(session.aiTabs[0].usageStats).toEqual(usageStats);
 		});
 
-		it('creates a session with group assignment', () => {
+		it('creates a session with project assignment', () => {
 			const { session } = createMergedSession({
 				name: 'Grouped',
 				projectRoot: '/project',
 				toolType: 'claude-code',
 				mergedLogs: [],
-				groupId: 'group-123',
+				projectId: 'project-123',
 			});
 
-			expect(session.groupId).toBe('group-123');
+			expect(session.projectId).toBe('project-123');
 		});
 
 		it('creates a session with saveToHistory option', () => {
@@ -1614,7 +1614,7 @@ describe('tabHelpers', () => {
 				mergedLogs: [],
 			});
 
-			expect(session.inputMode).toBe('terminal');
+			expect(session.inputMode).toBe('ai');
 		});
 
 		it('creates a session with non-terminal toolType sets ai inputMode', () => {
@@ -1659,7 +1659,6 @@ describe('tabHelpers', () => {
 			expect(session.fileExplorerExpanded).toEqual([]);
 			expect(session.executionQueue).toEqual([]);
 			expect(session.closedTabHistory).toEqual([]);
-			expect(session.shellCwd).toBe('/project');
 			expect(session.fileTreeAutoRefreshInterval).toBe(180);
 			expect(session.autoRunFolderPath).toBe('/project/Auto Run Docs');
 		});

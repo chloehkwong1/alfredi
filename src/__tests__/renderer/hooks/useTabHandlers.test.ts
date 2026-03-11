@@ -728,17 +728,6 @@ describe('useTabHandlers', () => {
 			expect((session.aiTabs[0] as any).readOnlyMode).toBe(true);
 		});
 
-		it('handleToggleTabSaveToHistory toggles save-to-history', () => {
-			const tab = createMockAITab({ id: 'tab-1', saveToHistory: true } as any);
-			const { result } = renderWithSession([tab]);
-			act(() => {
-				result.current.handleToggleTabSaveToHistory();
-			});
-
-			const session = getSession();
-			expect((session.aiTabs[0] as any).saveToHistory).toBe(false);
-		});
-
 		it('handleToggleTabShowThinking cycles thinking mode', () => {
 			const tab = createMockAITab({ id: 'tab-1' });
 			const { result } = renderWithSession([tab]);
@@ -796,30 +785,6 @@ describe('useTabHandlers', () => {
 
 			const session = getSession();
 			expect(session.aiTabs[0].scrollTop).toBe(250);
-		});
-
-		it('handleScrollPositionChange updates terminal scroll in terminal mode', () => {
-			const tab = createMockAITab({ id: 'tab-1' });
-			const session = createMockSession({
-				id: 'test-session',
-				aiTabs: [tab],
-				activeTabId: 'tab-1',
-				inputMode: 'terminal',
-				terminalScrollTop: 0,
-				unifiedTabOrder: [{ type: 'ai', id: 'tab-1' }],
-			});
-			useSessionStore.setState({
-				sessions: [session],
-				activeSessionId: 'test-session',
-			});
-
-			const { result } = renderHook(() => useTabHandlers());
-			act(() => {
-				result.current.handleScrollPositionChange(300);
-			});
-
-			const updated = getSession();
-			expect((updated as any).terminalScrollTop).toBe(300);
 		});
 
 		it('handleAtBottomChange updates isAtBottom and clears unread', () => {
@@ -1228,38 +1193,6 @@ describe('useTabHandlers', () => {
 			expect(getSession().aiTabs[0].logs).toHaveLength(2);
 		});
 
-		it('deletes from shell logs in terminal mode', () => {
-			const tab = createMockAITab({ id: 'tab-1' });
-			const session = createMockSession({
-				id: 'test-session',
-				aiTabs: [tab],
-				activeTabId: 'tab-1',
-				inputMode: 'terminal',
-				shellLogs: [
-					{ id: 'sl-1', source: 'user', text: 'ls', timestamp: Date.now() },
-					{ id: 'sl-2', source: 'output', text: 'file1.ts', timestamp: Date.now() },
-					{ id: 'sl-3', source: 'user', text: 'pwd', timestamp: Date.now() },
-				] as any,
-				shellCommandHistory: ['ls', 'pwd'],
-				unifiedTabOrder: [{ type: 'ai', id: 'tab-1' }],
-			});
-			useSessionStore.setState({
-				sessions: [session],
-				activeSessionId: 'test-session',
-			});
-
-			const { result } = renderHook(() => useTabHandlers());
-			act(() => {
-				result.current.handleDeleteLog('sl-1');
-			});
-
-			const updated = getSession();
-			expect((updated as any).shellLogs).toHaveLength(1);
-			expect((updated as any).shellLogs[0].id).toBe('sl-3');
-			// Command history also updated
-			expect((updated as any).shellCommandHistory).not.toContain('ls');
-		});
-
 		it('calls IPC deleteMessagePair for AI tab logs', () => {
 			const tab = createMockAITab({
 				id: 'tab-1',
@@ -1550,11 +1483,10 @@ describe('useTabHandlers', () => {
 	// ========================================================================
 
 	describe('handleNewAgentSession settings', () => {
-		it('applies defaultSaveToHistory and defaultShowThinking from settings', () => {
+		it('applies defaultShowThinking from settings', () => {
 			const tab = createMockAITab({ id: 'tab-1' });
 			setupSessionWithTabs([tab]);
 			useSettingsStore.setState({
-				defaultSaveToHistory: false,
 				defaultShowThinking: 'on',
 			} as any);
 
@@ -1566,7 +1498,6 @@ describe('useTabHandlers', () => {
 			const session = getSession();
 			const newTab = session.aiTabs.find((t) => t.id !== 'tab-1');
 			expect(newTab).toBeDefined();
-			expect((newTab as any).saveToHistory).toBe(false);
 			expect((newTab as any).showThinking).toBe('on');
 		});
 	});

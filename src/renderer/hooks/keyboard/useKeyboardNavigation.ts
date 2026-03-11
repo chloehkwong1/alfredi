@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
-import type { Session, Group, FocusArea } from '../../types';
+import type { Session, Project, FocusArea } from '../../types';
 
 /**
  * Dependencies for useKeyboardNavigation hook
  *
- * Note: editingSessionId/editingGroupId are checked in useMainKeyboardHandler.ts
+ * Note: editingSessionId/editingProjectId are checked in useMainKeyboardHandler.ts
  * before any navigation handlers are called, so they are not needed here.
  */
 export interface UseKeyboardNavigationDeps {
@@ -22,10 +22,10 @@ export interface UseKeyboardNavigationDeps {
 	activeFocus: FocusArea;
 	/** Setter for focus area */
 	setActiveFocus: React.Dispatch<React.SetStateAction<FocusArea>>;
-	/** Session groups */
-	groups: Group[];
-	/** Setter for groups (for collapse/expand) */
-	setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
+	/** Session projects */
+	projects: Project[];
+	/** Setter for projects (for collapse/expand) */
+	setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 	/** Whether bookmarks section is collapsed */
 	bookmarksCollapsed: boolean;
 	/** Setter for bookmarks collapsed state */
@@ -54,7 +54,7 @@ export interface UseKeyboardNavigationReturn {
  * Keyboard navigation utilities for sidebar and panel focus management.
  *
  * Provides handlers for:
- * - Arrow key navigation through sessions (with group collapse/expand)
+ * - Arrow key navigation through sessions (with project collapse/expand)
  * - Tab navigation between panels (sidebar, main, right)
  * - Enter to activate selected session
  * - Escape to blur input and focus terminal output
@@ -73,8 +73,8 @@ export function useKeyboardNavigation(
 		setActiveSessionId,
 		activeFocus,
 		setActiveFocus,
-		groups,
-		setGroups,
+		projects,
+		setProjects,
 		bookmarksCollapsed,
 		setBookmarksCollapsed,
 		inputRef,
@@ -88,8 +88,8 @@ export function useKeyboardNavigation(
 	const selectedSidebarIndexRef = useRef(selectedSidebarIndex);
 	selectedSidebarIndexRef.current = selectedSidebarIndex;
 
-	const groupsRef = useRef(groups);
-	groupsRef.current = groups;
+	const projectsRef = useRef(projects);
+	projectsRef.current = projects;
 
 	const bookmarksCollapsedRef = useRef(bookmarksCollapsed);
 	bookmarksCollapsedRef.current = bookmarksCollapsed;
@@ -99,13 +99,13 @@ export function useKeyboardNavigation(
 
 	/**
 	 * Handle sidebar navigation with arrow keys.
-	 * Supports collapse/expand of groups and bookmarks sections.
+	 * Supports collapse/expand of projects and bookmarks sections.
 	 * Returns true if the event was handled.
 	 */
 	const handleSidebarNavigation = useCallback(
 		(e: KeyboardEvent): boolean => {
 			const sessions = sortedSessionsRef.current;
-			const currentGroups = groupsRef.current;
+			const currentProjects = projectsRef.current;
 			const currentIndex = selectedSidebarIndexRef.current;
 			const isBookmarksCollapsed = bookmarksCollapsedRef.current;
 			const focus = activeFocusRef.current;
@@ -147,11 +147,11 @@ export function useKeyboardNavigation(
 				}
 
 				// Check if session is in a group
-				if (currentSession.groupId) {
-					const currentGroup = currentGroups.find((g) => g.id === currentSession.groupId);
-					if (currentGroup && !currentGroup.collapsed) {
-						setGroups((prev) =>
-							prev.map((g) => (g.id === currentGroup.id ? { ...g, collapsed: true } : g))
+				if (currentSession.projectId) {
+					const currentProject = currentProjects.find((g) => g.id === currentSession.projectId);
+					if (currentProject && !currentProject.collapsed) {
+						setProjects((prev) =>
+							prev.map((g) => (g.id === currentProject.id ? { ...g, collapsed: true } : g))
 						);
 						return true;
 					}
@@ -168,11 +168,11 @@ export function useKeyboardNavigation(
 				}
 
 				// Check if session is in a collapsed group
-				if (currentSession.groupId) {
-					const currentGroup = currentGroups.find((g) => g.id === currentSession.groupId);
-					if (currentGroup && currentGroup.collapsed) {
-						setGroups((prev) =>
-							prev.map((g) => (g.id === currentGroup.id ? { ...g, collapsed: false } : g))
+				if (currentSession.projectId) {
+					const currentProject = currentProjects.find((g) => g.id === currentSession.projectId);
+					if (currentProject && currentProject.collapsed) {
+						setProjects((prev) =>
+							prev.map((g) => (g.id === currentProject.id ? { ...g, collapsed: false } : g))
 						);
 						return true;
 					}
@@ -181,19 +181,19 @@ export function useKeyboardNavigation(
 			}
 
 			// Space: Close the current group and jump to nearest visible session
-			if (e.key === ' ' && currentSession?.groupId) {
-				const currentGroup = currentGroups.find((g) => g.id === currentSession.groupId);
-				if (currentGroup && !currentGroup.collapsed) {
+			if (e.key === ' ' && currentSession?.projectId) {
+				const currentProject = currentProjects.find((g) => g.id === currentSession.projectId);
+				if (currentProject && !currentProject.collapsed) {
 					// Collapse the group
-					setGroups((prev) =>
-						prev.map((g) => (g.id === currentGroup.id ? { ...g, collapsed: true } : g))
+					setProjects((prev) =>
+						prev.map((g) => (g.id === currentProject.id ? { ...g, collapsed: true } : g))
 					);
 
 					// Helper to check if a session will be visible after collapse
 					const willBeVisible = (s: Session) => {
-						if (s.groupId === currentGroup.id) return false; // In the group being collapsed
-						if (!s.groupId) return true; // Ungrouped sessions are always visible
-						const g = currentGroups.find((grp) => grp.id === s.groupId);
+						if (s.projectId === currentProject.id) return false; // In the group being collapsed
+						if (!s.projectId) return true; // Ungrouped sessions are always visible
+						const g = currentProjects.find((grp) => grp.id === s.projectId);
 						return g && !g.collapsed; // In an expanded group
 					};
 
@@ -228,19 +228,19 @@ export function useKeyboardNavigation(
 				}
 			}
 
-			// ArrowUp/ArrowDown: Navigate through sessions, expanding collapsed groups as needed
+			// ArrowUp/ArrowDown: Navigate through sessions, expanding collapsed projects as needed
 			if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
 				const totalSessions = sessions.length;
 
-				// Helper to get all sessions in a group
-				const getGroupSessions = (groupId: string) => {
-					return sessions.filter((s) => s.groupId === groupId);
+				// Helper to get all sessions in a project
+				const getProjectSessions = (projectId: string) => {
+					return sessions.filter((s) => s.projectId === projectId);
 				};
 
-				// Find the next session, skipping visible sessions in collapsed groups
-				// but stopping when we hit a NEW collapsed group (to expand it)
+				// Find the next session, skipping visible sessions in collapsed projects
+				// but stopping when we hit a NEW collapsed project (to expand it)
 				let nextIndex = currentIndex;
-				let foundCollapsedGroup: string | null = null;
+				let foundCollapsedProject: string | null = null;
 
 				if (e.key === 'ArrowDown') {
 					// Moving down
@@ -248,14 +248,14 @@ export function useKeyboardNavigation(
 						const candidateIndex = (currentIndex + i) % totalSessions;
 						const candidate = sessions[candidateIndex];
 
-						if (!candidate.groupId) {
+						if (!candidate.projectId) {
 							// Ungrouped session - can navigate to it
 							nextIndex = candidateIndex;
 							break;
 						}
 
-						const candidateGroup = currentGroups.find((g) => g.id === candidate.groupId);
-						if (!candidateGroup?.collapsed) {
+						const candidateProject = currentProjects.find((g) => g.id === candidate.projectId);
+						if (!candidateProject?.collapsed) {
 							// Session in expanded group - can navigate to it
 							nextIndex = candidateIndex;
 							break;
@@ -263,11 +263,11 @@ export function useKeyboardNavigation(
 
 						// Session is in a collapsed group
 						// Check if this is a different group than we're currently in
-						if (candidate.groupId !== currentSession?.groupId) {
+						if (candidate.projectId !== currentSession?.projectId) {
 							// We've hit a collapsed group - expand it and go to FIRST item
-							foundCollapsedGroup = candidate.groupId;
-							const groupSessions = getGroupSessions(candidate.groupId);
-							nextIndex = sessions.findIndex((s) => s.id === groupSessions[0]?.id);
+							foundCollapsedProject = candidate.projectId;
+							const projectSessions = getProjectSessions(candidate.projectId);
+							nextIndex = sessions.findIndex((s) => s.id === projectSessions[0]?.id);
 							break;
 						}
 						// Same collapsed group, keep looking (shouldn't happen if current is visible)
@@ -278,14 +278,14 @@ export function useKeyboardNavigation(
 						const candidateIndex = (currentIndex - i + totalSessions) % totalSessions;
 						const candidate = sessions[candidateIndex];
 
-						if (!candidate.groupId) {
+						if (!candidate.projectId) {
 							// Ungrouped session - can navigate to it
 							nextIndex = candidateIndex;
 							break;
 						}
 
-						const candidateGroup = currentGroups.find((g) => g.id === candidate.groupId);
-						if (!candidateGroup?.collapsed) {
+						const candidateProject = currentProjects.find((g) => g.id === candidate.projectId);
+						if (!candidateProject?.collapsed) {
 							// Session in expanded group - can navigate to it
 							nextIndex = candidateIndex;
 							break;
@@ -293,12 +293,12 @@ export function useKeyboardNavigation(
 
 						// Session is in a collapsed group
 						// Check if this is a different group than we're currently in
-						if (candidate.groupId !== currentSession?.groupId) {
+						if (candidate.projectId !== currentSession?.projectId) {
 							// We've hit a collapsed group - expand it and go to LAST item
-							foundCollapsedGroup = candidate.groupId;
-							const groupSessions = getGroupSessions(candidate.groupId);
+							foundCollapsedProject = candidate.projectId;
+							const projectSessions = getProjectSessions(candidate.projectId);
 							nextIndex = sessions.findIndex(
-								(s) => s.id === groupSessions[groupSessions.length - 1]?.id
+								(s) => s.id === projectSessions[projectSessions.length - 1]?.id
 							);
 							break;
 						}
@@ -307,9 +307,9 @@ export function useKeyboardNavigation(
 				}
 
 				// If we found a collapsed group, expand it
-				if (foundCollapsedGroup) {
-					setGroups((prev) =>
-						prev.map((g) => (g.id === foundCollapsedGroup ? { ...g, collapsed: false } : g))
+				if (foundCollapsedProject) {
+					setProjects((prev) =>
+						prev.map((g) => (g.id === foundCollapsedProject ? { ...g, collapsed: false } : g))
 					);
 				}
 
@@ -319,7 +319,7 @@ export function useKeyboardNavigation(
 
 			return false;
 		},
-		[setSelectedSidebarIndex, setActiveSessionId, setGroups, setBookmarksCollapsed]
+		[setSelectedSidebarIndex, setActiveSessionId, setProjects, setBookmarksCollapsed]
 	);
 
 	/**

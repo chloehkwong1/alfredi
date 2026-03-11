@@ -684,7 +684,7 @@ export function AgentConfigPanel({
 							>
 								{option.options.map((opt) => (
 									<option key={opt} value={opt} style={{ backgroundColor: theme.colors.bgMain }}>
-										{opt}
+										{opt.charAt(0).toUpperCase() + opt.slice(1)}
 									</option>
 								))}
 							</select>

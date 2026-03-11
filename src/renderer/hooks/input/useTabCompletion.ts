@@ -33,25 +33,10 @@ export interface UseTabCompletionReturn {
  * - getSuggestions is wrapped in useCallback to maintain referential equality
  */
 export function useTabCompletion(session: Session | null): UseTabCompletionReturn {
-	// Compute relative path from project root (cwd) to shell working directory (shellCwd)
+	// With terminal mode removed, shell relative path is always at project root
 	const shellRelativePath = useMemo(() => {
-		if (!session?.cwd || !session?.shellCwd) return '';
-
-		// Normalize paths
-		const projectRoot = session.cwd.replace(/\/$/, '');
-		const shellDir = session.shellCwd.replace(/\/$/, '');
-
-		// If shell is at project root, no relative path needed
-		if (shellDir === projectRoot) return '';
-
-		// If shell is within project, compute relative path
-		if (shellDir.startsWith(projectRoot + '/')) {
-			return shellDir.slice(projectRoot.length + 1);
-		}
-
-		// Shell is outside project root - can't use file tree
-		return null;
-	}, [session?.cwd, session?.shellCwd]);
+		return '';
+	}, []);
 
 	// Build a flat list of file/folder names from the file tree
 	// Filtered to show only files relative to the shell's current working directory
@@ -105,10 +90,10 @@ export function useTabCompletion(session: Session | null): UseTabCompletionRetur
 		return names;
 	}, [session?.fileTree, shellRelativePath]);
 
-	// Memoize shell history reference to avoid unnecessary getSuggestions re-creation
+	// Memoize command history reference to avoid unnecessary getSuggestions re-creation
 	const shellHistory = useMemo(() => {
-		return session?.shellCommandHistory || [];
-	}, [session?.shellCommandHistory]);
+		return session?.aiCommandHistory || [];
+	}, [session?.aiCommandHistory]);
 
 	// PERF: Memoize git-related data separately to avoid getSuggestions re-creation
 	const isGitRepo = session?.isGitRepo ?? false;

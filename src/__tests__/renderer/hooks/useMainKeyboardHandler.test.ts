@@ -13,7 +13,7 @@ function createMockContext(overrides: Record<string, unknown> = {}) {
 		hasOpenLayers: () => false,
 		hasOpenModal: () => false,
 		editingSessionId: null,
-		editingGroupId: null,
+		editingProjectId: null,
 		handleSidebarNavigation: vi.fn().mockReturnValue(false),
 		handleEnterToActivate: vi.fn().mockReturnValue(false),
 		handleTabNavigation: vi.fn().mockReturnValue(false),
@@ -260,7 +260,7 @@ describe('useMainKeyboardHandler', () => {
 
 			const mockToggleSidebar = vi.fn();
 			result.current.keyboardHandlerRef.current = createMockContext({
-				editingGroupId: 'group-123',
+				editingProjectId: 'group-123',
 				isShortcut: () => true,
 				setLeftSidebarOpen: mockToggleSidebar,
 				sessions: [{ id: 'test' }],
@@ -463,12 +463,10 @@ describe('useMainKeyboardHandler', () => {
 		});
 
 		it('should allow toggleMode shortcut (Cmd+J) when only overlays are open', () => {
-			vi.useFakeTimers();
 			const { result } = renderHook(() => useMainKeyboardHandler());
 
-			const mockToggleInputMode = vi.fn();
 			const mockSetActiveFocus = vi.fn();
-			const mockFocus = vi.fn();
+			const mockSetRightPanelOpen = vi.fn();
 			const mockActiveSession = {
 				id: 'test-session',
 				name: 'Test',
@@ -485,9 +483,9 @@ describe('useMainKeyboardHandler', () => {
 				isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
 				activeSessionId: 'test-session',
 				activeSession: mockActiveSession,
-				toggleInputMode: mockToggleInputMode,
 				setActiveFocus: mockSetActiveFocus,
-				inputRef: { current: { focus: mockFocus } },
+				setRightPanelOpen: mockSetRightPanelOpen,
+				inputRef: { current: { focus: vi.fn() } },
 			});
 
 			act(() => {
@@ -500,13 +498,9 @@ describe('useMainKeyboardHandler', () => {
 				);
 			});
 
-			// Cmd+J should toggle mode even when file preview overlay is open
-			expect(mockToggleInputMode).toHaveBeenCalled();
-			// Should auto-focus the input after toggling
-			expect(mockSetActiveFocus).toHaveBeenCalledWith('main');
-			vi.advanceTimersByTime(50);
-			expect(mockFocus).toHaveBeenCalled();
-			vi.useRealTimers();
+			// Cmd+J should focus the right panel (persistent terminal)
+			expect(mockSetActiveFocus).toHaveBeenCalledWith('right');
+			expect(mockSetRightPanelOpen).toHaveBeenCalledWith(true);
 		});
 
 		it('should allow tab cycle shortcut with brace characters when layers are open', () => {
@@ -796,11 +790,85 @@ describe('useMainKeyboardHandler', () => {
 		});
 	});
 
-	describe('wizard tab restrictions', () => {
-		it('should disable toggleMode (Cmd+J) for wizard tabs', () => {
+	describe('toggleMode focuses persistent terminal', () => {
+		it('should focus right panel (Cmd+J) when focus is on main', () => {
 			const { result } = renderHook(() => useMainKeyboardHandler());
 
-			const mockToggleInputMode = vi.fn();
+			const mockSetActiveFocus = vi.fn();
+			const mockSetRightPanelOpen = vi.fn();
+
+			result.current.keyboardHandlerRef.current = createMockContext({
+				isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
+				activeSession: {
+					id: 'session-1',
+					aiTabs: [{ id: 'tab-1', name: 'Tab 1', logs: [] }],
+					activeTabId: 'tab-1',
+					inputMode: 'ai',
+				},
+				activeSessionId: 'session-1',
+				activeFocus: 'main',
+				setActiveFocus: mockSetActiveFocus,
+				setRightPanelOpen: mockSetRightPanelOpen,
+				inputRef: { current: { focus: vi.fn() } },
+			});
+
+			act(() => {
+				window.dispatchEvent(
+					new KeyboardEvent('keydown', {
+						key: 'j',
+						metaKey: true,
+						bubbles: true,
+					})
+				);
+			});
+
+			expect(mockSetActiveFocus).toHaveBeenCalledWith('right');
+			expect(mockSetRightPanelOpen).toHaveBeenCalledWith(true);
+		});
+
+		it('should focus main panel (Cmd+J) when focus is on right', () => {
+			vi.useFakeTimers();
+			const { result } = renderHook(() => useMainKeyboardHandler());
+
+			const mockSetActiveFocus = vi.fn();
+			const mockFocus = vi.fn();
+
+			result.current.keyboardHandlerRef.current = createMockContext({
+				isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
+				activeSession: {
+					id: 'session-1',
+					aiTabs: [{ id: 'tab-1', name: 'Tab 1', logs: [] }],
+					activeTabId: 'tab-1',
+					inputMode: 'ai',
+				},
+				activeSessionId: 'session-1',
+				activeFocus: 'right',
+				setActiveFocus: mockSetActiveFocus,
+				setRightPanelOpen: vi.fn(),
+				inputRef: { current: { focus: mockFocus } },
+			});
+
+			act(() => {
+				window.dispatchEvent(
+					new KeyboardEvent('keydown', {
+						key: 'j',
+						metaKey: true,
+						bubbles: true,
+					})
+				);
+			});
+
+			expect(mockSetActiveFocus).toHaveBeenCalledWith('main');
+			vi.advanceTimersByTime(50);
+			expect(mockFocus).toHaveBeenCalled();
+			vi.useRealTimers();
+		});
+
+		it('should work even for wizard tabs (focus toggle is always allowed)', () => {
+			const { result } = renderHook(() => useMainKeyboardHandler());
+
+			const mockSetActiveFocus = vi.fn();
+			const mockSetRightPanelOpen = vi.fn();
 			const wizardTab = {
 				id: 'tab-1',
 				name: 'Wizard',
@@ -817,49 +885,10 @@ describe('useMainKeyboardHandler', () => {
 					inputMode: 'ai',
 				},
 				activeSessionId: 'session-1',
-				toggleInputMode: mockToggleInputMode,
-			});
-
-			act(() => {
-				window.dispatchEvent(
-					new KeyboardEvent('keydown', {
-						key: 'j',
-						metaKey: true,
-						bubbles: true,
-					})
-				);
-			});
-
-			// toggleInputMode should NOT be called for wizard tabs
-			expect(mockToggleInputMode).not.toHaveBeenCalled();
-		});
-
-		it('should allow toggleMode (Cmd+J) for regular tabs', () => {
-			vi.useFakeTimers();
-			const { result } = renderHook(() => useMainKeyboardHandler());
-
-			const mockToggleInputMode = vi.fn();
-			const mockSetActiveFocus = vi.fn();
-			const mockFocus = vi.fn();
-			const regularTab = {
-				id: 'tab-1',
-				name: 'Regular Tab',
-				logs: [],
-				// No wizardState
-			};
-
-			result.current.keyboardHandlerRef.current = createMockContext({
-				isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
-				activeSession: {
-					id: 'session-1',
-					aiTabs: [regularTab],
-					activeTabId: 'tab-1',
-					inputMode: 'ai',
-				},
-				activeSessionId: 'session-1',
-				toggleInputMode: mockToggleInputMode,
+				activeFocus: 'main',
 				setActiveFocus: mockSetActiveFocus,
-				inputRef: { current: { focus: mockFocus } },
+				setRightPanelOpen: mockSetRightPanelOpen,
+				inputRef: { current: { focus: vi.fn() } },
 			});
 
 			act(() => {
@@ -872,60 +901,9 @@ describe('useMainKeyboardHandler', () => {
 				);
 			});
 
-			// toggleInputMode SHOULD be called for regular tabs
-			expect(mockToggleInputMode).toHaveBeenCalled();
-			// Should auto-focus the input after toggling
-			expect(mockSetActiveFocus).toHaveBeenCalledWith('main');
-			vi.advanceTimersByTime(50);
-			expect(mockFocus).toHaveBeenCalled();
-			vi.useRealTimers();
-		});
-
-		it('should allow toggleMode when wizardState exists but isActive is false', () => {
-			vi.useFakeTimers();
-			const { result } = renderHook(() => useMainKeyboardHandler());
-
-			const mockToggleInputMode = vi.fn();
-			const mockSetActiveFocus = vi.fn();
-			const mockFocus = vi.fn();
-			const completedWizardTab = {
-				id: 'tab-1',
-				name: 'Completed Wizard',
-				wizardState: { isActive: false }, // Wizard completed
-				logs: [],
-			};
-
-			result.current.keyboardHandlerRef.current = createMockContext({
-				isShortcut: (_e: KeyboardEvent, actionId: string) => actionId === 'toggleMode',
-				activeSession: {
-					id: 'session-1',
-					aiTabs: [completedWizardTab],
-					activeTabId: 'tab-1',
-					inputMode: 'ai',
-				},
-				activeSessionId: 'session-1',
-				toggleInputMode: mockToggleInputMode,
-				setActiveFocus: mockSetActiveFocus,
-				inputRef: { current: { focus: mockFocus } },
-			});
-
-			act(() => {
-				window.dispatchEvent(
-					new KeyboardEvent('keydown', {
-						key: 'j',
-						metaKey: true,
-						bubbles: true,
-					})
-				);
-			});
-
-			// toggleInputMode SHOULD be called when wizard is not active
-			expect(mockToggleInputMode).toHaveBeenCalled();
-			// Should auto-focus the input after toggling
-			expect(mockSetActiveFocus).toHaveBeenCalledWith('main');
-			vi.advanceTimersByTime(50);
-			expect(mockFocus).toHaveBeenCalled();
-			vi.useRealTimers();
+			// Focus toggle should work even for wizard tabs
+			expect(mockSetActiveFocus).toHaveBeenCalledWith('right');
+			expect(mockSetRightPanelOpen).toHaveBeenCalledWith(true);
 		});
 	});
 
@@ -1532,7 +1510,7 @@ describe('useMainKeyboardHandler', () => {
 						filePreviewTabs: [],
 						activeFileTabId: null,
 						unifiedTabOrder: ['ai-tab-1'],
-						inputMode: 'terminal', // Terminal mode - tabs not applicable
+						inputMode: 'ai', // Terminal mode - tabs not applicable
 					},
 				});
 

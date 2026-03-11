@@ -47,7 +47,7 @@ export interface EditAgentModalData {
 
 /** Quick action modal data */
 export interface QuickActionModalData {
-	initialMode: 'main' | 'move-to-group';
+	initialMode: 'main' | 'move-to-project';
 }
 
 /** Confirmation modal data */
@@ -70,9 +70,9 @@ export interface RenameTabModalData {
 	initialName: string;
 }
 
-/** Rename group modal data */
-export interface RenameGroupModalData {
-	groupId: string;
+/** Rename project modal data */
+export interface RenameProjectModalData {
+	projectId: string;
 	value: string;
 	emoji: string;
 }
@@ -143,8 +143,8 @@ export type ModalId =
 	| 'promptComposer'
 	// Tab Management
 	| 'renameTab'
-	// Group Management
-	| 'renameGroup'
+	// Project Management
+	| 'renameProject'
 	// Session Operations
 	| 'mergeSession'
 	| 'sendToAgent'
@@ -184,7 +184,7 @@ export interface ModalDataMap {
 	confirm: ConfirmModalData;
 	renameInstance: RenameInstanceModalData;
 	renameTab: RenameTabModalData;
-	renameGroup: RenameGroupModalData;
+	renameProject: RenameProjectModalData;
 	agentSessions: AgentSessionsModalData;
 	wizardResume: WizardResumeModalData;
 	agentError: AgentErrorModalData;
@@ -423,7 +423,7 @@ function _buildModalActions() {
 		// Quick Actions Modal
 		setQuickActionOpen: (open: boolean) =>
 			open ? openModal('quickAction', { initialMode: 'main' }) : closeModal('quickAction'),
-		setQuickActionInitialMode: (mode: 'main' | 'move-to-group') =>
+		setQuickActionInitialMode: (mode: 'main' | 'move-to-project') =>
 			updateModalData('quickAction', { initialMode: mode }),
 
 		// Lightbox Modal
@@ -530,38 +530,38 @@ function _buildModalActions() {
 			}
 		},
 
-		// Rename Group Modal
-		setRenameGroupModalOpen: (open: boolean) => {
+		// Rename Project Modal
+		setRenameProjectModalOpen: (open: boolean) => {
 			if (!open) {
-				closeModal('renameGroup');
+				closeModal('renameProject');
 				return;
 			}
-			const current = useModalStore.getState().getData('renameGroup');
-			openModal('renameGroup', current ?? { groupId: '', value: '', emoji: '📂' });
+			const current = useModalStore.getState().getData('renameProject');
+			openModal('renameProject', current ?? { projectId: '', value: '', emoji: '📂' });
 		},
-		setRenameGroupId: (groupId: string | null) => {
-			if (!groupId) return;
-			const current = useModalStore.getState().getData('renameGroup');
-			openModal('renameGroup', {
-				groupId,
+		setRenameProjectId: (projectId: string | null) => {
+			if (!projectId) return;
+			const current = useModalStore.getState().getData('renameProject');
+			openModal('renameProject', {
+				projectId,
 				value: current?.value ?? '',
 				emoji: current?.emoji ?? '📂',
 			});
 		},
-		setRenameGroupValue: (value: string) => {
-			const current = useModalStore.getState().getData('renameGroup');
+		setRenameProjectValue: (value: string) => {
+			const current = useModalStore.getState().getData('renameProject');
 			if (current) {
-				updateModalData('renameGroup', { value });
+				updateModalData('renameProject', { value });
 			} else {
-				openModal('renameGroup', { groupId: '', value, emoji: '📂' });
+				openModal('renameProject', { projectId: '', value, emoji: '📂' });
 			}
 		},
-		setRenameGroupEmoji: (emoji: string) => {
-			const current = useModalStore.getState().getData('renameGroup');
+		setRenameProjectEmoji: (emoji: string) => {
+			const current = useModalStore.getState().getData('renameProject');
 			if (current) {
-				updateModalData('renameGroup', { emoji });
+				updateModalData('renameProject', { emoji });
 			} else {
-				openModal('renameGroup', { groupId: '', value: '', emoji });
+				openModal('renameProject', { projectId: '', value: '', emoji });
 			}
 		},
 
@@ -689,8 +689,8 @@ export function useModalActions() {
 	const renameInstanceData = useModalStore(selectModalData('renameInstance'));
 	const renameTabModalOpen = useModalStore(selectModalOpen('renameTab'));
 	const renameTabData = useModalStore(selectModalData('renameTab'));
-	const renameGroupModalOpen = useModalStore(selectModalOpen('renameGroup'));
-	const renameGroupData = useModalStore(selectModalData('renameGroup'));
+	const renameProjectModalOpen = useModalStore(selectModalOpen('renameProject'));
+	const renameProjectData = useModalStore(selectModalData('renameProject'));
 	const agentSessionsOpen = useModalStore(selectModalOpen('agentSessions'));
 	const agentSessionsData = useModalStore(selectModalData('agentSessions'));
 	const queueBrowserOpen = useModalStore(selectModalOpen('queueBrowser'));
@@ -778,11 +778,11 @@ export function useModalActions() {
 		renameTabId: renameTabData?.tabId ?? null,
 		renameTabInitialName: renameTabData?.initialName ?? '',
 
-		// Rename Group Modal
-		renameGroupModalOpen,
-		renameGroupId: renameGroupData?.groupId ?? null,
-		renameGroupValue: renameGroupData?.value ?? '',
-		renameGroupEmoji: renameGroupData?.emoji ?? '📂',
+		// Rename Project Modal
+		renameProjectModalOpen,
+		renameProjectId: renameProjectData?.projectId ?? null,
+		renameProjectValue: renameProjectData?.value ?? '',
+		renameProjectEmoji: renameProjectData?.emoji ?? '📂',
 
 		// Agent Sessions Browser
 		agentSessionsOpen,

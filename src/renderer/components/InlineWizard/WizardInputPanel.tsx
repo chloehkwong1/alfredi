@@ -8,7 +8,6 @@
  * - Wizard pill on left
  * - Confidence gauge in center-right area
  * - Image attachment button (if agent supports it)
- * - Prompt composer button
  * - Terminal/AI mode toggle (disabled during generation)
  *
  * Hidden during wizard mode:
@@ -21,16 +20,12 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Terminal, Wand2, ImageIcon, ArrowUp, PenLine, X, Keyboard, Brain } from 'lucide-react';
+import { Terminal, Wand2, ImageIcon, ArrowUp, X, Brain } from 'lucide-react';
 import type { Session, Theme } from '../../types';
 import { WizardPill } from './WizardPill';
 import { WizardConfidenceGauge } from './WizardConfidenceGauge';
 import { WizardExitConfirmDialog } from './WizardExitConfirmDialog';
-import {
-	formatShortcutKeys,
-	formatEnterToSend,
-	formatEnterToSendTooltip,
-} from '../../utils/shortcutFormatter';
+import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 
 interface WizardInputPanelProps {
 	/** Current session with wizard state */
@@ -53,10 +48,6 @@ interface WizardInputPanelProps {
 	stagedImages: string[];
 	/** Set staged images */
 	setStagedImages: React.Dispatch<React.SetStateAction<string[]>>;
-	/** Open the prompt composer modal */
-	onOpenPromptComposer?: () => void;
-	/** Toggle between AI and terminal mode */
-	toggleInputMode: () => void;
 	/** Current confidence level from wizard state (0-100) */
 	confidence: number;
 	/** Whether the agent can attach images */
@@ -109,8 +100,6 @@ export const WizardInputPanel = React.memo(function WizardInputPanel({
 	processInput,
 	stagedImages,
 	setStagedImages,
-	onOpenPromptComposer,
-	toggleInputMode,
 	confidence,
 	canAttachImages,
 	isBusy,
@@ -172,7 +161,7 @@ export const WizardInputPanel = React.memo(function WizardInputPanel({
 		inputRef.current?.focus();
 	}, [inputRef]);
 
-	const isTerminalMode = session.inputMode === 'terminal';
+	const isTerminalMode = false;
 
 	return (
 		<div
@@ -264,16 +253,6 @@ export const WizardInputPanel = React.memo(function WizardInputPanel({
 
 						<div className="flex justify-between items-center px-2 pb-2 pt-1">
 							<div className="flex gap-1 items-center">
-								{/* Prompt composer button */}
-								{!isTerminalMode && onOpenPromptComposer && (
-									<button
-										onClick={onOpenPromptComposer}
-										className="p-1 hover:bg-white/10 rounded opacity-50 hover:opacity-100"
-										title="Open Prompt Composer"
-									>
-										<PenLine className="w-4 h-4" />
-									</button>
-								)}
 								{/* Image attachment button */}
 								{!isTerminalMode && canAttachImages && (
 									<button
@@ -330,14 +309,6 @@ export const WizardInputPanel = React.memo(function WizardInputPanel({
 										<span>{showThinking ? 'Thinking' : 'Thinking'}</span>
 									</button>
 								)}
-								<button
-									onClick={() => setEnterToSend(!enterToSend)}
-									className="flex items-center gap-1 text-[10px] opacity-50 hover:opacity-100 px-2 py-1 rounded hover:bg-white/5"
-									title={formatEnterToSendTooltip(enterToSend)}
-								>
-									<Keyboard className="w-3 h-3" />
-									{formatEnterToSend(enterToSend)}
-								</button>
 							</div>
 						</div>
 					</div>
@@ -347,7 +318,7 @@ export const WizardInputPanel = React.memo(function WizardInputPanel({
 				<div className="flex flex-col gap-2">
 					<button
 						type="button"
-						onClick={toggleInputMode}
+						onClick={() => {}}
 						disabled={isBusy}
 						className="p-2 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed"
 						style={{

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSessionCategories } from '../../../renderer/hooks/session/useSessionCategories';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
-import type { Session, Group } from '../../../renderer/types';
+import type { Session, Project } from '../../../renderer/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -37,19 +37,20 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 	} as Session;
 }
 
-function makeGroup(overrides: Partial<Group> = {}): Group {
+function makeProject(overrides: Partial<Project> = {}): Project {
 	idCounter++;
 	return {
 		id: `g${idCounter}`,
-		name: `Group ${idCounter}`,
+		name: `Project ${idCounter}`,
 		emoji: '📁',
 		collapsed: false,
+		rootPath: '/test/project',
 		...overrides,
 	};
 }
 
-function resetStore(sessions: Session[] = [], groups: Group[] = []) {
-	useSessionStore.setState({ sessions, groups } as any);
+function resetStore(sessions: Session[] = [], projects: Project[] = []) {
+	useSessionStore.setState({ sessions, projects } as any);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +76,7 @@ describe('useSessionCategories', () => {
 			expect(result.current.bookmarkedSessions).toEqual([]);
 			expect(result.current.ungroupedSessions).toEqual([]);
 			expect(result.current.sortedFilteredSessions).toEqual([]);
-			expect(result.current.sortedGroups).toEqual([]);
+			expect(result.current.sortedProjects).toEqual([]);
 		});
 	});
 
@@ -282,15 +283,15 @@ describe('useSessionCategories', () => {
 		});
 
 		it('bookmarked session also appears in grouped or ungrouped', () => {
-			const s1 = makeSession({ name: 'Alpha', bookmarked: true, groupId: 'g1' });
-			const group = makeGroup({ id: 'g1', name: 'My Group' });
-			resetStore([s1], [group]);
+			const s1 = makeSession({ name: 'Alpha', bookmarked: true, projectId: 'g1' });
+			const project = makeProject({ id: 'g1', name: 'My Project' });
+			resetStore([s1], [project]);
 
 			const { result } = renderHook(() => useSessionCategories('', [s1]));
 
 			expect(result.current.bookmarkedSessions).toHaveLength(1);
 			// Also in grouped
-			expect(result.current.sortedGroupSessionsById.get('g1')).toHaveLength(1);
+			expect(result.current.sortedProjectSessionsById.get('g1')).toHaveLength(1);
 			// Not in ungrouped
 			expect(result.current.ungroupedSessions).toHaveLength(0);
 		});
@@ -300,29 +301,29 @@ describe('useSessionCategories', () => {
 	// Categorization: groups
 	// -----------------------------------------------------------------------
 	describe('grouped sessions', () => {
-		it('assigns sessions to groups by groupId', () => {
-			const g1 = makeGroup({ id: 'g1', name: 'Frontend' });
-			const g2 = makeGroup({ id: 'g2', name: 'Backend' });
-			const s1 = makeSession({ name: 'React', groupId: 'g1' });
-			const s2 = makeSession({ name: 'Node', groupId: 'g2' });
-			const s3 = makeSession({ name: 'Go', groupId: 'g2' });
+		it('assigns sessions to groups by projectId', () => {
+			const g1 = makeProject({ id: 'g1', name: 'Frontend' });
+			const g2 = makeProject({ id: 'g2', name: 'Backend' });
+			const s1 = makeSession({ name: 'React', projectId: 'g1' });
+			const s2 = makeSession({ name: 'Node', projectId: 'g2' });
+			const s3 = makeSession({ name: 'Go', projectId: 'g2' });
 			resetStore([s1, s2, s3], [g1, g2]);
 
 			const { result } = renderHook(() => useSessionCategories('', [s1, s2, s3]));
 
-			expect(result.current.sortedGroupSessionsById.get('g1')).toHaveLength(1);
-			expect(result.current.sortedGroupSessionsById.get('g2')).toHaveLength(2);
+			expect(result.current.sortedProjectSessionsById.get('g1')).toHaveLength(1);
+			expect(result.current.sortedProjectSessionsById.get('g2')).toHaveLength(2);
 		});
 
-		it('sorts sessions within each group alphabetically', () => {
-			const g1 = makeGroup({ id: 'g1' });
-			const s1 = makeSession({ name: 'Zeta', groupId: 'g1' });
-			const s2 = makeSession({ name: 'Alpha', groupId: 'g1' });
+		it('sorts sessions within each project alphabetically', () => {
+			const g1 = makeProject({ id: 'g1' });
+			const s1 = makeSession({ name: 'Zeta', projectId: 'g1' });
+			const s2 = makeSession({ name: 'Alpha', projectId: 'g1' });
 			resetStore([s1, s2], [g1]);
 
 			const { result } = renderHook(() => useSessionCategories('', [s1, s2]));
 
-			const groupSessions = result.current.sortedGroupSessionsById.get('g1')!;
+			const groupSessions = result.current.sortedProjectSessionsById.get('g1')!;
 			expect(groupSessions[0].name).toBe('Alpha');
 			expect(groupSessions[1].name).toBe('Zeta');
 		});
@@ -332,11 +333,11 @@ describe('useSessionCategories', () => {
 	// Categorization: ungrouped
 	// -----------------------------------------------------------------------
 	describe('ungrouped sessions', () => {
-		it('sessions without groupId go to ungrouped', () => {
+		it('sessions without projectId go to ungrouped', () => {
 			const s1 = makeSession({ name: 'Alpha' });
-			const s2 = makeSession({ name: 'Beta', groupId: 'g1' });
+			const s2 = makeSession({ name: 'Beta', projectId: 'g1' });
 			const s3 = makeSession({ name: 'Gamma' });
-			const g1 = makeGroup({ id: 'g1' });
+			const g1 = makeProject({ id: 'g1' });
 			resetStore([s1, s2, s3], [g1]);
 
 			const { result } = renderHook(() => useSessionCategories('', [s1, s2, s3]));
@@ -359,7 +360,7 @@ describe('useSessionCategories', () => {
 
 		it('sortedUngroupedParentSessions excludes worktree children', () => {
 			const s1 = makeSession({ name: 'Parent' });
-			// Worktree child without groupId — excluded from parent list by parentSessionId filter
+			// Worktree child without projectId — excluded from parent list by parentSessionId filter
 			resetStore([s1]);
 
 			const { result } = renderHook(() => useSessionCategories('', [s1]));
@@ -371,18 +372,18 @@ describe('useSessionCategories', () => {
 	// -----------------------------------------------------------------------
 	// Sorting: groups
 	// -----------------------------------------------------------------------
-	describe('sortedGroups', () => {
+	describe('sortedProjects', () => {
 		it('sorts groups alphabetically ignoring emojis', () => {
-			const g1 = makeGroup({ name: '🔥 Zulu' });
-			const g2 = makeGroup({ name: '🌟 Alpha' });
-			const g3 = makeGroup({ name: 'Beta' });
+			const g1 = makeProject({ name: '🔥 Zulu' });
+			const g2 = makeProject({ name: '🌟 Alpha' });
+			const g3 = makeProject({ name: 'Beta' });
 			resetStore([], [g1, g2, g3]);
 
 			const { result } = renderHook(() => useSessionCategories('', []));
 
-			expect(result.current.sortedGroups[0].name).toBe('🌟 Alpha');
-			expect(result.current.sortedGroups[1].name).toBe('Beta');
-			expect(result.current.sortedGroups[2].name).toBe('🔥 Zulu');
+			expect(result.current.sortedProjects[0].name).toBe('🌟 Alpha');
+			expect(result.current.sortedProjects[1].name).toBe('Beta');
+			expect(result.current.sortedProjects[2].name).toBe('🔥 Zulu');
 		});
 	});
 
@@ -424,8 +425,8 @@ describe('useSessionCategories', () => {
 	// -----------------------------------------------------------------------
 	describe('combined scenarios', () => {
 		it('handles sessions that are both bookmarked and grouped', () => {
-			const g1 = makeGroup({ id: 'g1', name: 'My Group' });
-			const s1 = makeSession({ name: 'Both', bookmarked: true, groupId: 'g1' });
+			const g1 = makeProject({ id: 'g1', name: 'My Project' });
+			const s1 = makeSession({ name: 'Both', bookmarked: true, projectId: 'g1' });
 			const s2 = makeSession({ name: 'Just Ungrouped' });
 			resetStore([s1, s2], [g1]);
 
@@ -434,17 +435,17 @@ describe('useSessionCategories', () => {
 			// In bookmarked
 			expect(result.current.bookmarkedSessions).toHaveLength(1);
 			// In grouped
-			expect(result.current.sortedGroupSessionsById.get('g1')).toHaveLength(1);
+			expect(result.current.sortedProjectSessionsById.get('g1')).toHaveLength(1);
 			// Not in ungrouped
 			expect(result.current.ungroupedSessions).toHaveLength(1);
 			expect(result.current.ungroupedSessions[0].name).toBe('Just Ungrouped');
 		});
 
 		it('filtering interacts with categorization correctly', () => {
-			const g1 = makeGroup({ id: 'g1', name: 'API' });
-			const s1 = makeSession({ name: 'API Work', groupId: 'g1', bookmarked: true });
+			const g1 = makeProject({ id: 'g1', name: 'API' });
+			const s1 = makeSession({ name: 'API Work', projectId: 'g1', bookmarked: true });
 			const s2 = makeSession({ name: 'UI Work' });
-			const s3 = makeSession({ name: 'API Tests', groupId: 'g1' });
+			const s3 = makeSession({ name: 'API Tests', projectId: 'g1' });
 			resetStore([s1, s2, s3], [g1]);
 
 			const { result } = renderHook(() => useSessionCategories('api', [s1, s2, s3]));
@@ -452,7 +453,7 @@ describe('useSessionCategories', () => {
 			// Only API-matching sessions
 			expect(result.current.sortedFilteredSessions).toHaveLength(2);
 			expect(result.current.bookmarkedSessions).toHaveLength(1);
-			expect(result.current.sortedGroupSessionsById.get('g1')).toHaveLength(2);
+			expect(result.current.sortedProjectSessionsById.get('g1')).toHaveLength(2);
 			expect(result.current.ungroupedSessions).toHaveLength(0);
 		});
 
@@ -481,11 +482,11 @@ describe('useSessionCategories', () => {
 					makeSession({
 						name: `Session ${String(i).padStart(3, '0')}`,
 						bookmarked: i % 10 === 0,
-						groupId: i % 3 === 0 ? 'g1' : undefined,
+						projectId: i % 3 === 0 ? 'g1' : undefined,
 					})
 				);
 			}
-			const g1 = makeGroup({ id: 'g1', name: 'Group 1' });
+			const g1 = makeProject({ id: 'g1', name: 'Project 1' });
 			resetStore(sessions, [g1]);
 
 			const { result } = renderHook(() => useSessionCategories('', sessions));
@@ -493,7 +494,7 @@ describe('useSessionCategories', () => {
 			// 10 bookmarked (every 10th)
 			expect(result.current.bookmarkedSessions).toHaveLength(10);
 			// 34 grouped (every 3rd: 0,3,6,...,99 = 34)
-			expect(result.current.sortedGroupSessionsById.get('g1')!.length).toBe(34);
+			expect(result.current.sortedProjectSessionsById.get('g1')!.length).toBe(34);
 			// 66 ungrouped
 			expect(result.current.ungroupedSessions).toHaveLength(66);
 			// All 100 in filtered

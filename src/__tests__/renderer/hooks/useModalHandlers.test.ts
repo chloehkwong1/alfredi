@@ -1197,17 +1197,17 @@ describe('useModalHandlers', () => {
 			expect(useModalStore.getState().isOpen('queueBrowser')).toBe(false);
 		});
 
-		it('handleCloseRenameGroupModal closes renameGroup modal', () => {
-			getModalActions().setRenameGroupModalOpen(true);
+		it('handleCloseRenameProjectModal closes renameProject modal', () => {
+			getModalActions().setRenameProjectModalOpen(true);
 
 			const { result } = renderHook(() =>
 				useModalHandlers(createInputRef(), createTerminalOutputRef())
 			);
 			act(() => {
-				result.current.handleCloseRenameGroupModal();
+				result.current.handleCloseRenameProjectModal();
 			});
 
-			expect(useModalStore.getState().isOpen('renameGroup')).toBe(false);
+			expect(useModalStore.getState().isOpen('renameProject')).toBe(false);
 		});
 	});
 
@@ -1245,7 +1245,7 @@ describe('useModalHandlers', () => {
 		it('handleQuickActionsRenameTab does nothing when not in AI mode', () => {
 			const session = createMockSession({
 				id: 'session-1',
-				inputMode: 'terminal' as any,
+				inputMode: 'ai' as any,
 				activeTabId: 'tab-1',
 				aiTabs: [],
 			});
@@ -1303,7 +1303,7 @@ describe('useModalHandlers', () => {
 		it('handleQuickActionsOpenTabSwitcher does nothing when not in AI mode', () => {
 			const session = createMockSession({
 				id: 'session-1',
-				inputMode: 'terminal' as any,
+				inputMode: 'ai' as any,
 				aiTabs: [],
 			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'session-1' });
@@ -1815,12 +1815,11 @@ describe('useModalHandlers', () => {
 			expect(useModalStore.getState().getData('gitDiff')?.diff).toBe('diff --git a/file.ts');
 		});
 
-		it('uses shellCwd when in terminal mode', async () => {
+		it('uses session cwd for git diff', async () => {
 			const session = createMockSession({
 				isGitRepo: true,
 				cwd: '/projects/my-repo',
-				shellCwd: '/projects/my-repo/subdir',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: session.id });
 			(gitService.getDiff as ReturnType<typeof vi.fn>).mockResolvedValue({
@@ -1835,11 +1834,7 @@ describe('useModalHandlers', () => {
 				await result.current.handleViewGitDiff();
 			});
 
-			expect(gitService.getDiff).toHaveBeenCalledWith(
-				'/projects/my-repo/subdir',
-				undefined,
-				undefined
-			);
+			expect(gitService.getDiff).toHaveBeenCalledWith('/projects/my-repo', undefined, undefined);
 		});
 	});
 

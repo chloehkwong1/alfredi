@@ -32,7 +32,7 @@ import {
 	useNavigationHistory,
 	useSessionNavigation,
 	useSortedSessions,
-	useGroupManagement,
+	useProjectManagement,
 	// Input processing
 	useInputHandlers,
 	// Keyboard handling
@@ -220,15 +220,15 @@ function MaestroConsoleInner() {
 		setRenameTabId,
 		renameTabInitialName,
 		setRenameTabInitialName,
-		// Rename Group Modal
-		renameGroupModalOpen,
-		setRenameGroupModalOpen,
-		renameGroupId,
-		setRenameGroupId,
-		renameGroupValue,
-		setRenameGroupValue,
-		renameGroupEmoji,
-		setRenameGroupEmoji,
+		// Rename Project Modal
+		renameProjectModalOpen,
+		setRenameProjectModalOpen,
+		renameProjectId,
+		setRenameProjectId,
+		renameProjectValue,
+		setRenameProjectValue,
+		renameProjectEmoji,
+		setRenameProjectEmoji,
 		// Agent Sessions Browser
 		agentSessionsOpen,
 		setAgentSessionsOpen,
@@ -295,7 +295,6 @@ function MaestroConsoleInner() {
 		customThemeColors,
 		enterToSendAI,
 		setEnterToSendAI,
-		defaultSaveToHistory,
 		defaultShowThinking,
 		rightPanelWidth,
 		setRightPanelWidth,
@@ -357,7 +356,7 @@ function MaestroConsoleInner() {
 	// --- SESSION STATE (migrated from useSession() to direct useSessionStore selectors) ---
 	// Reactive values — each selector triggers re-render only when its specific value changes
 	const sessions = useSessionStore((s) => s.sessions);
-	const groups = useSessionStore((s) => s.groups);
+	const projects = useSessionStore((s) => s.projects);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	// sessionsLoaded moved to useQueueProcessing hook
 	const activeSession = useSessionStore(selectActiveSession);
@@ -365,7 +364,7 @@ function MaestroConsoleInner() {
 	// Actions — stable references from store, never trigger re-renders
 	const {
 		setSessions,
-		setGroups,
+		setProjects,
 		setActiveSessionId: storeSetActiveSessionId,
 		setRemovedWorktreePaths,
 	} = useMemo(() => useSessionStore.getState(), []);
@@ -437,7 +436,7 @@ function MaestroConsoleInner() {
 	const showUnreadOnly = useUIStore((s) => s.showUnreadOnly);
 	const fileTreeFilter = useFileExplorerStore((s) => s.fileTreeFilter);
 	const fileTreeFilterOpen = useFileExplorerStore((s) => s.fileTreeFilterOpen);
-	const editingGroupId = useUIStore((s) => s.editingGroupId);
+	const editingProjectId = useUIStore((s) => s.editingProjectId);
 	const editingSessionId = useUIStore((s) => s.editingSessionId);
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const flashNotification = useUIStore((s) => s.flashNotification);
@@ -451,7 +450,7 @@ function MaestroConsoleInner() {
 		setActiveRightTab,
 		setActiveFocus,
 		setBookmarksCollapsed,
-		setEditingGroupId,
+		setEditingProjectId,
 		setDraggingSessionId,
 		setFlashNotification,
 		setSuccessFlashNotification,
@@ -508,7 +507,7 @@ function MaestroConsoleInner() {
 
 	// Note: Git Diff State, Tour Overlay State, and Git Log Viewer State are from modalStore
 
-	// Note: Renaming state (editingGroupId/editingSessionId) and drag state (draggingSessionId)
+	// Note: Renaming state (editingProjectId/editingSessionId) and drag state (draggingSessionId)
 	// are now destructured from useUIStore() above
 
 	// Note: All modal states are now managed by modalStore (Zustand)
@@ -612,8 +611,8 @@ function MaestroConsoleInner() {
 					type: 'success',
 					title: 'Test Notification',
 					message: 'This is a test toast notification from the console!',
-					group: 'Debug',
-					project: 'Test Project',
+					project: 'Debug',
+					agentName: 'Test Project',
 				});
 			},
 		};
@@ -659,8 +658,9 @@ function MaestroConsoleInner() {
 		handleTabStar,
 		handleTabMarkUnread,
 		handleToggleTabReadOnlyMode,
-		handleToggleTabSaveToHistory,
 		handleToggleTabShowThinking,
+		handleTabModelChange,
+		handleToggleTabOutputStyle,
 		handleOpenFileTab,
 		handleSelectFileTab,
 		handleCloseFileTab,
@@ -703,7 +703,6 @@ function MaestroConsoleInner() {
 		handleClearAgentError,
 		handleOpenQueueBrowser,
 		handleOpenTabSearch,
-		handleOpenPromptComposer,
 		handleOpenFuzzySearch,
 		handleOpenCreatePR,
 		handleOpenAboutModal,
@@ -720,7 +719,7 @@ function MaestroConsoleInner() {
 		handleCloseCreatePRModal,
 		handleCloseSendToAgent,
 		handleCloseQueueBrowser,
-		handleCloseRenameGroupModal,
+		handleCloseRenameProjectModal,
 		handleQuickActionsRenameTab,
 		handleQuickActionsOpenTabSwitcher,
 		handleQuickActionsStartTour,
@@ -789,16 +788,7 @@ function MaestroConsoleInner() {
 	themeRef.current = theme;
 
 	// Memoized cwd for git viewers (prevents re-renders from inline computation)
-	const gitViewerCwd = useMemo(
-		() =>
-			activeSession
-				? activeSession.inputMode === 'terminal'
-					? activeSession.shellCwd || activeSession.cwd
-					: activeSession.cwd
-				: '',
-
-		[activeSession?.inputMode, activeSession?.shellCwd, activeSession?.cwd]
-	);
+	const gitViewerCwd = useMemo(() => activeSession?.cwd ?? '', [activeSession?.cwd]);
 
 	// PERF: Memoize sessions for NewInstanceModal validation (only recompute when modal is open)
 	// This prevents re-renders of the modal's validation logic on every session state change
@@ -818,7 +808,6 @@ function MaestroConsoleInner() {
 		activeSessionIdRef,
 		setSessions,
 		setActiveSessionId,
-		defaultSaveToHistory,
 		defaultShowThinking,
 	});
 
@@ -905,7 +894,7 @@ function MaestroConsoleInner() {
 	}, [activeSession?.agentCommands, activeSession?.toolType, hasActiveSessionCapability]);
 
 	const canAttachImages = useMemo(() => {
-		if (!activeSession || activeSession.inputMode !== 'ai') return false;
+		if (!activeSession) return false;
 		return isResumingSession
 			? hasActiveSessionCapability('supportsImageInputOnResume')
 			: hasActiveSessionCapability('supportsImageInput');
@@ -972,7 +961,6 @@ function MaestroConsoleInner() {
 			setActiveAgentSessionId,
 			setAgentSessionsOpen,
 			rightPanelRef,
-			defaultSaveToHistory,
 			defaultShowThinking,
 		});
 
@@ -1221,13 +1209,12 @@ function MaestroConsoleInner() {
 					// If a specific tab ID is provided, check if it exists
 					if (tabId && !s.aiTabs?.some((t) => t.id === tabId)) {
 						// Tab doesn't exist, just clear file preview
-						return { ...s, activeFileTabId: null, inputMode: 'ai' };
+						return { ...s, activeFileTabId: null };
 					}
 					return {
 						...s,
 						...(tabId && { activeTabId: tabId }),
 						activeFileTabId: null,
-						inputMode: 'ai',
 					};
 				})
 			);
@@ -1239,7 +1226,7 @@ function MaestroConsoleInner() {
 	// Extracted hook for sorted and visible session lists (ignores leading emojis for alphabetization)
 	const { sortedSessions, visibleSessions } = useSortedSessions({
 		sessions,
-		groups,
+		projects,
 		bookmarksCollapsed,
 	});
 
@@ -1258,8 +1245,8 @@ function MaestroConsoleInner() {
 		setActiveSessionId,
 		activeFocus,
 		setActiveFocus,
-		groups,
-		setGroups,
+		projects,
+		setProjects,
 		bookmarksCollapsed,
 		setBookmarksCollapsed,
 		inputRef,
@@ -1277,7 +1264,7 @@ function MaestroConsoleInner() {
 		initialLoadComplete
 	);
 
-	// Session lifecycle operations (rename, delete, star, unread, groups persistence, nav tracking)
+	// Session lifecycle operations (rename, delete, star, unread, projects persistence, nav tracking)
 	// — provided by useSessionLifecycle hook (Phase 2H)
 	const {
 		handleSaveEditAgent,
@@ -1306,7 +1293,7 @@ function MaestroConsoleInner() {
 	const { cycleSession } = useCycleSession({ sortedSessions });
 
 	// showConfirmation, performDeleteSession — provided by useSessionLifecycle hook (Phase 2H)
-	// deleteSession, deleteWorktreeGroup — provided by useSessionCrud hook
+	// deleteSession, deleteWorktreeProject — provided by useSessionCrud hook
 
 	// addNewSession, createNewSession — provided by useSessionCrud hook
 
@@ -1382,54 +1369,54 @@ function MaestroConsoleInner() {
 		handleOpenFileTab,
 	});
 
-	// --- GROUP MANAGEMENT ---
-	// Extracted hook for group CRUD operations (toggle, rename, create, drag-drop)
+	// --- PROJECT MANAGEMENT ---
+	// Extracted hook for project CRUD operations (toggle, rename, create, drag-drop)
 	const {
-		toggleGroup,
-		startRenamingGroup,
-		finishRenamingGroup,
-		createNewGroup,
-		handleDropOnGroup,
+		toggleProject,
+		startRenamingProject,
+		finishRenamingProject,
+		createNewProject,
+		handleDropOnProject,
 		handleDropOnUngrouped,
-		modalState: groupModalState,
-	} = useGroupManagement({
-		groups,
-		setGroups,
+		modalState: projectModalState,
+	} = useProjectManagement({
+		projects,
+		setProjects,
 		setSessions,
 		draggingSessionId,
 		setDraggingSessionId,
-		editingGroupId,
-		setEditingGroupId,
+		editingProjectId,
+		setEditingProjectId,
 	});
 
-	// Destructure group modal state for use in JSX
-	const { createGroupModalOpen, setCreateGroupModalOpen } = groupModalState;
+	// Destructure project modal state for use in JSX
+	const { createProjectModalOpen, setCreateProjectModalOpen } = projectModalState;
 
-	// Session CRUD operations (create, delete, rename, bookmark, drag-drop, group-move)
+	// Session CRUD operations (create, delete, rename, bookmark, drag-drop, project-move)
 	const {
 		addNewSession,
 		createNewSession,
 		deleteSession,
-		deleteWorktreeGroup,
+		deleteWorktreeProject,
 		startRenamingSession,
 		finishRenamingSession,
 		toggleBookmark,
 		handleDragStart,
 		handleDragOver,
-		handleCreateGroupAndMove,
-		handleGroupCreated,
+		handleCreateProjectAndMove,
+		handleProjectCreated,
 	} = useSessionCrud({
 		flushSessionPersistence,
 		setRemovedWorktreePaths,
 		showConfirmation,
 		inputRef,
-		setCreateGroupModalOpen,
+		setCreateProjectModalOpen,
 	});
 
-	// Group Modal Handlers (stable callbacks for AppGroupModals)
-	const handleCloseCreateGroupModal = useCallback(() => {
-		setCreateGroupModalOpen(false);
-	}, [setCreateGroupModalOpen]);
+	// Project Modal Handlers (stable callbacks for AppProjectModals)
+	const handleCloseCreateProjectModal = useCallback(() => {
+		setCreateProjectModalOpen(false);
+	}, [setCreateProjectModalOpen]);
 
 	const handlePRCreated = useCallback(
 		async (prDetails: PRDetails) => {
@@ -1528,7 +1515,6 @@ function MaestroConsoleInner() {
 	const {
 		handlePromptComposerSubmit,
 		handlePromptComposerSend,
-		handlePromptToggleTabSaveToHistory,
 		handlePromptToggleTabReadOnlyMode,
 		handlePromptToggleTabShowThinking,
 		handlePromptToggleEnterToSend,
@@ -1561,6 +1547,24 @@ function MaestroConsoleInner() {
 	// Symphony stripped - stub
 	const handleStartContribution = useCallback(async () => {}, []);
 
+	// Clear context: writes /clear to agent PTY and clears active tab logs
+	const clearContext = useCallback(() => {
+		const session = useSessionStore
+			.getState()
+			.sessions.find((s) => s.id === useSessionStore.getState().activeSessionId);
+		if (!session) return;
+		const activeTab = session.aiTabs.find((t) => t.id === session.activeTabId);
+		if (!activeTab) return;
+
+		// Write /clear to the agent's PTY stdin
+		window.maestro.process.write(session.id, '/clear\n');
+
+		// Clear the active tab's logs (store action created in Section 3)
+		useSessionStore.getState().clearActiveTabLogs(session.id);
+
+		notifyToast({ type: 'success', title: 'Context cleared', message: 'Sent /clear to agent' });
+	}, []);
+
 	// Update keyboardHandlerRef synchronously during render (before effects run)
 	// This must be placed after all handler functions and state are defined to avoid TDZ errors
 	// The ref is provided by useMainKeyboardHandler hook
@@ -1577,10 +1581,10 @@ function MaestroConsoleInner() {
 		aboutModalOpen,
 		processMonitorOpen,
 		logViewerOpen,
-		createGroupModalOpen,
+		createProjectModalOpen,
 		confirmModalOpen,
 		renameInstanceModalOpen,
-		renameGroupModalOpen,
+		renameProjectModalOpen,
 		activeSession,
 		fileTreeFilter,
 		fileTreeFilterOpen,
@@ -1591,14 +1595,13 @@ function MaestroConsoleInner() {
 		hasOpenModal,
 		visibleSessions,
 		sortedSessions,
-		groups,
+		projects,
 		bookmarksCollapsed,
 		leftSidebarOpen,
 		editingSessionId,
-		editingGroupId,
+		editingProjectId,
 		markdownEditMode,
 		chatRawTextMode,
-		defaultSaveToHistory,
 		defaultShowThinking,
 		setLeftSidebarOpen,
 		setRightPanelOpen,
@@ -1614,7 +1617,7 @@ function MaestroConsoleInner() {
 		handleSetActiveRightTab,
 		setActiveFocus,
 		setBookmarksCollapsed,
-		setGroups,
+		setProjects,
 		setSelectedSidebarIndex,
 		setActiveSessionId,
 		handleViewGitDiff,
@@ -1675,6 +1678,9 @@ function MaestroConsoleInner() {
 		handleEscapeInMain,
 		// Agent capabilities
 		hasActiveSessionCapability,
+
+		// Clear context action
+		clearContext,
 
 		// Merge session modal and send to agent modal
 		setMergeSessionModalOpen,
@@ -1840,7 +1846,6 @@ function MaestroConsoleInner() {
 		// Handlers
 		handleResumeSession,
 		handleNewAgentSession,
-		toggleInputMode,
 		processInput,
 		handleInterrupt,
 		handleInputKeyDown,
@@ -1864,8 +1869,9 @@ function MaestroConsoleInner() {
 		handleTabStar,
 		handleTabMarkUnread,
 		handleToggleTabReadOnlyMode,
-		handleToggleTabSaveToHistory,
 		handleToggleTabShowThinking,
+		handleTabModelChange,
+		handleToggleTabOutputStyle,
 		toggleUnreadFilter,
 		handleOpenTabSearch,
 		handleCloseAllTabs,
@@ -1888,7 +1894,6 @@ function MaestroConsoleInner() {
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleMainPanelInputBlur,
-		handleOpenPromptComposer,
 		handleReplayMessage,
 		handleMainPanelFileClick,
 		handleNavigateBack: handleFileTabNavigateBack,
@@ -1956,21 +1961,21 @@ function MaestroConsoleInner() {
 		// Domain handlers
 		toggleGlobalLive,
 		restartWebServer,
-		toggleGroup,
+		toggleProject,
 		handleDragStart,
 		handleDragOver,
-		handleDropOnGroup,
+		handleDropOnProject,
 		handleDropOnUngrouped,
-		finishRenamingGroup,
+		finishRenamingProject,
 		finishRenamingSession,
-		startRenamingGroup,
+		startRenamingProject,
 		startRenamingSession,
 		showConfirmation,
-		createNewGroup,
-		handleCreateGroupAndMove,
+		createNewProject,
+		handleCreateProjectAndMove,
 		addNewSession,
 		deleteSession,
-		deleteWorktreeGroup,
+		deleteWorktreeProject,
 		handleEditAgent,
 		handleOpenCreatePRSession,
 		handleQuickCreateWorktree,
@@ -2101,10 +2106,10 @@ function MaestroConsoleInner() {
 							>
 								{(() => {
 									const parts: string[] = [];
-									// Group name (if grouped)
-									const group = groups.find((g) => g.id === activeSession.groupId);
-									if (group) {
-										parts.push(`${group.emoji} ${group.name}`);
+									// Project name (if in a project)
+									const project = projects.find((p) => p.id === activeSession.projectId);
+									if (project) {
+										parts.push(`${project.emoji} ${project.name}`);
 									}
 									// Agent name (user-given name for this agent instance)
 									parts.push(activeSession.name);
@@ -2129,9 +2134,9 @@ function MaestroConsoleInner() {
 					</div>
 				)}
 
-				{/* --- UNIFIED MODALS (all modal groups consolidated into AppModals) --- */}
+				{/* --- UNIFIED MODALS (all modal sections consolidated into AppModals) --- */}
 				<AppModals
-					// Common props (sessions/groups + modal booleans self-sourced from stores — Tier 1B)
+					// Common props (sessions/projects + modal booleans self-sourced from stores — Tier 1B)
 					theme={theme}
 					shortcuts={shortcuts}
 					tabShortcuts={tabShortcuts}
@@ -2170,16 +2175,16 @@ function MaestroConsoleInner() {
 					renameTabInitialName={renameTabInitialName}
 					onCloseRenameTabModal={handleCloseRenameTabModal}
 					onRenameTab={handleRenameTab}
-					// AppGroupModals props
-					createGroupModalOpen={createGroupModalOpen}
-					onCloseCreateGroupModal={handleCloseCreateGroupModal}
-					onGroupCreated={handleGroupCreated}
-					renameGroupId={renameGroupId}
-					renameGroupValue={renameGroupValue}
-					setRenameGroupValue={setRenameGroupValue}
-					renameGroupEmoji={renameGroupEmoji}
-					setRenameGroupEmoji={setRenameGroupEmoji}
-					onCloseRenameGroupModal={handleCloseRenameGroupModal}
+					// AppProjectModals props
+					createProjectModalOpen={createProjectModalOpen}
+					onCloseCreateProjectModal={handleCloseCreateProjectModal}
+					onProjectCreated={handleProjectCreated}
+					renameProjectId={renameProjectId}
+					renameProjectValue={renameProjectValue}
+					setRenameProjectValue={setRenameProjectValue}
+					renameProjectEmoji={renameProjectEmoji}
+					setRenameProjectEmoji={setRenameProjectEmoji}
+					onCloseRenameProjectModal={handleCloseRenameProjectModal}
 					// AppWorktreeModals props
 					onCloseWorktreeConfigModal={handleCloseWorktreeConfigModal}
 					onSaveWorktreeConfig={handleSaveWorktreeConfig}
@@ -2202,11 +2207,11 @@ function MaestroConsoleInner() {
 					addNewSession={addNewSession}
 					setRenameInstanceValue={setRenameInstanceValue}
 					setRenameInstanceModalOpen={setRenameInstanceModalOpen}
-					setRenameGroupId={setRenameGroupId}
-					setRenameGroupValueForQuickActions={setRenameGroupValue}
-					setRenameGroupEmojiForQuickActions={setRenameGroupEmoji}
-					setRenameGroupModalOpenForQuickActions={setRenameGroupModalOpen}
-					setCreateGroupModalOpenForQuickActions={setCreateGroupModalOpen}
+					setRenameProjectId={setRenameProjectId}
+					setRenameProjectValueForQuickActions={setRenameProjectValue}
+					setRenameProjectEmojiForQuickActions={setRenameProjectEmoji}
+					setRenameProjectModalOpenForQuickActions={setRenameProjectModalOpen}
+					setCreateProjectModalOpenForQuickActions={setCreateProjectModalOpen}
 					setLeftSidebarOpen={setLeftSidebarOpen}
 					setRightPanelOpen={setRightPanelOpen}
 					toggleInputMode={toggleInputMode}
@@ -2221,7 +2226,7 @@ function MaestroConsoleInner() {
 					setActiveAgentSessionId={setActiveAgentSessionId}
 					setGitDiffPreview={setGitDiffPreview}
 					setGitLogOpen={setGitLogOpen}
-					isAiMode={activeSession?.inputMode === 'ai'}
+					isAiMode={true}
 					onQuickActionsRenameTab={handleQuickActionsRenameTab}
 					onQuickActionsToggleReadOnlyMode={handleQuickActionsToggleReadOnlyMode}
 					onQuickActionsToggleTabShowThinking={handleQuickActionsToggleTabShowThinking}
@@ -2298,8 +2303,6 @@ function MaestroConsoleInner() {
 					promptComposerStagedImages={canAttachImages ? stagedImages : []}
 					setPromptComposerStagedImages={canAttachImages ? setStagedImages : undefined}
 					onPromptOpenLightbox={handleSetLightboxImage}
-					promptTabSaveToHistory={activeTab?.saveToHistory ?? false}
-					onPromptToggleTabSaveToHistory={handlePromptToggleTabSaveToHistory}
 					promptTabReadOnlyMode={activeTab?.readOnlyMode ?? false}
 					onPromptToggleTabReadOnlyMode={handlePromptToggleTabReadOnlyMode}
 					promptTabShowThinking={activeTab?.showThinking ?? 'off'}
@@ -2351,7 +2354,6 @@ function MaestroConsoleInner() {
 						theme={theme}
 						shortcuts={shortcuts}
 						onNewAgent={addNewSession}
-						onOpenWizard={openWizardModal}
 						onOpenSettings={() => {
 							setSettingsModalOpen(true);
 							setSettingsTab('general');

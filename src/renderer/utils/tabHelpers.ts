@@ -265,7 +265,6 @@ export interface CreateTabOptions {
 	name?: string | null; // User-defined name (null = show UUID octet)
 	starred?: boolean; // Whether session is starred
 	usageStats?: UsageStats; // Token usage stats
-	saveToHistory?: boolean; // Whether to save synopsis to history after completions
 	showThinking?: ThinkingMode; // Thinking display mode: 'off' | 'on' (temporary) | 'sticky' (persistent)
 }
 
@@ -312,7 +311,6 @@ export function createTab(
 		name = null,
 		starred = false,
 		usageStats,
-		saveToHistory = true,
 		showThinking = 'off',
 	} = options;
 
@@ -328,7 +326,6 @@ export function createTab(
 		usageStats,
 		createdAt: Date.now(),
 		state: 'idle',
-		saveToHistory,
 		showThinking,
 	};
 
@@ -1593,10 +1590,8 @@ export interface CreateMergedSessionOptions {
 	mergedLogs: LogEntry[];
 	/** Aggregated usage stats from merged contexts (optional) */
 	usageStats?: UsageStats;
-	/** Group ID to assign the session to (optional) */
-	groupId?: string;
-	/** Whether to save completions to history (default: true) */
-	saveToHistory?: boolean;
+	/** Project ID to assign the session to (optional) */
+	projectId?: string;
 	/** Thinking display mode: 'off' | 'on' (temporary) | 'sticky' (persistent) */
 	showThinking?: ThinkingMode;
 }
@@ -1643,8 +1638,7 @@ export function createMergedSession(
 		toolType,
 		mergedLogs,
 		usageStats,
-		groupId,
-		saveToHistory = true,
+		projectId,
 		showThinking = 'off',
 	} = options;
 
@@ -1663,7 +1657,6 @@ export function createMergedSession(
 		usageStats,
 		createdAt: Date.now(),
 		state: 'idle',
-		saveToHistory,
 		showThinking,
 	};
 
@@ -1672,7 +1665,7 @@ export function createMergedSession(
 	const session: Session = {
 		id: sessionId,
 		name,
-		groupId,
+		projectId,
 		toolType,
 		state: 'idle',
 		cwd: projectRoot,
@@ -1690,7 +1683,7 @@ export function createMergedSession(
 		],
 		workLog: [],
 		contextUsage: 0,
-		inputMode: toolType === 'terminal' ? 'terminal' : 'ai',
+		inputMode: 'ai',
 		aiPid: 0,
 		terminalPid: 0,
 		port: 3000 + Math.floor(Math.random() * 100),
@@ -1700,9 +1693,7 @@ export function createMergedSession(
 		fileExplorerExpanded: [],
 		fileExplorerScrollPos: 0,
 		fileTreeAutoRefreshInterval: 180, // Default: auto-refresh every 3 minutes
-		shellCwd: projectRoot,
 		aiCommandHistory: [],
-		shellCommandHistory: [],
 		executionQueue: [],
 		activeTimeMs: 0,
 		aiTabs: [mergedTab],

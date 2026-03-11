@@ -36,7 +36,7 @@ import { generateId } from '../../utils/ids';
 import { getSlashCommandDescription } from '../../constants/app';
 import { validateNewSession } from '../../utils/sessionValidation';
 import { parseSynopsis } from '../../../shared/synopsis';
-import { formatRelativeTime } from '../../../shared/formatters';
+
 import { gitService } from '../../services/git';
 import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
 // Inline types and constants after stripping batch module
@@ -342,7 +342,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					})),
 					previousUIState: tabWizardState.previousUIState ?? {
 						readOnlyMode: false,
-						saveToHistory: true,
 						showThinking: 'off',
 					},
 					error: tabWizardState.error,
@@ -522,13 +521,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 		addLogToTab(currentSession.id, pendingLog);
 
 		try {
-			let synopsisPrompt: string;
-			if (activeTab.lastSynopsisTime) {
-				const timeAgo = formatRelativeTime(activeTab.lastSynopsisTime);
-				synopsisPrompt = `${autorunSynopsisPrompt}\n\nIMPORTANT: Only synopsize work done since the last synopsis (${timeAgo}). Do not repeat previous work.`;
-			} else {
-				synopsisPrompt = autorunSynopsisPrompt;
-			}
+			const synopsisPrompt = autorunSynopsisPrompt;
 			const synopsisTime = Date.now();
 
 			const result = await spawnBackgroundSynopsis(
@@ -573,13 +566,11 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					return;
 				}
 
-				const currentGroups = useSessionStore.getState().groups;
-				const group = currentGroups.find((g) => g.id === currentSession.groupId);
-				const groupName = group?.name || 'Ungrouped';
+				const currentProjects = useSessionStore.getState().projects;
+				const project = currentProjects.find((g) => g.id === currentSession.projectId);
+				const projectName = project?.name || 'Unassigned';
 
-				const elapsedTimeMs = activeTab.lastSynopsisTime
-					? synopsisTime - activeTab.lastSynopsisTime
-					: synopsisTime - activeTab.createdAt;
+				const elapsedTimeMs = synopsisTime - activeTab.createdAt;
 
 				addHistoryEntry({
 					type: 'AUTO',
@@ -602,7 +593,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 								if (tab.id !== activeTab.id) return tab;
 								return {
 									...tab,
-									lastSynopsisTime: synopsisTime,
 									logs: tab.logs.map((log) =>
 										log.id === pendingLog.id
 											? { ...log, text: `Synopsis saved to history: ${parsed.shortSummary}` }
@@ -618,8 +608,8 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					type: 'success',
 					title: 'History Entry Added',
 					message: parsed.shortSummary,
-					group: groupName,
-					project: currentSession.name,
+					project: projectName,
+					agentName: currentSession.name,
 					sessionId: currentSession.id,
 					tabId: activeTab.id,
 					tabName: activeTab.name || undefined,
@@ -795,7 +785,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 
 			const currentUIState: PreviousUIState = {
 				readOnlyMode: activeTab.readOnlyMode ?? false,
-				saveToHistory: activeTab.saveToHistory ?? true,
 				showThinking: activeTab.showThinking ?? 'off',
 			};
 
@@ -860,7 +849,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 		const currentDefaults = useSettingsStore.getState();
 		const result = createTab(currentSession, {
 			name: 'Wizard',
-			saveToHistory: currentDefaults.defaultSaveToHistory,
 			showThinking: currentDefaults.defaultShowThinking,
 		});
 		if (!result) {
@@ -883,7 +871,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 
 		const currentUIState: PreviousUIState = {
 			readOnlyMode: false,
-			saveToHistory: currentDefaults.defaultSaveToHistory,
 			showThinking: currentDefaults.defaultShowThinking,
 		};
 
@@ -1117,7 +1104,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				stagedImages: [],
 				createdAt: Date.now(),
 				state: 'idle',
-				saveToHistory: currentDefaults.defaultSaveToHistory,
 				showThinking: currentDefaults.defaultShowThinking,
 			};
 
@@ -1138,14 +1124,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				gitTags,
 				gitRefsCacheTime,
 				aiLogs: [],
-				shellLogs: [
-					{
-						id: generateId(),
-						timestamp: Date.now(),
-						source: 'system',
-						text: 'Shell Session Ready.',
-					},
-				],
+				shellLogs: [],
 				workLog: [],
 				contextUsage: 0,
 				inputMode: 'ai',
@@ -1158,9 +1137,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				fileExplorerExpanded: [],
 				fileExplorerScrollPos: 0,
 				fileTreeAutoRefreshInterval: 180,
-				shellCwd: directoryPath,
 				aiCommandHistory: [],
-				shellCommandHistory: [],
 				executionQueue: [],
 				activeTimeMs: 0,
 				aiTabs: [initialTab],

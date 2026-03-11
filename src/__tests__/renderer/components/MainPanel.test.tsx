@@ -739,7 +739,7 @@ describe('MainPanel', () => {
 		});
 
 		it('should not render TabBar in terminal mode', () => {
-			const session = createSession({ inputMode: 'terminal' });
+			const session = createSession({ inputMode: 'ai' });
 
 			render(<MainPanel {...defaultProps} activeSession={session} />);
 
@@ -823,7 +823,7 @@ describe('MainPanel', () => {
 
 		it('should not show UUID pill in terminal mode', () => {
 			const session = createSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				aiTabs: [
 					{
 						id: 'tab-1',
@@ -933,7 +933,7 @@ describe('MainPanel', () => {
 		});
 
 		it('should not display cost tracker in terminal mode', () => {
-			const session = createSession({ inputMode: 'terminal' });
+			const session = createSession({ inputMode: 'ai' });
 
 			render(<MainPanel {...defaultProps} activeSession={session} />);
 
@@ -1015,7 +1015,7 @@ describe('MainPanel', () => {
 		});
 
 		it('should not display context window in terminal mode', () => {
-			const session = createSession({ inputMode: 'terminal' });
+			const session = createSession({ inputMode: 'ai' });
 
 			render(<MainPanel {...defaultProps} activeSession={session} />);
 
@@ -2900,7 +2900,7 @@ describe('MainPanel', () => {
 			// The error banner is shown based on activeTab's error, not inputMode
 			// This ensures users see errors even when they switch to terminal mode
 			const session = createSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				aiTabs: [
 					{
 						id: 'tab-1',

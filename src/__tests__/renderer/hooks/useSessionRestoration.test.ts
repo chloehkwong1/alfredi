@@ -52,7 +52,7 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		fullPath: '/projects/myapp',
 		projectRoot: '/projects/myapp',
 		toolType: 'claude-code' as any,
-		groupId: 'group-1',
+		projectId: 'group-1',
 		inputMode: 'ai' as any,
 		state: 'idle' as any,
 		aiTabs: [
@@ -105,7 +105,7 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 
 // Mock IPC
 const mockGetAll = vi.fn();
-const mockGroupsGetAll = vi.fn();
+const mockProjectsGetAll = vi.fn();
 const mockAgentsGet = vi.fn();
 
 // ============================================================================
@@ -118,7 +118,7 @@ beforeEach(() => {
 
 	useSessionStore.setState({
 		sessions: [],
-		groups: [],
+		projects: [],
 		activeSessionId: '',
 		sessionsLoaded: false,
 		initialLoadComplete: false,
@@ -129,13 +129,13 @@ beforeEach(() => {
 		(window as any).maestro = {};
 	}
 	(window as any).maestro.sessions = { getAll: mockGetAll };
-	(window as any).maestro.groups = { getAll: mockGroupsGetAll };
+	(window as any).maestro.projects = { getAll: mockProjectsGetAll };
 	(window as any).maestro.agents = {
 		get: mockAgentsGet.mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
 	};
 
 	mockGetAll.mockResolvedValue([]);
-	mockGroupsGetAll.mockResolvedValue([]);
+	mockProjectsGetAll.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -279,7 +279,7 @@ describe('restoreSession — Corruption recovery', () => {
 
 	it('clears orphaned activeFileTabId when inputMode is terminal', async () => {
 		const session = createMockSession({
-			inputMode: 'terminal',
+			inputMode: 'ai',
 			activeFileTabId: 'orphaned-file-tab',
 		});
 		const { result } = renderHook(() => useSessionRestoration());
@@ -761,10 +761,10 @@ describe('initialLoadComplete proxy', () => {
 });
 
 // ============================================================================
-// Session & Group loading effect
+// Session Session & Group loading Project loading effect
 // ============================================================================
 
-describe('Session & Group loading effect', () => {
+describe('Session Session & Group loading Project loading effect', () => {
 	it('loads sessions from IPC on mount', async () => {
 		const session = createMockSession({ id: 'loaded-1' });
 		mockGetAll.mockResolvedValueOnce([session]);
@@ -782,9 +782,11 @@ describe('Session & Group loading effect', () => {
 		expect(sessions[0].id).toBe('loaded-1');
 	});
 
-	it('loads groups from IPC on mount', async () => {
+	it('loads projects from IPC on mount', async () => {
 		mockGetAll.mockResolvedValueOnce([]);
-		mockGroupsGetAll.mockResolvedValueOnce([{ id: 'g1', name: 'Group 1' }]);
+		mockProjectsGetAll.mockResolvedValueOnce([
+			{ id: 'g1', name: 'Project 1', rootPath: '/test/project', emoji: '', collapsed: false },
+		]);
 
 		renderHook(() => useSessionRestoration());
 
@@ -792,8 +794,8 @@ describe('Session & Group loading effect', () => {
 			await new Promise((r) => setTimeout(r, 50));
 		});
 
-		expect(mockGroupsGetAll).toHaveBeenCalled();
-		const groups = useSessionStore.getState().groups;
+		expect(mockProjectsGetAll).toHaveBeenCalled();
+		const groups = useSessionStore.getState().projects;
 		expect(groups).toHaveLength(1);
 	});
 
@@ -859,7 +861,7 @@ describe('Session & Group loading effect', () => {
 		});
 
 		expect(useSessionStore.getState().sessions).toEqual([]);
-		expect(useSessionStore.getState().groups).toEqual([]);
+		expect(useSessionStore.getState().projects).toEqual([]);
 		expect(useSessionStore.getState().sessionsLoaded).toBe(true);
 		expect(useSessionStore.getState().initialLoadComplete).toBe(true);
 	});

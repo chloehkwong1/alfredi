@@ -464,7 +464,7 @@ describe('useAgentListeners', () => {
 			const session = createMockSession({
 				id: 'sess-1',
 				state: 'busy',
-				busySource: 'terminal',
+				busySource: 'ai',
 			});
 			useSessionStore.setState({
 				sessions: [session],
@@ -484,7 +484,7 @@ describe('useAgentListeners', () => {
 			const session = createMockSession({
 				id: 'sess-1',
 				state: 'busy',
-				busySource: 'terminal',
+				busySource: 'ai',
 			});
 			useSessionStore.setState({
 				sessions: [session],
@@ -912,7 +912,7 @@ describe('useAgentListeners', () => {
 			const session = createMockSession({
 				id: 'sess-1',
 				state: 'busy',
-				busySource: 'terminal',
+				busySource: 'ai',
 			});
 			useSessionStore.setState({
 				sessions: [session],

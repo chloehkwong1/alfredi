@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Search } from 'lucide-react';
-import type { Session, Group, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
+import type { Session, Project, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { notifyToast } from '../stores/notificationStore';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
@@ -11,6 +11,9 @@ import type { WizardStep } from './Wizard/WizardContext';
 import { useListNavigation } from '../hooks';
 import { useUIStore } from '../stores/uiStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { OUTPUT_STYLE_OPTIONS } from '../../shared/types';
+import type { OutputStyle } from '../../shared/types';
 
 interface QuickAction {
 	id: string;
@@ -25,19 +28,19 @@ interface QuickActionsModalProps {
 	sessions: Session[];
 	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	activeSessionId: string;
-	groups: Group[];
-	setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
+	projects: Project[];
+	setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 	shortcuts: Record<string, Shortcut>;
-	initialMode?: 'main' | 'move-to-group';
+	initialMode?: 'main' | 'move-to-project';
 	setQuickActionOpen: (open: boolean) => void;
 	setActiveSessionId: (id: string) => void;
 	setRenameInstanceModalOpen: (open: boolean) => void;
 	setRenameInstanceValue: (value: string) => void;
-	setRenameGroupModalOpen: (open: boolean) => void;
-	setRenameGroupId: (id: string) => void;
-	setRenameGroupValue: (value: string) => void;
-	setRenameGroupEmoji: (emoji: string) => void;
-	setCreateGroupModalOpen: (open: boolean) => void;
+	setRenameProjectModalOpen: (open: boolean) => void;
+	setRenameProjectId: (id: string) => void;
+	setRenameProjectValue: (value: string) => void;
+	setRenameProjectEmoji: (emoji: string) => void;
+	setCreateProjectModalOpen: (open: boolean) => void;
 	setLeftSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	setRightPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	setActiveRightTab: (tab: RightPanelTab) => void;
@@ -115,19 +118,19 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		sessions,
 		setSessions,
 		activeSessionId,
-		groups,
-		setGroups,
+		projects,
+		setProjects,
 		shortcuts,
 		initialMode = 'main',
 		setQuickActionOpen,
 		setActiveSessionId,
 		setRenameInstanceModalOpen,
 		setRenameInstanceValue,
-		setRenameGroupModalOpen,
-		setRenameGroupId,
-		setRenameGroupValue,
-		setRenameGroupEmoji,
-		setCreateGroupModalOpen,
+		setRenameProjectModalOpen,
+		setRenameProjectId,
+		setRenameProjectValue,
+		setRenameProjectEmoji,
+		setCreateProjectModalOpen,
 		setLeftSidebarOpen,
 		setRightPanelOpen,
 		setActiveRightTab,
@@ -189,8 +192,10 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const storeSetSessionFilterOpen = useUIStore((s) => s.setSessionFilterOpen);
 	const storeSetOutputSearchOpen = useUIStore((s) => s.setOutputSearchOpen);
 	const storeSetFileTreeFilterOpen = useFileExplorerStore((s) => s.setFileTreeFilterOpen);
+	const currentOutputStyle = useSettingsStore((s) => s.outputStyle);
+	const setOutputStyle = useSettingsStore((s) => s.setOutputStyle);
 	const [search, setSearch] = useState('');
-	const [mode, setMode] = useState<'main' | 'move-to-group'>(initialMode);
+	const [mode, setMode] = useState<'main' | 'move-to-project'>(initialMode);
 	const [renamingSession, setRenamingSession] = useState(false);
 	const [renameValue, setRenameValue] = useState('');
 	const [firstVisibleIndex, setFirstVisibleIndex] = useState(0);
@@ -233,7 +238,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	useEffect(() => {
 		handleEscapeRef.current = () => {
 			// Handle escape based on current mode
-			if (mode === 'move-to-group') {
+			if (mode === 'move-to-project') {
 				setMode('main');
 				// Note: Selection will be reset by the search/mode change useEffect
 			} else {
@@ -275,14 +280,16 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		}
 	};
 
-	const handleMoveToGroup = (groupId: string) => {
-		const updatedSessions = sessions.map((s) => (s.id === activeSessionId ? { ...s, groupId } : s));
+	const handleMoveToProject = (projectId: string) => {
+		const updatedSessions = sessions.map((s) =>
+			s.id === activeSessionId ? { ...s, projectId } : s
+		);
 		setSessions(updatedSessions);
 		setQuickActionOpen(false);
 	};
 
-	const handleCreateGroup = () => {
-		setCreateGroupModalOpen(true);
+	const handleCreateProject = () => {
+		setCreateProjectModalOpen(true);
 		setQuickActionOpen(false);
 	};
 
@@ -302,10 +309,10 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			label,
 			action: () => {
 				setActiveSessionId(s.id);
-				// Auto-expand group if it's collapsed
-				if (s.groupId) {
-					setGroups((prev) =>
-						prev.map((g) => (g.id === s.groupId && g.collapsed ? { ...g, collapsed: false } : g))
+				// Auto-expand project if it's collapsed
+				if (s.projectId) {
+					setProjects((prev) =>
+						prev.map((p) => (p.id === s.projectId && p.collapsed ? { ...p, collapsed: false } : p))
 					);
 				}
 			},
@@ -378,18 +385,18 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 					},
 				]
 			: []),
-		...(activeSession?.groupId
+		...(activeSession?.projectId
 			? [
 					{
-						id: 'renameGroup',
-						label: 'Rename Group',
+						id: 'renameProject',
+						label: 'Rename Project',
 						action: () => {
-							const group = groups.find((g) => g.id === activeSession.groupId);
-							if (group) {
-								setRenameGroupId(group.id);
-								setRenameGroupValue(group.name);
-								setRenameGroupEmoji(group.emoji);
-								setRenameGroupModalOpen(true);
+							const project = projects.find((p) => p.id === activeSession.projectId);
+							if (project) {
+								setRenameProjectId(project.id);
+								setRenameProjectValue(project.name);
+								setRenameProjectEmoji(project.emoji);
+								setRenameProjectModalOpen(true);
 								setQuickActionOpen(false);
 							}
 						},
@@ -399,16 +406,16 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		...(activeSession
 			? [
 					{
-						id: 'moveToGroup',
-						label: 'Move to Group...',
+						id: 'moveToProject',
+						label: 'Move to Project...',
 						action: () => {
-							setMode('move-to-group');
+							setMode('move-to-project');
 							setSelectedIndex(0);
 						},
 					},
 				]
 			: []),
-		{ id: 'createGroup', label: 'Create New Group', action: handleCreateGroup },
+		{ id: 'createProject', label: 'Create New Project', action: handleCreateProject },
 		{
 			id: 'toggleSidebar',
 			label: 'Toggle Sidebar',
@@ -602,6 +609,18 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			},
 		},
 		{
+			id: 'outputStyle',
+			label: `Output Style: ${OUTPUT_STYLE_OPTIONS.find((o) => o.id === currentOutputStyle)?.label ?? 'Default'}`,
+			subtext: 'Cycle output style (Default → Explanatory → Learning)',
+			action: () => {
+				const styles: OutputStyle[] = ['default', 'explanatory', 'learning'];
+				const currentIndex = styles.indexOf(currentOutputStyle);
+				const nextStyle = styles[(currentIndex + 1) % styles.length];
+				setOutputStyle(nextStyle);
+				setQuickActionOpen(false);
+			},
+		},
+		{
 			id: 'theme',
 			label: 'Change Theme',
 			action: () => {
@@ -713,10 +732,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						label: 'View Git Diff',
 						shortcut: shortcuts.viewGitDiff,
 						action: async () => {
-							const cwd =
-								activeSession.inputMode === 'terminal'
-									? activeSession.shellCwd || activeSession.cwd
-									: activeSession.cwd;
+							const cwd = activeSession.cwd;
 							const sshRemoteId =
 								activeSession.sshRemoteId ||
 								(activeSession.sessionSshRemoteConfig?.enabled
@@ -751,10 +767,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						id: 'openRepo',
 						label: 'Open Repository in Browser',
 						action: async () => {
-							const cwd =
-								activeSession.inputMode === 'terminal'
-									? activeSession.shellCwd || activeSession.cwd
-									: activeSession.cwd;
+							const cwd = activeSession.cwd;
 							try {
 								const browserUrl = await gitService.getRemoteBrowserUrl(cwd);
 								if (browserUrl) {
@@ -1104,7 +1117,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			: []),
 	];
 
-	const groupActions: QuickAction[] = [
+	const projectActions: QuickAction[] = [
 		{
 			id: 'back',
 			label: '← Back to main menu',
@@ -1113,16 +1126,16 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				setSelectedIndex(0);
 			},
 		},
-		{ id: 'no-group', label: '📁 No Group (Root)', action: () => handleMoveToGroup('') },
-		...groups.map((g) => ({
-			id: `group-${g.id}`,
-			label: `${g.emoji} ${g.name}`,
-			action: () => handleMoveToGroup(g.id),
+		{ id: 'no-project', label: '📁 No Project', action: () => handleMoveToProject('') },
+		...projects.map((p) => ({
+			id: `project-${p.id}`,
+			label: `${p.emoji} ${p.name}`,
+			action: () => handleMoveToProject(p.id),
 		})),
-		{ id: 'create-new', label: '+ Create New Group', action: handleCreateGroup },
+		{ id: 'create-new', label: '+ Create New Project', action: handleCreateProject },
 	];
 
-	const actions = mode === 'main' ? mainActions : groupActions;
+	const actions = mode === 'main' ? mainActions : projectActions;
 
 	// Filter actions - hide "Debug:" prefixed commands unless user explicitly types "debug"
 	const searchLower = search.toLowerCase();
@@ -1150,7 +1163,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			if (!selectedAction) return;
 
 			// Don't close modal if action switches modes
-			const switchesModes = selectedAction.id === 'moveToGroup' || selectedAction.id === 'back';
+			const switchesModes = selectedAction.id === 'moveToProject' || selectedAction.id === 'back';
 			selectedAction.action();
 			if (!renamingSession && mode === 'main' && !switchesModes) {
 				setQuickActionOpen(false);
@@ -1191,9 +1204,9 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		setFirstVisibleIndex(0);
 	}, [search, mode, setSelectedIndex]);
 
-	// Clear search when switching to move-to-group mode
+	// Clear search when switching to move-to-project mode
 	useEffect(() => {
-		if (mode === 'move-to-group') {
+		if (mode === 'move-to-project') {
 			setSearch('');
 		}
 	}, [mode]);
@@ -1252,8 +1265,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 							ref={inputRef}
 							className="flex-1 bg-transparent outline-none text-lg placeholder-opacity-50"
 							placeholder={
-								mode === 'move-to-group'
-									? `Move ${activeSession?.name || 'session'} to...`
+								mode === 'move-to-project'
+									? `Move ${activeSession?.name || 'agent'} to project...`
 									: 'Type a command or jump to agent...'
 							}
 							style={{ color: theme.colors.textMain }}
@@ -1290,7 +1303,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 									key={a.id}
 									ref={i === selectedIndex ? selectedItemRef : null}
 									onClick={() => {
-										const switchesModes = a.id === 'moveToGroup' || a.id === 'back';
+										const switchesModes = a.id === 'moveToProject' || a.id === 'back';
 										a.action();
 										if (mode === 'main' && !switchesModes) setQuickActionOpen(false);
 									}}

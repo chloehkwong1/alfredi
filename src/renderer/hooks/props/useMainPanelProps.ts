@@ -147,7 +147,6 @@ export interface UseMainPanelPropsDeps {
 		usageStats?: UsageStats
 	) => void;
 	handleNewAgentSession: () => void;
-	toggleInputMode: () => void;
 	processInput: () => void;
 	handleInterrupt: () => void;
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
@@ -174,8 +173,9 @@ export interface UseMainPanelPropsDeps {
 	handleTabStar: (tabId: string, starred: boolean) => void;
 	handleTabMarkUnread: (tabId: string) => void;
 	handleToggleTabReadOnlyMode: () => void;
-	handleToggleTabSaveToHistory: () => void;
 	handleToggleTabShowThinking: () => void;
+	handleTabModelChange: (modelId: string) => void;
+	handleToggleTabOutputStyle: () => void;
 	toggleUnreadFilter: () => void;
 	handleOpenTabSearch: () => void;
 	handleCloseAllTabs: () => void;
@@ -202,7 +202,6 @@ export interface UseMainPanelPropsDeps {
 	handleScrollPositionChange: (scrollTop: number) => void;
 	handleAtBottomChange: (isAtBottom: boolean) => void;
 	handleMainPanelInputBlur: () => void;
-	handleOpenPromptComposer: () => void;
 	handleReplayMessage: (text: string, images?: string[]) => void;
 	handleMainPanelFileClick: (relativePath: string) => void;
 	handleNavigateBack: () => void;
@@ -326,7 +325,6 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			inputRef: deps.inputRef,
 			logsEndRef: deps.logsEndRef,
 			terminalOutputRef: deps.terminalOutputRef,
-			toggleInputMode: deps.toggleInputMode,
 			processInput: deps.processInput,
 			handleInterrupt: deps.handleInterrupt,
 			handleInputKeyDown: deps.handleInputKeyDown,
@@ -350,6 +348,8 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onTabStar: deps.handleTabStar,
 			onTabMarkUnread: deps.handleTabMarkUnread,
 			onToggleTabReadOnlyMode: deps.handleToggleTabReadOnlyMode,
+			onTabModelChange: deps.handleTabModelChange,
+			onToggleTabOutputStyle: deps.handleToggleTabOutputStyle,
 			onToggleUnreadFilter: deps.toggleUnreadFilter,
 			onOpenTabSearch: deps.handleOpenTabSearch,
 			onCloseAllTabs: deps.handleCloseAllTabs,
@@ -367,12 +367,10 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onFileTabScrollPositionChange: deps.handleFileTabScrollPositionChange,
 			onFileTabSearchQueryChange: deps.handleFileTabSearchQueryChange,
 			onReloadFileTab: deps.handleReloadFileTab,
-			onToggleTabSaveToHistory: deps.handleToggleTabSaveToHistory,
 			onToggleTabShowThinking: deps.handleToggleTabShowThinking,
 			onScrollPositionChange: deps.handleScrollPositionChange,
 			onAtBottomChange: deps.handleAtBottomChange,
 			onInputBlur: deps.handleMainPanelInputBlur,
-			onOpenPromptComposer: deps.handleOpenPromptComposer,
 			onReplayMessage: deps.handleReplayMessage,
 			fileTree: deps.fileTree,
 			onFileClick: deps.handleMainPanelFileClick,
@@ -456,7 +454,6 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.activeAgentSessionId,
 			deps.activeSession?.id, // Use ID instead of full object
 			deps.activeSession?.activeTabId,
-			deps.activeSession?.inputMode,
 			deps.activeSession?.projectRoot,
 			deps.activeSession?.cwd,
 			deps.thinkingItems,
@@ -523,7 +520,6 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.setAtMentionStartIndex,
 			deps.setSelectedAtMentionIndex,
 			deps.setGitLogOpen,
-			deps.toggleInputMode,
 			deps.processInput,
 			deps.handleInterrupt,
 			deps.handleInputKeyDown,
@@ -545,8 +541,9 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleTabStar,
 			deps.handleTabMarkUnread,
 			deps.handleToggleTabReadOnlyMode,
-			deps.handleToggleTabSaveToHistory,
 			deps.handleToggleTabShowThinking,
+			deps.handleTabModelChange,
+			deps.handleToggleTabOutputStyle,
 			deps.toggleUnreadFilter,
 			deps.handleOpenTabSearch,
 			deps.handleCloseAllTabs,
@@ -567,7 +564,6 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleScrollPositionChange,
 			deps.handleAtBottomChange,
 			deps.handleMainPanelInputBlur,
-			deps.handleOpenPromptComposer,
 			deps.handleReplayMessage,
 			deps.handleMainPanelFileClick,
 			deps.handleNavigateBack,

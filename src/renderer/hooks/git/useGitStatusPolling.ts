@@ -236,8 +236,7 @@ export function useGitStatusPolling(
 			const results = await Promise.all(
 				gitSessions.map(async (session) => {
 					try {
-						const cwd =
-							session.inputMode === 'terminal' ? session.shellCwd || session.cwd : session.cwd;
+						const cwd = session.cwd;
 
 						const isActiveSession = session.id === currentActiveSessionId;
 

@@ -68,9 +68,7 @@ function createSession(overrides: Partial<Session> = {}): Session {
 		fileExplorerExpanded: [],
 		fileExplorerScrollPos: 0,
 		fileTreeAutoRefreshInterval: 180,
-		shellCwd: '/test/project',
 		aiCommandHistory: [],
-		shellCommandHistory: [],
 		executionQueue: [],
 		activeTimeMs: 0,
 		aiTabs: [tab],
@@ -205,7 +203,7 @@ describe('useQuickActionsHandlers', () => {
 			const tab = createTab({ id: 'tab-1', readOnlyMode: false });
 			const session = createSession({
 				id: 'sess-1',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				activeTabId: 'tab-1',
 				aiTabs: [tab],
 			});
@@ -476,7 +474,7 @@ describe('useQuickActionsHandlers', () => {
 			const tab = createTab({ id: 'tab-1', showThinking: 'off' });
 			const session = createSession({
 				id: 'sess-1',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				activeTabId: 'tab-1',
 				aiTabs: [tab],
 			});

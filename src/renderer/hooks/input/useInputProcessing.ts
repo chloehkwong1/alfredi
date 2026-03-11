@@ -13,7 +13,21 @@ import { generateId } from '../../utils/ids';
 import { substituteTemplateVariables } from '../../utils/templateVariables';
 import { filterYoloArgs } from '../../utils/agentArgs';
 import { gitService } from '../../services/git';
-import { imageOnlyDefaultPrompt, maestroSystemPrompt } from '../../../prompts';
+import {
+	imageOnlyDefaultPrompt,
+	maestroSystemPrompt,
+	outputStyleExplanatoryPrompt,
+	outputStyleLearningPrompt,
+} from '../../../prompts';
+import type { OutputStyle } from '../../../shared/types';
+import { useSettingsStore } from '../../stores/settingsStore';
+
+/** Map of output style to its prompt text (default has no extra prompt). */
+const OUTPUT_STYLE_PROMPTS: Record<OutputStyle, string | null> = {
+	default: null,
+	explanatory: outputStyleExplanatoryPrompt,
+	learning: outputStyleLearningPrompt,
+};
 
 /**
  * Default prompt used when user sends only an image without text.
@@ -46,10 +60,6 @@ export interface UseInputProcessingDeps {
 	setSlashCommandOpen: (open: boolean) => void;
 	/** Sync AI input value to session state (for persistence) */
 	syncAiInputToSession: (value: string) => void;
-	/** Sync terminal input value to session state (for persistence) */
-	syncTerminalInputToSession: (value: string) => void;
-	/** Whether the active session is in AI mode */
-	isAiMode: boolean;
 	/** Reference to sessions array (for avoiding stale closures) */
 	sessionsRef: React.MutableRefObject<Session[]>;
 	/** Get batch state for a session */
@@ -119,8 +129,6 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 		customAICommands,
 		setSlashCommandOpen,
 		syncAiInputToSession,
-		syncTerminalInputToSession,
-		isAiMode,
 		sessionsRef,
 		getBatchState,
 		// Note: activeBatchRunState is in deps interface but not used - kept for API compatibility
@@ -156,12 +164,11 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			// Note: slash commands are queued like regular messages when agent is busy
 			if (effectiveInputValue.trim().startsWith('/')) {
 				const commandText = effectiveInputValue.trim();
-				const isTerminalMode = activeSession.inputMode === 'terminal';
 
-				// Handle built-in /history command (only in AI mode)
+				// Handle built-in /history command
 				// This is intercepted here because it requires Maestro to handle the synopsis generation
 				// rather than passing through to the agent (which may not support it or require special permissions)
-				if (!isTerminalMode && commandText === '/history' && onHistoryCommand) {
+				if (commandText === '/history' && onHistoryCommand) {
 					setInputValue('');
 					setSlashCommandOpen(false);
 					syncAiInputToSession('');
@@ -179,7 +186,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				// The command can have optional arguments: /wizard <natural language input>
 				// Match exactly "/wizard" or "/wizard " followed by arguments (not "/wizardry" etc.)
 				const isWizardCommand = commandText === '/wizard' || commandText.startsWith('/wizard ');
-				if (!isTerminalMode && isWizardCommand && onWizardCommand) {
+				if (isWizardCommand && onWizardCommand) {
 					// Extract arguments after '/wizard ' (everything after the command)
 					const args = commandText.slice('/wizard'.length).trim();
 
@@ -196,7 +203,6 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				// Handle built-in /skills command (only in AI mode, only for Claude Code sessions)
 				// This lists available Claude Code skills for the current project
 				if (
-					!isTerminalMode &&
 					commandText === '/skills' &&
 					onSkillsCommand &&
 					activeSession.toolType === 'claude-code'
@@ -213,8 +219,8 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					return;
 				}
 
-				// Check for custom AI commands (only in AI mode)
-				if (!isTerminalMode) {
+				// Check for custom AI commands
+				{
 					// Parse command and arguments: "/speckit.plan Blah blah" -> baseCommand="/speckit.plan", args="Blah blah"
 					const firstSpaceIndex = commandText.indexOf(' ');
 					const baseCommand =
@@ -333,11 +339,9 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				}
 			}
 
-			const currentMode = activeSession.inputMode;
-
 			// Handle wizard mode - route messages to wizard sendMessage instead of normal AI processing
 			// This allows the wizard to have its own conversation without affecting the regular AI queue
-			if (currentMode === 'ai' && isWizardActive && onWizardSendMessage) {
+			if (isWizardActive && onWizardSendMessage) {
 				// Don't allow slash commands in wizard mode (except /wizard which ends/restarts it)
 				if (
 					effectiveInputValue.trim().startsWith('/') &&
@@ -372,7 +376,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			// For write mode tabs: queue if ANY tab in session is busy (prevents conflicts)
 			// EXCEPTION: Write commands can bypass the queue and run in parallel if ALL busy tabs
 			// and ALL queued items are read-only
-			if (currentMode === 'ai') {
+			{
 				const activeTab = getActiveTab(activeSession);
 				const isReadOnlyMode = activeTab?.readOnlyMode === true;
 
@@ -462,7 +466,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			}
 
 			// Check if we're in read-only mode for the log entry (tab setting OR Auto Run without worktree)
-			const activeTabForEntry = currentMode === 'ai' ? getActiveTab(activeSession) : null;
+			const activeTabForEntry = getActiveTab(activeSession) ?? null;
 			const currentBatchState = getBatchState(activeSession.id);
 			const isAutoRunReadOnly = currentBatchState?.isRunning && !currentBatchState?.worktreeActive;
 			const isReadOnlyEntry = activeTabForEntry?.readOnlyMode === true || isAutoRunReadOnly;
@@ -476,118 +480,12 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				...(isReadOnlyEntry && { readOnly: true }),
 			};
 
-			// Track shell CWD changes when in terminal mode
-			// For SSH sessions, use remoteCwd; for local sessions, use shellCwd
-			// Check both sshRemoteId (set after spawn) and sessionSshRemoteConfig.enabled (set before spawn)
-			const isRemoteSession =
-				!!activeSession.sshRemoteId || !!activeSession.sessionSshRemoteConfig?.enabled;
-			let newShellCwd = activeSession.shellCwd || activeSession.cwd;
-			let newRemoteCwd = activeSession.remoteCwd;
-			let cwdChanged = false;
-			let remoteCwdChanged = false;
-			if (currentMode === 'terminal') {
-				const trimmedInput = effectiveInputValue.trim();
-				// Get the current CWD based on whether this is a remote or local session
-				const currentCwd = isRemoteSession
-					? activeSession.remoteCwd ||
-						activeSession.sessionSshRemoteConfig?.workingDirOverride ||
-						activeSession.cwd
-					: activeSession.shellCwd || activeSession.cwd;
-
-				// Handle bare "cd" command - go to session's original directory (or remote working dir for SSH)
-				if (trimmedInput === 'cd') {
-					if (isRemoteSession) {
-						// For remote sessions, bare cd goes to the session's configured working directory
-						remoteCwdChanged = true;
-						newRemoteCwd =
-							activeSession.sessionSshRemoteConfig?.workingDirOverride || activeSession.cwd;
-					} else {
-						cwdChanged = true;
-						newShellCwd = activeSession.cwd;
-					}
-				}
-				const cdMatch = trimmedInput.match(/^cd\s+(.+)$/);
-				if (cdMatch) {
-					const targetPath = cdMatch[1].trim().replace(/^['"]|['"]$/g, ''); // Remove quotes
-					let candidatePath: string;
-					if (targetPath === '~' || targetPath.startsWith('~/')) {
-						// For remote sessions, ~ should expand to session's base directory
-						if (isRemoteSession) {
-							const basePath =
-								activeSession.sessionSshRemoteConfig?.workingDirOverride || activeSession.cwd;
-							if (targetPath === '~') {
-								candidatePath = basePath;
-							} else {
-								// ~/subpath
-								const subPath = targetPath.slice(2); // Remove ~/
-								candidatePath = basePath + (basePath.endsWith('/') ? '' : '/') + subPath;
-							}
-						} else {
-							// Local: navigate to session's original directory
-							if (targetPath === '~') {
-								candidatePath = activeSession.cwd;
-							} else {
-								candidatePath =
-									activeSession.cwd +
-									(activeSession.cwd.endsWith('/') ? '' : '/') +
-									targetPath.slice(2);
-							}
-						}
-					} else if (targetPath.startsWith('/')) {
-						// Absolute path
-						candidatePath = targetPath;
-					} else if (targetPath === '..') {
-						// Go up one directory
-						const parts = currentCwd.split('/').filter(Boolean);
-						parts.pop();
-						candidatePath = '/' + parts.join('/');
-					} else if (targetPath.startsWith('../')) {
-						// Relative path going up
-						const parts = currentCwd.split('/').filter(Boolean);
-						const upCount = targetPath.split('/').filter((p) => p === '..').length;
-						for (let i = 0; i < upCount; i++) parts.pop();
-						const remainingPath = targetPath
-							.split('/')
-							.filter((p) => p !== '..')
-							.join('/');
-						candidatePath = '/' + [...parts, ...remainingPath.split('/').filter(Boolean)].join('/');
-					} else {
-						// Relative path going down
-						candidatePath = currentCwd + (currentCwd.endsWith('/') ? '' : '/') + targetPath;
-					}
-
-					// Verify the directory exists before updating CWD
-					// Pass SSH remote ID for remote sessions - use sessionSshRemoteConfig.remoteId as fallback
-					// because sshRemoteId is only set after AI agent spawns, not for terminal-only SSH sessions
-					const sshIdForVerify =
-						activeSession.sshRemoteId ||
-						activeSession.sessionSshRemoteConfig?.remoteId ||
-						undefined;
-					try {
-						await window.maestro.fs.readDir(candidatePath, sshIdForVerify);
-						// Directory exists, update the appropriate CWD
-						if (isRemoteSession) {
-							remoteCwdChanged = true;
-							newRemoteCwd = candidatePath;
-						} else {
-							cwdChanged = true;
-							newShellCwd = candidatePath;
-						}
-					} catch {
-						// Directory doesn't exist, keep the current CWD
-						// The shell will show its own error message
-					}
-				}
-			}
-
 			setSessions((prev) =>
 				prev.map((s) => {
 					if (s.id !== activeSessionId) return s;
 
-					// Add command to history (separate histories for AI and terminal modes)
-					const historyKey = currentMode === 'ai' ? 'aiCommandHistory' : 'shellCommandHistory';
-					const currentHistory =
-						currentMode === 'ai' ? s.aiCommandHistory || [] : s.shellCommandHistory || [];
+					// Add command to AI command history
+					const currentHistory = s.aiCommandHistory || [];
 					const newHistory = [...currentHistory];
 					if (
 						effectiveInputValue.trim() &&
@@ -597,21 +495,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 						newHistory.push(effectiveInputValue.trim());
 					}
 
-					// For terminal mode, add to shellLogs
-					if (currentMode !== 'ai') {
-						return {
-							...s,
-							shellLogs: [...s.shellLogs, newEntry],
-							state: 'busy',
-							busySource: currentMode,
-							shellCwd: newShellCwd,
-							// Update remoteCwd for SSH sessions when cd command changes directory
-							...(remoteCwdChanged && newRemoteCwd && { remoteCwd: newRemoteCwd }),
-							[historyKey]: newHistory,
-						};
-					}
-
-					// For AI mode, add to ACTIVE TAB's logs
+					// Add to ACTIVE TAB's logs
 					const activeTab = getActiveTab(s);
 					if (!activeTab) {
 						// No tabs exist - this is a bug, sessions must have aiTabs
@@ -642,13 +526,10 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					return {
 						...s,
 						state: 'busy',
-						busySource: currentMode,
+						busySource: 'ai',
 						thinkingStartTime: Date.now(),
 						currentCycleTokens: 0,
-						// Context usage is now exclusively updated from agent-reported usage stats
-						// Remove artificial +5 increment that was causing erroneous 100% detection
-						shellCwd: newShellCwd,
-						[historyKey]: newHistory,
+						aiCommandHistory: newHistory,
 						aiTabs: updatedAiTabs,
 					};
 				})
@@ -657,8 +538,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			// Trigger automatic tab naming for new AI sessions immediately after sending the first message
 			// This runs in parallel with the agent request (no need to wait for session ID)
 			const activeTabForNaming = getActiveTab(activeSession);
-			const isNewAiSession =
-				currentMode === 'ai' && activeTabForNaming && !activeTabForNaming.agentSessionId;
+			const isNewAiSession = activeTabForNaming && !activeTabForNaming.agentSessionId;
 			const hasTextMessage = effectiveInputValue.trim().length > 0;
 			const hasNoCustomName = !activeTabForNaming?.name;
 
@@ -793,69 +673,42 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				}
 			}
 
-			// If directory changed, check if new directory is a Git repository
-			// For remote sessions, check remoteCwd; for local sessions, check shellCwd
-			if (cwdChanged || remoteCwdChanged) {
-				(async () => {
-					const cwdToCheck = remoteCwdChanged && newRemoteCwd ? newRemoteCwd : newShellCwd;
-					// Use sessionSshRemoteConfig.remoteId as fallback for terminal-only SSH sessions
-					const sshIdForGit =
-						activeSession.sshRemoteId ||
-						activeSession.sessionSshRemoteConfig?.remoteId ||
-						undefined;
-					const isGitRepo = await gitService.isRepo(cwdToCheck, sshIdForGit);
-					setSessions((prev) =>
-						prev.map((s) => (s.id === activeSessionId ? { ...s, isGitRepo } : s))
-					);
-				})();
-			}
-
 			// Capture input value and images before clearing (needed for async batch mode spawn)
 			// Append nudge message if present (only for interactive AI messages, not Auto Run)
 			// The nudge is invisible in the UI - only sent to the agent
 			const nudgeMessage = activeSession.nudgeMessage;
-			const capturedInputValue =
-				nudgeMessage && currentMode === 'ai'
-					? `${effectiveInputValue}\n\n---\n\n${nudgeMessage}`
-					: effectiveInputValue;
+			const capturedInputValue = nudgeMessage
+				? `${effectiveInputValue}\n\n---\n\n${nudgeMessage}`
+				: effectiveInputValue;
 			const capturedImages = [...stagedImages];
 
 			// Broadcast user input to web clients so they stay in sync
 			// Use effectiveInputValue (without nudge) since nudge should be hidden from UI
-			window.maestro.web.broadcastUserInput(activeSession.id, effectiveInputValue, currentMode);
+			window.maestro.web.broadcastUserInput(activeSession.id, effectiveInputValue, 'ai');
 
 			setInputValue('');
 			setStagedImages([]);
 
 			// Sync empty value to session state (prevents stale input restoration on blur)
-			if (isAiMode) {
-				syncAiInputToSession('');
-			} else {
-				syncTerminalInputToSession('');
-			}
+			syncAiInputToSession('');
 
 			// Reset height
 			if (inputRef.current) inputRef.current.style.height = 'auto';
 
-			// Write to the appropriate process based on inputMode
-			// Each session has TWO processes: AI agent and terminal
-			const targetPid = currentMode === 'ai' ? activeSession.aiPid : activeSession.terminalPid;
+			// Write to the AI agent process
+			const targetPid = activeSession.aiPid;
 			// For batch mode (Claude), include tab ID in session ID to prevent process collision
 			// This ensures each tab's process has a unique identifier
 			const activeTabForSpawn = getActiveTab(activeSession);
-			const targetSessionId =
-				currentMode === 'ai'
-					? `${activeSession.id}-ai-${activeTabForSpawn?.id || 'default'}`
-					: `${activeSession.id}-terminal`;
+			const targetSessionId = `${activeSession.id}-ai-${activeTabForSpawn?.id || 'default'}`;
 
 			// Check if this is an AI agent in batch mode (e.g., Claude Code, OpenCode, Codex, Factory Droid)
 			// Batch mode agents spawn a new process per message rather than writing to stdin
 			const isBatchModeAgent =
-				currentMode === 'ai' &&
-				(activeSession.toolType === 'claude-code' ||
-					activeSession.toolType === 'opencode' ||
-					activeSession.toolType === 'codex' ||
-					activeSession.toolType === 'factory-droid');
+				activeSession.toolType === 'claude-code' ||
+				activeSession.toolType === 'opencode' ||
+				activeSession.toolType === 'codex' ||
+				activeSession.toolType === 'factory-droid';
 
 			if (isBatchModeAgent) {
 				// Batch mode: Spawn new agent process with prompt
@@ -975,6 +828,36 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 
 							// Prepend system prompt to user's message
 							effectivePrompt = `${substitutedSystemPrompt}\n\n---\n\n# User Request\n\n${effectivePrompt}`;
+
+							// Inject output style instructions for Claude Code agents
+							if (freshSession.toolType === 'claude-code') {
+								// Resolution order: per-tab > per-agent > global
+								const activeTab = freshSession.aiTabs?.find(
+									(t) => t.id === freshSession.activeTabId
+								);
+								let style: OutputStyle = useSettingsStore.getState().outputStyle;
+								// Per-agent override
+								try {
+									const agentStyle = await window.maestro.agents.getConfigValue(
+										freshSession.id,
+										'outputStyle'
+									);
+									if (agentStyle && agentStyle !== 'default') {
+										style = agentStyle as OutputStyle;
+									}
+								} catch {
+									// Fall back to global setting
+								}
+								// Per-tab override takes highest precedence
+								if (activeTab?.outputStyle && activeTab.outputStyle !== 'default') {
+									style = activeTab.outputStyle;
+								}
+
+								const stylePrompt = OUTPUT_STYLE_PROMPTS[style];
+								if (stylePrompt) {
+									effectivePrompt = `${effectivePrompt}\n\n---\n\n${stylePrompt}`;
+								}
+							}
 						}
 
 						const { sendPromptViaStdin, sendPromptViaStdinRaw } = getStdinFlags({
@@ -1046,67 +929,6 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 						);
 					}
 				})();
-			} else if (currentMode === 'terminal') {
-				// Intercept "clear" command to clear shell logs instead of sending to shell
-				const trimmedCommand = capturedInputValue.trim();
-				if (trimmedCommand === 'clear') {
-					setSessions((prev) =>
-						prev.map((s) => {
-							if (s.id !== activeSessionId) return s;
-							return {
-								...s,
-								state: 'idle',
-								busySource: undefined,
-								thinkingStartTime: undefined,
-								shellLogs: [],
-							};
-						})
-					);
-					return;
-				}
-
-				// Terminal mode: Use runCommand for clean stdout/stderr capture (no PTY noise)
-				// This spawns a fresh shell with -l -c to run the command, ensuring aliases work
-				// When SSH is enabled for the session, the command runs on the remote host
-				// For SSH sessions, use remoteCwd (updated by cd commands); for local, use shellCwd
-				const isRemote =
-					!!activeSession.sshRemoteId || !!activeSession.sessionSshRemoteConfig?.enabled;
-				const commandCwd = isRemote
-					? activeSession.remoteCwd ||
-						activeSession.sessionSshRemoteConfig?.workingDirOverride ||
-						activeSession.cwd
-					: activeSession.shellCwd || activeSession.cwd;
-				window.maestro.process
-					.runCommand({
-						sessionId: activeSession.id, // Plain session ID (not suffixed)
-						command: capturedInputValue,
-						cwd: commandCwd,
-						// Pass SSH config if the session has SSH enabled
-						sessionSshRemoteConfig: activeSession.sessionSshRemoteConfig,
-					})
-					.catch((error) => {
-						console.error('Failed to run command:', error);
-						setSessions((prev) =>
-							prev.map((s) => {
-								if (s.id !== activeSessionId) return s;
-								return {
-									...s,
-									state: 'idle',
-									busySource: undefined,
-									thinkingStartTime: undefined,
-									shellLogs: [
-										...s.shellLogs,
-										{
-											id: generateId(),
-											timestamp: Date.now(),
-											source: 'system',
-											text: `Error: Failed to run command - ${(error as Error).message}`,
-										},
-									],
-								};
-							})
-						);
-					});
 			} else if (targetPid > 0) {
 				// AI mode: Write to stdin
 				window.maestro.process.write(targetSessionId, capturedInputValue).catch((error) => {
@@ -1156,8 +978,6 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			setStagedImages,
 			setSlashCommandOpen,
 			syncAiInputToSession,
-			syncTerminalInputToSession,
-			isAiMode,
 			inputRef,
 			sessionsRef,
 			getBatchState,

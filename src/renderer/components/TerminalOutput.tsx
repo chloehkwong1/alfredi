@@ -1148,7 +1148,7 @@ export const TerminalOutput = memo(
 		const hasRestoredScrollRef = useRef(false);
 
 		// Get active tab ID for resetting state on tab switch
-		const activeTabId = session.inputMode === 'ai' ? session.activeTabId : null;
+		const activeTabId = session.activeTabId;
 
 		// Copy text to clipboard with notification
 		const copyToClipboard = useCallback(async (text: string) => {
@@ -1303,24 +1303,15 @@ export const TerminalOutput = memo(
 		}, [theme]);
 
 		// PERF: Memoize active tab lookup to avoid O(n) .find() on every render
-		const activeTab = useMemo(
-			() => (session.inputMode === 'ai' ? getActiveTab(session) : undefined),
-			[session.inputMode, session.aiTabs, session.activeTabId]
-		);
+		const activeTab = useMemo(() => getActiveTab(session), [session.aiTabs, session.activeTabId]);
 
 		// PERF: Memoize activeLogs to provide stable reference for collapsedLogs dependency
-		const activeLogs = useMemo(
-			(): LogEntry[] => (session.inputMode === 'ai' ? (activeTab?.logs ?? []) : session.shellLogs),
-			[session.inputMode, activeTab?.logs, session.shellLogs]
-		);
+		const activeLogs = useMemo((): LogEntry[] => activeTab?.logs ?? [], [activeTab?.logs]);
 
 		// In AI mode, collapse consecutive non-user entries into single response blocks
 		// This provides a cleaner view where each user message gets one response
 		// Tool and thinking entries are kept separate (not collapsed)
 		const collapsedLogs = useMemo(() => {
-			// Only collapse in AI mode
-			if (session.inputMode !== 'ai') return activeLogs;
-
 			const result: LogEntry[] = [];
 			let currentResponseGroup: LogEntry[] = [];
 
@@ -1357,7 +1348,7 @@ export const TerminalOutput = memo(
 			flushResponseGroup();
 
 			return result;
-		}, [activeLogs, session.inputMode]);
+		}, [activeLogs]);
 
 		// PERF: Debounce search query to avoid filtering on every keystroke
 		const debouncedSearchQuery = useDebouncedValue(outputSearchQuery, 150);
@@ -1502,9 +1493,7 @@ export const TerminalOutput = memo(
 			if (!container) return;
 
 			const shouldAutoScroll = () =>
-				session.inputMode === 'terminal' ||
-				(session.inputMode === 'ai' && autoScrollAiMode && !autoScrollPaused) ||
-				(session.inputMode === 'ai' && isAtBottomRef.current);
+				(autoScrollAiMode && !autoScrollPaused) || isAtBottomRef.current;
 
 			const scrollToBottom = () => {
 				if (!scrollContainerRef.current) return;
@@ -1548,7 +1537,7 @@ export const TerminalOutput = memo(
 			});
 
 			return () => observer.disconnect();
-		}, [session.inputMode, autoScrollAiMode, autoScrollPaused]);
+		}, [autoScrollAiMode, autoScrollPaused]);
 
 		// Restore scroll position when component mounts or initialScrollTop changes
 		// Uses requestAnimationFrame to ensure DOM is ready
@@ -1596,8 +1585,8 @@ export const TerminalOutput = memo(
 		);
 
 		// Computed values for rendering
-		const isTerminal = session.inputMode === 'terminal';
-		const isAIMode = session.inputMode === 'ai';
+		const isTerminal = false;
+		const isAIMode = true;
 
 		// Memoized prose styles - applied once at container level instead of per-log-item
 		// IMPORTANT: Scoped to .terminal-output to avoid CSS conflicts with other prose containers (e.g., AutoRun panel)
@@ -1614,8 +1603,7 @@ export const TerminalOutput = memo(
 				aria-label="Terminal output"
 				className="terminal-output flex-1 flex flex-col overflow-hidden transition-colors outline-none relative"
 				style={{
-					backgroundColor:
-						session.inputMode === 'ai' ? theme.colors.bgMain : theme.colors.bgActivity,
+					backgroundColor: theme.colors.bgMain,
 				}}
 				onKeyDown={(e) => {
 					// Cmd+F to open search
@@ -1705,10 +1693,7 @@ export const TerminalOutput = memo(
 					ref={scrollContainerRef}
 					className="flex-1 overflow-y-auto scrollbar-thin"
 					style={{
-						overflowAnchor:
-							session.inputMode === 'ai' && (!autoScrollAiMode || autoScrollPaused)
-								? 'none'
-								: undefined,
+						overflowAnchor: !autoScrollAiMode || autoScrollPaused ? 'none' : undefined,
 					}}
 					onScroll={handleScroll}
 				>
@@ -1756,46 +1741,15 @@ export const TerminalOutput = memo(
 						/>
 					))}
 
-					{/* Terminal busy indicator - only show for terminal commands (AI thinking moved to ThinkingStatusPill) */}
-					{session.state === 'busy' &&
-						session.inputMode === 'terminal' &&
-						session.busySource === 'terminal' && (
-							<div
-								className="flex flex-col items-center justify-center gap-2 py-6 mx-6 my-4 rounded-xl border"
-								style={{
-									backgroundColor: theme.colors.bgActivity,
-									borderColor: theme.colors.border,
-								}}
-							>
-								<div className="flex items-center gap-3">
-									<div
-										className="w-2 h-2 rounded-full animate-pulse"
-										style={{ backgroundColor: theme.colors.warning }}
-									/>
-									<span className="text-sm" style={{ color: theme.colors.textMain }}>
-										{session.statusMessage || 'Executing command...'}
-									</span>
-									{session.thinkingStartTime && (
-										<ElapsedTimeDisplay
-											thinkingStartTime={session.thinkingStartTime}
-											textColor={theme.colors.textDim}
-										/>
-									)}
-								</div>
-							</div>
-						)}
-
-					{/* Queued items section - only show in AI mode, filtered to active tab */}
-					{session.inputMode === 'ai' &&
-						session.executionQueue &&
-						session.executionQueue.length > 0 && (
-							<QueuedItemsList
-								executionQueue={session.executionQueue}
-								theme={theme}
-								onRemoveQueuedItem={onRemoveQueuedItem}
-								activeTabId={activeTabId || undefined}
-							/>
-						)}
+					{/* Queued items section - filtered to active tab */}
+					{session.executionQueue && session.executionQueue.length > 0 && (
+						<QueuedItemsList
+							executionQueue={session.executionQueue}
+							theme={theme}
+							onRemoveQueuedItem={onRemoveQueuedItem}
+							activeTabId={activeTabId || undefined}
+						/>
+					)}
 
 					{/* End ref for scrolling - always rendered so Cmd+Shift+J works even when busy */}
 					<div ref={logsEndRef} />

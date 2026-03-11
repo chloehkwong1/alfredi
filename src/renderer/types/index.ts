@@ -13,7 +13,8 @@ export type {
 	AgentErrorType,
 	AgentErrorRecovery,
 	ToolType,
-	Group,
+	Project,
+	TerminalTab,
 	UsageStats,
 	BatchDocumentEntry,
 	ThinkingMode,
@@ -27,6 +28,7 @@ import type {
 	BatchDocumentEntry,
 	UsageStats,
 	ToolType,
+	TerminalTab,
 	ThinkingMode,
 } from '../../shared/types';
 
@@ -36,6 +38,8 @@ import type { AgentError } from '../../shared/types';
 export type SessionState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'error';
 export type FileChangeType = 'modified' | 'added' | 'deleted';
 export type RightPanelTab = 'files';
+/** Active tab in the top section of the right panel (file explorer or a file preview tab) */
+export type RightTopTab = 'explorer' | string;
 export type SettingsTab =
 	| 'general'
 	| 'shortcuts'
@@ -84,7 +88,6 @@ export interface WizardMessage {
  */
 export interface WizardPreviousUIState {
 	readOnlyMode: boolean;
-	saveToHistory: boolean;
 	showThinking: ThinkingMode;
 }
 
@@ -443,8 +446,6 @@ export interface AITab {
 	createdAt: number; // Timestamp for ordering
 	state: 'idle' | 'busy'; // Tab-level state for write-mode tracking
 	readOnlyMode?: boolean; // When true, agent operates in plan/read-only mode
-	saveToHistory?: boolean; // When true, synopsis is requested after each completion and saved to History
-	lastSynopsisTime?: number; // Timestamp of last synopsis generation (for time-window context in prompts)
 	showThinking?: ThinkingMode; // Controls thinking display: 'off' | 'on' (temporary) | 'sticky' (persistent)
 	awaitingSessionId?: boolean; // True when this tab sent a message and is awaiting its session ID
 	thinkingStartTime?: number; // Timestamp when tab started thinking (for elapsed time display)
@@ -453,6 +454,8 @@ export interface AITab {
 	isAtBottom?: boolean; // True when user is scrolled to bottom of output
 	pendingMergedContext?: string; // Context from merge that needs to be sent with next message
 	autoSendOnActivate?: boolean; // When true, automatically send inputValue when tab becomes active
+	modelId?: string; // Per-tab model override (falls back to global modelSlug if not set)
+	outputStyle?: import('../../shared/types').OutputStyle; // Per-tab output style override (falls back to global outputStyle if not set)
 	wizardState?: SessionWizardState; // Per-tab inline wizard state for /wizard command
 	isGeneratingName?: boolean; // True while automatic tab naming is in progress
 }
@@ -534,7 +537,7 @@ export type ClosedTabEntry =
 
 export interface Session {
 	id: string;
-	groupId?: string;
+	projectId?: string;
 	name: string;
 	toolType: ToolType;
 	state: SessionState;
@@ -547,7 +550,7 @@ export interface Session {
 	contextUsage: number;
 	// Usage statistics from AI responses
 	usageStats?: UsageStats;
-	inputMode: 'terminal' | 'ai';
+	inputMode: 'ai';
 	// AI process PID (for agents with persistent processes)
 	// For batch mode agents, this is 0 since processes spawn per-message
 	aiPid: number;
@@ -599,11 +602,8 @@ export interface Session {
 	fileTreeLoading?: boolean;
 	/** Unix timestamp (seconds) of last successful file tree scan - used for incremental refresh */
 	fileTreeLastScanTime?: number;
-	// Shell state tracking
-	shellCwd?: string;
-	// Command history (separate for each mode)
+	// Command history
 	aiCommandHistory?: string[];
-	shellCommandHistory?: string[];
 	// Agent session ID for conversation continuity
 	// DEPRECATED: Use aiTabs[activeIndex].agentSessionId instead
 	agentSessionId?: string;
@@ -617,9 +617,8 @@ export interface Session {
 	currentCycleTokens?: number;
 	// Bytes received during current thinking cycle (for real-time progress display)
 	currentCycleBytes?: number;
-	// Tracks which mode (ai/terminal) triggered the busy state
-	// Used to show the correct busy indicator message when user switches modes
-	busySource?: 'ai' | 'terminal';
+	// Tracks which mode triggered the busy state
+	busySource?: 'ai';
 	// Execution queue for sequential processing within this session
 	// All messages and commands are queued here and processed one at a time
 	executionQueue: QueuedItem[];
@@ -660,11 +659,6 @@ export interface Session {
 	// Stack of recently closed tabs (both AI and file) for undo (max 25, runtime-only, not persisted)
 	// Used by Cmd+Shift+T to restore any recently closed tab
 	unifiedClosedTabHistory: ClosedTabEntry[];
-
-	// Saved scroll position for terminal/shell output view
-	terminalScrollTop?: number;
-	// Draft input for terminal mode (persisted across session switches)
-	terminalDraftInput?: string;
 
 	// Auto Run panel state (file-based document runner)
 	autoRunFolderPath?: string; // Persisted folder path for Runner Docs
@@ -733,6 +727,12 @@ export interface Session {
 	// SSH connection status - runtime only, not persisted
 	// Set when background SSH operations fail (e.g., git info fetch on startup)
 	sshConnectionFailed?: boolean;
+
+	// Terminal tabs for the Right Panel persistent terminal section
+	// Each tab owns an independent shell PTY
+	terminalTabs?: TerminalTab[];
+	// Currently active terminal tab ID (defaults to first tab)
+	activeTerminalTabId?: string;
 }
 
 export interface AgentConfigOption {
@@ -878,7 +878,7 @@ export interface OpenSpecMetadata {
 
 // Encore Features - optional features that are disabled by default
 // Each key is a feature ID, value indicates whether it's enabled
- 
+
 export interface EncoreFeatureFlags {
 	// No active encore features
 }

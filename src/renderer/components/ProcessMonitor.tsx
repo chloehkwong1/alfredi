@@ -15,14 +15,14 @@ import {
 	Hash,
 	Play,
 } from 'lucide-react';
-import type { Session, Group, Theme } from '../types';
+import type { Session, Project, Theme } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 interface ProcessMonitorProps {
 	theme: Theme;
 	sessions: Session[];
-	groups: Group[];
+	projects: Project[];
 	onClose: () => void;
 	onNavigateToSession?: (sessionId: string, tabId?: string) => void;
 }
@@ -98,7 +98,7 @@ interface ProcessDetailData {
 }
 
 export function ProcessMonitor(props: ProcessMonitorProps) {
-	const { theme, sessions, groups, onClose, onNavigateToSession } = props;
+	const { theme, sessions, projects, onClose, onNavigateToSession } = props;
 	const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 	const [activeProcesses, setActiveProcesses] = useState<ActiveProcess[]>([]);
@@ -312,16 +312,16 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 	const buildProcessTree = (): ProcessNode[] => {
 		const tree: ProcessNode[] = [];
 
-		// Group sessions by group
-		const sessionsByGroup = new Map<string, Session[]>();
-		const ungroupedSessions: Session[] = [];
+		// Group sessions by project
+		const sessionsByProject = new Map<string, Session[]>();
+		const unassignedSessions: Session[] = [];
 
 		sessions.forEach((session) => {
-			if (session.groupId) {
-				const existing = sessionsByGroup.get(session.groupId) || [];
-				sessionsByGroup.set(session.groupId, [...existing, session]);
+			if (session.projectId) {
+				const existing = sessionsByProject.get(session.projectId) || [];
+				sessionsByProject.set(session.projectId, [...existing, session]);
 			} else {
-				ungroupedSessions.push(session);
+				unassignedSessions.push(session);
 			}
 		});
 
@@ -411,30 +411,30 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			return sessionNode;
 		};
 
-		// Add grouped sessions (only include sessions with active processes)
-		groups.forEach((group) => {
-			const groupSessions = sessionsByGroup.get(group.id) || [];
-			const sessionNodes = groupSessions
+		// Add project sessions (only include sessions with active processes)
+		projects.forEach((project) => {
+			const projectSessions = sessionsByProject.get(project.id) || [];
+			const sessionNodes = projectSessions
 				.map((session) => buildSessionNode(session))
 				.filter((node) => node.children && node.children.length > 0);
 
-			// Only add group if it has sessions with active processes
+			// Only add project if it has sessions with active processes
 			if (sessionNodes.length > 0) {
-				const groupNode: ProcessNode = {
-					id: `group-${group.id}`,
+				const projectNode: ProcessNode = {
+					id: `group-${project.id}`,
 					type: 'group',
-					label: group.name,
-					emoji: group.emoji,
-					expanded: expandedNodes.has(`group-${group.id}`),
+					label: project.name,
+					emoji: project.emoji,
+					expanded: expandedNodes.has(`group-${project.id}`),
 					children: sessionNodes,
 				};
-				tree.push(groupNode);
+				tree.push(projectNode);
 			}
 		});
 
-		// Add ungrouped sessions (root level, only with active processes)
-		if (ungroupedSessions.length > 0) {
-			const sessionNodes = ungroupedSessions
+		// Add unassigned sessions (root level, only with active processes)
+		if (unassignedSessions.length > 0) {
+			const sessionNodes = unassignedSessions
 				.map((session) => buildSessionNode(session))
 				.filter((node) => node.children && node.children.length > 0);
 
@@ -442,7 +442,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 				const rootNode: ProcessNode = {
 					id: 'group-root',
 					type: 'group',
-					label: 'UNGROUPED AGENTS',
+					label: 'NO PROJECT',
 					emoji: '📁',
 					expanded: expandedNodes.has('group-root'),
 					children: sessionNodes,
@@ -1310,7 +1310,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 							<div className="flex items-center gap-4">
 								<span>
 									{sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} •{' '}
-									{groups.length} {groups.length === 1 ? 'group' : 'groups'}
+									{projects.length} {projects.length === 1 ? 'project' : 'projects'}
 								</span>
 								<span style={{ opacity: 0.7 }}>↑↓ navigate • Enter view details • R refresh</span>
 							</div>

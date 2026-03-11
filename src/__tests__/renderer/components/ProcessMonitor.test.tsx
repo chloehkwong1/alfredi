@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { ProcessMonitor } from '../../../renderer/components/ProcessMonitor';
-import type { Session, Group, Theme } from '../../../renderer/types';
+import type { Session, Project, Theme } from '../../../renderer/types';
 
 // Mock lucide-react icons
 vi.mock('lucide-react', () => ({
@@ -112,10 +112,10 @@ const createSession = (overrides: Partial<Session> = {}): Session => ({
 	...overrides,
 });
 
-// Create test group
-const createGroup = (overrides: Partial<Group> = {}): Group => ({
-	id: 'group-1',
-	name: 'Test Group',
+// Create test project
+const createProject = (overrides: Partial<Project> = {}): Project => ({
+	id: 'project-1',
+	name: 'Test Project',
 	emoji: '📁',
 	isExpanded: true,
 	...overrides,
@@ -195,7 +195,9 @@ describe('ProcessMonitor', () => {
 
 			const session = createSession();
 			await act(async () => {
-				render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+				render(
+					<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />
+				);
 			});
 
 			await waitFor(() => {
@@ -218,7 +220,9 @@ describe('ProcessMonitor', () => {
 
 			const session = createSession();
 			await act(async () => {
-				render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+				render(
+					<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />
+				);
 			});
 
 			await waitFor(() => {
@@ -241,7 +245,9 @@ describe('ProcessMonitor', () => {
 
 			const session = createSession();
 			await act(async () => {
-				render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+				render(
+					<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />
+				);
 			});
 
 			await waitFor(() => {
@@ -264,7 +270,9 @@ describe('ProcessMonitor', () => {
 
 			const session = createSession();
 			await act(async () => {
-				render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+				render(
+					<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />
+				);
 			});
 
 			await waitFor(() => {
@@ -278,13 +286,13 @@ describe('ProcessMonitor', () => {
 
 	describe('Initial render', () => {
 		it('should render loading state initially', () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			expect(screen.getByText('Loading processes...')).toBeInTheDocument();
 		});
 
 		it('should render with dialog role and aria attributes', () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			const dialog = screen.getByRole('dialog');
 			expect(dialog).toHaveAttribute('aria-modal', 'true');
@@ -292,7 +300,7 @@ describe('ProcessMonitor', () => {
 		});
 
 		it('should render header with title', () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			expect(screen.getByText('System Processes')).toBeInTheDocument();
 		});
@@ -300,7 +308,7 @@ describe('ProcessMonitor', () => {
 		it('should display empty state when no processes', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('No running processes')).toBeInTheDocument();
@@ -314,7 +322,7 @@ describe('ProcessMonitor', () => {
 			]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('2 active')).toBeInTheDocument();
@@ -324,7 +332,7 @@ describe('ProcessMonitor', () => {
 
 	describe('Layer stack integration', () => {
 		it('should register layer on mount', () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			expect(mockRegisterLayer).toHaveBeenCalledWith(
 				expect.objectContaining({
@@ -339,7 +347,7 @@ describe('ProcessMonitor', () => {
 
 		it('should unregister layer on unmount', () => {
 			const { unmount } = render(
-				<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />
 			);
 
 			unmount();
@@ -349,11 +357,11 @@ describe('ProcessMonitor', () => {
 
 		it('should update handler when onClose changes', () => {
 			const { rerender } = render(
-				<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />
 			);
 
 			const newOnClose = vi.fn();
-			rerender(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={newOnClose} />);
+			rerender(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={newOnClose} />);
 
 			const lastCall = mockUpdateLayerHandler.mock.calls.at(-1);
 			expect(lastCall?.[0]).toBe('layer-123');
@@ -367,7 +375,7 @@ describe('ProcessMonitor', () => {
 
 	describe('Close functionality', () => {
 		it('should call onClose when X button is clicked', async () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			// Find the X button by its title
 			const closeButton = screen.getByTitle('Close (Esc)');
@@ -380,7 +388,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
 			const { container } = render(
-				<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />
 			);
 
 			// Click the backdrop (outer div)
@@ -391,7 +399,7 @@ describe('ProcessMonitor', () => {
 		});
 
 		it('should NOT call onClose when clicking inside modal', async () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			// Click the dialog content
 			const dialog = screen.getByRole('dialog');
@@ -402,41 +410,41 @@ describe('ProcessMonitor', () => {
 	});
 
 	describe('Process tree building', () => {
-		it('should display ungrouped sessions with processes', async () => {
+		it('should display unassigned sessions with processes', async () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.queryByText('Loading processes...')).not.toBeInTheDocument();
 			});
 
-			expect(screen.getByText('UNGROUPED AGENTS')).toBeInTheDocument();
+			expect(screen.getByText('NO PROJECT')).toBeInTheDocument();
 			expect(screen.getByText('Test Session')).toBeInTheDocument();
 		});
 
-		it('should display grouped sessions with processes', async () => {
+		it('should display project sessions with processes', async () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
 				expect(screen.queryByText('Loading processes...')).not.toBeInTheDocument();
 			});
 
-			expect(screen.getByText('Test Group')).toBeInTheDocument();
+			expect(screen.getByText('Test Project')).toBeInTheDocument();
 			expect(screen.getByText('Test Session')).toBeInTheDocument();
 		});
 
-		it('should show session count in group', async () => {
+		it('should show session count in project', async () => {
 			const processes = [
 				createActiveProcess({ sessionId: 'session-1-ai-tab-1' }),
 				createActiveProcess({ sessionId: 'session-2-terminal', pid: 12347 }),
@@ -444,13 +452,13 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue(processes);
 
 			const sessions = [
-				createSession({ id: 'session-1', groupId: 'group-1' }),
-				createSession({ id: 'session-2', name: 'Session 2', groupId: 'group-1' }),
+				createSession({ id: 'session-1', projectId: 'project-1' }),
+				createSession({ id: 'session-2', name: 'Session 2', projectId: 'project-1' }),
 			];
-			const group = createGroup();
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={sessions} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={sessions} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -462,11 +470,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -482,7 +490,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue(processes);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('2 running')).toBeInTheDocument();
@@ -494,7 +502,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ id: 'abcdef12-3456-7890' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText(/Session: abcdef12\.\.\./)).toBeInTheDocument();
@@ -508,7 +516,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -523,7 +531,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - Terminal Shell')).toBeInTheDocument();
@@ -538,7 +546,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -553,7 +561,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(
@@ -569,7 +577,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			// Wizard processes don't belong to regular sessions
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('WIZARD PROCESSES')).toBeInTheDocument();
@@ -584,7 +592,7 @@ describe('ProcessMonitor', () => {
 			});
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('WIZARD PROCESSES')).toBeInTheDocument();
@@ -606,7 +614,7 @@ describe('ProcessMonitor', () => {
 			];
 			getActiveProcessesMock().mockResolvedValue(processes);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('WIZARD PROCESSES')).toBeInTheDocument();
@@ -622,7 +630,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('PID: 99999')).toBeInTheDocument();
@@ -634,7 +642,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				// Footer also has "Running" text, so find the badge
@@ -650,7 +658,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				// Claude session ID starts with abc12345
@@ -667,7 +675,7 @@ describe('ProcessMonitor', () => {
 				<ProcessMonitor
 					theme={theme}
 					sessions={[session]}
-					groups={[]}
+					projects={[]}
 					onClose={onClose}
 					onNavigateToSession={onNavigateToSession}
 				/>
@@ -690,7 +698,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('abc12345...')).toBeInTheDocument();
@@ -706,11 +714,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -723,19 +731,19 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
 			});
 
-			// Click the group to collapse
-			fireEvent.click(screen.getByText('Test Group'));
+			// Click the project to collapse
+			fireEvent.click(screen.getByText('Test Project'));
 
 			// Process should no longer be visible
 			await waitFor(() => {
@@ -747,11 +755,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -772,11 +780,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -810,7 +818,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue(processes);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.queryByText('Loading processes...')).not.toBeInTheDocument();
@@ -832,7 +840,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.queryByText('Loading processes...')).not.toBeInTheDocument();
@@ -848,11 +856,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -869,7 +877,7 @@ describe('ProcessMonitor', () => {
 
 			const dialog = screen.getByRole('dialog');
 
-			// Select the group
+			// Select the project
 			fireEvent.keyDown(dialog, { key: 'ArrowDown' });
 
 			// Expand with ArrowRight
@@ -885,11 +893,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -898,7 +906,7 @@ describe('ProcessMonitor', () => {
 
 			const dialog = screen.getByRole('dialog');
 
-			// Select the group
+			// Select the project
 			fireEvent.keyDown(dialog, { key: 'ArrowDown' });
 
 			// Collapse with ArrowLeft
@@ -914,11 +922,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -927,7 +935,7 @@ describe('ProcessMonitor', () => {
 
 			const dialog = screen.getByRole('dialog');
 
-			// Select the group
+			// Select the project
 			fireEvent.keyDown(dialog, { key: 'ArrowDown' });
 
 			// Toggle with Enter
@@ -943,11 +951,11 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -956,7 +964,7 @@ describe('ProcessMonitor', () => {
 
 			const dialog = screen.getByRole('dialog');
 
-			// Select the group
+			// Select the project
 			fireEvent.keyDown(dialog, { key: 'ArrowDown' });
 
 			// Toggle with Space
@@ -971,7 +979,7 @@ describe('ProcessMonitor', () => {
 		it('should respond to R key for refresh', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('No running processes')).toBeInTheDocument();
@@ -993,7 +1001,7 @@ describe('ProcessMonitor', () => {
 		it('should refresh when clicking refresh button', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('No running processes')).toBeInTheDocument();
@@ -1010,7 +1018,7 @@ describe('ProcessMonitor', () => {
 		it('should poll for updates every 2 seconds', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('No running processes')).toBeInTheDocument();
@@ -1038,7 +1046,7 @@ describe('ProcessMonitor', () => {
 			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 			getActiveProcessesMock().mockRejectedValue(new Error('Network error'));
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(consoleError).toHaveBeenCalledWith(
@@ -1057,7 +1065,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1080,7 +1088,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1105,7 +1113,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1129,7 +1137,7 @@ describe('ProcessMonitor', () => {
 
 			const session = createSession();
 			const { container } = render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
@@ -1156,7 +1164,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1180,7 +1188,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1209,7 +1217,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1240,7 +1248,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1269,7 +1277,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ id: 'abc123' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session')).toBeInTheDocument();
@@ -1281,7 +1289,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ id: 'abc123' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session')).toBeInTheDocument();
@@ -1293,7 +1301,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ id: 'abc123' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session')).toBeInTheDocument();
@@ -1305,7 +1313,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ id: 'abc123' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session')).toBeInTheDocument();
@@ -1317,7 +1325,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ id: 'abc123' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session')).toBeInTheDocument();
@@ -1326,21 +1334,21 @@ describe('ProcessMonitor', () => {
 	});
 
 	describe('Footer', () => {
-		it('should display session and group count', async () => {
+		it('should display session and project count', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
 			render(
 				<ProcessMonitor
 					theme={theme}
 					sessions={[createSession(), createSession({ id: 'session-2', name: 'Session 2' })]}
-					groups={[createGroup()]}
+					projects={[createProject()]}
 					onClose={onClose}
 				/>
 			);
 
 			await waitFor(() => {
 				expect(screen.getByText(/2 sessions/)).toBeInTheDocument();
-				expect(screen.getByText(/1 group/)).toBeInTheDocument();
+				expect(screen.getByText(/1 project/)).toBeInTheDocument();
 			});
 		});
 
@@ -1348,25 +1356,30 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[createSession()]} groups={[]} onClose={onClose} />
+				<ProcessMonitor
+					theme={theme}
+					sessions={[createSession()]}
+					projects={[]}
+					onClose={onClose}
+				/>
 			);
 
 			await waitFor(() => {
 				expect(screen.getByText(/1 session/)).toBeInTheDocument();
-				expect(screen.getByText(/0 groups/)).toBeInTheDocument();
+				expect(screen.getByText(/0 projects/)).toBeInTheDocument();
 			});
 		});
 
 		it('should display keyboard shortcuts hint', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			expect(screen.getByText('↑↓ navigate • Enter view details • R refresh')).toBeInTheDocument();
 		});
 
 		it('should display running indicator', () => {
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			// Should have a "Running" label in footer
 			const footerRunning = screen.getAllByText('Running');
@@ -1379,23 +1392,23 @@ describe('ProcessMonitor', () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
-				expect(screen.getByText('Test Group')).toBeInTheDocument();
+				expect(screen.getByText('Test Project')).toBeInTheDocument();
 			});
 
-			// Click the group
-			fireEvent.click(screen.getByText('Test Group'));
+			// Click the project
+			fireEvent.click(screen.getByText('Test Project'));
 
-			// Group button should have selection style (outline)
-			const groupButton = screen.getByText('Test Group').closest('button');
-			expect(groupButton).toHaveStyle({ outline: `2px solid ${theme.colors.accent}` });
+			// Project button should have selection style (outline)
+			const projectButton = screen.getByText('Test Project').closest('button');
+			expect(projectButton).toHaveStyle({ outline: `2px solid ${theme.colors.accent}` });
 		});
 
 		it('should select process when clicked', async () => {
@@ -1403,7 +1416,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1421,54 +1434,54 @@ describe('ProcessMonitor', () => {
 	});
 
 	describe('Hover effects', () => {
-		it('should trigger hover handlers on group node', async () => {
+		it('should trigger hover handlers on project node', async () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
-				expect(screen.getByText('Test Group')).toBeInTheDocument();
+				expect(screen.getByText('Test Project')).toBeInTheDocument();
 			});
 
-			const groupButton = screen.getByText('Test Group').closest('button');
+			const projectButton = screen.getByText('Test Project').closest('button');
 
 			// Hover should not throw
-			fireEvent.mouseEnter(groupButton!);
-			fireEvent.mouseLeave(groupButton!);
+			fireEvent.mouseEnter(projectButton!);
+			fireEvent.mouseLeave(projectButton!);
 
 			// Button should still exist
-			expect(groupButton).toBeInTheDocument();
+			expect(projectButton).toBeInTheDocument();
 		});
 
 		it('should maintain selection state on hover', async () => {
 			const process = createActiveProcess();
 			getActiveProcessesMock().mockResolvedValue([process]);
 
-			const session = createSession({ groupId: 'group-1' });
-			const group = createGroup();
+			const session = createSession({ projectId: 'project-1' });
+			const project = createProject();
 
 			render(
-				<ProcessMonitor theme={theme} sessions={[session]} groups={[group]} onClose={onClose} />
+				<ProcessMonitor theme={theme} sessions={[session]} projects={[project]} onClose={onClose} />
 			);
 
 			await waitFor(() => {
-				expect(screen.getByText('Test Group')).toBeInTheDocument();
+				expect(screen.getByText('Test Project')).toBeInTheDocument();
 			});
 
-			const groupButton = screen.getByText('Test Group').closest('button');
+			const projectButton = screen.getByText('Test Project').closest('button');
 
 			// Select first
-			fireEvent.click(groupButton!);
+			fireEvent.click(projectButton!);
 
 			// Hover should not lose selection outline
-			fireEvent.mouseEnter(groupButton!);
-			expect(groupButton).toHaveStyle({ outline: `2px solid ${theme.colors.accent}` });
+			fireEvent.mouseEnter(projectButton!);
+			expect(projectButton).toHaveStyle({ outline: `2px solid ${theme.colors.accent}` });
 		});
 	});
 
@@ -1476,7 +1489,7 @@ describe('ProcessMonitor', () => {
 		it('should handle empty sessions array', async () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
-			render(<ProcessMonitor theme={theme} sessions={[]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('No running processes')).toBeInTheDocument();
@@ -1487,7 +1500,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([]);
 
 			const session = createSession();
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('No running processes')).toBeInTheDocument();
@@ -1502,7 +1515,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ aiTabs: undefined });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
@@ -1514,14 +1527,14 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ aiTabs: [] });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('Test Session - AI Agent (claude-code)')).toBeInTheDocument();
 			});
 		});
 
-		it('should handle multiple groups with processes', async () => {
+		it('should handle multiple projects with processes', async () => {
 			const processes = [
 				createActiveProcess({ sessionId: 'session-1-ai-tab-1' }),
 				createActiveProcess({ sessionId: 'session-2-ai-tab-2', pid: 12347 }),
@@ -1529,21 +1542,26 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue(processes);
 
 			const sessions = [
-				createSession({ id: 'session-1', groupId: 'group-1' }),
-				createSession({ id: 'session-2', name: 'Session 2', groupId: 'group-2' }),
+				createSession({ id: 'session-1', projectId: 'project-1' }),
+				createSession({ id: 'session-2', name: 'Session 2', projectId: 'project-2' }),
 			];
-			const groups = [
-				createGroup({ id: 'group-1', name: 'Group 1' }),
-				createGroup({ id: 'group-2', name: 'Group 2' }),
+			const projectsList = [
+				createProject({ id: 'project-1', name: 'Project 1' }),
+				createProject({ id: 'project-2', name: 'Project 2' }),
 			];
 
 			render(
-				<ProcessMonitor theme={theme} sessions={sessions} groups={groups} onClose={onClose} />
+				<ProcessMonitor
+					theme={theme}
+					sessions={sessions}
+					projects={projectsList}
+					onClose={onClose}
+				/>
 			);
 
 			await waitFor(() => {
-				expect(screen.getByText('Group 1')).toBeInTheDocument();
-				expect(screen.getByText('Group 2')).toBeInTheDocument();
+				expect(screen.getByText('Project 1')).toBeInTheDocument();
+				expect(screen.getByText('Project 2')).toBeInTheDocument();
 			});
 		});
 
@@ -1552,7 +1570,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ name: '<script>alert("XSS")</script>' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('<script>alert("XSS")</script>')).toBeInTheDocument();
@@ -1564,7 +1582,7 @@ describe('ProcessMonitor', () => {
 			getActiveProcessesMock().mockResolvedValue([process]);
 
 			const session = createSession({ name: '测试会话 🎉' });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				expect(screen.getByText('测试会话 🎉')).toBeInTheDocument();
@@ -1577,7 +1595,7 @@ describe('ProcessMonitor', () => {
 
 			const longName = 'A'.repeat(100);
 			const session = createSession({ name: longName });
-			render(<ProcessMonitor theme={theme} sessions={[session]} groups={[]} onClose={onClose} />);
+			render(<ProcessMonitor theme={theme} sessions={[session]} projects={[]} onClose={onClose} />);
 
 			await waitFor(() => {
 				// Should be truncated with CSS

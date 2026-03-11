@@ -1,7 +1,7 @@
 /**
- * sessionStore - Zustand store for centralized session and group state management
+ * sessionStore - Zustand store for centralized session and project state management
  *
- * All session, group, active session, bookmark, worktree tracking, and
+ * All session, project, active session, bookmark, worktree tracking, and
  * initialization states live here. Components subscribe to individual slices
  * via selectors to avoid unnecessary re-renders.
  *
@@ -14,7 +14,8 @@
  */
 
 import { create } from 'zustand';
-import type { Session, Group, LogEntry } from '../types';
+import type { Session, Project, LogEntry } from '../types';
+import type { TerminalTab } from '../../shared/types';
 import { generateId } from '../utils/ids';
 import { getActiveTab } from '../utils/tabHelpers';
 
@@ -25,7 +26,7 @@ import { getActiveTab } from '../utils/tabHelpers';
 export interface SessionStoreState {
 	// Core entities
 	sessions: Session[];
-	groups: Group[];
+	projects: Project[];
 
 	// Active session
 	activeSessionId: string;
@@ -76,24 +77,24 @@ export interface SessionStoreActions {
 	 */
 	setActiveSessionIdInternal: (id: string | ((prev: string) => string)) => void;
 
-	// === Groups ===
+	// === Projects ===
 
 	/**
-	 * Set the groups array. Supports both direct value and functional updater.
+	 * Set the projects array. Supports both direct value and functional updater.
 	 */
-	setGroups: (groups: Group[] | ((prev: Group[]) => Group[])) => void;
+	setProjects: (projects: Project[] | ((prev: Project[]) => Project[])) => void;
 
-	/** Add a single group. */
-	addGroup: (group: Group) => void;
+	/** Add a single project. */
+	addProject: (project: Project) => void;
 
-	/** Remove a group by ID. */
-	removeGroup: (id: string) => void;
+	/** Remove a project by ID. */
+	removeProject: (id: string) => void;
 
-	/** Update a group by ID with a partial update. */
-	updateGroup: (id: string, updates: Partial<Group>) => void;
+	/** Update a project by ID with a partial update. */
+	updateProject: (id: string, updates: Partial<Project>) => void;
 
-	/** Toggle a group's collapsed state. */
-	toggleGroupCollapsed: (id: string) => void;
+	/** Toggle a project's collapsed state. */
+	toggleProjectCollapsed: (id: string) => void;
 
 	// === Initialization ===
 
@@ -118,6 +119,17 @@ export interface SessionStoreActions {
 	setCyclePosition: (pos: number) => void;
 	resetCyclePosition: () => void;
 
+	// === Terminal tabs ===
+
+	/** Add a new terminal tab to a session (max 5). Returns the new tab or null if at cap. */
+	addTerminalTab: (sessionId: string) => TerminalTab | null;
+
+	/** Remove a terminal tab from a session (cannot remove the last tab). */
+	removeTerminalTab: (sessionId: string, tabId: string) => void;
+
+	/** Set the active terminal tab for a session. */
+	setActiveTerminalTab: (sessionId: string, tabId: string) => void;
+
 	// === Log management ===
 
 	/**
@@ -129,6 +141,12 @@ export interface SessionStoreActions {
 		logEntry: Omit<LogEntry, 'id' | 'timestamp'> & { id?: string; timestamp?: number },
 		tabId?: string
 	) => void;
+
+	/**
+	 * Clear all logs on the active tab of a session.
+	 * Used by Clear Context to visually reset the terminal output.
+	 */
+	clearActiveTabLogs: (sessionId: string) => void;
 }
 
 export type SessionStore = SessionStoreState & SessionStoreActions;
@@ -151,7 +169,7 @@ function resolve<T>(valOrFn: T | ((prev: T) => T), prev: T): T {
 export const useSessionStore = create<SessionStore>()((set) => ({
 	// --- State ---
 	sessions: [],
-	groups: [],
+	projects: [],
 	activeSessionId: '',
 	sessionsLoaded: false,
 	initialLoadComplete: false,
@@ -200,40 +218,40 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 	setActiveSessionIdInternal: (v) =>
 		set((s) => ({ activeSessionId: resolve(v, s.activeSessionId) })),
 
-	// Groups
-	setGroups: (v) =>
+	// Projects
+	setProjects: (v) =>
 		set((s) => {
-			const newGroups = resolve(v, s.groups);
-			if (newGroups === s.groups) return s;
-			return { groups: newGroups };
+			const newProjects = resolve(v, s.projects);
+			if (newProjects === s.projects) return s;
+			return { projects: newProjects };
 		}),
 
-	addGroup: (group) => set((s) => ({ groups: [...s.groups, group] })),
+	addProject: (project) => set((s) => ({ projects: [...s.projects, project] })),
 
-	removeGroup: (id) =>
+	removeProject: (id) =>
 		set((s) => {
-			const filtered = s.groups.filter((g) => g.id !== id);
-			if (filtered.length === s.groups.length) return s;
-			return { groups: filtered };
+			const filtered = s.projects.filter((p) => p.id !== id);
+			if (filtered.length === s.projects.length) return s;
+			return { projects: filtered };
 		}),
 
-	updateGroup: (id, updates) =>
+	updateProject: (id, updates) =>
 		set((s) => {
 			let found = false;
-			const newGroups = s.groups.map((g) => {
-				if (g.id === id) {
+			const newProjects = s.projects.map((p) => {
+				if (p.id === id) {
 					found = true;
-					return { ...g, ...updates };
+					return { ...p, ...updates };
 				}
-				return g;
+				return p;
 			});
 			if (!found) return s;
-			return { groups: newGroups };
+			return { projects: newProjects };
 		}),
 
-	toggleGroupCollapsed: (id) =>
+	toggleProjectCollapsed: (id) =>
 		set((s) => ({
-			groups: s.groups.map((g) => (g.id === id ? { ...g, collapsed: !g.collapsed } : g)),
+			projects: s.projects.map((p) => (p.id === id ? { ...p, collapsed: !p.collapsed } : p)),
 		})),
 
 	// Initialization
@@ -265,6 +283,79 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 	// Navigation
 	setCyclePosition: (pos) => set({ cyclePosition: pos }),
 	resetCyclePosition: () => set({ cyclePosition: -1 }),
+
+	// Terminal tabs
+	addTerminalTab: (sessionId) => {
+		const MAX_TERMINAL_TABS = 5;
+		let newTab: TerminalTab | null = null;
+
+		set((s) => {
+			const session = s.sessions.find((sess) => sess.id === sessionId);
+			if (!session) return s;
+
+			const existing = session.terminalTabs ?? [{ id: generateId(), name: 'Terminal 1' }];
+			if (existing.length >= MAX_TERMINAL_TABS) return s;
+
+			// Find next number: parse existing names, pick max + 1
+			const nums = existing.map((t) => {
+				const m = t.name.match(/Terminal (\d+)/);
+				return m ? parseInt(m[1], 10) : 0;
+			});
+			const nextNum = Math.max(...nums, 0) + 1;
+
+			newTab = { id: generateId(), name: `Terminal ${nextNum}` };
+
+			return {
+				sessions: s.sessions.map((sess) =>
+					sess.id === sessionId
+						? {
+								...sess,
+								terminalTabs: [...existing, newTab!],
+								activeTerminalTabId: newTab!.id,
+							}
+						: sess
+				),
+			};
+		});
+
+		return newTab;
+	},
+
+	removeTerminalTab: (sessionId, tabId) =>
+		set((s) => {
+			const session = s.sessions.find((sess) => sess.id === sessionId);
+			if (!session) return s;
+
+			const existing = session.terminalTabs ?? [];
+			// Cannot remove the last tab
+			if (existing.length <= 1) return s;
+
+			const filtered = existing.filter((t) => t.id !== tabId);
+			if (filtered.length === existing.length) return s; // tabId not found
+
+			// If the removed tab was active, select the previous tab (or first)
+			let nextActiveId = session.activeTerminalTabId;
+			if (nextActiveId === tabId) {
+				const removedIdx = existing.findIndex((t) => t.id === tabId);
+				const newIdx = Math.min(removedIdx, filtered.length - 1);
+				nextActiveId = filtered[newIdx]?.id ?? filtered[0]?.id;
+			}
+
+			return {
+				sessions: s.sessions.map((sess) =>
+					sess.id === sessionId
+						? { ...sess, terminalTabs: filtered, activeTerminalTabId: nextActiveId }
+						: sess
+				),
+			};
+		}),
+
+	setActiveTerminalTab: (sessionId, tabId) =>
+		set((s) => ({
+			sessions: s.sessions.map((sess) =>
+				sess.id === sessionId ? { ...sess, activeTerminalTabId: tabId } : sess
+			),
+		})),
 
 	// Log management
 	addLogToTab: (sessionId, logEntry, tabId?) =>
@@ -303,6 +394,28 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 
 			return { sessions: newSessions };
 		}),
+
+	// Clear active tab logs
+	clearActiveTabLogs: (sessionId) =>
+		set((s) => {
+			const session = s.sessions.find((sess) => sess.id === sessionId);
+			if (!session) return s;
+
+			const activeTab = getActiveTab(session);
+			if (!activeTab) return s;
+
+			return {
+				sessions: s.sessions.map((sess) => {
+					if (sess.id !== sessionId) return sess;
+					return {
+						...sess,
+						aiTabs: sess.aiTabs.map((tab) =>
+							tab.id === activeTab.id ? { ...tab, logs: [] } : tab
+						),
+					};
+				}),
+			};
+		}),
 }));
 
 // ============================================================================
@@ -340,35 +453,35 @@ export const selectBookmarkedSessions = (state: SessionStore): Session[] =>
 	state.sessions.filter((s) => s.bookmarked);
 
 /**
- * Select sessions belonging to a specific group.
+ * Select sessions belonging to a specific project.
  *
  * @example
- * const groupSessions = useSessionStore(selectSessionsByGroup('group-1'));
+ * const projectSessions = useSessionStore(selectSessionsByProject('project-1'));
  */
-export const selectSessionsByGroup =
-	(groupId: string) =>
+export const selectSessionsByProject =
+	(projectId: string) =>
 	(state: SessionStore): Session[] =>
-		state.sessions.filter((s) => s.groupId === groupId);
+		state.sessions.filter((s) => s.projectId === projectId);
 
 /**
- * Select ungrouped sessions (no groupId set).
+ * Select unassigned sessions (no projectId set).
  *
  * @example
- * const ungrouped = useSessionStore(selectUngroupedSessions);
+ * const unassigned = useSessionStore(selectUnprojectSessions);
  */
-export const selectUngroupedSessions = (state: SessionStore): Session[] =>
-	state.sessions.filter((s) => !s.groupId && !s.parentSessionId);
+export const selectUnprojectSessions = (state: SessionStore): Session[] =>
+	state.sessions.filter((s) => !s.projectId && !s.parentSessionId);
 
 /**
- * Select a group by ID.
+ * Select a project by ID.
  *
  * @example
- * const group = useSessionStore(selectGroupById('group-1'));
+ * const project = useSessionStore(selectProjectById('project-1'));
  */
-export const selectGroupById =
+export const selectProjectById =
 	(id: string) =>
-	(state: SessionStore): Group | undefined =>
-		state.groups.find((g) => g.id === id);
+	(state: SessionStore): Project | undefined =>
+		state.projects.find((p) => p.id === id);
 
 /**
  * Select session count.
@@ -402,7 +515,7 @@ export const selectIsAnySessionBusy = (state: SessionStore): boolean =>
 
 /**
  * Get current session store state outside React.
- * Replaces sessionsRef.current, groupsRef.current, activeSessionIdRef.current.
+ * Replaces sessionsRef.current, projectsRef.current, activeSessionIdRef.current.
  *
  * @example
  * const { sessions, activeSessionId } = getSessionState();
@@ -427,11 +540,11 @@ export function getSessionActions() {
 		updateSession: state.updateSession,
 		setActiveSessionId: state.setActiveSessionId,
 		setActiveSessionIdInternal: state.setActiveSessionIdInternal,
-		setGroups: state.setGroups,
-		addGroup: state.addGroup,
-		removeGroup: state.removeGroup,
-		updateGroup: state.updateGroup,
-		toggleGroupCollapsed: state.toggleGroupCollapsed,
+		setProjects: state.setProjects,
+		addProject: state.addProject,
+		removeProject: state.removeProject,
+		updateProject: state.updateProject,
+		toggleProjectCollapsed: state.toggleProjectCollapsed,
 		setSessionsLoaded: state.setSessionsLoaded,
 		setInitialLoadComplete: state.setInitialLoadComplete,
 		toggleBookmark: state.toggleBookmark,
@@ -439,6 +552,10 @@ export function getSessionActions() {
 		setRemovedWorktreePaths: state.setRemovedWorktreePaths,
 		setCyclePosition: state.setCyclePosition,
 		resetCyclePosition: state.resetCyclePosition,
+		addTerminalTab: state.addTerminalTab,
+		removeTerminalTab: state.removeTerminalTab,
+		setActiveTerminalTab: state.setActiveTerminalTab,
 		addLogToTab: state.addLogToTab,
+		clearActiveTabLogs: state.clearActiveTabLogs,
 	};
 }

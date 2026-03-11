@@ -99,9 +99,7 @@ function createSession(overrides: Partial<Session> = {}): Session {
 		fileExplorerExpanded: [],
 		fileExplorerScrollPos: 0,
 		fileTreeAutoRefreshInterval: 180,
-		shellCwd: '/test/project',
 		aiCommandHistory: [],
-		shellCommandHistory: [],
 		executionQueue: [],
 		activeTimeMs: 0,
 		aiTabs: [tab],
@@ -367,7 +365,7 @@ describe('useInterruptHandler', () => {
 		it('sends SIGINT to terminal process target', async () => {
 			const session = createSession({
 				id: 'sess-term',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				state: 'busy',
 			});
 			useSessionStore.setState({
@@ -389,7 +387,7 @@ describe('useInterruptHandler', () => {
 			const tab = createTab({ id: 'tab-t', state: 'idle' });
 			const session = createSession({
 				id: 'sess-term-2',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				state: 'busy',
 				aiTabs: [tab],
 				activeTabId: 'tab-t',
@@ -669,7 +667,7 @@ describe('useInterruptHandler', () => {
 
 			const session = createSession({
 				id: 'sess-fk-term',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				state: 'busy',
 				shellLogs: [{ id: 'sl-1', timestamp: 1, source: 'system', text: 'Ready.' }],
 			});
@@ -744,7 +742,7 @@ describe('useInterruptHandler', () => {
 
 			const session = createSession({
 				id: 'sess-err-term',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				state: 'busy',
 				shellLogs: [],
 			});

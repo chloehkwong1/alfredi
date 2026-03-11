@@ -39,8 +39,6 @@ export interface UseAgentSessionManagementDeps {
 	setAgentSessionsOpen: (open: boolean) => void;
 	/** Ref to the right panel for refreshing history */
 	rightPanelRef: React.RefObject<RightPanelHandle | null>;
-	/** Default value for saveToHistory on new tabs */
-	defaultSaveToHistory: boolean;
 	/** Default value for showThinking on new tabs */
 	defaultShowThinking: ThinkingMode;
 }
@@ -85,7 +83,6 @@ export function useAgentSessionManagement(
 		setActiveAgentSessionId,
 		setAgentSessionsOpen,
 		rightPanelRef,
-		defaultSaveToHistory,
 		defaultShowThinking,
 	} = deps;
 
@@ -271,7 +268,6 @@ export function useAgentSessionManagement(
 							name,
 							starred: isStarred,
 							usageStats: finalUsageStats,
-							saveToHistory: defaultSaveToHistory,
 							showThinking: defaultShowThinking,
 						});
 						if (!result) return s;
@@ -291,7 +287,6 @@ export function useAgentSessionManagement(
 			activeSession?.toolType,
 			setSessions,
 			setActiveAgentSessionId,
-			defaultSaveToHistory,
 			defaultShowThinking,
 		]
 	);

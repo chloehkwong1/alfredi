@@ -168,7 +168,7 @@ describe('AgentComparisonChart', () => {
 			// In duration mode, claude-code has highest duration (2000000), then codex (1600000), then terminal (500000)
 			expect(agentNames[0]).toBe('claude-code');
 			expect(agentNames[1]).toBe('factory-droid');
-			expect(agentNames[2]).toBe('terminal');
+			expect(agentNames[2]).toBe('ai');
 		});
 	});
 

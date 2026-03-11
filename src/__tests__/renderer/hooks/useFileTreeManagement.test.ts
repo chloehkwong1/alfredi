@@ -188,8 +188,7 @@ describe('useFileTreeManagement', () => {
 		vi.mocked(gitService.getTags).mockResolvedValue(['v1.0.0']);
 
 		const session = createMockSession({
-			inputMode: 'terminal',
-			shellCwd: '/test/shell',
+			inputMode: 'ai',
 			fileTree: [{ name: 'existing', type: 'file' }],
 		});
 		const state = createSessionsState([session]);
@@ -203,8 +202,6 @@ describe('useFileTreeManagement', () => {
 			await result.current.refreshGitFileState(session.id);
 		});
 
-		// loadFileTree always uses projectRoot (treeRoot), not shellCwd
-		// Git operations use shellCwd when inputMode is 'terminal'
 		expect(loadFileTree).toHaveBeenCalledWith(
 			'/test/project',
 			10,

@@ -158,11 +158,6 @@ export interface TabStoreActions {
 	toggleReadOnly: (tabId: string) => void;
 
 	/**
-	 * Toggle saveToHistory flag on an AI tab.
-	 */
-	toggleSaveToHistory: (tabId: string) => void;
-
-	/**
 	 * Cycle through thinking modes: off → on → sticky → off.
 	 */
 	cycleThinkingMode: (tabId: string) => void;
@@ -407,14 +402,6 @@ export const useTabStore = create<TabStore>()((set) => ({
 		updateAiTab(tabId, { readOnlyMode: !tab.readOnlyMode });
 	},
 
-	toggleSaveToHistory: (tabId) => {
-		const session = getActiveSession();
-		if (!session) return;
-		const tab = session.aiTabs.find((t) => t.id === tabId);
-		if (!tab) return;
-		updateAiTab(tabId, { saveToHistory: !tab.saveToHistory });
-	},
-
 	cycleThinkingMode: (tabId) => {
 		const session = getActiveSession();
 		if (!session) return;
@@ -617,7 +604,6 @@ export function getTabActions() {
 		markUnread: state.markUnread,
 		updateTabName: state.updateTabName,
 		toggleReadOnly: state.toggleReadOnly,
-		toggleSaveToHistory: state.toggleSaveToHistory,
 		cycleThinkingMode: state.cycleThinkingMode,
 		// Tab reordering
 		reorderTabs: state.reorderTabs,

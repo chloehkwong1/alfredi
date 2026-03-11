@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { Activity, GitBranch, Bot, Bookmark, AlertCircle, Server } from 'lucide-react';
-import type { Session, Group, Theme } from '../types';
+import type { Session, Project, Theme } from '../types';
 import { getStatusColor } from '../utils/theme';
 
 // ============================================================================
@@ -9,13 +9,13 @@ import { getStatusColor } from '../utils/theme';
 
 /**
  * Variant determines the context in which the session item is rendered:
- * - 'bookmark': Session in the Bookmarks folder (shows group badge if session belongs to a group)
- * - 'group': Session inside a group folder
- * - 'flat': Session in flat list (when no groups exist)
- * - 'ungrouped': Session in the Ungrouped folder (when groups exist)
+ * - 'bookmark': Session in the Bookmarks folder (shows project badge if session belongs to a project)
+ * - 'project': Session inside a project folder
+ * - 'flat': Session in flat list (when no projects exist)
+ * - 'ungrouped': Session in the Ungrouped folder (when projects exist)
  * - 'worktree': Worktree child session nested under parent (shows branch name)
  */
-export type SessionItemVariant = 'bookmark' | 'group' | 'flat' | 'ungrouped' | 'worktree';
+export type SessionItemVariant = 'bookmark' | 'project' | 'flat' | 'ungrouped' | 'worktree';
 
 export interface SessionItemProps {
 	session: Session;
@@ -30,8 +30,8 @@ export interface SessionItemProps {
 	leftSidebarOpen: boolean;
 
 	// Optional data
-	group?: Group; // The group this session belongs to (for bookmark variant to show group badge)
-	groupId?: string; // The group ID context for generating editing key
+	project?: Project; // The project this session belongs to (for bookmark variant to show project badge)
+	projectId?: string; // The project ID context for generating editing key
 	gitFileCount?: number;
 	isInBatch?: boolean;
 	jumpNumber?: string | null; // Session jump shortcut number (1-9, 0)
@@ -52,13 +52,13 @@ export interface SessionItemProps {
  *
  * This component unifies 4 previously separate implementations:
  * 1. Bookmark items - sessions pinned to the Bookmarks folder
- * 2. Group items - sessions inside a group folder
- * 3. Flat items - sessions in a flat list (no groups)
+ * 2. Project items - sessions inside a project folder
+ * 3. Flat items - sessions in a flat list (no projects)
  * 4. Ungrouped items - sessions in the Ungrouped folder
  *
  * Key differences between variants are handled via props:
- * - Bookmark variant shows group badge and always shows filled bookmark icon
- * - Group/Flat/Ungrouped variants show bookmark icon on hover (unless bookmarked)
+ * - Bookmark variant shows project badge and always shows filled bookmark icon
+ * - Project/Flat/Ungrouped variants show bookmark icon on hover
  * - Flat variant has slightly different styling (mx-3 vs ml-4)
  */
 export const SessionItem = memo(function SessionItem({
@@ -70,8 +70,8 @@ export const SessionItem = memo(function SessionItem({
 	isDragging,
 	isEditing,
 	leftSidebarOpen,
-	group,
-	groupId,
+	project,
+	projectId,
 	gitFileCount,
 	isInBatch = false,
 	jumpNumber,
@@ -104,7 +104,7 @@ export const SessionItem = memo(function SessionItem({
 
 	return (
 		<div
-			key={`${variant}-${groupId || ''}-${session.id}`}
+			key={`${variant}-${projectId || ''}-${session.id}`}
 			draggable
 			onDragStart={onDragStart}
 			onDragOver={onDragOver}
@@ -176,13 +176,13 @@ export const SessionItem = memo(function SessionItem({
 						)}
 						<Activity className="w-3 h-3" /> {session.toolType}
 						{session.sessionSshRemoteConfig?.enabled ? ' (SSH)' : ''}
-						{/* Group badge (only in bookmark variant when session belongs to a group) */}
-						{variant === 'bookmark' && group && (
+						{/* Project badge (only in bookmark variant when session belongs to a project) */}
+						{variant === 'bookmark' && project && (
 							<span
 								className="text-[9px] px-1 py-0.5 rounded"
 								style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
 							>
-								{group.name}
+								{project.name}
 							</span>
 						)}
 					</div>

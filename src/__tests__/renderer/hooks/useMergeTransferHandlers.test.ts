@@ -164,7 +164,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		cwd: '/test',
 		projectRoot: '/test/project',
 		shellLogs: [],
-		shellCwd: '/test',
 	} as unknown as Session;
 }
 

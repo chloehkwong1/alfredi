@@ -101,7 +101,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	// selector would require a custom equality fn that's more complex than the current approach.
 	const sessions = useSessionStore((s) => s.sessions);
 	const sessionsLoaded = useSessionStore((s) => s.sessionsLoaded);
-	const defaultSaveToHistory = useSettingsStore((s) => s.defaultSaveToHistory);
 
 	// ---------------------------------------------------------------------------
 	// Refs
@@ -172,8 +171,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
 			const activeSession = currentSessions.find((s) => s.id === activeSessionId);
 			if (!activeSession) return;
-			const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-				useSettingsStore.getState();
+			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 			// Save the config first
 			useSessionStore
@@ -220,7 +218,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 								path: subdir.path,
 								branch: subdir.branch,
 								name: subdir.branch || subdir.name,
-								defaultSaveToHistory: savToHist,
 								defaultShowThinking: showThink,
 								...gitInfo,
 							})
@@ -297,8 +294,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				});
 				return;
 			}
-			const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-				useSettingsStore.getState();
+			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 			const worktreePath = `${basePath}/${branchName}`;
 
@@ -340,7 +336,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					path: worktreePath,
 					branch: branchName,
 					name: branchName,
-					defaultSaveToHistory: savToHist,
 					defaultShowThinking: showThink,
 					...gitInfo,
 				});
@@ -380,8 +375,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	const handleCreateWorktree = useCallback(async (branchName: string) => {
 		const createWtSession = useModalStore.getState().getData('createWorktree')?.session ?? null;
 		if (!createWtSession) return;
-		const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-			useSettingsStore.getState();
+		const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 		// Determine base path: use configured path or default to parent directory
 		const basePath =
@@ -423,7 +417,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				path: worktreePath,
 				branch: branchName,
 				name: branchName,
-				defaultSaveToHistory: savToHist,
 				defaultShowThinking: showThink,
 				...gitInfo,
 			});
@@ -491,8 +484,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 
 		const scanWorktreeConfigsOnStartup = async () => {
 			const currentSessions = useSessionStore.getState().sessions;
-			const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-				useSettingsStore.getState();
+			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 			// Find sessions that have worktreeConfig with basePath (only parent sessions)
 			const sessionsWithWorktreeConfig = currentSessions.filter(
@@ -544,7 +536,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 								path: subdir.path,
 								branch: subdir.branch,
 								name: subdir.branch || subdir.name,
-								defaultSaveToHistory: savToHist,
 								defaultShowThinking: showThink,
 								...gitInfo,
 							})
@@ -638,8 +629,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			if (existingSession) return;
 
 			// Create new worktree session
-			const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-				useSettingsStore.getState();
+			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 			const sshRemoteId = getSshRemoteId(parentSession);
 			const gitInfo = await fetchGitInfo(worktree.path, sshRemoteId);
 
@@ -648,7 +638,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				path: worktree.path,
 				branch: worktree.branch,
 				name: worktree.branch || worktree.name,
-				defaultSaveToHistory: savToHist,
 				defaultShowThinking: showThink,
 				...gitInfo,
 			});
@@ -683,7 +672,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	}, [
 		// Re-run when worktreeConfig changes on any session
 		worktreeConfigKey,
-		defaultSaveToHistory,
 	]);
 
 	// Effect 3: Legacy scanner for sessions using old worktreeParentPath
@@ -703,8 +691,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			try {
 				// Find sessions that have worktreeParentPath set (legacy model)
 				const latestSessions = useSessionStore.getState().sessions;
-				const { defaultSaveToHistory: savToHist, defaultShowThinking: showThink } =
-					useSettingsStore.getState();
+				const { defaultShowThinking: showThink } = useSettingsStore.getState();
 				const worktreeParentSessions = latestSessions.filter((s) => s.worktreeParentPath);
 				if (worktreeParentSessions.length === 0) return;
 
@@ -761,7 +748,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 									path: subdir.path,
 									branch: subdir.branch,
 									name: sessionName,
-									defaultSaveToHistory: savToHist,
 									defaultShowThinking: showThink,
 									worktreeParentPath: session.worktreeParentPath,
 									...gitInfo,
@@ -814,7 +800,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		return () => {
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 		};
-	}, [hasLegacyWorktreeSessions, defaultSaveToHistory]);
+	}, [hasLegacyWorktreeSessions]);
 
 	// ---------------------------------------------------------------------------
 	// Return

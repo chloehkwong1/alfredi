@@ -5,11 +5,11 @@
  *   - addNewSession (opens new instance modal)
  *   - createNewSession (core session creation with git, SSH, validation)
  *   - deleteSession (opens delete agent modal)
- *   - deleteWorktreeGroup (confirmation + process kill + cleanup)
+ *   - deleteWorktreeProject (confirmation + process kill + cleanup)
  *   - startRenamingSession / finishRenamingSession (rename + sync)
  *   - toggleBookmark (bookmark toggle)
  *   - handleDragStart / handleDragOver (drag and drop)
- *   - handleCreateGroupAndMove / handleGroupCreated (group move flow)
+ *   - handleCreateProjectAndMove / handleProjectCreated (project move flow)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -115,9 +115,7 @@ function createSession(overrides: Partial<Session> = {}): Session {
 		fileExplorerExpanded: [],
 		fileExplorerScrollPos: 0,
 		fileTreeAutoRefreshInterval: 180,
-		shellCwd: '/test/project',
 		aiCommandHistory: [],
-		shellCommandHistory: [],
 		executionQueue: [],
 		activeTimeMs: 0,
 		aiTabs: [
@@ -152,7 +150,7 @@ function createDeps(overrides: Partial<UseSessionCrudDeps> = {}): UseSessionCrud
 		setRemovedWorktreePaths: vi.fn(),
 		showConfirmation: vi.fn(),
 		inputRef: { current: { focus: vi.fn() } } as any,
-		setCreateGroupModalOpen: vi.fn(),
+		setCreateProjectModalOpen: vi.fn(),
 		...overrides,
 	};
 }
@@ -168,7 +166,7 @@ beforeEach(() => {
 	// Reset stores
 	useSessionStore.setState({
 		sessions: [],
-		groups: [],
+		projects: [],
 		activeSessionId: '',
 	});
 
@@ -411,7 +409,7 @@ describe('useSessionCrud', () => {
 				await result.current.createNewSession('terminal', '/test/project', 'Terminal Session');
 			});
 
-			expect(useSessionStore.getState().sessions[0].inputMode).toBe('terminal');
+			expect(useSessionStore.getState().sessions[0].inputMode).toBe('ai');
 		});
 
 		it('creates initial AI tab with default settings', async () => {
@@ -536,16 +534,16 @@ describe('useSessionCrud', () => {
 	});
 
 	// ========================================================================
-	// deleteWorktreeGroup
+	// deleteWorktreeProject
 	// ========================================================================
-	describe('deleteWorktreeGroup', () => {
-		it('does nothing when group not found', () => {
-			useSessionStore.setState({ groups: [] });
+	describe('deleteWorktreeProject', () => {
+		it('does nothing when project not found', () => {
+			useSessionStore.setState({ projects: [] });
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('nonexistent');
+				result.current.deleteWorktreeProject('nonexistent');
 			});
 
 			expect(deps.showConfirmation).not.toHaveBeenCalled();
@@ -553,10 +551,18 @@ describe('useSessionCrud', () => {
 
 		it('shows confirmation with correct message', () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'My Group' }],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'My Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
 				sessions: [
-					createSession({ id: 's1', groupId: 'grp-1' }),
-					createSession({ id: 's2', groupId: 'grp-1' }),
+					createSession({ id: 's1', projectId: 'grp-1' }),
+					createSession({ id: 's2', projectId: 'grp-1' }),
 				],
 			});
 
@@ -564,11 +570,11 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			expect(deps.showConfirmation).toHaveBeenCalledWith(
-				expect.stringContaining('My Group'),
+				expect.stringContaining('My Project'),
 				expect.any(Function)
 			);
 			expect(deps.showConfirmation).toHaveBeenCalledWith(
@@ -579,15 +585,23 @@ describe('useSessionCrud', () => {
 
 		it('uses singular agent for single session', () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Solo Group' }],
-				sessions: [createSession({ id: 's1', groupId: 'grp-1' })],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Solo Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
+				sessions: [createSession({ id: 's1', projectId: 'grp-1' })],
 			});
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const msg = (deps.showConfirmation as any).mock.calls[0][0];
@@ -597,10 +611,18 @@ describe('useSessionCrud', () => {
 
 		it('kills AI and terminal processes on confirm', async () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Kill Group' }],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Kill Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
 				sessions: [
-					createSession({ id: 's1', groupId: 'grp-1' }),
-					createSession({ id: 's2', groupId: 'grp-1' }),
+					createSession({ id: 's1', projectId: 'grp-1' }),
+					createSession({ id: 's2', projectId: 'grp-1' }),
 				],
 			});
 
@@ -608,7 +630,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			// Execute the confirmation callback
@@ -625,10 +647,18 @@ describe('useSessionCrud', () => {
 
 		it('deletes playbooks for each session on confirm', async () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'PB Group' }],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'PB Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
 				sessions: [
-					createSession({ id: 's1', groupId: 'grp-1' }),
-					createSession({ id: 's2', groupId: 'grp-1' }),
+					createSession({ id: 's1', projectId: 'grp-1' }),
+					createSession({ id: 's2', projectId: 'grp-1' }),
 				],
 			});
 
@@ -636,7 +666,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -649,12 +679,26 @@ describe('useSessionCrud', () => {
 		});
 
 		it('removes sessions from store on confirm', async () => {
-			const otherSession = createSession({ id: 'other', name: 'Other' });
+			const otherSession = createSession({
+				id: 'other',
+				name: 'Other',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Del Group' }],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Del Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
 				sessions: [
-					createSession({ id: 's1', groupId: 'grp-1' }),
-					createSession({ id: 's2', groupId: 'grp-1' }),
+					createSession({ id: 's1', projectId: 'grp-1' }),
+					createSession({ id: 's2', projectId: 'grp-1' }),
 					otherSession,
 				],
 			});
@@ -663,7 +707,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -676,20 +720,32 @@ describe('useSessionCrud', () => {
 			expect(sessions[0].id).toBe('other');
 		});
 
-		it('removes group from store on confirm', async () => {
+		it('removes project from store on confirm', async () => {
 			useSessionStore.setState({
-				groups: [
-					{ id: 'grp-1', name: 'Del Group' },
-					{ id: 'grp-2', name: 'Keep Group' },
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Del Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+					{
+						id: 'grp-2',
+						name: 'Keep Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
 				],
-				sessions: [createSession({ id: 's1', groupId: 'grp-1' })],
+				sessions: [createSession({ id: 's1', projectId: 'grp-1' })],
 			});
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -697,23 +753,31 @@ describe('useSessionCrud', () => {
 				await onConfirm();
 			});
 
-			const groups = useSessionStore.getState().groups;
-			expect(groups).toHaveLength(1);
-			expect(groups[0].id).toBe('grp-2');
+			const projects = useSessionStore.getState().projects;
+			expect(projects).toHaveLength(1);
+			expect(projects[0].id).toBe('grp-2');
 		});
 
 		it('flushes session persistence on confirm', async () => {
 			vi.useFakeTimers();
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Flush Group' }],
-				sessions: [createSession({ id: 's1', groupId: 'grp-1' })],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Flush Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
+				sessions: [createSession({ id: 's1', projectId: 'grp-1' })],
 			});
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -730,10 +794,24 @@ describe('useSessionCrud', () => {
 		});
 
 		it('switches to first remaining session when active session deleted', async () => {
-			const remaining = createSession({ id: 'remaining', name: 'Remaining' });
+			const remaining = createSession({
+				id: 'remaining',
+				name: 'Remaining',
+				emoji: '',
+				collapsed: false,
+				rootPath: '/test/project',
+			});
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Switch Group' }],
-				sessions: [createSession({ id: 's1', groupId: 'grp-1' }), remaining],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Switch Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
+				sessions: [createSession({ id: 's1', projectId: 'grp-1' }), remaining],
 				activeSessionId: 's1',
 			});
 
@@ -741,7 +819,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -754,8 +832,16 @@ describe('useSessionCrud', () => {
 
 		it('sets empty active session when no sessions remain', async () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Empty Group' }],
-				sessions: [createSession({ id: 's1', groupId: 'grp-1' })],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Empty Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
+				sessions: [createSession({ id: 's1', projectId: 'grp-1' })],
 				activeSessionId: 's1',
 			});
 
@@ -763,7 +849,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -776,10 +862,18 @@ describe('useSessionCrud', () => {
 
 		it('shows success toast on confirm', async () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Toast Group' }],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Toast Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
 				sessions: [
-					createSession({ id: 's1', groupId: 'grp-1' }),
-					createSession({ id: 's2', groupId: 'grp-1' }),
+					createSession({ id: 's1', projectId: 'grp-1' }),
+					createSession({ id: 's2', projectId: 'grp-1' }),
 				],
 			});
 
@@ -787,7 +881,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -798,19 +892,27 @@ describe('useSessionCrud', () => {
 			expect(notifyToast).toHaveBeenCalledWith(
 				expect.objectContaining({
 					type: 'success',
-					title: 'Group Removed',
-					message: expect.stringContaining('Toast Group'),
+					title: 'Project Removed',
+					message: expect.stringContaining('Toast Project'),
 				})
 			);
 		});
 
 		it('tracks removed worktree paths', async () => {
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'WT Group' }],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'WT Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
 				sessions: [
 					createSession({
 						id: 's1',
-						groupId: 'grp-1',
+						projectId: 'grp-1',
 						worktreeParentPath: '/parent',
 						cwd: '/parent/wt1',
 					}),
@@ -821,7 +923,7 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -837,15 +939,23 @@ describe('useSessionCrud', () => {
 			const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
 			useSessionStore.setState({
-				groups: [{ id: 'grp-1', name: 'Error Group' }],
-				sessions: [createSession({ id: 's1', groupId: 'grp-1' })],
+				projects: [
+					{
+						id: 'grp-1',
+						name: 'Error Project',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					},
+				],
+				sessions: [createSession({ id: 's1', projectId: 'grp-1' })],
 			});
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.deleteWorktreeGroup('grp-1');
+				result.current.deleteWorktreeProject('grp-1');
 			});
 
 			const onConfirm = (deps.showConfirmation as any).mock.calls[0][1];
@@ -878,7 +988,15 @@ describe('useSessionCrud', () => {
 	describe('finishRenamingSession', () => {
 		it('renames the session in store', () => {
 			useSessionStore.setState({
-				sessions: [createSession({ id: 'sess-1', name: 'Old Name' })],
+				sessions: [
+					createSession({
+						id: 'sess-1',
+						name: 'Old Name',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					}),
+				],
 			});
 
 			const deps = createDeps();
@@ -1006,8 +1124,20 @@ describe('useSessionCrud', () => {
 		it('does not affect other sessions when renaming', () => {
 			useSessionStore.setState({
 				sessions: [
-					createSession({ id: 'sess-1', name: 'Keep Me' }),
-					createSession({ id: 'sess-2', name: 'Rename Me' }),
+					createSession({
+						id: 'sess-1',
+						name: 'Keep Me',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					}),
+					createSession({
+						id: 'sess-2',
+						name: 'Rename Me',
+						emoji: '',
+						collapsed: false,
+						rootPath: '/test/project',
+					}),
 				],
 			});
 
@@ -1111,18 +1241,18 @@ describe('useSessionCrud', () => {
 	});
 
 	// ========================================================================
-	// handleCreateGroupAndMove / handleGroupCreated
+	// handleCreateProjectAndMove / handleProjectCreated
 	// ========================================================================
-	describe('handleCreateGroupAndMove', () => {
-		it('opens create group modal', () => {
+	describe('handleCreateProjectAndMove', () => {
+		it('opens create project modal', () => {
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.handleCreateGroupAndMove('sess-move');
+				result.current.handleCreateProjectAndMove('sess-move');
 			});
 
-			expect(deps.setCreateGroupModalOpen).toHaveBeenCalledWith(true);
+			expect(deps.setCreateProjectModalOpen).toHaveBeenCalledWith(true);
 		});
 
 		it('stores pending move session ID', () => {
@@ -1130,15 +1260,15 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.handleCreateGroupAndMove('sess-move');
+				result.current.handleCreateProjectAndMove('sess-move');
 			});
 
-			expect(result.current.pendingMoveToGroupSessionId).toBe('sess-move');
+			expect(result.current.pendingMoveToProjectSessionId).toBe('sess-move');
 		});
 	});
 
-	describe('handleGroupCreated', () => {
-		it('moves pending session to the new group', () => {
+	describe('handleProjectCreated', () => {
+		it('moves pending session to the new project', () => {
 			useSessionStore.setState({
 				sessions: [createSession({ id: 'sess-move' })],
 			});
@@ -1148,16 +1278,16 @@ describe('useSessionCrud', () => {
 
 			// First, set the pending move
 			act(() => {
-				result.current.handleCreateGroupAndMove('sess-move');
+				result.current.handleCreateProjectAndMove('sess-move');
 			});
 
-			// Then, complete the group creation
+			// Then, complete the project creation
 			act(() => {
-				result.current.handleGroupCreated('new-group-id');
+				result.current.handleProjectCreated('new-project-id');
 			});
 
 			const sessions = useSessionStore.getState().sessions;
-			expect(sessions[0].groupId).toBe('new-group-id');
+			expect(sessions[0].projectId).toBe('new-project-id');
 		});
 
 		it('clears pending move session ID after move', () => {
@@ -1169,14 +1299,14 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.handleCreateGroupAndMove('sess-move');
+				result.current.handleCreateProjectAndMove('sess-move');
 			});
 
 			act(() => {
-				result.current.handleGroupCreated('new-group-id');
+				result.current.handleProjectCreated('new-project-id');
 			});
 
-			expect(result.current.pendingMoveToGroupSessionId).toBeNull();
+			expect(result.current.pendingMoveToProjectSessionId).toBeNull();
 		});
 
 		it('does nothing when no pending session ID', () => {
@@ -1188,11 +1318,11 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.handleGroupCreated('new-group-id');
+				result.current.handleProjectCreated('new-project-id');
 			});
 
 			const sessions = useSessionStore.getState().sessions;
-			expect(sessions[0].groupId).toBeUndefined();
+			expect(sessions[0].projectId).toBeUndefined();
 		});
 
 		it('does not affect other sessions during move', () => {
@@ -1204,28 +1334,28 @@ describe('useSessionCrud', () => {
 			const { result } = renderHook(() => useSessionCrud(deps));
 
 			act(() => {
-				result.current.handleCreateGroupAndMove('sess-1');
+				result.current.handleCreateProjectAndMove('sess-1');
 			});
 
 			act(() => {
-				result.current.handleGroupCreated('grp-new');
+				result.current.handleProjectCreated('grp-new');
 			});
 
 			const sessions = useSessionStore.getState().sessions;
-			expect(sessions[0].groupId).toBe('grp-new');
-			expect(sessions[1].groupId).toBeUndefined();
+			expect(sessions[0].projectId).toBe('grp-new');
+			expect(sessions[1].projectId).toBeUndefined();
 		});
 	});
 
 	// ========================================================================
-	// pendingMoveToGroupSessionId
+	// pendingMoveToProjectSessionId
 	// ========================================================================
-	describe('pendingMoveToGroupSessionId', () => {
+	describe('pendingMoveToProjectSessionId', () => {
 		it('starts as null', () => {
 			const deps = createDeps();
 			const { result } = renderHook(() => useSessionCrud(deps));
 
-			expect(result.current.pendingMoveToGroupSessionId).toBeNull();
+			expect(result.current.pendingMoveToProjectSessionId).toBeNull();
 		});
 	});
 
@@ -1240,15 +1370,15 @@ describe('useSessionCrud', () => {
 			expect(typeof result.current.addNewSession).toBe('function');
 			expect(typeof result.current.createNewSession).toBe('function');
 			expect(typeof result.current.deleteSession).toBe('function');
-			expect(typeof result.current.deleteWorktreeGroup).toBe('function');
+			expect(typeof result.current.deleteWorktreeProject).toBe('function');
 			expect(typeof result.current.startRenamingSession).toBe('function');
 			expect(typeof result.current.finishRenamingSession).toBe('function');
 			expect(typeof result.current.toggleBookmark).toBe('function');
 			expect(typeof result.current.handleDragStart).toBe('function');
 			expect(typeof result.current.handleDragOver).toBe('function');
-			expect(typeof result.current.handleCreateGroupAndMove).toBe('function');
-			expect(typeof result.current.handleGroupCreated).toBe('function');
-			expect(result.current).toHaveProperty('pendingMoveToGroupSessionId');
+			expect(typeof result.current.handleCreateProjectAndMove).toBe('function');
+			expect(typeof result.current.handleProjectCreated).toBe('function');
+			expect(result.current).toHaveProperty('pendingMoveToProjectSessionId');
 		});
 	});
 });

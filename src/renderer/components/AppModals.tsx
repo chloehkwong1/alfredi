@@ -9,7 +9,7 @@
  * - AppInfoModals: Info/display modals (AboutModal, etc.)
  * - AppConfirmModals: Confirmation modals (ConfirmModal, QuitConfirmModal)
  * - AppSessionModals: Session management modals (NewInstanceModal, EditAgentModal, RenameSessionModal, RenameTabModal)
- * - AppGroupModals: Group management modals (CreateGroupModal, RenameGroupModal)
+ * - AppProjectModals: Project management modals (CreateProjectModal, RenameProjectModal)
  * - AppWorktreeModals: Worktree/PR management modals
  * - AppUtilityModals: Utility and workflow modals
  * - AppAgentModals: Agent error and context transfer modals
@@ -26,7 +26,7 @@ import { useModalStore } from '../stores/modalStore';
 import type {
 	Theme,
 	Session,
-	Group,
+	Project,
 	Shortcut,
 	AutoRunStats,
 	MaestroUsageStats,
@@ -65,9 +65,9 @@ import { NewInstanceModal, EditAgentModal } from './NewInstanceModal';
 import { RenameSessionModal } from './RenameSessionModal';
 import { RenameTabModal } from './RenameTabModal';
 
-// Group Modal Components
-import { CreateGroupModal } from './CreateGroupModal';
-import { RenameGroupModal } from './RenameGroupModal';
+// Project Modal Components
+import { CreateProjectModal } from './CreateProjectModal';
+import { RenameProjectModal } from './RenameProjectModal';
 
 // Worktree Modal Components
 import { WorktreeConfigModal } from './WorktreeConfigModal';
@@ -119,7 +119,7 @@ export interface AppInfoModalsProps {
 	processMonitorOpen: boolean;
 	onCloseProcessMonitor: () => void;
 	sessions: Session[]; // Used by ProcessMonitor
-	groups: Group[];
+	projects: Project[];
 	onNavigateToSession: (sessionId: string, tabId?: string) => void;
 }
 
@@ -149,7 +149,7 @@ export const AppInfoModals = memo(function AppInfoModals({
 	processMonitorOpen,
 	onCloseProcessMonitor,
 	sessions,
-	groups,
+	projects,
 	onNavigateToSession,
 }: AppInfoModalsProps) {
 	return (
@@ -174,7 +174,7 @@ export const AppInfoModals = memo(function AppInfoModals({
 					<ProcessMonitor
 						theme={theme}
 						sessions={sessions}
-						groups={groups}
+						projects={projects}
 						onClose={onCloseProcessMonitor}
 						onNavigateToSession={onNavigateToSession}
 					/>
@@ -450,81 +450,81 @@ export const AppSessionModals = memo(function AppSessionModals({
 });
 
 // ============================================================================
-// APP GROUP MODALS - Group management modals
+// APP PROJECT MODALS - Project management modals
 // ============================================================================
 
 /**
- * Props for the AppGroupModals component
+ * Props for the AppProjectModals component
  */
-export interface AppGroupModalsProps {
+export interface AppProjectModalsProps {
 	theme: Theme;
-	groups: Group[];
-	setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
+	projects: Project[];
+	setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 
-	// CreateGroupModal
-	createGroupModalOpen: boolean;
-	onCloseCreateGroupModal: () => void;
-	onGroupCreated?: (groupId: string) => void;
+	// CreateProjectModal
+	createProjectModalOpen: boolean;
+	onCloseCreateProjectModal: () => void;
+	onProjectCreated?: (projectId: string) => void;
 
-	// RenameGroupModal
-	renameGroupModalOpen: boolean;
-	renameGroupId: string | null;
-	renameGroupValue: string;
-	setRenameGroupValue: (value: string) => void;
-	renameGroupEmoji: string;
-	setRenameGroupEmoji: (emoji: string) => void;
-	onCloseRenameGroupModal: () => void;
+	// RenameProjectModal
+	renameProjectModalOpen: boolean;
+	renameProjectId: string | null;
+	renameProjectValue: string;
+	setRenameProjectValue: (value: string) => void;
+	renameProjectEmoji: string;
+	setRenameProjectEmoji: (emoji: string) => void;
+	onCloseRenameProjectModal: () => void;
 }
 
 /**
- * AppGroupModals - Renders group management modals
+ * AppProjectModals - Renders project management modals
  *
  * Contains:
- * - CreateGroupModal: Create a new session group
- * - RenameGroupModal: Rename an existing group
+ * - CreateProjectModal: Create a new project
+ * - RenameProjectModal: Rename an existing project
  */
-export const AppGroupModals = memo(function AppGroupModals({
+export const AppProjectModals = memo(function AppProjectModals({
 	theme,
-	groups,
-	setGroups,
-	// CreateGroupModal
-	createGroupModalOpen,
-	onCloseCreateGroupModal,
-	onGroupCreated,
-	// RenameGroupModal
-	renameGroupModalOpen,
-	renameGroupId,
-	renameGroupValue,
-	setRenameGroupValue,
-	renameGroupEmoji,
-	setRenameGroupEmoji,
-	onCloseRenameGroupModal,
-}: AppGroupModalsProps) {
+	projects,
+	setProjects,
+	// CreateProjectModal
+	createProjectModalOpen,
+	onCloseCreateProjectModal,
+	onProjectCreated,
+	// RenameProjectModal
+	renameProjectModalOpen,
+	renameProjectId,
+	renameProjectValue,
+	setRenameProjectValue,
+	renameProjectEmoji,
+	setRenameProjectEmoji,
+	onCloseRenameProjectModal,
+}: AppProjectModalsProps) {
 	return (
 		<>
-			{/* --- CREATE GROUP MODAL --- */}
-			{createGroupModalOpen && (
-				<CreateGroupModal
+			{/* --- CREATE PROJECT MODAL --- */}
+			{createProjectModalOpen && (
+				<CreateProjectModal
 					theme={theme}
-					onClose={onCloseCreateGroupModal}
-					groups={groups}
-					setGroups={setGroups}
-					onGroupCreated={onGroupCreated}
+					onClose={onCloseCreateProjectModal}
+					projects={projects}
+					setProjects={setProjects}
+					onProjectCreated={onProjectCreated}
 				/>
 			)}
 
-			{/* --- RENAME GROUP MODAL --- */}
-			{renameGroupModalOpen && renameGroupId && (
-				<RenameGroupModal
+			{/* --- RENAME PROJECT MODAL --- */}
+			{renameProjectModalOpen && renameProjectId && (
+				<RenameProjectModal
 					theme={theme}
-					groupId={renameGroupId}
-					groupName={renameGroupValue}
-					setGroupName={setRenameGroupValue}
-					groupEmoji={renameGroupEmoji}
-					setGroupEmoji={setRenameGroupEmoji}
-					onClose={onCloseRenameGroupModal}
-					groups={groups}
-					setGroups={setGroups}
+					projectId={renameProjectId}
+					projectName={renameProjectValue}
+					setProjectName={setRenameProjectValue}
+					projectEmoji={renameProjectEmoji}
+					setProjectEmoji={setRenameProjectEmoji}
+					onClose={onCloseRenameProjectModal}
+					projects={projects}
+					setProjects={setProjects}
 				/>
 			)}
 		</>
@@ -677,24 +677,24 @@ export interface AppUtilityModalsProps {
 	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	activeSessionId: string;
 	activeSession: Session | null;
-	groups: Group[];
-	setGroups: React.Dispatch<React.SetStateAction<Group[]>>;
+	projects: Project[];
+	setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 	shortcuts: Record<string, Shortcut>;
 	tabShortcuts: Record<string, Shortcut>;
 
 	// QuickActionsModal
 	quickActionOpen: boolean;
-	quickActionInitialMode: 'main' | 'move-to-group';
+	quickActionInitialMode: 'main' | 'move-to-project';
 	setQuickActionOpen: (open: boolean) => void;
 	setActiveSessionId: (id: string) => void;
 	addNewSession: () => void;
 	setRenameInstanceValue: (value: string) => void;
 	setRenameInstanceModalOpen: (open: boolean) => void;
-	setRenameGroupId: (id: string) => void;
-	setRenameGroupValue: (value: string) => void;
-	setRenameGroupEmoji: (emoji: string) => void;
-	setRenameGroupModalOpen: (open: boolean) => void;
-	setCreateGroupModalOpen: (open: boolean) => void;
+	setRenameProjectId: (id: string) => void;
+	setRenameProjectValue: (value: string) => void;
+	setRenameProjectEmoji: (emoji: string) => void;
+	setRenameProjectModalOpen: (open: boolean) => void;
+	setCreateProjectModalOpen: (open: boolean) => void;
 	setLeftSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	setRightPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	toggleInputMode: () => void;
@@ -815,8 +815,6 @@ export interface AppUtilityModalsProps {
 		contextImages?: string[],
 		source?: 'staged' | 'history'
 	) => void;
-	promptTabSaveToHistory: boolean;
-	onPromptToggleTabSaveToHistory?: () => void;
 	promptTabReadOnlyMode: boolean;
 	onPromptToggleTabReadOnlyMode: () => void;
 	promptTabShowThinking: ThinkingMode;
@@ -854,8 +852,8 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	setSessions,
 	activeSessionId,
 	activeSession,
-	groups,
-	setGroups,
+	projects,
+	setProjects,
 	shortcuts,
 	tabShortcuts,
 	// QuickActionsModal
@@ -866,11 +864,11 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	addNewSession,
 	setRenameInstanceValue,
 	setRenameInstanceModalOpen,
-	setRenameGroupId,
-	setRenameGroupValue,
-	setRenameGroupEmoji,
-	setRenameGroupModalOpen,
-	setCreateGroupModalOpen,
+	setRenameProjectId,
+	setRenameProjectValue,
+	setRenameProjectEmoji,
+	setRenameProjectModalOpen,
+	setCreateProjectModalOpen,
 	setLeftSidebarOpen,
 	setRightPanelOpen,
 	toggleInputMode,
@@ -965,8 +963,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	setPromptComposerStagedImages,
 	onPromptImageAttachBlocked,
 	onPromptOpenLightbox,
-	promptTabSaveToHistory,
-	onPromptToggleTabSaveToHistory,
 	promptTabReadOnlyMode,
 	onPromptToggleTabReadOnlyMode,
 	promptTabShowThinking,
@@ -990,8 +986,8 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					sessions={sessions}
 					setSessions={setSessions}
 					activeSessionId={activeSessionId}
-					groups={groups}
-					setGroups={setGroups}
+					projects={projects}
+					setProjects={setProjects}
 					shortcuts={shortcuts}
 					initialMode={quickActionInitialMode}
 					setQuickActionOpen={setQuickActionOpen}
@@ -999,11 +995,11 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					addNewSession={addNewSession}
 					setRenameInstanceValue={setRenameInstanceValue}
 					setRenameInstanceModalOpen={setRenameInstanceModalOpen}
-					setRenameGroupId={setRenameGroupId}
-					setRenameGroupValue={setRenameGroupValue}
-					setRenameGroupEmoji={setRenameGroupEmoji}
-					setRenameGroupModalOpen={setRenameGroupModalOpen}
-					setCreateGroupModalOpen={setCreateGroupModalOpen}
+					setRenameProjectId={setRenameProjectId}
+					setRenameProjectValue={setRenameProjectValue}
+					setRenameProjectEmoji={setRenameProjectEmoji}
+					setRenameProjectModalOpen={setRenameProjectModalOpen}
+					setCreateProjectModalOpen={setCreateProjectModalOpen}
 					setLeftSidebarOpen={setLeftSidebarOpen}
 					setRightPanelOpen={setRightPanelOpen}
 					toggleInputMode={toggleInputMode}
@@ -1146,8 +1142,6 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 					setStagedImages={setPromptComposerStagedImages}
 					onImageAttachBlocked={onPromptImageAttachBlocked}
 					onOpenLightbox={onPromptOpenLightbox}
-					tabSaveToHistory={promptTabSaveToHistory}
-					onToggleTabSaveToHistory={onPromptToggleTabSaveToHistory}
 					tabReadOnlyMode={promptTabReadOnlyMode}
 					onToggleTabReadOnlyMode={onPromptToggleTabReadOnlyMode}
 					tabShowThinking={promptTabShowThinking}
@@ -1318,16 +1312,16 @@ export const AppAgentModals = memo(function AppAgentModals({
 });
 
 // ============================================================================
-// UNIFIED APP MODALS - Single component combining all modal groups
+// UNIFIED APP MODALS - Single component combining all modal sections
 // ============================================================================
 
 /**
  * Combined props interface for the unified AppModals component.
- * This consolidates all modal group props into a single interface for simpler
+ * This consolidates all modal section props into a single interface for simpler
  * usage in App.tsx.
  */
 export interface AppModalsProps {
-	// Common props (sessions/groups/modal booleans self-sourced from stores — Tier 1B)
+	// Common props (sessions/projects/modal booleans self-sourced from stores — Tier 1B)
 	theme: Theme;
 	shortcuts: Record<string, Shortcut>;
 	tabShortcuts: Record<string, Shortcut>;
@@ -1405,16 +1399,16 @@ export interface AppModalsProps {
 	onCloseRenameTabModal: () => void;
 	onRenameTab: (newName: string) => void;
 
-	// --- AppGroupModals props ---
-	createGroupModalOpen: boolean;
-	onCloseCreateGroupModal: () => void;
-	onGroupCreated?: (groupId: string) => void;
-	renameGroupId: string | null;
-	renameGroupValue: string;
-	setRenameGroupValue: (value: string) => void;
-	renameGroupEmoji: string;
-	setRenameGroupEmoji: (emoji: string) => void;
-	onCloseRenameGroupModal: () => void;
+	// --- AppProjectModals props ---
+	createProjectModalOpen: boolean;
+	onCloseCreateProjectModal: () => void;
+	onProjectCreated?: (projectId: string) => void;
+	renameProjectId: string | null;
+	renameProjectValue: string;
+	setRenameProjectValue: (value: string) => void;
+	renameProjectEmoji: string;
+	setRenameProjectEmoji: (emoji: string) => void;
+	onCloseRenameProjectModal: () => void;
 
 	// --- AppWorktreeModals props ---
 	onCloseWorktreeConfigModal: () => void;
@@ -1433,17 +1427,17 @@ export interface AppModalsProps {
 	onConfirmAndDeleteWorktreeOnDisk: () => Promise<void>;
 
 	// --- AppUtilityModals props ---
-	quickActionInitialMode: 'main' | 'move-to-group';
+	quickActionInitialMode: 'main' | 'move-to-project';
 	setQuickActionOpen: (open: boolean) => void;
 	setActiveSessionId: (id: string) => void;
 	addNewSession: () => void;
 	setRenameInstanceValue: (value: string) => void;
 	setRenameInstanceModalOpen: (open: boolean) => void;
-	setRenameGroupId: (id: string) => void;
-	setRenameGroupValueForQuickActions: (value: string) => void;
-	setRenameGroupEmojiForQuickActions: (emoji: string) => void;
-	setRenameGroupModalOpenForQuickActions: (open: boolean) => void;
-	setCreateGroupModalOpenForQuickActions: (open: boolean) => void;
+	setRenameProjectId: (id: string) => void;
+	setRenameProjectValueForQuickActions: (value: string) => void;
+	setRenameProjectEmojiForQuickActions: (emoji: string) => void;
+	setRenameProjectModalOpenForQuickActions: (open: boolean) => void;
+	setCreateProjectModalOpenForQuickActions: (open: boolean) => void;
 	setLeftSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	setRightPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	toggleInputMode: () => void;
@@ -1557,8 +1551,6 @@ export interface AppModalsProps {
 		contextImages?: string[],
 		source?: 'staged' | 'history'
 	) => void;
-	promptTabSaveToHistory: boolean;
-	onPromptToggleTabSaveToHistory?: () => void;
 	promptTabReadOnlyMode: boolean;
 	onPromptToggleTabReadOnlyMode: () => void;
 	promptTabShowThinking: ThinkingMode;
@@ -1607,7 +1599,7 @@ export interface AppModalsProps {
  * - AppInfoModals: Info/display modals
  * - AppConfirmModals: Confirmation modals
  * - AppSessionModals: Session management modals
- * - AppGroupModals: Group management modals
+ * - AppProjectModals: Group management modals
  * - AppWorktreeModals: Worktree/PR modals
  * - AppUtilityModals: Utility and workflow modals
  * - AppAgentModals: Agent error and transfer modals
@@ -1616,9 +1608,9 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 	// Self-source data from stores (Tier 1B)
 	const sessions = useSessionStore((s) => s.sessions);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
-	const groups = useSessionStore((s) => s.groups);
+	const projects = useSessionStore((s) => s.projects);
 	const setSessions = useSessionStore((s) => s.setSessions);
-	const setGroups = useSessionStore((s) => s.setGroups);
+	const setProjects = useSessionStore((s) => s.setProjects);
 	const activeSession = useMemo(
 		() => sessions.find((s) => s.id === activeSessionId) ?? null,
 		[sessions, activeSessionId]
@@ -1634,7 +1626,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		editAgentModalOpen,
 		renameSessionModalOpen,
 		renameTabModalOpen,
-		renameGroupModalOpen,
+		renameProjectModalOpen,
 		worktreeConfigModalOpen,
 		createWorktreeModalOpen,
 		createPRModalOpen,
@@ -1658,7 +1650,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 			editAgentModalOpen: s.modals.get('editAgent')?.open ?? false,
 			renameSessionModalOpen: s.modals.get('renameInstance')?.open ?? false,
 			renameTabModalOpen: s.modals.get('renameTab')?.open ?? false,
-			renameGroupModalOpen: s.modals.get('renameGroup')?.open ?? false,
+			renameProjectModalOpen: s.modals.get('renameProject')?.open ?? false,
 			worktreeConfigModalOpen: s.modals.get('worktreeConfig')?.open ?? false,
 			createWorktreeModalOpen: s.modals.get('createWorktree')?.open ?? false,
 			createPRModalOpen: s.modals.get('createPR')?.open ?? false,
@@ -1714,16 +1706,16 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		renameTabInitialName,
 		onCloseRenameTabModal,
 		onRenameTab,
-		// Group modals
-		createGroupModalOpen,
-		onCloseCreateGroupModal,
-		onGroupCreated,
-		renameGroupId,
-		renameGroupValue,
-		setRenameGroupValue,
-		renameGroupEmoji,
-		setRenameGroupEmoji,
-		onCloseRenameGroupModal,
+		// Project modals
+		createProjectModalOpen,
+		onCloseCreateProjectModal,
+		onProjectCreated,
+		renameProjectId,
+		renameProjectValue,
+		setRenameProjectValue,
+		renameProjectEmoji,
+		setRenameProjectEmoji,
+		onCloseRenameProjectModal,
 		// Worktree modals
 		onCloseWorktreeConfigModal,
 		onSaveWorktreeConfig,
@@ -1746,11 +1738,11 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		addNewSession,
 		setRenameInstanceValue,
 		setRenameInstanceModalOpen,
-		setRenameGroupId,
-		setRenameGroupValueForQuickActions,
-		setRenameGroupEmojiForQuickActions,
-		setRenameGroupModalOpenForQuickActions,
-		setCreateGroupModalOpenForQuickActions,
+		setRenameProjectId,
+		setRenameProjectValueForQuickActions,
+		setRenameProjectEmojiForQuickActions,
+		setRenameProjectModalOpenForQuickActions,
+		setCreateProjectModalOpenForQuickActions,
 		setLeftSidebarOpen,
 		setRightPanelOpen,
 		toggleInputMode,
@@ -1844,8 +1836,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		setPromptComposerStagedImages,
 		onPromptImageAttachBlocked,
 		onPromptOpenLightbox,
-		promptTabSaveToHistory,
-		onPromptToggleTabSaveToHistory,
 		promptTabReadOnlyMode,
 		onPromptToggleTabReadOnlyMode,
 		promptTabShowThinking,
@@ -1895,7 +1885,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				processMonitorOpen={processMonitorOpen}
 				onCloseProcessMonitor={onCloseProcessMonitor}
 				sessions={sessions}
-				groups={groups}
+				projects={projects}
 				onNavigateToSession={onNavigateToSession}
 			/>
 
@@ -1944,21 +1934,21 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onRenameTab={onRenameTab}
 			/>
 
-			{/* Group Management Modals */}
-			<AppGroupModals
+			{/* Project Management Modals */}
+			<AppProjectModals
 				theme={theme}
-				groups={groups}
-				setGroups={setGroups}
-				createGroupModalOpen={createGroupModalOpen}
-				onCloseCreateGroupModal={onCloseCreateGroupModal}
-				onGroupCreated={onGroupCreated}
-				renameGroupModalOpen={renameGroupModalOpen}
-				renameGroupId={renameGroupId}
-				renameGroupValue={renameGroupValue}
-				setRenameGroupValue={setRenameGroupValue}
-				renameGroupEmoji={renameGroupEmoji}
-				setRenameGroupEmoji={setRenameGroupEmoji}
-				onCloseRenameGroupModal={onCloseRenameGroupModal}
+				projects={projects}
+				setProjects={setProjects}
+				createProjectModalOpen={createProjectModalOpen}
+				onCloseCreateProjectModal={onCloseCreateProjectModal}
+				onProjectCreated={onProjectCreated}
+				renameProjectModalOpen={renameProjectModalOpen}
+				renameProjectId={renameProjectId}
+				renameProjectValue={renameProjectValue}
+				setRenameProjectValue={setRenameProjectValue}
+				renameProjectEmoji={renameProjectEmoji}
+				setRenameProjectEmoji={setRenameProjectEmoji}
+				onCloseRenameProjectModal={onCloseRenameProjectModal}
 			/>
 
 			{/* Worktree/PR Modals */}
@@ -1992,8 +1982,8 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				setSessions={setSessions}
 				activeSessionId={activeSessionId}
 				activeSession={activeSession}
-				groups={groups}
-				setGroups={setGroups}
+				projects={projects}
+				setProjects={setProjects}
 				shortcuts={shortcuts}
 				tabShortcuts={tabShortcuts}
 				quickActionOpen={quickActionOpen}
@@ -2003,11 +1993,11 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				addNewSession={addNewSession}
 				setRenameInstanceValue={setRenameInstanceValue}
 				setRenameInstanceModalOpen={setRenameInstanceModalOpen}
-				setRenameGroupId={setRenameGroupId}
-				setRenameGroupValue={setRenameGroupValueForQuickActions}
-				setRenameGroupEmoji={setRenameGroupEmojiForQuickActions}
-				setRenameGroupModalOpen={setRenameGroupModalOpenForQuickActions}
-				setCreateGroupModalOpen={setCreateGroupModalOpenForQuickActions}
+				setRenameProjectId={setRenameProjectId}
+				setRenameProjectValue={setRenameProjectValueForQuickActions}
+				setRenameProjectEmoji={setRenameProjectEmojiForQuickActions}
+				setRenameProjectModalOpen={setRenameProjectModalOpenForQuickActions}
+				setCreateProjectModalOpen={setCreateProjectModalOpenForQuickActions}
 				setLeftSidebarOpen={setLeftSidebarOpen}
 				setRightPanelOpen={setRightPanelOpen}
 				toggleInputMode={toggleInputMode}
@@ -2091,8 +2081,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				setPromptComposerStagedImages={setPromptComposerStagedImages}
 				onPromptImageAttachBlocked={onPromptImageAttachBlocked}
 				onPromptOpenLightbox={onPromptOpenLightbox}
-				promptTabSaveToHistory={promptTabSaveToHistory}
-				onPromptToggleTabSaveToHistory={onPromptToggleTabSaveToHistory}
 				promptTabReadOnlyMode={promptTabReadOnlyMode}
 				onPromptToggleTabReadOnlyMode={onPromptToggleTabReadOnlyMode}
 				promptTabShowThinking={promptTabShowThinking}

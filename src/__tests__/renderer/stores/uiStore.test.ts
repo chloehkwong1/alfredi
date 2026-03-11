@@ -13,10 +13,8 @@ function resetStore() {
 		activeFocus: 'main',
 		activeRightTab: 'files',
 		bookmarksCollapsed: false,
-		groupChatsExpanded: true,
 		showUnreadOnly: false,
 		preFilterActiveTabId: null,
-		preTerminalFileTabId: null,
 		selectedSidebarIndex: 0,
 		flashNotification: null,
 		successFlashNotification: null,
@@ -25,7 +23,7 @@ function resetStore() {
 		sessionFilterOpen: false,
 		historySearchFilterOpen: false,
 		draggingSessionId: null,
-		editingGroupId: null,
+		editingProjectId: null,
 		editingSessionId: null,
 	});
 }
@@ -44,10 +42,8 @@ describe('uiStore', () => {
 			expect(state.activeFocus).toBe('main');
 			expect(state.activeRightTab).toBe('files');
 			expect(state.bookmarksCollapsed).toBe(false);
-			expect(state.groupChatsExpanded).toBe(true);
 			expect(state.showUnreadOnly).toBe(false);
 			expect(state.preFilterActiveTabId).toBeNull();
-			expect(state.preTerminalFileTabId).toBeNull();
 			expect(state.selectedSidebarIndex).toBe(0);
 			expect(state.flashNotification).toBeNull();
 			expect(state.successFlashNotification).toBeNull();
@@ -56,7 +52,7 @@ describe('uiStore', () => {
 			expect(state.sessionFilterOpen).toBe(false);
 			expect(state.historySearchFilterOpen).toBe(false);
 			expect(state.draggingSessionId).toBeNull();
-			expect(state.editingGroupId).toBeNull();
+			expect(state.editingProjectId).toBeNull();
 			expect(state.editingSessionId).toBeNull();
 		});
 	});
@@ -132,19 +128,6 @@ describe('uiStore', () => {
 			useUIStore.getState().toggleBookmarksCollapsed();
 			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
 		});
-
-		it('sets group chats expanded', () => {
-			useUIStore.getState().setGroupChatsExpanded(false);
-			expect(useUIStore.getState().groupChatsExpanded).toBe(false);
-		});
-
-		it('toggles group chats expanded', () => {
-			expect(useUIStore.getState().groupChatsExpanded).toBe(true);
-			useUIStore.getState().toggleGroupChatsExpanded();
-			expect(useUIStore.getState().groupChatsExpanded).toBe(false);
-			useUIStore.getState().toggleGroupChatsExpanded();
-			expect(useUIStore.getState().groupChatsExpanded).toBe(true);
-		});
 	});
 
 	describe('session list filter state', () => {
@@ -172,14 +155,6 @@ describe('uiStore', () => {
 
 			useUIStore.getState().setPreFilterActiveTabId(null);
 			expect(useUIStore.getState().preFilterActiveTabId).toBeNull();
-		});
-
-		it('sets pre-terminal file tab id', () => {
-			useUIStore.getState().setPreTerminalFileTabId('file-tab-456');
-			expect(useUIStore.getState().preTerminalFileTabId).toBe('file-tab-456');
-
-			useUIStore.getState().setPreTerminalFileTabId(null);
-			expect(useUIStore.getState().preTerminalFileTabId).toBeNull();
 		});
 	});
 
@@ -261,12 +236,12 @@ describe('uiStore', () => {
 	});
 
 	describe('editing state', () => {
-		it('sets editing group id', () => {
-			useUIStore.getState().setEditingGroupId('group-1');
-			expect(useUIStore.getState().editingGroupId).toBe('group-1');
+		it('sets editing project id', () => {
+			useUIStore.getState().setEditingProjectId('project-1');
+			expect(useUIStore.getState().editingProjectId).toBe('project-1');
 
-			useUIStore.getState().setEditingGroupId(null);
-			expect(useUIStore.getState().editingGroupId).toBeNull();
+			useUIStore.getState().setEditingProjectId(null);
+			expect(useUIStore.getState().editingProjectId).toBeNull();
 		});
 
 		it('sets editing session id', () => {
@@ -393,19 +368,6 @@ describe('uiStore', () => {
 
 			useUIStore.getState().setPreFilterActiveTabId(null);
 			expect(useUIStore.getState().preFilterActiveTabId).toBeNull();
-		});
-
-		it('supports the preTerminalFileTabId ref-replacement pattern', () => {
-			// This tests the pattern used in App.tsx toggleInputMode:
-			// save → read → clear
-			useUIStore.getState().setPreTerminalFileTabId('file-tab-1');
-			expect(useUIStore.getState().preTerminalFileTabId).toBe('file-tab-1');
-
-			const saved = useUIStore.getState().preTerminalFileTabId;
-			expect(saved).toBe('file-tab-1');
-
-			useUIStore.getState().setPreTerminalFileTabId(null);
-			expect(useUIStore.getState().preTerminalFileTabId).toBeNull();
 		});
 	});
 });

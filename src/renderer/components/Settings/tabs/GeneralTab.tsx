@@ -2,7 +2,7 @@
  * GeneralTab - General settings tab for SettingsModal
  *
  * Contains: About Me, Shell, Log Level, GitHub CLI, Input Behavior,
- * History, Thinking Mode, Tab Naming, Auto-scroll, Power, Rendering,
+ * Thinking Mode, Tab Naming, Auto-scroll, Power, Rendering,
  * Updates, Pre-release, Privacy, Stats, Storage Location.
  */
 
@@ -12,7 +12,6 @@ import {
 	Key,
 	Check,
 	Terminal,
-	History,
 	Download,
 	Bug,
 	Cloud,
@@ -33,9 +32,11 @@ import {
 	ExternalLink,
 	Keyboard,
 	Trash2,
+	MessageSquareText,
 } from 'lucide-react';
 import { useSettings } from '../../../hooks';
 import type { Theme, ShellInfo } from '../../../types';
+import { OUTPUT_STYLE_OPTIONS } from '../../../../shared/types';
 import { formatMetaKey, formatEnterToSend } from '../../../utils/shortcutFormatter';
 import { getOpenInLabel, isLinuxPlatform } from '../../../utils/platformUtils';
 import { ToggleButtonGroup } from '../../ToggleButtonGroup';
@@ -71,8 +72,6 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 		setEnterToSendAI,
 		enterToSendTerminal,
 		setEnterToSendTerminal,
-		defaultSaveToHistory,
-		setDefaultSaveToHistory,
 		defaultShowThinking,
 		setDefaultShowThinking,
 		autoScrollAiMode,
@@ -98,6 +97,9 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 		setStatsCollectionEnabled,
 		defaultStatsTimeRange,
 		setDefaultStatsTimeRange,
+		// Output Style
+		outputStyle,
+		setOutputStyle,
 	} = useSettings();
 
 	// Shell state
@@ -622,17 +624,6 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 				</div>
 			</div>
 
-			{/* Default History Toggle */}
-			<SettingCheckbox
-				icon={History}
-				sectionLabel="Default History Toggle"
-				title='Enable "History" by default for new tabs'
-				description='When enabled, new AI tabs will have the "History" toggle on by default, saving a synopsis after each completion'
-				checked={defaultSaveToHistory}
-				onChange={setDefaultSaveToHistory}
-				theme={theme}
-			/>
-
 			{/* Default Thinking Toggle - Three states: Off, On, Sticky */}
 			<div>
 				<div className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
@@ -661,6 +652,37 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 						onChange={setDefaultShowThinking}
 						theme={theme}
 					/>
+				</div>
+			</div>
+
+			{/* Output Style - controls how Claude Code agents respond */}
+			<div>
+				<div className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
+					<MessageSquareText className="w-3 h-3" />
+					Output Style
+				</div>
+				<div
+					className="p-3 rounded border"
+					style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
+				>
+					<div className="font-medium mb-1" style={{ color: theme.colors.textMain }}>
+						Control how Claude Code agents structure responses
+					</div>
+					<div className="text-sm opacity-60 mb-3" style={{ color: theme.colors.textDim }}>
+						{OUTPUT_STYLE_OPTIONS.find((o) => o.id === outputStyle)?.description}
+					</div>
+					<ToggleButtonGroup
+						options={OUTPUT_STYLE_OPTIONS.map((o) => ({
+							value: o.id,
+							label: o.label,
+						}))}
+						value={outputStyle}
+						onChange={setOutputStyle}
+						theme={theme}
+					/>
+					<p className="text-xs opacity-50 mt-2">
+						Only applies to Claude Code agents. Can be overridden per-agent in agent settings.
+					</p>
 				</div>
 			</div>
 
@@ -1061,7 +1083,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							Settings folder
 						</p>
 						<p className="text-xs opacity-60 mt-0.5">
-							Choose where Maestro stores settings, sessions, and groups (including global
+							Choose where Maestro stores settings, sessions, and projects (including global
 							environment variables, agents, and configurations). Use a synced folder (iCloud Drive,
 							Dropbox, OneDrive) to share across devices.
 						</p>

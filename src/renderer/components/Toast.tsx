@@ -167,13 +167,13 @@ const ToastItem = memo(function ToastItem({
 
 				{/* Content */}
 				<div className="flex-1 min-w-0">
-					{/* Line 1: Group + Agent/Project name + Tab name (wraps to line 2 if needed) */}
-					{(toast.group || toast.project || toast.tabName) && (
+					{/* Line 1: Project + Agent name + Tab name (wraps to line 2 if needed) */}
+					{(toast.project || toast.agentName || toast.tabName) && (
 						<div
 							className="flex flex-wrap items-center gap-2 text-xs mb-1"
 							style={{ color: theme.colors.textDim }}
 						>
-							{toast.group && (
+							{toast.project && (
 								<span
 									className="px-1.5 py-0.5 rounded"
 									style={{
@@ -181,12 +181,12 @@ const ToastItem = memo(function ToastItem({
 										color: theme.colors.accentText,
 									}}
 								>
-									{toast.group}
+									{toast.project}
 								</span>
 							)}
-							{toast.project && (
+							{toast.agentName && (
 								<span className="truncate font-medium" style={{ color: theme.colors.textMain }}>
-									{toast.project}
+									{toast.agentName}
 								</span>
 							)}
 							{toast.tabName && (

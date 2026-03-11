@@ -7,7 +7,7 @@
  *   - performDeleteSession: multi-step session deletion with cleanup
  *   - showConfirmation: modal coordination helper
  *   - toggleTabStar / toggleTabUnread / toggleUnreadFilter: tab state toggles
- *   - Groups persistence effect
+ *   - Projects persistence effect
  *   - Navigation history tracking effect
  */
 
@@ -54,7 +54,7 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		fullPath: '/projects/myapp',
 		projectRoot: '/projects/myapp',
 		toolType: 'claude-code' as any,
-		groupId: 'group-1',
+		projectId: 'group-1',
 		inputMode: 'ai' as any,
 		state: 'idle' as any,
 		aiTabs: [createMockAITab()],
@@ -113,7 +113,7 @@ beforeEach(() => {
 		activeSessionId: '',
 		sessionsLoaded: false,
 		initialLoadComplete: false,
-		groups: [],
+		projects: [],
 	});
 
 	useModalStore.setState({ modals: new Map() });
@@ -151,7 +151,7 @@ beforeEach(() => {
 		history: {
 			updateSessionName: vi.fn().mockResolvedValue(undefined),
 		},
-		groups: {
+		projects: {
 			setAll: vi.fn(),
 		},
 	};
@@ -1044,61 +1044,67 @@ describe('useSessionLifecycle', () => {
 	});
 
 	// ======================================================================
-	// Effects: Groups persistence
+	// Effects: Projects persistence
 	// ======================================================================
 
-	describe('groups persistence effect', () => {
-		it('persists groups when initialLoadComplete is true', () => {
-			const groups = [{ id: 'g1', name: 'Group 1', emoji: '', collapsed: false }];
+	describe('projects persistence effect', () => {
+		it('persists projects when initialLoadComplete is true', () => {
+			const projects = [
+				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
+			];
 			useSessionStore.setState({
 				sessions: [],
 				activeSessionId: '',
-				groups,
+				projects,
 				initialLoadComplete: true,
 			});
 
 			renderHook(() => useSessionLifecycle(createDeps()));
 
-			expect(window.maestro.groups.setAll).toHaveBeenCalledWith(groups);
+			expect(window.maestro.projects.setAll).toHaveBeenCalledWith(projects);
 		});
 
-		it('does not persist groups before initialLoadComplete', () => {
-			const groups = [{ id: 'g1', name: 'Group 1', emoji: '', collapsed: false }];
+		it('does not persist projects before initialLoadComplete', () => {
+			const projects = [
+				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
+			];
 			useSessionStore.setState({
 				sessions: [],
 				activeSessionId: '',
-				groups,
+				projects,
 				initialLoadComplete: false,
 			});
 
 			renderHook(() => useSessionLifecycle(createDeps()));
 
-			expect(window.maestro.groups.setAll).not.toHaveBeenCalled();
+			expect(window.maestro.projects.setAll).not.toHaveBeenCalled();
 		});
 
-		it('re-persists when groups change', () => {
-			const groups1 = [{ id: 'g1', name: 'Group 1', emoji: '', collapsed: false }];
+		it('re-persists when projects change', () => {
+			const projects1 = [
+				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
+			];
 			useSessionStore.setState({
 				sessions: [],
 				activeSessionId: '',
-				groups: groups1,
+				projects: projects1,
 				initialLoadComplete: true,
 			});
 
 			renderHook(() => useSessionLifecycle(createDeps()));
 
-			expect(window.maestro.groups.setAll).toHaveBeenCalledWith(groups1);
+			expect(window.maestro.projects.setAll).toHaveBeenCalledWith(projects1);
 
-			const groups2 = [
-				{ id: 'g1', name: 'Group 1', emoji: '', collapsed: false },
-				{ id: 'g2', name: 'Group 2', emoji: '', collapsed: false },
+			const projects2 = [
+				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
+				{ id: 'g2', name: 'Project 2', emoji: '', collapsed: false, rootPath: '/test/project' },
 			];
 
 			act(() => {
-				useSessionStore.setState({ groups: groups2 });
+				useSessionStore.setState({ projects: projects2 });
 			});
 
-			expect(window.maestro.groups.setAll).toHaveBeenCalledWith(groups2);
+			expect(window.maestro.projects.setAll).toHaveBeenCalledWith(projects2);
 		});
 	});
 
@@ -1129,7 +1135,7 @@ describe('useSessionLifecycle', () => {
 		it('does not include tabId when session is in terminal mode', () => {
 			const session = createMockSession({
 				id: 'session-1',
-				inputMode: 'terminal' as any,
+				inputMode: 'ai' as any,
 				aiTabs: [],
 				activeTabId: '',
 			});
@@ -1554,7 +1560,7 @@ describe('useSessionLifecycle', () => {
 			const tab = createMockAITab({ id: 'tab-1' });
 			const session = createMockSession({
 				id: 'session-1',
-				inputMode: 'terminal' as any,
+				inputMode: 'ai' as any,
 				aiTabs: [tab],
 				activeTabId: 'tab-1',
 			});

@@ -68,7 +68,6 @@ export interface ModalHandlersReturn {
 	// Open handlers
 	handleOpenQueueBrowser: () => void;
 	handleOpenTabSearch: () => void;
-	handleOpenPromptComposer: () => void;
 	handleOpenFuzzySearch: () => void;
 	handleOpenCreatePR: () => void;
 	handleOpenAboutModal: () => void;
@@ -97,7 +96,7 @@ export interface ModalHandlersReturn {
 	handleCloseCreatePRModal: () => void;
 	handleCloseSendToAgent: () => void;
 	handleCloseQueueBrowser: () => void;
-	handleCloseRenameGroupModal: () => void;
+	handleCloseRenameProjectModal: () => void;
 
 	// Quick actions modal openers
 	handleQuickActionsRenameTab: () => void;
@@ -266,9 +265,8 @@ export function useModalHandlers(
 
 	const handleStartNewSessionAfterError = useCallback(
 		(sessionId: string) => {
-			const { defaultSaveToHistory, defaultShowThinking } = useSettingsStore.getState();
+			const { defaultShowThinking } = useSettingsStore.getState();
 			useAgentStore.getState().startNewSessionAfterError(sessionId, {
-				saveToHistory: defaultSaveToHistory,
 				showThinking: defaultShowThinking,
 			});
 			getModalActions().setAgentErrorModalSessionId(null);
@@ -345,10 +343,6 @@ export function useModalHandlers(
 
 	const handleOpenTabSearch = useCallback(() => {
 		getModalActions().setTabSwitcherOpen(true);
-	}, []);
-
-	const handleOpenPromptComposer = useCallback(() => {
-		getModalActions().setPromptComposerOpen(true);
 	}, []);
 
 	const handleOpenFuzzySearch = useCallback(() => {
@@ -474,8 +468,8 @@ export function useModalHandlers(
 		getModalActions().setQueueBrowserOpen(false);
 	}, []);
 
-	const handleCloseRenameGroupModal = useCallback(() => {
-		getModalActions().setRenameGroupModalOpen(false);
+	const handleCloseRenameProjectModal = useCallback(() => {
+		getModalActions().setRenameProjectModalOpen(false);
 	}, []);
 
 	// ====================================================================
@@ -554,10 +548,7 @@ export function useModalHandlers(
 	const handleViewGitDiff = useCallback(async () => {
 		if (!activeSession || !activeSession.isGitRepo) return;
 
-		const cwd =
-			activeSession.inputMode === 'terminal'
-				? activeSession.shellCwd || activeSession.cwd
-				: activeSession.cwd;
+		const cwd = activeSession.cwd;
 		const sshRemoteId =
 			activeSession.sshRemoteId ||
 			(activeSession.sessionSshRemoteConfig?.enabled
@@ -615,7 +606,6 @@ export function useModalHandlers(
 		// Open handlers
 		handleOpenQueueBrowser,
 		handleOpenTabSearch,
-		handleOpenPromptComposer,
 		handleOpenFuzzySearch,
 		handleOpenCreatePR,
 		handleOpenAboutModal,
@@ -640,7 +630,7 @@ export function useModalHandlers(
 		handleCloseCreatePRModal,
 		handleCloseSendToAgent,
 		handleCloseQueueBrowser,
-		handleCloseRenameGroupModal,
+		handleCloseRenameProjectModal,
 
 		// Quick actions modal openers
 		handleQuickActionsRenameTab,

@@ -199,9 +199,9 @@ interface MaestroAPI {
 		getAll: () => Promise<any[]>;
 		setAll: (sessions: any[]) => Promise<boolean>;
 	};
-	groups: {
+	projects: {
 		getAll: () => Promise<any[]>;
-		setAll: (groups: any[]) => Promise<boolean>;
+		setAll: (projects: any[]) => Promise<boolean>;
 	};
 	process: {
 		spawn: (config: ProcessConfig) => Promise<{ pid: number; success: boolean }>;
@@ -231,6 +231,7 @@ interface MaestroAPI {
 			}>
 		>;
 		onData: (callback: (sessionId: string, data: string) => void) => () => void;
+		onRawData: (callback: (sessionId: string, data: string) => void) => () => void;
 		onExit: (callback: (sessionId: string, code: number) => void) => () => void;
 		onSessionId: (callback: (sessionId: string, agentSessionId: string) => void) => () => void;
 		onSlashCommands: (callback: (sessionId: string, slashCommands: string[]) => void) => () => void;

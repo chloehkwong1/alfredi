@@ -754,7 +754,7 @@ describe('agentStore', () => {
 
 			const updated = useSessionStore.getState().sessions[0];
 			expect(updated.state).toBe('idle');
-			expect(updated.inputMode).toBe('terminal');
+			expect(updated.inputMode).toBe('ai');
 			expect(updated.agentError).toBeUndefined();
 			expect(useSessionStore.getState().activeSessionId).toBe('session-1');
 		});
@@ -769,7 +769,7 @@ describe('agentStore', () => {
 			const session = createMockSession({
 				id: 'session-1',
 				state: 'error',
-				inputMode: 'terminal',
+				inputMode: 'ai',
 			});
 
 			useSessionStore.getState().setSessions([session]);
@@ -778,7 +778,7 @@ describe('agentStore', () => {
 
 			const updated = useSessionStore.getState().sessions[0];
 			expect(updated.state).toBe('idle');
-			expect(updated.inputMode).toBe('terminal');
+			expect(updated.inputMode).toBe('ai');
 		});
 
 		it('switches active session even if it was already active', () => {
@@ -794,7 +794,7 @@ describe('agentStore', () => {
 			useAgentStore.getState().authenticateAfterError('session-1');
 
 			expect(useSessionStore.getState().activeSessionId).toBe('session-1');
-			expect(useSessionStore.getState().sessions[0].inputMode).toBe('terminal');
+			expect(useSessionStore.getState().sessions[0].inputMode).toBe('ai');
 		});
 
 		it('calls IPC clearError via delegation', () => {
@@ -849,7 +849,7 @@ describe('agentStore', () => {
 			useAgentStore.getState().authenticateAfterError('session-1');
 
 			const updated = useSessionStore.getState().sessions[0];
-			expect(updated.inputMode).toBe('terminal');
+			expect(updated.inputMode).toBe('ai');
 			expect(updated.activeFileTabId).toBeNull();
 		});
 	});
@@ -1105,7 +1105,7 @@ describe('agentStore', () => {
 			// Active session switched to session-2
 			expect(useSessionStore.getState().activeSessionId).toBe('session-2');
 			// session-2 is now in terminal mode
-			expect(useSessionStore.getState().sessions[1].inputMode).toBe('terminal');
+			expect(useSessionStore.getState().sessions[1].inputMode).toBe('ai');
 		});
 
 		it('double clear is idempotent', () => {
@@ -1149,7 +1149,7 @@ describe('agentStore', () => {
 			expect(updated[0].state).toBe('idle');
 			expect(updated[0].agentError).toBeUndefined();
 			expect(updated[1].state).toBe('idle');
-			expect(updated[1].inputMode).toBe('terminal');
+			expect(updated[1].inputMode).toBe('ai');
 		});
 
 		it('recovery after restart then new session', async () => {

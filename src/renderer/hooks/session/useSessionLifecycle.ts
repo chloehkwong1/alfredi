@@ -9,7 +9,7 @@
  *   - toggleTabStar / toggleTabUnread / toggleUnreadFilter: tab state toggles
  *
  * Effects:
- *   - Groups persistence (sync groups to electron-store)
+ *   - Projects persistence (sync projects to electron-store)
  *   - Navigation history tracking (push on session/tab change)
  *
  * Reads from: sessionStore, modalStore, uiStore
@@ -26,6 +26,7 @@ import { notifyToast } from '../../stores/notificationStore';
 import { getActiveTab } from '../../utils/tabHelpers';
 import type { NavHistoryEntry } from './useNavigationHistory';
 import { captureException } from '../../utils/sentry';
+import { getPersistentTerminalId } from '../terminal/usePersistentTerminal';
 
 // ============================================================================
 // Dependencies interface
@@ -82,7 +83,7 @@ export interface SessionLifecycleReturn {
 
 const selectRenameTabId = (s: ReturnType<typeof useModalStore.getState>) =>
 	s.getData('renameTab')?.tabId ?? null;
-const selectGroups = (s: ReturnType<typeof useSessionStore.getState>) => s.groups;
+const selectProjects = (s: ReturnType<typeof useSessionStore.getState>) => s.projects;
 const selectInitialLoadComplete = (s: ReturnType<typeof useSessionStore.getState>) =>
 	s.initialLoadComplete;
 const selectActiveSessionId = (s: ReturnType<typeof useSessionStore.getState>) => s.activeSessionId;
@@ -97,7 +98,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	// --- Store subscriptions ---
 	const activeSession = useSessionStore(selectActiveSession);
 	const renameTabId = useModalStore(selectRenameTabId);
-	const groups = useSessionStore(selectGroups);
+	const projects = useSessionStore(selectProjects);
 	const initialLoadComplete = useSessionStore(selectInitialLoadComplete);
 	const activeSessionId = useSessionStore(selectActiveSessionId);
 
@@ -150,7 +151,6 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 							stagedImages: [],
 							createdAt: Date.now(),
 							state: 'idle',
-							saveToHistory: true,
 						};
 
 						Object.assign(updatedFields, {
@@ -299,6 +299,14 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 				});
 			}
 
+			try {
+				await window.maestro.process.kill(getPersistentTerminalId(id));
+			} catch (error) {
+				captureException(error, {
+					extra: { sessionId: id, operation: 'kill-persistent-terminal' },
+				});
+			}
+
 			// If this is a worktree session, track its path to prevent re-discovery
 			if (session.worktreeParentPath && session.cwd) {
 				setRemovedWorktreePaths((prev) => new Set([...prev, session.cwd]));
@@ -436,12 +444,12 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	// Effects
 	// ====================================================================
 
-	// Persist groups directly (groups change infrequently, no need to debounce)
+	// Persist projects directly (projects change infrequently, no need to debounce)
 	useEffect(() => {
 		if (initialLoadComplete) {
-			window.maestro.groups.setAll(groups);
+			window.maestro.projects.setAll(projects);
 		}
-	}, [groups, initialLoadComplete]);
+	}, [projects, initialLoadComplete]);
 
 	// Track navigation history when session or AI tab changes
 	useEffect(() => {

@@ -389,8 +389,7 @@ export function useSendToAgent(): UseSendToAgentResult {
 				projectRoot: sourceSession.projectRoot,
 				toolType: targetAgent,
 				mergedLogs: contextLogs,
-				groupId: sourceSession.groupId,
-				saveToHistory: true,
+				projectId: sourceSession.projectId,
 			});
 
 			// Add a system message indicating this is a transferred context
@@ -642,7 +641,7 @@ Please confirm you've reviewed this context and let me know you're ready to cont
 					projectRoot: sourceSession.projectRoot,
 					toolType: targetAgent,
 					mergedLogs: [], // Empty - context is sent as message, not pre-populated logs
-					groupId: sourceSession.groupId,
+					projectId: sourceSession.projectId,
 				});
 
 				// Add transfer notice and set pendingMergedContext on the active tab

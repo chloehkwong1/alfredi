@@ -11,7 +11,7 @@
  */
 
 import { create } from 'zustand';
-import type { FocusArea, RightPanelTab } from '../types';
+import type { FocusArea, RightPanelTab, RightTopTab } from '../types';
 
 export interface UIStoreState {
 	// Sidebar
@@ -22,13 +22,15 @@ export interface UIStoreState {
 	activeFocus: FocusArea;
 	activeRightTab: RightPanelTab;
 
+	// Right panel top section tab (file explorer vs file preview tabs)
+	activeRightTopTab: RightTopTab;
+
 	// Sidebar collapse/expand
 	bookmarksCollapsed: boolean;
 
 	// Session list filter
 	showUnreadOnly: boolean;
 	preFilterActiveTabId: string | null;
-	preTerminalFileTabId: string | null;
 
 	// Session sidebar selection
 	selectedSidebarIndex: number;
@@ -51,7 +53,7 @@ export interface UIStoreState {
 	draggingSessionId: string | null;
 
 	// Editing (inline renaming in sidebar)
-	editingGroupId: string | null;
+	editingProjectId: string | null;
 	editingSessionId: string | null;
 }
 
@@ -66,6 +68,9 @@ export interface UIStoreActions {
 	setActiveFocus: (focus: FocusArea | ((prev: FocusArea) => FocusArea)) => void;
 	setActiveRightTab: (tab: RightPanelTab | ((prev: RightPanelTab) => RightPanelTab)) => void;
 
+	// Right panel top section tab
+	setActiveRightTopTab: (tab: RightTopTab | ((prev: RightTopTab) => RightTopTab)) => void;
+
 	// Sidebar collapse/expand
 	setBookmarksCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
 	toggleBookmarksCollapsed: () => void;
@@ -73,7 +78,6 @@ export interface UIStoreActions {
 	setShowUnreadOnly: (show: boolean | ((prev: boolean) => boolean)) => void;
 	toggleShowUnreadOnly: () => void;
 	setPreFilterActiveTabId: (id: string | null) => void;
-	setPreTerminalFileTabId: (id: string | null) => void;
 
 	// Session sidebar selection
 	setSelectedSidebarIndex: (index: number | ((prev: number) => number)) => void;
@@ -98,7 +102,7 @@ export interface UIStoreActions {
 	setDraggingSessionId: (id: string | null | ((prev: string | null) => string | null)) => void;
 
 	// Editing
-	setEditingGroupId: (id: string | null | ((prev: string | null) => string | null)) => void;
+	setEditingProjectId: (id: string | null | ((prev: string | null) => string | null)) => void;
 	setEditingSessionId: (id: string | null | ((prev: string | null) => string | null)) => void;
 }
 
@@ -117,10 +121,10 @@ export const useUIStore = create<UIStore>()((set) => ({
 	rightPanelOpen: true,
 	activeFocus: 'main',
 	activeRightTab: 'files',
+	activeRightTopTab: 'explorer',
 	bookmarksCollapsed: false,
 	showUnreadOnly: false,
 	preFilterActiveTabId: null,
-	preTerminalFileTabId: null,
 	selectedSidebarIndex: 0,
 	flashNotification: null,
 	successFlashNotification: null,
@@ -129,7 +133,7 @@ export const useUIStore = create<UIStore>()((set) => ({
 	sessionFilterOpen: false,
 	historySearchFilterOpen: false,
 	draggingSessionId: null,
-	editingGroupId: null,
+	editingProjectId: null,
 	editingSessionId: null,
 
 	// --- Actions ---
@@ -141,13 +145,14 @@ export const useUIStore = create<UIStore>()((set) => ({
 	setActiveFocus: (v) => set((s) => ({ activeFocus: resolve(v, s.activeFocus) })),
 	setActiveRightTab: (v) => set((s) => ({ activeRightTab: resolve(v, s.activeRightTab) })),
 
+	setActiveRightTopTab: (v) => set((s) => ({ activeRightTopTab: resolve(v, s.activeRightTopTab) })),
+
 	setBookmarksCollapsed: (v) =>
 		set((s) => ({ bookmarksCollapsed: resolve(v, s.bookmarksCollapsed) })),
 	toggleBookmarksCollapsed: () => set((s) => ({ bookmarksCollapsed: !s.bookmarksCollapsed })),
 	setShowUnreadOnly: (v) => set((s) => ({ showUnreadOnly: resolve(v, s.showUnreadOnly) })),
 	toggleShowUnreadOnly: () => set((s) => ({ showUnreadOnly: !s.showUnreadOnly })),
 	setPreFilterActiveTabId: (id) => set({ preFilterActiveTabId: id }),
-	setPreTerminalFileTabId: (id) => set({ preTerminalFileTabId: id }),
 
 	setSelectedSidebarIndex: (v) =>
 		set((s) => ({ selectedSidebarIndex: resolve(v, s.selectedSidebarIndex) })),
@@ -164,6 +169,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 		set((s) => ({ historySearchFilterOpen: resolve(v, s.historySearchFilterOpen) })),
 	setDraggingSessionId: (v) => set((s) => ({ draggingSessionId: resolve(v, s.draggingSessionId) })),
 
-	setEditingGroupId: (v) => set((s) => ({ editingGroupId: resolve(v, s.editingGroupId) })),
+	setEditingProjectId: (v) => set((s) => ({ editingProjectId: resolve(v, s.editingProjectId) })),
 	setEditingSessionId: (v) => set((s) => ({ editingSessionId: resolve(v, s.editingSessionId) })),
 }));

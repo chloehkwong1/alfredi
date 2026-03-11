@@ -192,7 +192,7 @@ describe('useInputProcessing', () => {
 		});
 
 		it('does not intercept /history in terminal mode', async () => {
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createDeps({
 				activeSession: session,
 				inputValue: '/history',
@@ -264,7 +264,7 @@ describe('useInputProcessing', () => {
 		});
 
 		it('does not intercept /wizard in terminal mode', async () => {
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createDeps({
 				activeSession: session,
 				inputValue: '/wizard',
@@ -716,7 +716,7 @@ describe('useInputProcessing', () => {
 
 	describe('terminal mode behavior', () => {
 		it('does not process custom commands in terminal mode', async () => {
-			const session = createMockSession({ inputMode: 'terminal' });
+			const session = createMockSession({ inputMode: 'ai' });
 			const deps = createDeps({
 				activeSession: session,
 				inputValue: '/commit',
@@ -1121,7 +1121,7 @@ describe('useInputProcessing', () => {
 				name: null,
 			});
 			const session = createMockSession({
-				inputMode: 'terminal',
+				inputMode: 'ai',
 				aiTabs: [newTab],
 				activeTabId: newTab.id,
 			});

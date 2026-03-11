@@ -178,7 +178,7 @@ export function SshRemoteModal({
 
 	// Load SSH config hosts when modal opens
 	useEffect(() => {
-		if (isOpen && !initialConfig) {
+		if (isOpen && !initialConfig && window.maestro.sshRemote) {
 			setSshConfigLoading(true);
 			window.maestro.sshRemote
 				.getSshConfigHosts()

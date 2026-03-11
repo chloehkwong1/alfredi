@@ -39,7 +39,6 @@ import {
 } from '../../utils/contextUsage';
 import { isLikelyConcatenatedToolNames, getSlashCommandDescription } from '../../constants/app';
 import { getActiveTab, getWriteModeTab } from '../../utils/tabHelpers';
-import { formatRelativeTime } from '../../../shared/formatters';
 import { parseSynopsis } from '../../../shared/synopsis';
 // autorunSynopsisPrompt removed (Auto Run stripped)
 const autorunSynopsisPrompt = '';
@@ -179,7 +178,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 
 		// Shorthand for reading current state (always fresh — called per-event)
 		const getSessions = () => useSessionStore.getState().sessions;
-		const getGroups = () => useSessionStore.getState().groups;
+		const getProjects = () => useSessionStore.getState().projects;
 		const getActiveSessionId = () => useSessionStore.getState().activeSessionId;
 
 		// ================================================================
@@ -328,8 +327,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				let toastData: {
 					title: string;
 					summary: string;
-					groupName: string;
 					projectName: string;
+					sessionName: string;
 					duration: number;
 					agentSessionId?: string;
 					tabName?: string;
@@ -353,11 +352,10 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					cwd: string;
 					agentSessionId: string;
 					command: string;
-					groupName: string;
 					projectName: string;
+					sessionName: string;
 					tabName?: string;
 					tabId?: string;
-					lastSynopsisTime?: number;
 					taskDuration?: number;
 					toolType?: ToolType;
 					sessionConfig?: {
@@ -402,11 +400,11 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						const sessionSizeBytes = logs.reduce((sum, log) => sum + (log.text?.length || 0), 0);
 						const sessionSizeKB = (sessionSizeBytes / 1024).toFixed(1);
 
-						const sessionGroup = currentSession.groupId
-							? getGroups().find((g) => g.id === currentSession.groupId)
+						const sessionProject = currentSession.projectId
+							? getProjects().find((g) => g.id === currentSession.projectId)
 							: null;
-						const groupName = sessionGroup?.name || 'Ungrouped';
-						const projectName =
+						const projectName = sessionProject?.name || 'Unassigned';
+						const sessionName =
 							currentSession.name || currentSession.cwd.split('/').pop() || 'Unknown';
 
 						let title = 'Task Complete';
@@ -442,8 +440,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						toastData = {
 							title,
 							summary,
-							groupName,
 							projectName,
+							sessionName,
 							duration,
 							agentSessionId: agentSessionId || undefined,
 							tabName,
@@ -464,7 +462,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						const shouldSynopsis =
 							currentSession.executionQueue.length === 0 &&
 							(completedTab?.agentSessionId || currentSession.agentSessionId) &&
-							(completedTab?.saveToHistory || currentSession.pendingAICommandForSynopsis);
+							currentSession.pendingAICommandForSynopsis;
 
 						if (shouldSynopsis) {
 							synopsisData = {
@@ -472,11 +470,10 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 								cwd: currentSession.cwd,
 								agentSessionId: completedTab?.agentSessionId || currentSession.agentSessionId!,
 								command: currentSession.pendingAICommandForSynopsis || 'Save to History',
-								groupName,
 								projectName,
+								sessionName,
 								tabName,
 								tabId: completedTab?.id,
-								lastSynopsisTime: completedTab?.lastSynopsisTime,
 								taskDuration: duration,
 								toolType: currentSession.toolType,
 								sessionConfig: {
@@ -751,8 +748,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					setTimeout(() => {
 						window.maestro.logger.log('info', 'Agent process completed', 'App', {
 							agentSessionId: toastData!.agentSessionId,
-							group: toastData!.groupName,
 							project: toastData!.projectName,
+							agentName: toastData!.sessionName,
 							durationMs: toastData!.duration,
 							sessionSizeKB: toastData!.sessionSizeKB,
 							prompt:
@@ -777,8 +774,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 								type: 'success',
 								title: toastData!.title,
 								message: toastData!.summary,
-								group: toastData!.groupName,
 								project: toastData!.projectName,
+								agentName: toastData!.sessionName,
 								taskDuration: toastData!.duration,
 								agentSessionId: toastData!.agentSessionId,
 								tabName: toastData!.tabName,
@@ -795,15 +792,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					deps.spawnBackgroundSynopsisRef.current &&
 					deps.addHistoryEntryRef.current
 				) {
-					let SYNOPSIS_PROMPT: string;
-					if (synopsisData.lastSynopsisTime) {
-						const timeAgo = formatRelativeTime(synopsisData.lastSynopsisTime);
-						SYNOPSIS_PROMPT = `${autorunSynopsisPrompt}\n\nIMPORTANT: Only synopsize work done since the last synopsis (${timeAgo}). Do not repeat previous work.`;
-					} else {
-						SYNOPSIS_PROMPT = autorunSynopsisPrompt;
-					}
+					const SYNOPSIS_PROMPT = autorunSynopsisPrompt;
 					const startTime = Date.now();
-					const synopsisTime = Date.now();
 
 					deps.spawnBackgroundSynopsisRef
 						.current(
@@ -843,28 +833,12 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									elapsedTimeMs: synopsisData!.taskDuration,
 								});
 
-								setSessions((prev) =>
-									prev.map((s) => {
-										if (s.id !== synopsisData!.sessionId) return s;
-										return {
-											...s,
-											aiTabs: s.aiTabs.map((tab) => {
-												if (tab.id !== synopsisData!.tabId) return tab;
-												return {
-													...tab,
-													lastSynopsisTime: synopsisTime,
-												};
-											}),
-										};
-									})
-								);
-
 								notifyToast({
 									type: 'info',
 									title: 'Synopsis',
 									message: parsed.shortSummary,
-									group: synopsisData!.groupName,
 									project: synopsisData!.projectName,
+									agentName: synopsisData!.sessionName,
 									taskDuration: duration,
 									sessionId: synopsisData!.sessionId,
 									tabId: synopsisData!.tabId,

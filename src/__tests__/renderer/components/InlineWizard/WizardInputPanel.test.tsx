@@ -13,10 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { WizardInputPanel } from '../../../../renderer/components/InlineWizard/WizardInputPanel';
-import {
-	formatShortcutKeys,
-	formatEnterToSend,
-} from '../../../../renderer/utils/shortcutFormatter';
+import { formatShortcutKeys } from '../../../../renderer/utils/shortcutFormatter';
 import type { Session, Theme } from '../../../../renderer/types';
 
 // Mock useLayerStack for the WizardExitConfirmDialog
@@ -113,7 +110,6 @@ describe('WizardInputPanel', () => {
 		processInput: vi.fn(),
 		stagedImages: [] as string[],
 		setStagedImages: vi.fn(),
-		onOpenPromptComposer: vi.fn(),
 		toggleInputMode: vi.fn(),
 		confidence: 50,
 		canAttachImages: true,
@@ -235,7 +231,7 @@ describe('WizardInputPanel', () => {
 		});
 
 		it('shows Terminal icon when in terminal mode', () => {
-			const terminalSession = createMockSession({ inputMode: 'terminal' });
+			const terminalSession = createMockSession({ inputMode: 'ai' });
 			const { container } = render(
 				<WizardInputPanel {...defaultProps} session={terminalSession} />
 			);
@@ -270,7 +266,7 @@ describe('WizardInputPanel', () => {
 		});
 
 		it('does not render image attachment button in terminal mode', () => {
-			const terminalSession = createMockSession({ inputMode: 'terminal' });
+			const terminalSession = createMockSession({ inputMode: 'ai' });
 			render(
 				<WizardInputPanel {...defaultProps} session={terminalSession} canAttachImages={true} />
 			);
@@ -303,56 +299,6 @@ describe('WizardInputPanel', () => {
 			fireEvent.click(xButton!);
 
 			expect(setStagedImages).toHaveBeenCalled();
-		});
-	});
-
-	describe('prompt composer', () => {
-		it('renders prompt composer button in AI mode', () => {
-			render(<WizardInputPanel {...defaultProps} />);
-			expect(screen.getByTitle('Open Prompt Composer')).toBeInTheDocument();
-		});
-
-		it('does not render prompt composer button in terminal mode', () => {
-			const terminalSession = createMockSession({ inputMode: 'terminal' });
-			render(<WizardInputPanel {...defaultProps} session={terminalSession} />);
-			expect(screen.queryByTitle('Open Prompt Composer')).not.toBeInTheDocument();
-		});
-
-		it('calls onOpenPromptComposer when clicked', () => {
-			const onOpenPromptComposer = vi.fn();
-			render(<WizardInputPanel {...defaultProps} onOpenPromptComposer={onOpenPromptComposer} />);
-
-			fireEvent.click(screen.getByTitle('Open Prompt Composer'));
-
-			expect(onOpenPromptComposer).toHaveBeenCalled();
-		});
-
-		it('does not render when onOpenPromptComposer is not provided', () => {
-			render(<WizardInputPanel {...defaultProps} onOpenPromptComposer={undefined} />);
-			expect(screen.queryByTitle('Open Prompt Composer')).not.toBeInTheDocument();
-		});
-	});
-
-	describe('enter to send toggle', () => {
-		it('renders the enter to send toggle', () => {
-			render(<WizardInputPanel {...defaultProps} enterToSend={true} />);
-			expect(screen.getByText('Enter')).toBeInTheDocument();
-		});
-
-		it('shows "⌘ + Enter" (or "Ctrl + Enter" on non-Mac) when enterToSend is false', () => {
-			render(<WizardInputPanel {...defaultProps} enterToSend={false} />);
-			expect(screen.getByText(formatEnterToSend(false))).toBeInTheDocument();
-		});
-
-		it('calls setEnterToSend when clicked', () => {
-			const setEnterToSend = vi.fn();
-			render(
-				<WizardInputPanel {...defaultProps} enterToSend={true} setEnterToSend={setEnterToSend} />
-			);
-
-			fireEvent.click(screen.getByText('Enter'));
-
-			expect(setEnterToSend).toHaveBeenCalledWith(false);
 		});
 	});
 
@@ -407,7 +353,7 @@ describe('WizardInputPanel', () => {
 		});
 
 		it('does not render thinking toggle in terminal mode', () => {
-			const terminalSession = createMockSession({ inputMode: 'terminal' });
+			const terminalSession = createMockSession({ inputMode: 'ai' });
 			render(
 				<WizardInputPanel
 					{...defaultProps}

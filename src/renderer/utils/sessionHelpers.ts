@@ -24,10 +24,8 @@ export interface CreateSessionForAgentOptions {
 	name: string;
 	/** Initial context to send to the agent (groomed context from transfer) */
 	initialContext: string;
-	/** Optional group ID to assign the session to */
-	groupId?: string;
-	/** Whether to save completions to history (default: true) */
-	saveToHistory?: boolean;
+	/** Optional project ID to assign the session to */
+	projectId?: string;
 }
 
 /**
@@ -188,7 +186,7 @@ export async function buildSpawnConfigForAgent(
  *   projectRoot: '/path/to/project',
  *   name: 'Context Transfer → OpenCode',
  *   initialContext: groomedContextText,
- *   groupId: sourceSession.groupId,
+ *   projectId: sourceSession.projectId,
  * });
  *
  * if (result) {
@@ -202,7 +200,7 @@ export async function buildSpawnConfigForAgent(
 export async function createSessionForAgent(
 	options: CreateSessionForAgentOptions
 ): Promise<CreateSessionForAgentResult | null> {
-	const { agentType, projectRoot, name, initialContext, groupId, saveToHistory = true } = options;
+	const { agentType, projectRoot, name, initialContext, projectId } = options;
 
 	// Verify the agent is available
 	const agentConfig = await window.maestro.agents.get(agentType);
@@ -224,8 +222,7 @@ export async function createSessionForAgent(
 		projectRoot,
 		toolType: agentType,
 		mergedLogs: [], // Context is sent as initial prompt, not as pre-existing logs
-		groupId,
-		saveToHistory,
+		projectId,
 	});
 
 	// Build the spawn configuration

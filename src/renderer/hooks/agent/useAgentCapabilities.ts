@@ -68,6 +68,9 @@ export interface AgentCapabilities {
 
 	/** Agent can export its context for transfer to other sessions/agents */
 	supportsContextExport: boolean;
+
+	/** Agent supports /clear command to reset conversation context */
+	supportsClearContext: boolean;
 }
 
 /**
@@ -94,6 +97,7 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
 	supportsThinkingDisplay: false,
 	supportsContextMerge: false,
 	supportsContextExport: false,
+	supportsClearContext: false,
 };
 
 /**

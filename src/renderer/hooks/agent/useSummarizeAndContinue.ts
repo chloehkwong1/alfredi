@@ -225,7 +225,6 @@ export function useSummarizeAndContinue(session: Session | null): UseSummarizeAn
 					afterTabId: sourceTabId,
 					name: compactedTabName,
 					logs: summarizeResult.summarizedLogs,
-					saveToHistory: sourceTab.saveToHistory,
 				});
 
 				if (!tabResult) {

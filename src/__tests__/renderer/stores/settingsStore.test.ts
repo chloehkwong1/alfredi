@@ -92,6 +92,7 @@ function resetStore() {
 		directorNotesSettings: { provider: 'claude-code', defaultLookbackDays: 7 },
 		wakatimeApiKey: '',
 		wakatimeEnabled: false,
+		outputStyle: 'default',
 	});
 }
 
@@ -316,6 +317,20 @@ describe('settingsStore', () => {
 				useSettingsStore.getState().setDefaultShowThinking('on');
 				expect(useSettingsStore.getState().defaultShowThinking).toBe('on');
 				expect(window.maestro.settings.set).toHaveBeenCalledWith('defaultShowThinking', 'on');
+			});
+
+			it('setOutputStyle updates state and persists', () => {
+				useSettingsStore.getState().setOutputStyle('explanatory');
+				expect(useSettingsStore.getState().outputStyle).toBe('explanatory');
+				expect(window.maestro.settings.set).toHaveBeenCalledWith('outputStyle', 'explanatory');
+			});
+
+			it('setOutputStyle cycles through all styles', () => {
+				useSettingsStore.getState().setOutputStyle('learning');
+				expect(useSettingsStore.getState().outputStyle).toBe('learning');
+
+				useSettingsStore.getState().setOutputStyle('default');
+				expect(useSettingsStore.getState().outputStyle).toBe('default');
 			});
 		});
 
@@ -1599,6 +1614,34 @@ describe('settingsStore', () => {
 			await loadAllSettings();
 
 			expect(useSettingsStore.getState().documentGraphLayoutType).toBe('force');
+		});
+
+		it('loads valid outputStyle from settings', async () => {
+			vi.mocked(window.maestro.settings.getAll).mockResolvedValue({
+				outputStyle: 'learning',
+			});
+
+			await loadAllSettings();
+
+			expect(useSettingsStore.getState().outputStyle).toBe('learning');
+		});
+
+		it('rejects invalid outputStyle on load', async () => {
+			vi.mocked(window.maestro.settings.getAll).mockResolvedValue({
+				outputStyle: 'invalid-style',
+			});
+
+			await loadAllSettings();
+
+			expect(useSettingsStore.getState().outputStyle).toBe('default');
+		});
+
+		it('defaults outputStyle to "default" when not set', async () => {
+			vi.mocked(window.maestro.settings.getAll).mockResolvedValue({});
+
+			await loadAllSettings();
+
+			expect(useSettingsStore.getState().outputStyle).toBe('default');
 		});
 	});
 
