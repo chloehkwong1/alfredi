@@ -99,6 +99,11 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 		setCommandHistoryOpen,
 		setCommandHistoryFilter,
 		setCommandHistorySelectedIndex,
+		historyBrowseIndex,
+		setHistoryBrowseIndex,
+		historyBrowseDraft,
+		setHistoryBrowseDraft,
+		resetHistoryBrowse,
 	} = useInputContext();
 
 	const handleInputKeyDown = useCallback(
@@ -229,6 +234,57 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 				return;
 			}
 
+			// ArrowUp/ArrowDown: inline history browsing (AI mode)
+			// Only activates when cursor is on the first line (ArrowUp) or last line (ArrowDown),
+			// so multi-line editing still works normally.
+			if (activeSession?.inputMode === 'ai' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+				const history = activeSession.aiCommandHistory || [];
+				if (history.length === 0) return;
+
+				const textarea = inputRef.current;
+				const cursorPos = textarea?.selectionStart ?? 0;
+				const value = textarea?.value ?? '';
+
+				// ArrowUp: only trigger when cursor is on the first line (or already browsing)
+				// ArrowDown: only trigger when cursor is on the last line (or already browsing)
+				const isOnFirstLine =
+					historyBrowseIndex !== -1 || !value.substring(0, cursorPos).includes('\n');
+				const isOnLastLine =
+					historyBrowseIndex !== -1 || !value.substring(cursorPos).includes('\n');
+
+				// Reverse so index 0 = most recent
+				const reversed = [...history].reverse();
+
+				if (e.key === 'ArrowUp' && isOnFirstLine) {
+					e.preventDefault();
+					if (historyBrowseIndex === -1) {
+						// Start browsing: save current input as draft, show most recent
+						setHistoryBrowseDraft(inputValue);
+						setHistoryBrowseIndex(0);
+						setInputValue(reversed[0]);
+					} else if (historyBrowseIndex < reversed.length - 1) {
+						// Go further back in history
+						const newIndex = historyBrowseIndex + 1;
+						setHistoryBrowseIndex(newIndex);
+						setInputValue(reversed[newIndex]);
+					}
+					return;
+				} else if (e.key === 'ArrowDown' && isOnLastLine) {
+					e.preventDefault();
+					if (historyBrowseIndex > 0) {
+						// Go forward in history
+						const newIndex = historyBrowseIndex - 1;
+						setHistoryBrowseIndex(newIndex);
+						setInputValue(reversed[newIndex]);
+					} else if (historyBrowseIndex === 0) {
+						// Return to draft input
+						resetHistoryBrowse();
+						setInputValue(historyBrowseDraft);
+					}
+					return;
+				}
+			}
+
 			// Read enter-to-send settings at call time (not closure)
 			const settings = useSettingsStore.getState();
 			const enterToSendAI = settings.enterToSendAI;
@@ -239,9 +295,11 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 
 				if (currentEnterToSend && !e.shiftKey && !e.metaKey) {
 					e.preventDefault();
+					resetHistoryBrowse();
 					processInput();
 				} else if (!currentEnterToSend && (e.metaKey || e.ctrlKey)) {
 					e.preventDefault();
+					resetHistoryBrowse();
 					processInput();
 				}
 			} else if (e.key === 'Escape') {
@@ -302,6 +360,11 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 			setCommandHistoryOpen,
 			setCommandHistoryFilter,
 			setCommandHistorySelectedIndex,
+			historyBrowseIndex,
+			historyBrowseDraft,
+			setHistoryBrowseIndex,
+			setHistoryBrowseDraft,
+			resetHistoryBrowse,
 		]
 	);
 

@@ -64,6 +64,13 @@ export interface InputContextValue {
 	setCommandHistorySelectedIndex: React.Dispatch<React.SetStateAction<number>>;
 	resetCommandHistory: () => void;
 
+	// Inline History Browsing (ArrowUp/ArrowDown in AI mode)
+	historyBrowseIndex: number;
+	setHistoryBrowseIndex: React.Dispatch<React.SetStateAction<number>>;
+	historyBrowseDraft: string;
+	setHistoryBrowseDraft: React.Dispatch<React.SetStateAction<string>>;
+	resetHistoryBrowse: () => void;
+
 	// Convenience method to close all completion popups
 	closeAllCompletions: () => void;
 }
@@ -113,6 +120,11 @@ export function InputProvider({ children }: InputProviderProps) {
 	const [commandHistoryFilter, setCommandHistoryFilter] = useState('');
 	const [commandHistorySelectedIndex, setCommandHistorySelectedIndex] = useState(0);
 
+	// Inline History Browsing (ArrowUp/ArrowDown in AI mode)
+	// -1 means not browsing; 0 = most recent, 1 = second most recent, etc.
+	const [historyBrowseIndex, setHistoryBrowseIndex] = useState(-1);
+	const [historyBrowseDraft, setHistoryBrowseDraft] = useState('');
+
 	// Reset methods for each completion type - memoized for stable references
 	const resetSlashCommand = useCallback(() => {
 		setSlashCommandOpen(false);
@@ -138,13 +150,25 @@ export function InputProvider({ children }: InputProviderProps) {
 		setCommandHistorySelectedIndex(0);
 	}, []);
 
+	const resetHistoryBrowse = useCallback(() => {
+		setHistoryBrowseIndex(-1);
+		setHistoryBrowseDraft('');
+	}, []);
+
 	// Convenience method to close all completion popups at once
 	const closeAllCompletions = useCallback(() => {
 		resetSlashCommand();
 		resetTabCompletion();
 		resetAtMention();
 		resetCommandHistory();
-	}, [resetSlashCommand, resetTabCompletion, resetAtMention, resetCommandHistory]);
+		resetHistoryBrowse();
+	}, [
+		resetSlashCommand,
+		resetTabCompletion,
+		resetAtMention,
+		resetCommandHistory,
+		resetHistoryBrowse,
+	]);
 
 	// PERFORMANCE: Memoize context value to prevent unnecessary re-renders
 	// Only re-creates when completion states actually change
@@ -186,6 +210,13 @@ export function InputProvider({ children }: InputProviderProps) {
 			setCommandHistorySelectedIndex,
 			resetCommandHistory,
 
+			// Inline History Browsing
+			historyBrowseIndex,
+			setHistoryBrowseIndex,
+			historyBrowseDraft,
+			setHistoryBrowseDraft,
+			resetHistoryBrowse,
+
 			// Convenience method
 			closeAllCompletions,
 		}),
@@ -210,6 +241,10 @@ export function InputProvider({ children }: InputProviderProps) {
 			commandHistoryFilter,
 			commandHistorySelectedIndex,
 			resetCommandHistory,
+			// Inline History Browsing - only changes when browsing starts/navigates
+			historyBrowseIndex,
+			historyBrowseDraft,
+			resetHistoryBrowse,
 			// Convenience method
 			closeAllCompletions,
 		]

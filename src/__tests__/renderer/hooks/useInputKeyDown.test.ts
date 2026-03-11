@@ -42,6 +42,11 @@ const mockInputContext = {
 	setCommandHistoryFilter: vi.fn(),
 	commandHistorySelectedIndex: 0,
 	setCommandHistorySelectedIndex: vi.fn(),
+	historyBrowseIndex: -1,
+	setHistoryBrowseIndex: vi.fn(),
+	historyBrowseDraft: '',
+	setHistoryBrowseDraft: vi.fn(),
+	resetHistoryBrowse: vi.fn(),
 };
 
 vi.mock('../../../renderer/contexts/InputContext', () => ({
@@ -123,6 +128,8 @@ beforeEach(() => {
 		atMentionStartIndex: -1,
 		selectedAtMentionIndex: 0,
 		commandHistoryOpen: false,
+		historyBrowseIndex: -1,
+		historyBrowseDraft: '',
 	});
 
 	useSessionStore.setState({
@@ -726,9 +733,9 @@ describe('Escape key', () => {
 // ============================================================================
 
 describe('Command history', () => {
-	it('opens command history on ArrowUp in terminal mode', () => {
-		setActiveSession({ inputMode: 'ai' });
-		const deps = createMockDeps({ inputValue: 'git st' });
+	it('ArrowUp starts inline history browsing in AI mode', () => {
+		setActiveSession({ inputMode: 'ai', aiCommandHistory: ['hello', 'world'] });
+		const deps = createMockDeps({ inputValue: 'current draft' });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('ArrowUp');
 
@@ -737,13 +744,31 @@ describe('Command history', () => {
 		});
 
 		expect(e.preventDefault).toHaveBeenCalled();
-		expect(mockInputContext.setCommandHistoryOpen).toHaveBeenCalledWith(true);
-		expect(mockInputContext.setCommandHistoryFilter).toHaveBeenCalledWith('git st');
-		expect(mockInputContext.setCommandHistorySelectedIndex).toHaveBeenCalledWith(0);
+		// Should save current input as draft and show most recent history item
+		expect(mockInputContext.setHistoryBrowseDraft).toHaveBeenCalledWith('current draft');
+		expect(mockInputContext.setHistoryBrowseIndex).toHaveBeenCalledWith(0);
+		expect(deps.setInputValue).toHaveBeenCalledWith('world'); // most recent
 	});
 
-	it('does not open command history on ArrowUp in AI mode', () => {
-		setActiveSession({ inputMode: 'ai' });
+	it('ArrowDown returns to draft after browsing history', () => {
+		setActiveSession({ inputMode: 'ai', aiCommandHistory: ['hello', 'world'] });
+		mockInputContext.historyBrowseIndex = 0;
+		mockInputContext.historyBrowseDraft = 'my draft';
+		const deps = createMockDeps({ inputValue: 'world' });
+		const { result } = renderHook(() => useInputKeyDown(deps));
+		const e = createKeyEvent('ArrowDown');
+
+		act(() => {
+			result.current.handleInputKeyDown(e);
+		});
+
+		expect(e.preventDefault).toHaveBeenCalled();
+		expect(mockInputContext.resetHistoryBrowse).toHaveBeenCalled();
+		expect(deps.setInputValue).toHaveBeenCalledWith('my draft');
+	});
+
+	it('does nothing on ArrowUp with empty history', () => {
+		setActiveSession({ inputMode: 'ai', aiCommandHistory: [] });
 		const deps = createMockDeps();
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('ArrowUp');
@@ -752,7 +777,7 @@ describe('Command history', () => {
 			result.current.handleInputKeyDown(e);
 		});
 
-		expect(mockInputContext.setCommandHistoryOpen).not.toHaveBeenCalled();
+		expect(mockInputContext.setHistoryBrowseIndex).not.toHaveBeenCalled();
 	});
 });
 
@@ -1260,9 +1285,11 @@ describe('Escape key — additional', () => {
 // ============================================================================
 
 describe('Command history — additional', () => {
-	it('opens with empty filter when inputValue is empty in terminal mode', () => {
-		setActiveSession({ inputMode: 'ai' });
-		const deps = createMockDeps({ inputValue: '' });
+	it('ArrowUp navigates further back through history', () => {
+		setActiveSession({ inputMode: 'ai', aiCommandHistory: ['first', 'second', 'third'] });
+		mockInputContext.historyBrowseIndex = 0; // Currently viewing 'third' (most recent)
+		mockInputContext.historyBrowseDraft = '';
+		const deps = createMockDeps({ inputValue: 'third' });
 		const { result } = renderHook(() => useInputKeyDown(deps));
 		const e = createKeyEvent('ArrowUp');
 
@@ -1270,9 +1297,9 @@ describe('Command history — additional', () => {
 			result.current.handleInputKeyDown(e);
 		});
 
-		expect(mockInputContext.setCommandHistoryOpen).toHaveBeenCalledWith(true);
-		expect(mockInputContext.setCommandHistoryFilter).toHaveBeenCalledWith('');
-		expect(mockInputContext.setCommandHistorySelectedIndex).toHaveBeenCalledWith(0);
+		expect(e.preventDefault).toHaveBeenCalled();
+		expect(mockInputContext.setHistoryBrowseIndex).toHaveBeenCalledWith(1);
+		expect(deps.setInputValue).toHaveBeenCalledWith('second');
 	});
 });
 
