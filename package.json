@@ -97,9 +97,6 @@
 		"afterSign": "scripts/notarize.js"
 	},
 	"dependencies": {
-		"@xterm/xterm": "^5.5.0",
-		"@xterm/addon-fit": "^0.10.0",
-		"@xterm/addon-web-links": "^0.11.0",
 		"@fastify/cors": "^8.5.0",
 		"@fastify/rate-limit": "^9.1.0",
 		"@fastify/static": "^7.0.4",
@@ -107,6 +104,10 @@
 		"@sentry/electron": "^7.5.0",
 		"@tanstack/react-virtual": "^3.13.13",
 		"@types/dompurify": "^3.0.5",
+		"@xterm/addon-fit": "^0.10.0",
+		"@xterm/addon-search": "^0.16.0",
+		"@xterm/addon-web-links": "^0.11.0",
+		"@xterm/xterm": "^5.5.0",
 		"ansi-to-html": "^0.7.2",
 		"better-sqlite3": "^12.5.0",
 		"chokidar": "^3.6.0",
