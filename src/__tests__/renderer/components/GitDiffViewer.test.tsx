@@ -86,6 +86,8 @@ vi.mock('react-diff-view', () => ({
 			Hunk: {hunk?.content}
 		</div>
 	),
+	getChangeKey: (change: any) =>
+		`${change.type}-${change.lineNumber ?? change.oldLineNumber ?? change.newLineNumber}`,
 	tokenize: vi.fn(() => []),
 	parseDiff: vi.fn(() => []),
 }));

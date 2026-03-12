@@ -1,12 +1,26 @@
-import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
-import { Diff, Hunk } from 'react-diff-view';
+import { useState, useMemo, useRef, useEffect, useCallback, memo, type ReactElement } from 'react';
+import { Diff, Hunk, Decoration, getChangeKey } from 'react-diff-view';
 import { parseDiff } from 'react-diff-view';
+import type { ChangeData, HunkData, ChangeEventArgs, EventMap } from 'react-diff-view';
 import { createTwoFilesPatch } from 'diff';
-import { Columns2, Rows3, Plus, Minus, ImageIcon } from 'lucide-react';
+import {
+	Columns2,
+	Rows3,
+	Plus,
+	Minus,
+	ImageIcon,
+	ChevronUp,
+	ChevronDown,
+	ChevronsUpDown,
+	MessageSquare,
+} from 'lucide-react';
 import type { Theme, DiffViewTab } from '../types';
 import { getDiffStats } from '../utils/gitDiffParser';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
 import 'react-diff-view/style/index.css';
+
+const CONTEXT_INCREMENT = 10;
+const DEFAULT_CONTEXT = 3;
 
 // Binary detection: check if content contains null bytes or is marked as binary
 function isBinaryContent(content: string): boolean {
@@ -31,12 +45,42 @@ function isImageFile(filePath: string): boolean {
 	return IMAGE_EXTENSIONS.has(ext);
 }
 
+interface ExpandButtonProps {
+	direction: 'up' | 'down' | 'both';
+	onClick: () => void;
+	color: string;
+}
+
+function ExpandButton({ direction, onClick, color }: ExpandButtonProps) {
+	const Icon = direction === 'up' ? ChevronUp : direction === 'down' ? ChevronDown : ChevronsUpDown;
+	const label =
+		direction === 'up'
+			? 'Show more lines above'
+			: direction === 'down'
+				? 'Show more lines below'
+				: 'Show more lines';
+
+	return (
+		<div
+			className="diff-expand-button flex items-center justify-center py-1 cursor-pointer select-none transition-colors"
+			onClick={onClick}
+			title={label}
+		>
+			<div className="flex items-center gap-1 text-xs" style={{ color }}>
+				<Icon className="w-3 h-3" />
+				<span>Expand</span>
+			</div>
+		</div>
+	);
+}
+
 interface DiffPreviewProps {
 	diff: DiffViewTab;
 	theme: Theme;
 	onClose: () => void;
 	onViewModeChange: (mode: 'unified' | 'split') => void;
 	onScrollPositionChange?: (scrollTop: number) => void;
+	onAskAboutLines?: (context: string) => void;
 }
 
 export const DiffPreview = memo(function DiffPreview({
@@ -45,14 +89,31 @@ export const DiffPreview = memo(function DiffPreview({
 	onClose,
 	onViewModeChange,
 	onScrollPositionChange,
+	onAskAboutLines,
 }: DiffPreviewProps) {
 	const contentRef = useRef<HTMLDivElement>(null);
 	const [viewMode, setViewMode] = useState<'unified' | 'split'>(diff.viewMode);
+	const [contextLines, setContextLines] = useState(DEFAULT_CONTEXT);
+
+	// Reset context lines when switching to a different diff
+	useEffect(() => {
+		setContextLines(DEFAULT_CONTEXT);
+	}, [diff.id]);
 
 	// Sync local viewMode with prop changes (e.g., tab switch restoring saved mode)
 	useEffect(() => {
 		setViewMode(diff.viewMode);
 	}, [diff.viewMode]);
+
+	// --- Line selection state ---
+	const [selectedChangeKeys, setSelectedChangeKeys] = useState<string[]>([]);
+	const lastClickedKeyRef = useRef<string | null>(null);
+
+	// Reset selection when switching files or view mode
+	useEffect(() => {
+		setSelectedChangeKeys([]);
+		lastClickedKeyRef.current = null;
+	}, [diff.id, viewMode]);
 
 	const handleViewModeToggle = useCallback(() => {
 		const newMode = viewMode === 'unified' ? 'split' : 'unified';
@@ -72,8 +133,9 @@ export const DiffPreview = memo(function DiffPreview({
 		if (isBinary) return [];
 
 		try {
-			// Use pre-computed raw diff when available (more reliable for uncommitted changes)
-			if (diff.rawDiff) {
+			// Use pre-computed raw diff when available, but only at default context level.
+			// When user expands context, regenerate from full content.
+			if (diff.rawDiff && contextLines <= DEFAULT_CONTEXT) {
 				return parseDiff(diff.rawDiff);
 			}
 
@@ -83,7 +145,8 @@ export const DiffPreview = memo(function DiffPreview({
 				diff.oldContent,
 				diff.newContent,
 				diff.oldRef,
-				diff.newRef
+				diff.newRef,
+				{ context: contextLines }
 			);
 			return parseDiff(unifiedDiff);
 		} catch (err) {
@@ -98,7 +161,150 @@ export const DiffPreview = memo(function DiffPreview({
 		diff.newRef,
 		diff.rawDiff,
 		isBinary,
+		contextLines,
 	]);
+
+	// Build a flat ordered list of change keys from all hunks for shift-click range selection
+	const allChangeKeys = useMemo(() => {
+		if (!parsedFiles.length) return [];
+		const keys: string[] = [];
+		for (const file of parsedFiles) {
+			for (const hunk of file.hunks) {
+				for (const change of (hunk as HunkData).changes) {
+					keys.push(getChangeKey(change as ChangeData));
+				}
+			}
+		}
+		return keys;
+	}, [parsedFiles]);
+
+	const handleChangeClick = useCallback(
+		({ change }: ChangeEventArgs, event: React.MouseEvent) => {
+			if (!change) return;
+			const key = getChangeKey(change);
+
+			if (event.shiftKey && lastClickedKeyRef.current) {
+				// Shift-click: select range from last clicked to current
+				const lastIdx = allChangeKeys.indexOf(lastClickedKeyRef.current);
+				const curIdx = allChangeKeys.indexOf(key);
+				if (lastIdx !== -1 && curIdx !== -1) {
+					const start = Math.min(lastIdx, curIdx);
+					const end = Math.max(lastIdx, curIdx);
+					setSelectedChangeKeys(allChangeKeys.slice(start, end + 1));
+				}
+			} else if (event.metaKey || event.ctrlKey) {
+				// Cmd/Ctrl-click: toggle individual line in selection
+				setSelectedChangeKeys((prev) =>
+					prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+				);
+				lastClickedKeyRef.current = key;
+			} else {
+				// Plain click: select single line
+				setSelectedChangeKeys([key]);
+				lastClickedKeyRef.current = key;
+			}
+		},
+		[allChangeKeys]
+	);
+
+	const gutterEvents: EventMap = useMemo(
+		() => ({
+			onClick: handleChangeClick as EventMap['onClick'],
+		}),
+		[handleChangeClick]
+	);
+
+	const codeEvents: EventMap = useMemo(
+		() => ({
+			onClick: handleChangeClick as EventMap['onClick'],
+		}),
+		[handleChangeClick]
+	);
+
+	// Compose markdown snippet from selected lines and trigger the callback
+	const handleAskAboutSelection = useCallback(() => {
+		if (!onAskAboutLines || selectedChangeKeys.length === 0 || !parsedFiles.length) return;
+
+		// Collect the selected changes in order
+		const selectedChanges: ChangeData[] = [];
+		const selectedKeySet = new Set(selectedChangeKeys);
+		for (const file of parsedFiles) {
+			for (const hunk of file.hunks) {
+				for (const change of (hunk as HunkData).changes) {
+					if (selectedKeySet.has(getChangeKey(change as ChangeData))) {
+						selectedChanges.push(change as ChangeData);
+					}
+				}
+			}
+		}
+
+		if (selectedChanges.length === 0) return;
+
+		// Determine line range for context
+		const lineNumbers = selectedChanges
+			.map((c) => (c as any).newLineNumber ?? (c as any).oldLineNumber ?? (c as any).lineNumber)
+			.filter((n: number | undefined) => n !== undefined) as number[];
+		const minLine = Math.min(...lineNumbers);
+		const maxLine = Math.max(...lineNumbers);
+		const lineRange = minLine === maxLine ? `L${minLine}` : `L${minLine}-L${maxLine}`;
+
+		// Build code block with diff markers
+		const codeLines = selectedChanges.map((c) => {
+			const prefix = c.type === 'insert' ? '+' : c.type === 'delete' ? '-' : ' ';
+			return `${prefix}${c.content}`;
+		});
+
+		const snippet = [
+			`From \`${diff.filePath}\` (${lineRange}):`,
+			'```diff',
+			...codeLines,
+			'```',
+			'',
+		].join('\n');
+
+		onAskAboutLines(snippet);
+		setSelectedChangeKeys([]);
+		lastClickedKeyRef.current = null;
+	}, [onAskAboutLines, selectedChangeKeys, parsedFiles, diff.filePath]);
+
+	// Keyboard shortcut: Enter when lines are selected triggers Ask Claude
+	useEffect(() => {
+		if (selectedChangeKeys.length === 0 || !onAskAboutLines) return;
+
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				e.stopPropagation();
+				handleAskAboutSelection();
+			} else if (e.key === 'Escape') {
+				setSelectedChangeKeys([]);
+				lastClickedKeyRef.current = null;
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [selectedChangeKeys, onAskAboutLines, handleAskAboutSelection]);
+
+	// Determine the max lines in the file (for knowing when all context is shown)
+	const maxFileLines = useMemo(() => {
+		const oldLines = diff.oldContent ? diff.oldContent.split('\n').length : 0;
+		const newLines = diff.newContent ? diff.newContent.split('\n').length : 0;
+		return Math.max(oldLines, newLines);
+	}, [diff.oldContent, diff.newContent]);
+
+	// Skip expand UI for new files (no old content), deleted files (no new content),
+	// or binary files — there's no meaningful context to expand into
+	const canExpand = useMemo(() => {
+		if (isBinary) return false;
+		const hasOld = !!diff.oldContent;
+		const hasNew = !!diff.newContent;
+		return hasOld && hasNew;
+	}, [isBinary, diff.oldContent, diff.newContent]);
+
+	const handleExpandContext = useCallback(() => {
+		setContextLines((prev) => prev + CONTEXT_INCREMENT);
+	}, []);
 
 	// Compute stats
 	const stats = useMemo(() => getDiffStats(parsedFiles), [parsedFiles]);
@@ -211,7 +417,7 @@ export const DiffPreview = memo(function DiffPreview({
 			</div>
 
 			{/* Diff content */}
-			<div ref={contentRef} className="flex-1 overflow-auto">
+			<div ref={contentRef} className="flex-1 overflow-auto relative">
 				{isBinary && isImage ? (
 					<div className="flex flex-col items-center justify-center h-full gap-3">
 						<ImageIcon className="w-8 h-8" style={{ color: c.textDim }} />
@@ -234,27 +440,88 @@ export const DiffPreview = memo(function DiffPreview({
 				) : parsedFiles.length > 0 ? (
 					<div className="font-mono text-sm p-4">
 						<style>{generateDiffViewStyles(theme)}</style>
-						{parsedFiles.map((file, fileIndex) => (
-							<Diff key={fileIndex} viewType={viewMode} diffType={file.type} hunks={file.hunks}>
-								{(hunks) =>
-									hunks.length > 0 ? (
-										hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)
-									) : (
-										<tbody>
-											<tr>
-												<td
-													colSpan={viewMode === 'split' ? 4 : 3}
-													className="text-center py-8"
-													style={{ color: c.textDim }}
-												>
-													No changes in this hunk
-												</td>
-											</tr>
-										</tbody>
-									)
-								}
-							</Diff>
-						))}
+						{parsedFiles.map((file, fileIndex) => {
+							// Check if all context is already shown (single hunk covering the whole file)
+							const allContextShown =
+								file.hunks.length === 1 &&
+								file.hunks[0].oldStart === 1 &&
+								file.hunks[0].oldLines >= maxFileLines - 1;
+
+							return (
+								<Diff
+									key={fileIndex}
+									viewType={viewMode}
+									diffType={file.type}
+									hunks={file.hunks}
+									selectedChanges={selectedChangeKeys}
+									gutterEvents={gutterEvents}
+									codeEvents={codeEvents}
+								>
+									{(hunks) =>
+										hunks.length > 0 ? (
+											hunks.flatMap((hunk, hunkIndex) => {
+												const elements: ReactElement[] = [];
+
+												// Expand-up button before first hunk
+												if (canExpand && hunkIndex === 0 && !allContextShown) {
+													elements.push(
+														<Decoration key={`expand-top-${hunkIndex}`}>
+															<ExpandButton
+																direction="up"
+																onClick={handleExpandContext}
+																color={c.textDim}
+															/>
+														</Decoration>
+													);
+												}
+
+												elements.push(<Hunk key={hunk.content} hunk={hunk} />);
+
+												// Expand button between hunks (gap between this hunk and the next)
+												if (canExpand && hunkIndex < hunks.length - 1) {
+													elements.push(
+														<Decoration key={`expand-between-${hunkIndex}`}>
+															<ExpandButton
+																direction="both"
+																onClick={handleExpandContext}
+																color={c.textDim}
+															/>
+														</Decoration>
+													);
+												}
+
+												// Expand-down button after last hunk
+												if (canExpand && hunkIndex === hunks.length - 1 && !allContextShown) {
+													elements.push(
+														<Decoration key={`expand-bottom-${hunkIndex}`}>
+															<ExpandButton
+																direction="down"
+																onClick={handleExpandContext}
+																color={c.textDim}
+															/>
+														</Decoration>
+													);
+												}
+
+												return elements;
+											})
+										) : (
+											<tbody>
+												<tr>
+													<td
+														colSpan={viewMode === 'split' ? 4 : 3}
+														className="text-center py-8"
+														style={{ color: c.textDim }}
+													>
+														No changes in this hunk
+													</td>
+												</tr>
+											</tbody>
+										)
+									}
+								</Diff>
+							);
+						})}
 					</div>
 				) : diff.oldContent === '' && diff.newContent !== '' ? (
 					// New file with content but diff parsing returned empty (fallback)
@@ -282,6 +549,22 @@ export const DiffPreview = memo(function DiffPreview({
 							No changes to display
 						</p>
 					</div>
+				)}
+
+				{/* Floating "Ask about selection" button */}
+				{selectedChangeKeys.length > 0 && onAskAboutLines && (
+					<button
+						className="diff-ask-claude-button"
+						onClick={handleAskAboutSelection}
+						title={`Ask about ${selectedChangeKeys.length} selected line${selectedChangeKeys.length > 1 ? 's' : ''} (Enter)`}
+						style={{
+							backgroundColor: c.accent,
+							color: '#fff',
+						}}
+					>
+						<MessageSquare className="w-3.5 h-3.5" />
+						<span>Ask about selection</span>
+					</button>
 				)}
 			</div>
 		</div>

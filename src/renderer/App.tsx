@@ -2283,6 +2283,9 @@ function MaestroConsoleInner() {
 					gitDiffPreview={gitDiffPreview}
 					gitViewerCwd={gitViewerCwd}
 					onCloseGitDiff={handleCloseGitDiff}
+					onAskAboutDiffLines={(context) => {
+						setInputValue(context + '\n\n');
+					}}
 					onCloseGitLog={handleCloseGitLog}
 					onAutoRunFolderSelected={handleAutoRunFolderSelected}
 					onStartBatchRun={handleStartBatchRun}

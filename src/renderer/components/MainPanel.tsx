@@ -1627,6 +1627,18 @@ export const MainPanel = React.memo(
 											onDiffTabScrollPositionChange?.(activeDiffTabId, scrollTop);
 										}
 									}}
+									onAskAboutLines={(context) => {
+										setInputValue(context + '\n\n');
+										// Focus the input area so user can add their question
+										setTimeout(() => {
+											const el = inputRef.current;
+											if (el) {
+												el.focus();
+												el.selectionStart = el.value.length;
+												el.selectionEnd = el.value.length;
+											}
+										}, 50);
+									}}
 								/>
 							</div>
 						) : activeSession.inputMode === 'ai' &&

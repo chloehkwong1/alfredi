@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect, useRef, memo } from 'react';
-import { Diff, Hunk } from 'react-diff-view';
-import { Plus, Minus, ImageIcon } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
+import { Diff, Hunk, getChangeKey } from 'react-diff-view';
+import type { ChangeData, HunkData, ChangeEventArgs, EventMap } from 'react-diff-view';
+import { Plus, Minus, ImageIcon, MessageSquare } from 'lucide-react';
 import type { Theme } from '../types';
 import { parseGitDiff, getFileName, getDiffStats } from '../utils/gitDiffParser';
 import { useLayerStack } from '../contexts/LayerStackContext';
@@ -14,6 +15,7 @@ interface GitDiffViewerProps {
 	cwd: string;
 	theme: Theme;
 	onClose: () => void;
+	onAskAboutLines?: (context: string) => void;
 }
 
 export const GitDiffViewer = memo(function GitDiffViewer({
@@ -21,6 +23,7 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 	cwd,
 	theme,
 	onClose,
+	onAskAboutLines,
 }: GitDiffViewerProps) {
 	const [activeTab, setActiveTab] = useState(0);
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -92,6 +95,132 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [parsedFiles.length]);
+
+	// --- Line selection state ---
+	const [selectedChangeKeys, setSelectedChangeKeys] = useState<string[]>([]);
+	const lastClickedKeyRef = useRef<string | null>(null);
+
+	// Reset selection when switching tabs
+	useEffect(() => {
+		setSelectedChangeKeys([]);
+		lastClickedKeyRef.current = null;
+	}, [activeTab]);
+
+	// Build a flat ordered list of change keys from all hunks for shift-click range selection
+	const allChangeKeys = useMemo(() => {
+		const activeFile = parsedFiles[activeTab];
+		if (!activeFile || activeFile.isBinary) return [];
+		const keys: string[] = [];
+		for (const file of activeFile.parsedDiff) {
+			for (const hunk of file.hunks) {
+				for (const change of (hunk as HunkData).changes) {
+					keys.push(getChangeKey(change as ChangeData));
+				}
+			}
+		}
+		return keys;
+	}, [parsedFiles, activeTab]);
+
+	const handleChangeClick = useCallback(
+		({ change }: ChangeEventArgs, event: React.MouseEvent) => {
+			if (!change) return;
+			const key = getChangeKey(change);
+
+			if (event.shiftKey && lastClickedKeyRef.current) {
+				const lastIdx = allChangeKeys.indexOf(lastClickedKeyRef.current);
+				const curIdx = allChangeKeys.indexOf(key);
+				if (lastIdx !== -1 && curIdx !== -1) {
+					const start = Math.min(lastIdx, curIdx);
+					const end = Math.max(lastIdx, curIdx);
+					setSelectedChangeKeys(allChangeKeys.slice(start, end + 1));
+				}
+			} else if (event.metaKey || event.ctrlKey) {
+				setSelectedChangeKeys((prev) =>
+					prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+				);
+				lastClickedKeyRef.current = key;
+			} else {
+				setSelectedChangeKeys([key]);
+				lastClickedKeyRef.current = key;
+			}
+		},
+		[allChangeKeys]
+	);
+
+	const gutterEvents: EventMap = useMemo(
+		() => ({ onClick: handleChangeClick as EventMap['onClick'] }),
+		[handleChangeClick]
+	);
+
+	const codeEvents: EventMap = useMemo(
+		() => ({ onClick: handleChangeClick as EventMap['onClick'] }),
+		[handleChangeClick]
+	);
+
+	const handleAskAboutSelection = useCallback(() => {
+		if (!onAskAboutLines || selectedChangeKeys.length === 0) return;
+
+		const activeFile = parsedFiles[activeTab];
+		if (!activeFile) return;
+
+		const selectedChanges: ChangeData[] = [];
+		const selectedKeySet = new Set(selectedChangeKeys);
+		for (const file of activeFile.parsedDiff) {
+			for (const hunk of file.hunks) {
+				for (const change of (hunk as HunkData).changes) {
+					if (selectedKeySet.has(getChangeKey(change as ChangeData))) {
+						selectedChanges.push(change as ChangeData);
+					}
+				}
+			}
+		}
+
+		if (selectedChanges.length === 0) return;
+
+		const lineNumbers = selectedChanges
+			.map((c) => (c as any).newLineNumber ?? (c as any).oldLineNumber ?? (c as any).lineNumber)
+			.filter((n: number | undefined) => n !== undefined) as number[];
+		const minLine = Math.min(...lineNumbers);
+		const maxLine = Math.max(...lineNumbers);
+		const lineRange = minLine === maxLine ? `L${minLine}` : `L${minLine}-L${maxLine}`;
+
+		const filePath = activeFile.newPath || activeFile.oldPath || 'unknown';
+		const codeLines = selectedChanges.map((c) => {
+			const prefix = c.type === 'insert' ? '+' : c.type === 'delete' ? '-' : ' ';
+			return `${prefix}${c.content}`;
+		});
+
+		const snippet = [
+			`From \`${filePath}\` (${lineRange}):`,
+			'```diff',
+			...codeLines,
+			'```',
+			'',
+		].join('\n');
+
+		onAskAboutLines(snippet);
+		setSelectedChangeKeys([]);
+		lastClickedKeyRef.current = null;
+	}, [onAskAboutLines, selectedChangeKeys, parsedFiles, activeTab]);
+
+	// Keyboard shortcut: Enter triggers Ask Claude, Escape clears selection
+	useEffect(() => {
+		if (selectedChangeKeys.length === 0 || !onAskAboutLines) return;
+
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				e.stopPropagation();
+				handleAskAboutSelection();
+			} else if (e.key === 'Escape') {
+				setSelectedChangeKeys([]);
+				lastClickedKeyRef.current = null;
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [selectedChangeKeys, onAskAboutLines, handleAskAboutSelection]);
 
 	if (parsedFiles.length === 0) {
 		return (
@@ -240,7 +369,7 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 				</div>
 
 				{/* Diff Content */}
-				<div className="flex-1 overflow-auto p-6">
+				<div className="flex-1 overflow-auto p-6 relative">
 					{activeFile && activeFile.isImage ? (
 						// Image diff view - side-by-side comparison
 						<ImageDiffViewer
@@ -278,7 +407,14 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 									</div>
 
 									{/* Render each hunk */}
-									<Diff viewType="unified" diffType={file.type} hunks={file.hunks}>
+									<Diff
+										viewType="unified"
+										diffType={file.type}
+										hunks={file.hunks}
+										selectedChanges={selectedChangeKeys}
+										gutterEvents={gutterEvents}
+										codeEvents={codeEvents}
+									>
 										{(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
 									</Diff>
 								</div>
@@ -290,6 +426,22 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 								Unable to parse diff for this file
 							</p>
 						</div>
+					)}
+
+					{/* Floating "Ask about selection" button */}
+					{selectedChangeKeys.length > 0 && onAskAboutLines && (
+						<button
+							className="diff-ask-claude-button"
+							onClick={handleAskAboutSelection}
+							title={`Ask about ${selectedChangeKeys.length} selected line${selectedChangeKeys.length > 1 ? 's' : ''} (Enter)`}
+							style={{
+								backgroundColor: theme.colors.accent,
+								color: '#fff',
+							}}
+						>
+							<MessageSquare className="w-3.5 h-3.5" />
+							<span>Ask about selection</span>
+						</button>
 					)}
 				</div>
 

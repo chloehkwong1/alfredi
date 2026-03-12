@@ -577,5 +577,69 @@ export function generateDiffViewStyles(theme: Theme): string {
     .diff-line {
       color: ${c.textMain} !important;
     }
+    .diff-decoration {
+      background-color: ${c.bgMain} !important;
+    }
+    .diff-decoration-content {
+      padding: 0 !important;
+    }
+    .diff-expand-button {
+      width: 100%;
+      background-color: ${c.bgSidebar};
+      border-top: 1px dashed ${c.border};
+      border-bottom: 1px dashed ${c.border};
+    }
+    .diff-expand-button:hover {
+      background-color: ${c.bgActivity};
+    }
+    .diff-gutter-selected {
+      background-color: rgba(99, 102, 241, 0.3) !important;
+    }
+    .diff-code-selected {
+      background-color: rgba(99, 102, 241, 0.18) !important;
+    }
+    .diff-gutter-selected.diff-gutter-insert {
+      background-color: rgba(99, 102, 241, 0.3) !important;
+    }
+    .diff-code-selected.diff-code-insert {
+      background-color: rgba(99, 102, 241, 0.18) !important;
+    }
+    .diff-gutter-selected.diff-gutter-delete {
+      background-color: rgba(99, 102, 241, 0.3) !important;
+    }
+    .diff-code-selected.diff-code-delete {
+      background-color: rgba(99, 102, 241, 0.18) !important;
+    }
+    .diff-gutter {
+      cursor: pointer;
+    }
+    .diff-gutter:hover {
+      background-color: ${c.bgActivity} !important;
+    }
+    .diff-ask-claude-button {
+      position: sticky;
+      bottom: 12px;
+      float: right;
+      margin-right: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      transition: opacity 0.15s, transform 0.15s;
+      z-index: 10;
+    }
+    .diff-ask-claude-button:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+    .diff-ask-claude-button:active {
+      transform: translateY(0);
+    }
   `;
 }

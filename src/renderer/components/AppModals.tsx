@@ -775,6 +775,7 @@ export interface AppUtilityModalsProps {
 	gitDiffPreview: string | null;
 	gitViewerCwd: string;
 	onCloseGitDiff: () => void;
+	onAskAboutDiffLines?: (context: string) => void;
 
 	// GitLogViewer
 	gitLogOpen: boolean;
@@ -913,6 +914,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	gitDiffPreview,
 	gitViewerCwd,
 	onCloseGitDiff,
+	onAskAboutDiffLines,
 	// GitLogViewer
 	gitLogOpen,
 	onCloseGitLog,
@@ -1034,6 +1036,14 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 						cwd={gitViewerCwd}
 						theme={theme}
 						onClose={onCloseGitDiff}
+						onAskAboutLines={
+							onAskAboutDiffLines
+								? (context) => {
+										onAskAboutDiffLines(context);
+										onCloseGitDiff();
+									}
+								: undefined
+						}
 					/>
 				</Suspense>
 			)}
@@ -1439,6 +1449,7 @@ export interface AppModalsProps {
 	gitDiffPreview: string | null;
 	gitViewerCwd: string;
 	onCloseGitDiff: () => void;
+	onAskAboutDiffLines?: (context: string) => void;
 	onCloseGitLog: () => void;
 	onAutoRunFolderSelected: (folderPath: string) => void;
 	onStartBatchRun: (config: BatchRunConfig) => void | Promise<void>;
@@ -1716,6 +1727,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		gitDiffPreview,
 		gitViewerCwd,
 		onCloseGitDiff,
+		onAskAboutDiffLines,
 		onCloseGitLog,
 		onAutoRunFolderSelected,
 		onStartBatchRun,
@@ -1952,6 +1964,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				gitDiffPreview={gitDiffPreview}
 				gitViewerCwd={gitViewerCwd}
 				onCloseGitDiff={onCloseGitDiff}
+				onAskAboutDiffLines={onAskAboutDiffLines}
 				gitLogOpen={gitLogOpen}
 				onCloseGitLog={onCloseGitLog}
 				onOpenSymphony={onOpenSymphony}
