@@ -618,12 +618,46 @@ interface MaestroAPI {
 			url: string;
 			number: number;
 		} | null>;
+		/**
+		 * Discard unstaged changes for a single file
+		 */
+		restore: (
+			cwd: string,
+			file: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ success: boolean; stdout: string; stderr: string }>;
+		/**
+		 * Discard all unstaged changes
+		 */
+		restoreAll: (
+			cwd: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ success: boolean; stdout: string; stderr: string }>;
 		onWorktreeDiscovered: (
 			callback: (data: {
 				sessionId: string;
 				worktree: { path: string; name: string; branch: string | null };
 			}) => void
 		) => () => void;
+		/**
+		 * Start a long-lived server process for a worktree
+		 */
+		startServer: (
+			sessionId: string,
+			cwd: string,
+			script: string,
+			sshRemoteId?: string
+		) => Promise<{ success: boolean; processId?: string; error?: string }>;
+		/**
+		 * Stop a running worktree server process
+		 */
+		stopServer: (processId: string) => Promise<{ success: boolean; error?: string }>;
+		/**
+		 * Listen for server process exit events
+		 */
+		onServerStopped: (callback: (data: { processId: string }) => void) => () => void;
 	};
 	fs: {
 		homeDir: () => Promise<string>;

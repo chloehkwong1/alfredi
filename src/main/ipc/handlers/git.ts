@@ -12,6 +12,7 @@ import {
 	createIpcHandler,
 	CreateHandlerOptions,
 } from '../../utils/ipcHandler';
+import type { ProcessManager } from '../../process-manager/ProcessManager';
 import { resolveGhPath, getCachedGhStatus, setCachedGhStatus } from '../../utils/cliDetection';
 import {
 	parseGitBranches,
@@ -41,10 +42,16 @@ export interface GitHandlerDependencies {
 	settingsStore: {
 		get: (key: string, defaultValue?: unknown) => unknown;
 	};
+	/** Process manager for spawning/killing managed server processes */
+	getProcessManager?: () => ProcessManager | null;
+	/** Main window for sending events to the renderer */
+	getMainWindow?: () => Electron.BrowserWindow | null;
 }
 
-// Module-level reference to settings store (set during registration)
+// Module-level references (set during registration)
 let gitSettingsStore: GitHandlerDependencies['settingsStore'] | null = null;
+let gitGetProcessManager: GitHandlerDependencies['getProcessManager'] | null = null;
+let gitGetMainWindow: GitHandlerDependencies['getMainWindow'] | null = null;
 
 /**
  * Look up SSH remote configuration by ID.
@@ -90,6 +97,8 @@ const handlerOpts = (operation: string, logSuccess = false): CreateHandlerOption
 export function registerGitHandlers(deps: GitHandlerDependencies): void {
 	// Store the settings reference for SSH remote lookups
 	gitSettingsStore = deps.settingsStore;
+	gitGetProcessManager = deps.getProcessManager ?? null;
+	gitGetMainWindow = deps.getMainWindow ?? null;
 	// Basic Git operations
 	// All handlers accept optional sshRemoteId and remoteCwd for remote execution
 
@@ -1648,6 +1657,125 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 					);
 					return null;
 				}
+			}
+		)
+	);
+
+	// Start a long-running server process for a worktree
+	// Uses ProcessManager's ChildProcess strategy (not PTY) so output can be streamed to the renderer
+	ipcMain.handle(
+		'worktree:startServer',
+		createIpcHandler(
+			handlerOpts('startServer'),
+			async (sessionId: string, cwd: string, script: string, sshRemoteId?: string) => {
+				const pm = gitGetProcessManager?.();
+				if (!pm) {
+					return { success: false, error: 'ProcessManager not available' };
+				}
+
+				const processId = `${sessionId}-server`;
+
+				// Kill any existing server process for this session
+				if (pm.get(processId)) {
+					pm.kill(processId);
+				}
+
+				// Build command — use SSH wrapping if needed
+				let command: string;
+				let args: string[];
+				let spawnCwd: string | undefined = cwd;
+
+				if (sshRemoteId) {
+					const sshConfig = getSshRemoteById(sshRemoteId);
+					if (!sshConfig) {
+						return { success: false, error: `SSH remote not found: ${sshRemoteId}` };
+					}
+					const sshCommand = await buildSshCommand(sshConfig, {
+						command: 'sh',
+						args: ['-c', script],
+						cwd,
+						env: sshConfig.remoteEnv,
+					});
+					command = sshCommand.command;
+					args = sshCommand.args;
+					spawnCwd = undefined; // SSH command runs locally, remote cwd is embedded
+				} else {
+					command = 'sh';
+					args = ['-c', script];
+				}
+
+				try {
+					const result = pm.spawn({
+						sessionId: processId,
+						toolType: 'worktree-server',
+						cwd: spawnCwd || cwd,
+						command,
+						args,
+						requiresPty: false,
+						sshRemoteId,
+					});
+
+					// Listen for exit to notify renderer
+					const onExit = (_exitSessionId: string, code: number) => {
+						if (_exitSessionId !== processId) return;
+						pm.removeListener('exit', onExit);
+						const win = gitGetMainWindow?.();
+						if (win && isWebContentsAvailable(win)) {
+							win.webContents.send('worktree:serverStopped', {
+								sessionId,
+								processId,
+								exitCode: code,
+							});
+						}
+					};
+					pm.on('exit', onExit);
+
+					return { success: result.success, processId };
+				} catch (error) {
+					return { success: false, error: String(error) };
+				}
+			}
+		)
+	);
+
+	// Stop a running worktree server process
+	ipcMain.handle(
+		'worktree:stopServer',
+		createIpcHandler(handlerOpts('stopServer'), async (processId: string) => {
+			const pm = gitGetProcessManager?.();
+			if (!pm) {
+				return { success: false, error: 'ProcessManager not available' };
+			}
+
+			const success = pm.kill(processId);
+			return { success };
+		})
+	);
+
+	// Discard unstaged changes for a single file (git checkout -- <file>)
+	ipcMain.handle(
+		'git:restore',
+		withIpcErrorLogging(
+			handlerOpts('restore'),
+			async (cwd: string, file: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const result = await execGit(['checkout', '--', file], cwd, sshRemote, effectiveRemoteCwd);
+				return { success: true, stdout: result.stdout, stderr: result.stderr };
+			}
+		)
+	);
+
+	// Discard all unstaged changes (git checkout -- .)
+	ipcMain.handle(
+		'git:restoreAll',
+		withIpcErrorLogging(
+			handlerOpts('restoreAll'),
+			async (cwd: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const result = await execGit(['checkout', '--', '.'], cwd, sshRemote, effectiveRemoteCwd);
+				return { success: true, stdout: result.stdout, stderr: result.stderr };
 			}
 		)
 	);

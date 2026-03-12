@@ -159,12 +159,21 @@ export interface AgentConfig {
 /**
  * A terminal tab within an agent's Right Panel terminal section.
  * Each tab owns a persistent shell PTY identified by `{sessionId}-terminal-{id}`.
+ *
+ * When `serverProcessId` is set, the tab is a read-only server output viewer
+ * that listens to ProcessManager data events instead of spawning a shell PTY.
  */
 export interface TerminalTab {
 	/** Unique identifier (used to build the PTY process ID) */
 	id: string;
 	/** Display name shown on the tab (e.g., "Terminal 1") */
 	name: string;
+	/**
+	 * When set, this tab displays output from a managed server process
+	 * instead of an interactive shell. The value is the ProcessManager key
+	 * (e.g., `${sessionId}-server`).
+	 */
+	serverProcessId?: string;
 }
 
 // ============================================================================

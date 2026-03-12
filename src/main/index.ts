@@ -398,6 +398,8 @@ function setupIpcHandlers() {
 	// Git operations - extracted to src/main/ipc/handlers/git.ts
 	registerGitHandlers({
 		settingsStore: store,
+		getProcessManager: () => processManager,
+		getMainWindow: () => mainWindow,
 	});
 
 	// History operations - extracted to src/main/ipc/handlers/history.ts

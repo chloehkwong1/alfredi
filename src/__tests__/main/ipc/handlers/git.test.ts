@@ -132,10 +132,13 @@ describe('Git IPC handlers', () => {
 	});
 
 	describe('registration', () => {
-		it('should register all 26 git handlers', () => {
+		it('should register all 36 git handlers', () => {
 			const expectedChannels = [
 				'git:status',
 				'git:diff',
+				'git:diffRefs',
+				'git:diffStaged',
+				'git:mergeBase',
 				'git:isRepo',
 				'git:numstat',
 				'git:branch',
@@ -160,9 +163,16 @@ describe('Git IPC handlers', () => {
 				'git:unwatchWorktreeDirectory',
 				'git:removeWorktree',
 				'git:createGist',
+				'git:runWorktreeScript',
+				'git:listRemotes',
+				'git:prStatus',
+				'git:restore',
+				'git:restoreAll',
+				'worktree:startServer',
+				'worktree:stopServer',
 			];
 
-			expect(handlers.size).toBe(26);
+			expect(handlers.size).toBe(36);
 			for (const channel of expectedChannels) {
 				expect(handlers.has(channel)).toBe(true);
 			}
@@ -4405,6 +4415,147 @@ branch refs/heads/bugfix-123
 			await watchHandler!({} as any, 'session-cycle', '/path/3');
 			await unwatchHandler!({} as any, 'session-cycle');
 			expect(mockWatchers[2].close).toHaveBeenCalled();
+		});
+	});
+
+	// ===========================================================================
+	// worktree:startServer / worktree:stopServer
+	// ===========================================================================
+
+	describe('worktree:startServer', () => {
+		let serverHandlers: Map<string, Function>;
+		let mockProcessManager: any;
+		let mockMainWindow: any;
+
+		beforeEach(() => {
+			// Create a mock ProcessManager
+			mockProcessManager = {
+				spawn: vi.fn().mockReturnValue({ success: true }),
+				kill: vi.fn().mockReturnValue(true),
+				get: vi.fn().mockReturnValue(null),
+				on: vi.fn(),
+				removeListener: vi.fn(),
+			};
+
+			mockMainWindow = {
+				webContents: {
+					send: vi.fn(),
+					isDestroyed: vi.fn().mockReturnValue(false),
+				},
+				isDestroyed: vi.fn().mockReturnValue(false),
+			};
+
+			// Re-register handlers with ProcessManager dependency
+			serverHandlers = new Map();
+			vi.mocked(ipcMain.handle).mockImplementation((channel, handler) => {
+				serverHandlers.set(channel, handler);
+			});
+
+			registerGitHandlers({
+				settingsStore: mockSettingsStore,
+				getProcessManager: () => mockProcessManager,
+				getMainWindow: () => mockMainWindow,
+			});
+		});
+
+		it('should spawn a process via ProcessManager with correct key', async () => {
+			const handler = serverHandlers.get('worktree:startServer');
+			const result = await handler!({} as any, 'session-123', '/projects/app', 'npm start');
+
+			expect(mockProcessManager.spawn).toHaveBeenCalledWith(
+				expect.objectContaining({
+					sessionId: 'session-123-server',
+					toolType: 'worktree-server',
+					cwd: '/projects/app',
+					command: 'sh',
+					args: ['-c', 'npm start'],
+					requiresPty: false,
+				})
+			);
+			expect(result).toEqual({ success: true, processId: 'session-123-server' });
+		});
+
+		it('should kill existing server process before spawning new one', async () => {
+			mockProcessManager.get.mockReturnValue({ pid: 12345 }); // existing process
+
+			const handler = serverHandlers.get('worktree:startServer');
+			await handler!({} as any, 'session-123', '/projects/app', 'npm start');
+
+			expect(mockProcessManager.kill).toHaveBeenCalledWith('session-123-server');
+			expect(mockProcessManager.spawn).toHaveBeenCalled();
+		});
+
+		it('should register an exit listener on spawn', async () => {
+			const handler = serverHandlers.get('worktree:startServer');
+			await handler!({} as any, 'session-123', '/projects/app', 'npm start');
+
+			expect(mockProcessManager.on).toHaveBeenCalledWith('exit', expect.any(Function));
+		});
+
+		it('should return error when ProcessManager is not available', async () => {
+			// Re-register without ProcessManager
+			const nopmHandlers = new Map<string, Function>();
+			vi.mocked(ipcMain.handle).mockImplementation((channel, handler) => {
+				nopmHandlers.set(channel, handler);
+			});
+			registerGitHandlers({
+				settingsStore: mockSettingsStore,
+				getProcessManager: () => null,
+			});
+
+			const handler = nopmHandlers.get('worktree:startServer');
+			const result = await handler!({} as any, 'session-123', '/projects/app', 'npm start');
+
+			expect(result).toEqual({ success: false, error: 'ProcessManager not available' });
+		});
+	});
+
+	describe('worktree:stopServer', () => {
+		let serverHandlers: Map<string, Function>;
+		let mockProcessManager: any;
+
+		beforeEach(() => {
+			mockProcessManager = {
+				spawn: vi.fn(),
+				kill: vi.fn().mockReturnValue(true),
+				get: vi.fn(),
+				on: vi.fn(),
+				removeListener: vi.fn(),
+			};
+
+			serverHandlers = new Map();
+			vi.mocked(ipcMain.handle).mockImplementation((channel, handler) => {
+				serverHandlers.set(channel, handler);
+			});
+
+			registerGitHandlers({
+				settingsStore: mockSettingsStore,
+				getProcessManager: () => mockProcessManager,
+			});
+		});
+
+		it('should kill the process via ProcessManager', async () => {
+			const handler = serverHandlers.get('worktree:stopServer');
+			const result = await handler!({} as any, 'session-123-server');
+
+			expect(mockProcessManager.kill).toHaveBeenCalledWith('session-123-server');
+			expect(result).toEqual({ success: true });
+		});
+
+		it('should return error when ProcessManager is not available', async () => {
+			const nopmHandlers = new Map<string, Function>();
+			vi.mocked(ipcMain.handle).mockImplementation((channel, handler) => {
+				nopmHandlers.set(channel, handler);
+			});
+			registerGitHandlers({
+				settingsStore: mockSettingsStore,
+				getProcessManager: () => null,
+			});
+
+			const handler = nopmHandlers.get('worktree:stopServer');
+			const result = await handler!({} as any, 'session-123-server');
+
+			expect(result).toEqual({ success: false, error: 'ProcessManager not available' });
 		});
 	});
 });

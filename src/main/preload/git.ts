@@ -425,6 +425,27 @@ export function createGitApi() {
 			ipcRenderer.invoke('git:prStatus', repoPath, branch),
 
 		/**
+		 * Discard unstaged changes for a single file
+		 */
+		restore: (
+			cwd: string,
+			file: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ success: boolean; stdout: string; stderr: string }> =>
+			ipcRenderer.invoke('git:restore', cwd, file, sshRemoteId, remoteCwd),
+
+		/**
+		 * Discard all unstaged changes
+		 */
+		restoreAll: (
+			cwd: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ success: boolean; stdout: string; stderr: string }> =>
+			ipcRenderer.invoke('git:restoreAll', cwd, sshRemoteId, remoteCwd),
+
+		/**
 		 * Subscribe to discovered worktrees
 		 */
 		onWorktreeDiscovered: (callback: (data: WorktreeDiscoveredData) => void): (() => void) => {
@@ -432,6 +453,38 @@ export function createGitApi() {
 				callback(data);
 			ipcRenderer.on('worktree:discovered', handler);
 			return () => ipcRenderer.removeListener('worktree:discovered', handler);
+		},
+
+		/**
+		 * Start a long-running server process for a worktree
+		 * Returns a processId that can be used to stop the server or stream output
+		 */
+		startServer: (
+			sessionId: string,
+			cwd: string,
+			script: string,
+			sshRemoteId?: string
+		): Promise<{ success: boolean; processId?: string; error?: string }> =>
+			ipcRenderer.invoke('worktree:startServer', sessionId, cwd, script, sshRemoteId),
+
+		/**
+		 * Stop a running worktree server process
+		 */
+		stopServer: (processId: string): Promise<{ success: boolean; error?: string }> =>
+			ipcRenderer.invoke('worktree:stopServer', processId),
+
+		/**
+		 * Subscribe to worktree server stopped events (process exit)
+		 */
+		onServerStopped: (
+			callback: (data: { sessionId: string; processId: string; exitCode: number }) => void
+		): (() => void) => {
+			const handler = (
+				_event: Electron.IpcRendererEvent,
+				data: { sessionId: string; processId: string; exitCode: number }
+			) => callback(data);
+			ipcRenderer.on('worktree:serverStopped', handler);
+			return () => ipcRenderer.removeListener('worktree:serverStopped', handler);
 		},
 	};
 }
