@@ -37,6 +37,7 @@ vi.mock('@xterm/xterm', () => {
 		dispose = vi.fn();
 		loadAddon = vi.fn();
 		write = vi.fn();
+		attachCustomKeyEventHandler = vi.fn();
 		onData = vi.fn((cb: (data: string) => void) => {
 			latestOnDataCallback = cb;
 			return { dispose: vi.fn() };
@@ -64,6 +65,14 @@ vi.mock('@xterm/addon-fit', () => {
 vi.mock('@xterm/addon-web-links', () => {
 	class MockWebLinksAddon {}
 	return { WebLinksAddon: MockWebLinksAddon };
+});
+
+vi.mock('@xterm/addon-search', () => {
+	class MockSearchAddon {
+		findNext = vi.fn();
+		findPrevious = vi.fn();
+	}
+	return { SearchAddon: MockSearchAddon };
 });
 
 // ============================================================================
@@ -120,7 +129,7 @@ describe('XTerminal', () => {
 		expect(mockTerminalInstances).toHaveLength(1);
 		const term = mockTerminalInstances[0];
 		expect(term.open).toHaveBeenCalled();
-		expect(term.loadAddon).toHaveBeenCalledTimes(2); // FitAddon + WebLinksAddon
+		expect(term.loadAddon).toHaveBeenCalledTimes(3); // FitAddon + WebLinksAddon + SearchAddon
 	});
 
 	it('calls window.maestro.process.write on terminal.onData', async () => {

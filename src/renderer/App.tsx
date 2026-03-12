@@ -63,6 +63,8 @@ import {
 	useModalHandlers,
 	// Worktree handlers
 	useWorktreeHandlers,
+	useWorktreeAutoArchive,
+	useWorktreeStatusPoller,
 	// Session restoration
 	useSessionRestoration,
 	// Input keyboard handling
@@ -631,6 +633,7 @@ function MaestroConsoleInner() {
 		activeTab,
 		unifiedTabs,
 		activeFileTab,
+		activeDiffTab,
 		isResumingSession,
 		fileTabBackHistory,
 		fileTabForwardHistory,
@@ -672,6 +675,9 @@ function MaestroConsoleInner() {
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleDeleteLog,
+		handleOpenDiffTab,
+		handleSelectDiffTab,
+		handleCloseDiffTab,
 	} = useTabHandlers();
 
 	// --- MODAL HANDLERS (open/close, error recovery, lightbox) ---
@@ -743,6 +749,10 @@ function MaestroConsoleInner() {
 		handleConfirmAndDeleteWorktreeOnDisk,
 		handleRunWorktreeScript,
 	} = useWorktreeHandlers();
+
+	// --- WORKTREE AUTO-STATUS & AUTO-ARCHIVE ---
+	useWorktreeStatusPoller();
+	useWorktreeAutoArchive();
 
 	// --- APP HANDLERS (drag, file, folder operations) ---
 	const {
@@ -1080,6 +1090,8 @@ function MaestroConsoleInner() {
 		setInputValue,
 		stagedImages,
 		setStagedImages,
+		stagedFiles,
+		setStagedFiles,
 		processInput,
 		handleInputKeyDown,
 		handleMainPanelInputBlur,
@@ -1744,6 +1756,7 @@ function MaestroConsoleInner() {
 		isMobileLandscape,
 		inputValue,
 		stagedImages,
+		stagedFiles,
 		commandHistoryOpen,
 		commandHistoryFilter,
 		commandHistorySelectedIndex,
@@ -1807,6 +1820,7 @@ function MaestroConsoleInner() {
 		setActiveAgentSessionId,
 		setInputValue,
 		setStagedImages,
+		setStagedFiles,
 		setCommandHistoryOpen,
 		setCommandHistoryFilter,
 		setCommandHistorySelectedIndex,
@@ -1873,6 +1887,14 @@ function MaestroConsoleInner() {
 		handleFileTabScrollPositionChange,
 		handleFileTabSearchQueryChange,
 		handleReloadFileTab,
+
+		// Diff tab props
+		activeDiffTabId: activeSession?.activeDiffTabId ?? null,
+		activeDiffTab,
+		handleSelectDiffTab,
+		handleCloseDiffTab,
+		handleDiffTabViewModeChange: useTabStore.getState().updateDiffTabViewMode,
+		handleDiffTabScrollPositionChange: useTabStore.getState().updateDiffTabScrollPosition,
 
 		handleScrollPositionChange,
 		handleAtBottomChange,
@@ -1966,8 +1988,6 @@ function MaestroConsoleInner() {
 		handleDeleteWorktreeSession,
 		handleRunWorktreeScript,
 		handleToggleWorktreeExpanded,
-		openWizardModal,
-		handleStartTour,
 	});
 
 	const rightPanelProps = useRightPanelProps({
@@ -2020,6 +2040,9 @@ function MaestroConsoleInner() {
 		// Document Graph handlers
 		handleFocusFileInGraph,
 		handleOpenLastDocumentGraph,
+
+		// Diff tab handler
+		handleOpenDiffTab,
 	});
 
 	return (
@@ -2390,47 +2413,9 @@ function MaestroConsoleInner() {
 					</Suspense>
 				)}
 
-				{/* --- WIZARD RESUME MODAL (asks if user wants to resume incomplete wizard) --- */}
-				{wizardResumeModalOpen && wizardResumeState && (
-					<WizardResumeModal
-						theme={theme}
-						resumeState={wizardResumeState}
-						onResume={handleWizardResume}
-						onStartFresh={handleWizardStartFresh}
-						onClose={handleWizardResumeClose}
-					/>
-				)}
-
-				{/* --- MAESTRO WIZARD (onboarding wizard for new users) --- */}
-				{/* PERF: Only mount wizard component when open to avoid running hooks/effects */}
-				{wizardState.isOpen && (
-					<MaestroWizard
-						theme={theme}
-						onLaunchSession={handleWizardLaunchSession}
-						onWizardStart={recordWizardStart}
-						onWizardResume={recordWizardResume}
-						onWizardAbandon={recordWizardAbandon}
-						onWizardComplete={recordWizardComplete}
-					/>
-				)}
-
-				{/* --- TOUR OVERLAY (onboarding tour for interface guidance) --- */}
-				{/* PERF: Only mount tour component when open to avoid running hooks/effects */}
-				{tourOpen && (
-					<TourOverlay
-						theme={theme}
-						isOpen={tourOpen}
-						fromWizard={tourFromWizard}
-						shortcuts={{ ...shortcuts, ...tabShortcuts }}
-						onClose={() => {
-							setTourOpen(false);
-							setTourCompleted(true);
-						}}
-						onTourStart={recordTourStart}
-						onTourComplete={recordTourComplete}
-						onTourSkip={recordTourSkip}
-					/>
-				)}
+				{/* --- WIZARD & TOUR: Hidden (entry points removed, components disabled) --- */}
+				{/* WizardResumeModal, MaestroWizard, and TourOverlay rendering disabled */}
+				{/* Underlying components preserved for potential future re-enablement */}
 
 				{/* --- FLASH NOTIFICATION (centered, auto-dismiss) --- */}
 				{flashNotification && (

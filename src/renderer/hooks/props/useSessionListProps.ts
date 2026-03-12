@@ -53,8 +53,6 @@ export interface UseSessionListPropsDeps {
 	handleDeleteWorktreeSession: (session: Session) => void;
 	handleRunWorktreeScript: (session: Session) => Promise<void>;
 	handleToggleWorktreeExpanded: (sessionId: string) => void;
-	openWizardModal: () => void;
-	handleStartTour: () => void;
 }
 
 /**
@@ -103,8 +101,6 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			onOpenWorktreeConfig: deps.handleOpenWorktreeConfigSession,
 			onDeleteWorktree: deps.handleDeleteWorktreeSession,
 			onRunWorktreeScript: deps.handleRunWorktreeScript,
-			openWizard: deps.openWizardModal,
-			startTour: deps.handleStartTour,
 		}),
 		[
 			deps.theme,
@@ -139,8 +135,6 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			deps.handleDeleteWorktreeSession,
 			deps.handleRunWorktreeScript,
 			deps.handleToggleWorktreeExpanded,
-			deps.openWizardModal,
-			deps.handleStartTour,
 		]
 	);
 }

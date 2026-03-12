@@ -171,6 +171,8 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					activeTabId: defaultTabId,
 					filePreviewTabs: [],
 					activeFileTabId: null,
+					diffViewTabs: [],
+					activeDiffTabId: null,
 					unifiedTabOrder: [{ type: 'ai' as const, id: defaultTabId }],
 					unifiedClosedTabHistory: [],
 				};

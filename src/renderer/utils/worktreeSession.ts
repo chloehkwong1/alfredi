@@ -69,6 +69,7 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		// Legacy model: no parentSessionId (uses worktreeParentPath instead)
 		parentSessionId: isLegacy ? undefined : params.parentSession.id,
 		worktreeBranch: isLegacy ? undefined : params.branch || undefined,
+		worktreeStatus: isLegacy ? undefined : 'in_progress',
 		worktreeParentPath: params.worktreeParentPath,
 		// Inherit SSH configuration from parent session
 		sessionSshRemoteConfig: params.parentSession.sessionSshRemoteConfig,
@@ -102,6 +103,8 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		closedTabHistory: [],
 		filePreviewTabs: [],
 		activeFileTabId: null,
+		diffViewTabs: [],
+		activeDiffTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
 		unifiedClosedTabHistory: [],
 		customPath: params.parentSession.customPath,

@@ -19,8 +19,10 @@ import type {
 	AITab,
 	UnifiedTab,
 	FilePreviewTab,
+	DiffViewTab,
 	ThinkingItem,
 	AgentError,
+	StagedFile,
 } from '../../types';
 import type { FileTreeChanges } from '../../utils/fileExplorer';
 import type { TabCompletionSuggestion, TabCompletionFilter } from '../input/useTabCompletion';
@@ -48,6 +50,7 @@ export interface UseMainPanelPropsDeps {
 	isMobileLandscape: boolean;
 	inputValue: string;
 	stagedImages: string[];
+	stagedFiles: StagedFile[];
 	commandHistoryOpen: boolean;
 	commandHistoryFilter: string;
 	commandHistorySelectedIndex: number;
@@ -119,6 +122,7 @@ export interface UseMainPanelPropsDeps {
 	setActiveAgentSessionId: (id: string | null) => void;
 	setInputValue: (value: string) => void;
 	setStagedImages: React.Dispatch<React.SetStateAction<string[]>>;
+	setStagedFiles: (files: StagedFile[] | ((prev: StagedFile[]) => StagedFile[])) => void;
 	setCommandHistoryOpen: (open: boolean) => void;
 	setCommandHistoryFilter: (filter: string) => void;
 	setCommandHistorySelectedIndex: (index: number) => void;
@@ -198,6 +202,14 @@ export interface UseMainPanelPropsDeps {
 	handleFileTabScrollPositionChange: (tabId: string, scrollTop: number) => void;
 	handleFileTabSearchQueryChange: (tabId: string, searchQuery: string) => void;
 	handleReloadFileTab: (tabId: string) => void;
+
+	// Diff tab props
+	activeDiffTabId: string | null;
+	activeDiffTab: DiffViewTab | null;
+	handleSelectDiffTab: (tabId: string) => void;
+	handleCloseDiffTab: (tabId: string) => void;
+	handleDiffTabViewModeChange: (tabId: string, viewMode: 'unified' | 'split') => void;
+	handleDiffTabScrollPositionChange: (tabId: string, scrollTop: number) => void;
 
 	handleScrollPositionChange: (scrollTop: number) => void;
 	handleAtBottomChange: (isAtBottom: boolean) => void;
@@ -284,6 +296,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			isMobileLandscape: deps.isMobileLandscape,
 			inputValue: deps.inputValue,
 			stagedImages: deps.stagedImages,
+			stagedFiles: deps.stagedFiles,
 			commandHistoryOpen: deps.commandHistoryOpen,
 			commandHistoryFilter: deps.commandHistoryFilter,
 			commandHistorySelectedIndex: deps.commandHistorySelectedIndex,
@@ -299,6 +312,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onNewAgentSession: deps.handleNewAgentSession,
 			setInputValue: deps.setInputValue,
 			setStagedImages: deps.setStagedImages,
+			setStagedFiles: deps.setStagedFiles,
 			setLightboxImage: deps.handleSetLightboxImage,
 			setCommandHistoryOpen: deps.setCommandHistoryOpen,
 			setCommandHistoryFilter: deps.setCommandHistoryFilter,
@@ -367,6 +381,13 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onFileTabScrollPositionChange: deps.handleFileTabScrollPositionChange,
 			onFileTabSearchQueryChange: deps.handleFileTabSearchQueryChange,
 			onReloadFileTab: deps.handleReloadFileTab,
+			// Diff tab props
+			activeDiffTabId: deps.activeDiffTabId,
+			activeDiffTab: deps.activeDiffTab,
+			onDiffTabSelect: deps.handleSelectDiffTab,
+			onDiffTabClose: deps.handleCloseDiffTab,
+			onDiffTabViewModeChange: deps.handleDiffTabViewModeChange,
+			onDiffTabScrollPositionChange: deps.handleDiffTabScrollPositionChange,
 			onToggleTabShowThinking: deps.handleToggleTabShowThinking,
 			onScrollPositionChange: deps.handleScrollPositionChange,
 			onAtBottomChange: deps.handleAtBottomChange,
@@ -461,6 +482,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.isMobileLandscape,
 			deps.inputValue,
 			deps.stagedImages,
+			deps.stagedFiles,
 			deps.commandHistoryOpen,
 			deps.commandHistoryFilter,
 			deps.commandHistorySelectedIndex,
@@ -506,6 +528,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleNewAgentSession,
 			deps.setInputValue,
 			deps.setStagedImages,
+			deps.setStagedFiles,
 			deps.handleSetLightboxImage,
 			deps.setCommandHistoryOpen,
 			deps.setCommandHistoryFilter,
@@ -561,6 +584,13 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleFileTabScrollPositionChange,
 			deps.handleFileTabSearchQueryChange,
 			deps.handleReloadFileTab,
+			// Diff tab deps
+			deps.activeDiffTabId,
+			deps.activeDiffTab,
+			deps.handleSelectDiffTab,
+			deps.handleCloseDiffTab,
+			deps.handleDiffTabViewModeChange,
+			deps.handleDiffTabScrollPositionChange,
 			deps.handleScrollPositionChange,
 			deps.handleAtBottomChange,
 			deps.handleMainPanelInputBlur,

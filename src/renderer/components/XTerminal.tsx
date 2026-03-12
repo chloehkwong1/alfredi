@@ -1,7 +1,15 @@
-import React, { useRef, useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, {
+	useRef,
+	useEffect,
+	useImperativeHandle,
+	forwardRef,
+	useCallback,
+	useState,
+} from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 import type { ThemeColors } from '../types';
 
@@ -24,9 +32,14 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 		const containerRef = useRef<HTMLDivElement>(null);
 		const terminalRef = useRef<Terminal | null>(null);
 		const fitAddonRef = useRef<FitAddon | null>(null);
+		const searchAddonRef = useRef<SearchAddon | null>(null);
+		const searchInputRef = useRef<HTMLInputElement>(null);
 		// Track the latest sessionId so callbacks always reference the current one
 		const sessionIdRef = useRef(sessionId);
 		sessionIdRef.current = sessionId;
+
+		const [searchVisible, setSearchVisible] = useState(false);
+		const [searchQuery, setSearchQuery] = useState('');
 
 		// Build xterm theme from Maestro ThemeColors
 		const buildTheme = useCallback(
@@ -57,6 +70,35 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			[themeColors]
 		);
 
+		const openSearch = useCallback(() => {
+			setSearchVisible(true);
+			// Focus the input after it renders
+			requestAnimationFrame(() => {
+				searchInputRef.current?.focus();
+				searchInputRef.current?.select();
+			});
+		}, []);
+
+		const closeSearch = useCallback(() => {
+			setSearchVisible(false);
+			setSearchQuery('');
+			searchAddonRef.current?.clearDecorations();
+			// Return focus to the terminal
+			terminalRef.current?.focus();
+		}, []);
+
+		const findNext = useCallback(() => {
+			if (searchQuery) {
+				searchAddonRef.current?.findNext(searchQuery);
+			}
+		}, [searchQuery]);
+
+		const findPrevious = useCallback(() => {
+			if (searchQuery) {
+				searchAddonRef.current?.findPrevious(searchQuery);
+			}
+		}, [searchQuery]);
+
 		// Expose write/fit to parent via ref
 		useImperativeHandle(
 			ref,
@@ -78,6 +120,7 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 
 			const fitAddon = new FitAddon();
 			const webLinksAddon = new WebLinksAddon();
+			const searchAddon = new SearchAddon();
 
 			const terminal = new Terminal({
 				fontFamily,
@@ -85,20 +128,27 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 				theme: buildTheme(),
 				cursorBlink: true,
 				cursorInactiveStyle: 'none',
-				scrollback: 10000,
+				scrollback: 100000,
 				allowProposedApi: true,
 			});
 
 			terminal.loadAddon(fitAddon);
 			terminal.loadAddon(webLinksAddon);
+			terminal.loadAddon(searchAddon);
 			terminal.open(container);
 
 			terminalRef.current = terminal;
 			fitAddonRef.current = fitAddon;
+			searchAddonRef.current = searchAddon;
 
-			// Initial fit after a frame so the container has dimensions
+			// Initial fit after a frame so the container has dimensions.
+			// Guard with try/catch — the renderer may not be fully initialised yet.
 			requestAnimationFrame(() => {
-				fitAddon.fit();
+				try {
+					fitAddon.fit();
+				} catch {
+					// Renderer not ready; the ResizeObserver will fit later.
+				}
 			});
 
 			// Handle terminal-native keybindings (e.g., Cmd+K to clear scrollback)
@@ -107,6 +157,10 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 					// Clear both scrollback and visible screen
 					terminal.write('\x1b[2J\x1b[3J\x1b[H');
 					terminal.clear();
+					return false; // Prevent xterm from processing further
+				}
+				if (e.type === 'keydown' && (e.metaKey || e.ctrlKey) && e.key === 'f') {
+					openSearch();
 					return false; // Prevent xterm from processing further
 				}
 				return true; // Let xterm handle everything else
@@ -126,7 +180,11 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			const resizeObserver = new ResizeObserver(() => {
 				// debounce via rAF to avoid excessive fitting
 				requestAnimationFrame(() => {
-					fitAddon.fit();
+					try {
+						fitAddon.fit();
+					} catch {
+						// Terminal renderer may not be ready yet
+					}
 				});
 			});
 			resizeObserver.observe(container);
@@ -138,8 +196,8 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 				terminal.dispose();
 				terminalRef.current = null;
 				fitAddonRef.current = null;
+				searchAddonRef.current = null;
 			};
-			 
 		}, []); // Mount/unmount only
 
 		// Update theme when colors change
@@ -158,11 +216,125 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			}
 		}, [fontFamily, fontSize]);
 
+		const handleSearchKeyDown = useCallback(
+			(e: React.KeyboardEvent<HTMLInputElement>) => {
+				if (e.key === 'Escape') {
+					e.preventDefault();
+					closeSearch();
+				} else if (e.key === 'Enter') {
+					e.preventDefault();
+					if (e.shiftKey) {
+						findPrevious();
+					} else {
+						findNext();
+					}
+				}
+			},
+			[closeSearch, findNext, findPrevious]
+		);
+
+		const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+			const value = e.target.value;
+			setSearchQuery(value);
+			if (value) {
+				searchAddonRef.current?.findNext(value);
+			} else {
+				searchAddonRef.current?.clearDecorations();
+			}
+		}, []);
+
 		return (
-			<div
-				ref={containerRef}
-				style={{ width: '100%', height: '100%', overflow: 'hidden', paddingLeft: '8px' }}
-			/>
+			<div style={{ position: 'relative', width: '100%', height: '100%' }}>
+				<div
+					ref={containerRef}
+					style={{ width: '100%', height: '100%', overflow: 'hidden', paddingLeft: '8px' }}
+				/>
+				{searchVisible && (
+					<div
+						style={{
+							position: 'absolute',
+							top: 8,
+							right: 16,
+							display: 'flex',
+							alignItems: 'center',
+							gap: 4,
+							background: themeColors.bgSidebar,
+							border: `1px solid ${themeColors.border}`,
+							borderRadius: 6,
+							padding: '4px 8px',
+							zIndex: 10,
+							boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+						}}
+					>
+						<input
+							ref={searchInputRef}
+							type="text"
+							value={searchQuery}
+							onChange={handleSearchChange}
+							onKeyDown={handleSearchKeyDown}
+							placeholder="Search…"
+							style={{
+								background: themeColors.bgMain,
+								color: themeColors.textMain,
+								border: `1px solid ${themeColors.border}`,
+								borderRadius: 4,
+								padding: '3px 8px',
+								fontSize: 12,
+								width: 180,
+								outline: 'none',
+							}}
+						/>
+						<button
+							onClick={findPrevious}
+							title="Previous (Shift+Enter)"
+							style={{
+								background: 'transparent',
+								border: 'none',
+								color: themeColors.textDim,
+								cursor: 'pointer',
+								padding: '2px 6px',
+								fontSize: 14,
+								lineHeight: 1,
+								borderRadius: 3,
+							}}
+						>
+							&#x25B2;
+						</button>
+						<button
+							onClick={findNext}
+							title="Next (Enter)"
+							style={{
+								background: 'transparent',
+								border: 'none',
+								color: themeColors.textDim,
+								cursor: 'pointer',
+								padding: '2px 6px',
+								fontSize: 14,
+								lineHeight: 1,
+								borderRadius: 3,
+							}}
+						>
+							&#x25BC;
+						</button>
+						<button
+							onClick={closeSearch}
+							title="Close (Escape)"
+							style={{
+								background: 'transparent',
+								border: 'none',
+								color: themeColors.textDim,
+								cursor: 'pointer',
+								padding: '2px 6px',
+								fontSize: 14,
+								lineHeight: 1,
+								borderRadius: 3,
+							}}
+						>
+							&#x2715;
+						</button>
+					</div>
+				)}
+			</div>
 		);
 	}
 );

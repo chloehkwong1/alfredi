@@ -28,6 +28,7 @@ import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
 import { InputArea } from './InputArea';
 import { FilePreview, FilePreviewHandle } from './FilePreview';
+import { DiffPreview } from './DiffPreview';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
@@ -46,10 +47,12 @@ import type {
 	Session,
 	Theme,
 	BatchRunState,
+	DiffViewTab,
 	UnifiedTab,
 	FilePreviewTab,
 	ThinkingItem,
 	AgentError,
+	StagedFile,
 } from '../types';
 
 interface SlashCommand {
@@ -80,6 +83,7 @@ interface MainPanelProps {
 	isMobileLandscape?: boolean;
 	inputValue: string;
 	stagedImages: string[];
+	stagedFiles: StagedFile[];
 	commandHistoryOpen: boolean;
 	commandHistoryFilter: string;
 	commandHistorySelectedIndex: number;
@@ -119,6 +123,7 @@ interface MainPanelProps {
 	onNewAgentSession: () => void;
 	setInputValue: (value: string) => void;
 	setStagedImages: React.Dispatch<React.SetStateAction<string[]>>;
+	setStagedFiles: (files: StagedFile[] | ((prev: StagedFile[]) => StagedFile[])) => void;
 	setLightboxImage: (
 		image: string | null,
 		contextImages?: string[],
@@ -192,6 +197,13 @@ interface MainPanelProps {
 	activeFileTab?: FilePreviewTab | null;
 	onFileTabSelect?: (tabId: string) => void;
 	onFileTabClose?: (tabId: string) => void;
+	// Diff view tab support
+	activeDiffTabId?: string | null;
+	activeDiffTab?: DiffViewTab | null;
+	onDiffTabSelect?: (tabId: string) => void;
+	onDiffTabClose?: (tabId: string) => void;
+	onDiffTabViewModeChange?: (tabId: string, viewMode: 'unified' | 'split') => void;
+	onDiffTabScrollPositionChange?: (tabId: string, scrollTop: number) => void;
 	onOpenFileTab?: (filePath: string) => void;
 	/** Handler to update file tab editMode when toggled in FilePreview */
 	onFileTabEditModeChange?: (tabId: string, editMode: boolean) => void;
@@ -327,6 +339,7 @@ export const MainPanel = React.memo(
 			theme,
 			inputValue,
 			stagedImages,
+			stagedFiles,
 			commandHistoryOpen,
 			commandHistoryFilter,
 			commandHistorySelectedIndex,
@@ -358,6 +371,7 @@ export const MainPanel = React.memo(
 			onNewAgentSession,
 			setInputValue,
 			setStagedImages,
+			setStagedFiles,
 			setLightboxImage,
 			setCommandHistoryOpen,
 			setCommandHistoryFilter,
@@ -472,6 +486,13 @@ export const MainPanel = React.memo(
 			onFileTabEditContentChange,
 			onFileTabScrollPositionChange,
 			onFileTabSearchQueryChange,
+			// Diff tab props
+			activeDiffTabId,
+			activeDiffTab,
+			onDiffTabSelect,
+			onDiffTabClose,
+			onDiffTabViewModeChange,
+			onDiffTabScrollPositionChange,
 		} = props;
 
 		// Get the active tab for header display
@@ -1510,6 +1531,9 @@ export const MainPanel = React.memo(
 									activeFileTabId={activeFileTabId}
 									onFileTabSelect={onFileTabSelect}
 									onFileTabClose={onFileTabClose}
+									activeDiffTabId={activeDiffTabId}
+									onDiffTabSelect={onDiffTabSelect}
+									onDiffTabClose={onDiffTabClose}
 									// Accessibility
 									colorBlindMode={colorBlindMode}
 								/>
@@ -1581,6 +1605,29 @@ export const MainPanel = React.memo(
 										</div>
 									</div>
 								</div>
+							</div>
+						) : activeSession.inputMode === 'ai' && activeDiffTabId && activeDiffTab ? (
+							// Diff view tab - DiffPreview rendered as tab content
+							<div tabIndex={-1} className="flex-1 overflow-hidden outline-none">
+								<DiffPreview
+									diff={activeDiffTab}
+									theme={theme}
+									onClose={() => {
+										if (activeDiffTabId) {
+											onDiffTabClose?.(activeDiffTabId);
+										}
+									}}
+									onViewModeChange={(mode) => {
+										if (activeDiffTabId) {
+											onDiffTabViewModeChange?.(activeDiffTabId, mode);
+										}
+									}}
+									onScrollPositionChange={(scrollTop) => {
+										if (activeDiffTabId) {
+											onDiffTabScrollPositionChange?.(activeDiffTabId, scrollTop);
+										}
+									}}
+								/>
 							</div>
 						) : activeSession.inputMode === 'ai' &&
 						  activeFileTabId &&
@@ -1746,6 +1793,8 @@ export const MainPanel = React.memo(
 											setEnterToSend={useSettingsStore.getState().setEnterToSendAI}
 											stagedImages={stagedImages}
 											setStagedImages={setStagedImages}
+											stagedFiles={stagedFiles}
+											setStagedFiles={setStagedFiles}
 											setLightboxImage={setLightboxImage}
 											commandHistoryOpen={commandHistoryOpen}
 											setCommandHistoryOpen={setCommandHistoryOpen}

@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import type { FocusArea, RightPanelTab, RightTopTab } from '../types';
+import type { WorktreeStatus } from '../../shared/types';
 
 export interface UIStoreState {
 	// Sidebar
@@ -51,6 +52,7 @@ export interface UIStoreState {
 
 	// Drag and drop (session dragging in sidebar)
 	draggingSessionId: string | null;
+	draggingWorktreeTargetStatus: WorktreeStatus | null;
 
 	// Editing (inline renaming in sidebar)
 	editingProjectId: string | null;
@@ -100,6 +102,9 @@ export interface UIStoreActions {
 
 	// Drag and drop
 	setDraggingSessionId: (id: string | null | ((prev: string | null) => string | null)) => void;
+	setDraggingWorktreeTargetStatus: (
+		status: WorktreeStatus | null | ((prev: WorktreeStatus | null) => WorktreeStatus | null)
+	) => void;
 
 	// Editing
 	setEditingProjectId: (id: string | null | ((prev: string | null) => string | null)) => void;
@@ -133,6 +138,7 @@ export const useUIStore = create<UIStore>()((set) => ({
 	sessionFilterOpen: false,
 	historySearchFilterOpen: false,
 	draggingSessionId: null,
+	draggingWorktreeTargetStatus: null,
 	editingProjectId: null,
 	editingSessionId: null,
 
@@ -168,6 +174,8 @@ export const useUIStore = create<UIStore>()((set) => ({
 	setHistorySearchFilterOpen: (v) =>
 		set((s) => ({ historySearchFilterOpen: resolve(v, s.historySearchFilterOpen) })),
 	setDraggingSessionId: (v) => set((s) => ({ draggingSessionId: resolve(v, s.draggingSessionId) })),
+	setDraggingWorktreeTargetStatus: (v) =>
+		set((s) => ({ draggingWorktreeTargetStatus: resolve(v, s.draggingWorktreeTargetStatus) })),
 
 	setEditingProjectId: (v) => set((s) => ({ editingProjectId: resolve(v, s.editingProjectId) })),
 	setEditingSessionId: (v) => set((s) => ({ editingSessionId: resolve(v, s.editingSessionId) })),
