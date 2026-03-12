@@ -14,11 +14,10 @@ import {
 import type { Session, Theme, LogEntry, FocusArea, AgentError } from '../types';
 import type { FileNode } from '../types/fileTree';
 import Convert from 'ansi-to-html';
-import DOMPurify from 'dompurify';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getActiveTab } from '../utils/tabHelpers';
-import { useDebouncedValue, useThrottledCallback } from '../hooks';
+import { useDebouncedValue, useThrottledCallback, useHighlightSearch } from '../hooks';
 import {
 	processLogTextHelper,
 	filterTextByLinesHelper,
@@ -78,7 +77,6 @@ interface LogItemProps {
 	theme: Theme;
 	fontFamily: string;
 	maxOutputLines: number;
-	outputSearchQuery: string;
 	lastUserCommand?: string;
 	// Expansion state
 	isExpanded: boolean;
@@ -138,7 +136,6 @@ const LogItemComponent = memo(
 		theme,
 		fontFamily,
 		maxOutputLines,
-		outputSearchQuery,
 		lastUserCommand,
 		isExpanded,
 		onToggleExpanded,
@@ -199,76 +196,6 @@ const LogItemComponent = memo(
 			}
 		}, [isExpanded, log.id, onToggleExpanded, scrollContainerRef]);
 
-		// Helper function to highlight search matches in text
-		const highlightMatches = (text: string, query: string): React.ReactNode => {
-			if (!query) return text;
-
-			const parts: React.ReactNode[] = [];
-			let lastIndex = 0;
-			const lowerText = text.toLowerCase();
-			const lowerQuery = query.toLowerCase();
-			let searchIndex = 0;
-
-			while (searchIndex < lowerText.length) {
-				const matchStart = lowerText.indexOf(lowerQuery, searchIndex);
-				if (matchStart === -1) break;
-
-				if (matchStart > lastIndex) {
-					parts.push(text.substring(lastIndex, matchStart));
-				}
-
-				parts.push(
-					<span
-						key={`match-${matchStart}`}
-						style={{
-							backgroundColor: theme.colors.warning,
-							color: theme.mode === 'light' ? '#fff' : '#000',
-							padding: '1px 2px',
-							borderRadius: '2px',
-						}}
-					>
-						{text.substring(matchStart, matchStart + query.length)}
-					</span>
-				);
-
-				lastIndex = matchStart + query.length;
-				searchIndex = lastIndex;
-			}
-
-			if (lastIndex < text.length) {
-				parts.push(text.substring(lastIndex));
-			}
-
-			return parts.length > 0 ? parts : text;
-		};
-
-		// Helper function to add search highlighting markers to text (before ANSI conversion)
-		const addHighlightMarkers = (text: string, query: string): string => {
-			if (!query) return text;
-
-			let result = '';
-			let lastIndex = 0;
-			const lowerText = text.toLowerCase();
-			const lowerQuery = query.toLowerCase();
-			let searchIndex = 0;
-
-			while (searchIndex < lowerText.length) {
-				const matchStart = lowerText.indexOf(lowerQuery, searchIndex);
-				if (matchStart === -1) break;
-
-				result += text.substring(lastIndex, matchStart);
-				result += `<mark style="background-color: ${theme.colors.warning}; color: ${theme.mode === 'light' ? '#fff' : '#000'}; padding: 1px 2px; border-radius: 2px;">`;
-				result += text.substring(matchStart, matchStart + query.length);
-				result += '</mark>';
-
-				lastIndex = matchStart + query.length;
-				searchIndex = lastIndex;
-			}
-
-			result += text.substring(lastIndex);
-			return result;
-		};
-
 		// Strip command echo from terminal output
 		let textToProcess = log.text;
 		if (isTerminal && log.source !== 'user' && lastUserCommand) {
@@ -322,19 +249,11 @@ const LogItemComponent = memo(
 		// For stderr entries, use stderr content; for all others, use stdout content
 		const contentToDisplay = log.source === 'stderr' ? filteredStderr : filteredStdout;
 
-		// Apply search highlighting before ANSI conversion for terminal output
-		const contentWithHighlights =
-			isTerminal && log.source !== 'user' && outputSearchQuery
-				? addHighlightMarkers(contentToDisplay, outputSearchQuery)
-				: contentToDisplay;
-
-		// PERF: Convert ANSI codes to HTML, using cache when no search highlighting is applied
-		// When search is active, highlighting markers change the text so we can't use cache
+		// PERF: Convert ANSI codes to HTML with cache (search highlighting is now
+		// handled at the container level via CSS Custom Highlight API — no per-item work)
 		const htmlContent =
 			isTerminal && log.source !== 'user'
-				? outputSearchQuery
-					? DOMPurify.sanitize(ansiConverter.toHtml(contentWithHighlights))
-					: getCachedAnsiHtml(contentToDisplay, theme.id, ansiConverter)
+				? getCachedAnsiHtml(contentToDisplay, theme.id, ansiConverter)
 				: contentToDisplay;
 
 		const filteredText = contentToDisplay;
@@ -349,18 +268,10 @@ const LogItemComponent = memo(
 				? filteredText.split('\n').slice(0, maxOutputLines).join('\n')
 				: filteredText;
 
-		// Apply highlighting to truncated text as well
-		const displayTextWithHighlights =
-			shouldCollapse && !isExpanded && isTerminal && log.source !== 'user' && outputSearchQuery
-				? addHighlightMarkers(displayText, outputSearchQuery)
-				: displayText;
-
-		// PERF: Sanitize with DOMPurify, using cache when no search highlighting
+		// PERF: ANSI→HTML conversion with cache for collapsed view
 		const displayHtmlContent =
 			shouldCollapse && !isExpanded && isTerminal && log.source !== 'user'
-				? outputSearchQuery
-					? DOMPurify.sanitize(ansiConverter.toHtml(displayTextWithHighlights))
-					: getCachedAnsiHtml(displayText, theme.id, ansiConverter)
+				? getCachedAnsiHtml(displayText, theme.id, ansiConverter)
 				: htmlContent;
 
 		const isUserMessage = log.source === 'user';
@@ -628,7 +539,7 @@ const LogItemComponent = memo(
 									}}
 								>
 									{isTerminal && log.source !== 'user' ? (
-										// Content sanitized with DOMPurify above
+										// Content sanitized via getCachedAnsiHtml
 										// Horizontal scroll for terminal output to preserve column alignment
 										<div
 											className="overflow-x-auto scrollbar-thin"
@@ -688,13 +599,13 @@ const LogItemComponent = memo(
 									}}
 								>
 									{isTerminal && log.source !== 'user' ? (
-										// Content sanitized with DOMPurify above
+										// Content sanitized via getCachedAnsiHtml
 										// Horizontal scroll for terminal output to preserve column alignment
 										<div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
 									) : log.source === 'user' && isTerminal ? (
 										<div style={{ fontFamily }}>
 											<span style={{ color: theme.colors.accent }}>$ </span>
-											{highlightMatches(filteredText, outputSearchQuery)}
+											{filteredText}
 										</div>
 									) : log.aiCommand ? (
 										<div className="space-y-3">
@@ -715,7 +626,7 @@ const LogItemComponent = memo(
 													{log.aiCommand.description}
 												</span>
 											</div>
-											<div>{highlightMatches(filteredText, outputSearchQuery)}</div>
+											<div>{filteredText}</div>
 										</div>
 									) : isAIMode && !markdownEditMode ? (
 										// Expanded markdown rendering
@@ -729,7 +640,7 @@ const LogItemComponent = memo(
 											onFileClick={onFileClick}
 										/>
 									) : (
-										<div>{highlightMatches(filteredText, outputSearchQuery)}</div>
+										<div>{filteredText}</div>
 									)}
 								</div>
 								<button
@@ -748,7 +659,7 @@ const LogItemComponent = memo(
 						) : (
 							<>
 								{isTerminal && log.source !== 'user' ? (
-									// Content sanitized with DOMPurify above
+									// Content sanitized via getCachedAnsiHtml
 									<div
 										className="whitespace-pre text-sm overflow-x-auto scrollbar-thin"
 										style={{
@@ -764,7 +675,7 @@ const LogItemComponent = memo(
 										style={{ color: theme.colors.textMain, fontFamily }}
 									>
 										<span style={{ color: theme.colors.accent }}>$ </span>
-										{highlightMatches(filteredText, outputSearchQuery)}
+										{filteredText}
 									</div>
 								) : log.aiCommand ? (
 									<div className="space-y-3">
@@ -789,7 +700,7 @@ const LogItemComponent = memo(
 											className="whitespace-pre-wrap text-sm break-words"
 											style={{ color: theme.colors.textMain }}
 										>
-											{highlightMatches(filteredText, outputSearchQuery)}
+											{filteredText}
 										</div>
 									</div>
 								) : isAIMode && !markdownEditMode ? (
@@ -809,7 +720,7 @@ const LogItemComponent = memo(
 										className="whitespace-pre-wrap text-sm break-words"
 										style={{ color: theme.colors.textMain }}
 									>
-										{highlightMatches(filteredText, outputSearchQuery)}
+										{filteredText}
 									</div>
 								)}
 							</>
@@ -945,7 +856,6 @@ const LogItemComponent = memo(
 			prevProps.filterMode.regex === nextProps.filterMode.regex &&
 			prevProps.activeLocalFilter === nextProps.activeLocalFilter &&
 			prevProps.deleteConfirmLogId === nextProps.deleteConfirmLogId &&
-			prevProps.outputSearchQuery === nextProps.outputSearchQuery &&
 			prevProps.theme === nextProps.theme &&
 			prevProps.maxOutputLines === nextProps.maxOutputLines &&
 			prevProps.markdownEditMode === nextProps.markdownEditMode &&
@@ -1353,6 +1263,12 @@ export const TerminalOutput = memo(
 		// PERF: Debounce search query to avoid filtering on every keystroke
 		const debouncedSearchQuery = useDebouncedValue(outputSearchQuery, 150);
 
+		// PERF: Use CSS Custom Highlight API for search match highlighting.
+		// This highlights text at the browser level over existing DOM nodes — zero React
+		// re-renders. Previously, outputSearchQuery was passed as a prop to every
+		// LogItemComponent, causing ALL items to re-render on each keystroke.
+		useHighlightSearch(scrollContainerRef, debouncedSearchQuery);
+
 		// Filter logs based on search query - memoized for performance
 		// Uses debounced query to reduce CPU usage during rapid typing
 		const filteredLogs = useMemo(() => {
@@ -1595,6 +1511,13 @@ export const TerminalOutput = memo(
 			[theme]
 		);
 
+		// CSS Custom Highlight API styles for search match highlighting
+		const highlightStyles = useMemo(
+			() =>
+				`::highlight(output-search) { background-color: ${theme.colors.warning}; color: ${theme.mode === 'light' ? '#fff' : '#000'}; }`,
+			[theme.colors.warning, theme.mode]
+		);
+
 		return (
 			<div
 				ref={terminalOutputRef}
@@ -1686,6 +1609,7 @@ export const TerminalOutput = memo(
 				)}
 				{/* Prose styles for markdown rendering - injected once at container level for performance */}
 				<style>{proseStyles}</style>
+				<style>{highlightStyles}</style>
 				{/* Native scroll log list */}
 				{/* overflow-anchor: disabled in AI mode when auto-scroll is off to prevent
 				    browser from automatically keeping viewport pinned to bottom on new content */}
@@ -1708,7 +1632,6 @@ export const TerminalOutput = memo(
 							theme={theme}
 							fontFamily={fontFamily}
 							maxOutputLines={maxOutputLines}
-							outputSearchQuery={outputSearchQuery}
 							lastUserCommand={
 								isTerminal && log.source !== 'user' ? getLastUserCommand(index) : undefined
 							}

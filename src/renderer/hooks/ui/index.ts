@@ -56,3 +56,6 @@ export type { AppInitializationReturn } from './useAppInitialization';
 
 // Tour actions listener (right panel control from tour overlay)
 export { useTourActions } from './useTourActions';
+
+// CSS Custom Highlight API search (zero re-render text highlighting)
+export { useHighlightSearch } from './useHighlightSearch';
