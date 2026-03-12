@@ -10,9 +10,23 @@
  */
 
 import React, { useState, useCallback, useRef, memo } from 'react';
-import { ChevronRight, ChevronDown, RefreshCw, GitBranch, Loader2 } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import {
+	ChevronRight,
+	ChevronDown,
+	RefreshCw,
+	GitBranch,
+	Loader2,
+	Undo2,
+	AlertTriangle,
+} from 'lucide-react';
 import type { Theme } from '../types';
 import type { ChangesFile, CommittedFile, ChangesPanelCommit } from '../hooks/useChangesPanel';
+import { gitService } from '../services/git';
+import { useClickOutside } from '../hooks/ui/useClickOutside';
+import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
+import { Modal, ModalFooter } from './ui/Modal';
+import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 // --- Types ---
 
@@ -27,6 +41,10 @@ export interface ChangesPanelProps {
 	currentBranch: string | undefined;
 	baseBranch: string | undefined;
 	isLoading: boolean;
+	/** Working directory for git operations (discard changes) */
+	cwd: string | undefined;
+	/** Optional SSH remote ID for remote execution */
+	sshRemoteId?: string;
 	onRefresh: () => void;
 	onOpenDiff: (
 		filePath: string,
@@ -101,6 +119,7 @@ const FileRow = memo(function FileRow({
 	selected,
 	onClick,
 	onDoubleClick,
+	onContextMenu,
 	onRef,
 }: {
 	filePath: string;
@@ -112,6 +131,7 @@ const FileRow = memo(function FileRow({
 	selected: boolean;
 	onClick: () => void;
 	onDoubleClick?: () => void;
+	onContextMenu?: (e: React.MouseEvent) => void;
 	onRef?: (el: HTMLDivElement | null) => void;
 }) {
 	return (
@@ -125,6 +145,7 @@ const FileRow = memo(function FileRow({
 			}}
 			onClick={onClick}
 			onDoubleClick={onDoubleClick}
+			onContextMenu={onContextMenu}
 		>
 			{/* Status badge */}
 			<span
@@ -163,6 +184,7 @@ const SectionHeader = memo(function SectionHeader({
 	onToggle,
 	theme,
 	badge,
+	actions,
 }: {
 	title: string;
 	count: number;
@@ -170,10 +192,12 @@ const SectionHeader = memo(function SectionHeader({
 	onToggle: () => void;
 	theme: Theme;
 	badge?: string;
+	/** Optional action buttons rendered at the right end of the header */
+	actions?: React.ReactNode;
 }) {
 	return (
-		<button
-			className="flex items-center gap-1.5 w-full px-3 py-2 text-xs font-bold transition-colors hover:bg-white/5"
+		<div
+			className="flex items-center gap-1.5 w-full px-3 py-2 text-xs font-bold transition-colors hover:bg-white/5 cursor-pointer"
 			style={{ color: theme.colors.textMain }}
 			onClick={onToggle}
 		>
@@ -197,7 +221,12 @@ const SectionHeader = memo(function SectionHeader({
 					{badge}
 				</span>
 			)}
-		</button>
+			{actions && (
+				<span className={badge ? '' : 'ml-auto'} onClick={(e) => e.stopPropagation()}>
+					{actions}
+				</span>
+			)}
+		</div>
 	);
 });
 
@@ -212,6 +241,8 @@ function ChangesPanelInner({
 	currentBranch,
 	baseBranch,
 	isLoading,
+	cwd,
+	sshRemoteId,
 	onRefresh,
 	onOpenDiff,
 }: ChangesPanelProps) {
@@ -226,6 +257,25 @@ function ChangesPanelInner({
 	// Keyboard navigation state
 	const [selectedIndex, setSelectedIndex] = useState(-1);
 	const containerRef = useRef<HTMLDivElement>(null);
+
+	// Context menu state for unstaged file rows
+	const [contextMenu, setContextMenu] = useState<{
+		x: number;
+		y: number;
+		filePath: string;
+	} | null>(null);
+	const contextMenuRef = useRef<HTMLDivElement>(null);
+	const contextMenuPos = useContextMenuPosition(
+		contextMenuRef,
+		contextMenu?.x ?? 0,
+		contextMenu?.y ?? 0
+	);
+
+	// Close context menu on click outside
+	useClickOutside(contextMenuRef, () => setContextMenu(null), contextMenu !== null);
+
+	// Discard All confirmation modal state
+	const [showDiscardAllModal, setShowDiscardAllModal] = useState(false);
 
 	// Build flat list of all visible files for keyboard navigation
 	const flatItems = React.useMemo(() => {
@@ -302,6 +352,29 @@ function ChangesPanelInner({
 		},
 		[onOpenDiff]
 	);
+
+	// Right-click handler for unstaged file rows
+	const handleUnstagedContextMenu = useCallback((e: React.MouseEvent, filePath: string) => {
+		e.preventDefault();
+		setContextMenu({ x: e.clientX, y: e.clientY, filePath });
+	}, []);
+
+	// Discard changes for a single unstaged file
+	const handleDiscardFile = useCallback(async () => {
+		if (!contextMenu || !cwd) return;
+		const filePath = contextMenu.filePath;
+		setContextMenu(null);
+		await gitService.restoreFile(cwd, filePath, sshRemoteId);
+		onRefresh();
+	}, [contextMenu, cwd, sshRemoteId, onRefresh]);
+
+	// Discard all unstaged changes (called after confirmation)
+	const handleDiscardAll = useCallback(async () => {
+		if (!cwd) return;
+		setShowDiscardAllModal(false);
+		await gitService.restoreAll(cwd, sshRemoteId);
+		onRefresh();
+	}, [cwd, sshRemoteId, onRefresh]);
 
 	// Track which flat-list index each row corresponds to
 	let flatIndex = 0;
@@ -403,6 +476,17 @@ function ChangesPanelInner({
 						expanded={unstagedExpanded}
 						onToggle={() => setUnstagedExpanded((v) => !v)}
 						theme={theme}
+						actions={
+							cwd ? (
+								<button
+									onClick={() => setShowDiscardAllModal(true)}
+									className="p-0.5 rounded hover:bg-white/10 transition-colors"
+									title="Discard all unstaged changes"
+								>
+									<Undo2 className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+								</button>
+							) : undefined
+						}
 					/>
 					{unstagedExpanded &&
 						unstagedFiles.map((file) => {
@@ -420,6 +504,7 @@ function ChangesPanelInner({
 									selected={selectedIndex === idx}
 									onClick={() => handleFileClick(file.path, 'uncommitted-unstaged')}
 									onDoubleClick={() => handleFileDoubleClick(file.path, 'uncommitted-unstaged')}
+									onContextMenu={(e) => handleUnstagedContextMenu(e, file.path)}
 								/>
 							);
 						})}
@@ -496,6 +581,60 @@ function ChangesPanelInner({
 						</>
 					)}
 				</div>
+			)}
+
+			{/* Context menu for unstaged file rows */}
+			{contextMenu &&
+				createPortal(
+					<div
+						ref={contextMenuRef}
+						className="fixed z-[10000] rounded-lg shadow-xl border overflow-hidden"
+						style={{
+							backgroundColor: theme.colors.bgSidebar,
+							borderColor: theme.colors.border,
+							minWidth: '180px',
+							top: contextMenuPos.top,
+							left: contextMenuPos.left,
+							opacity: contextMenuPos.ready ? 1 : 0,
+						}}
+					>
+						<div className="p-1">
+							<button
+								onClick={handleDiscardFile}
+								className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-white/10 transition-colors"
+								style={{ color: theme.colors.textMain }}
+							>
+								<Undo2 className="w-3.5 h-3.5" style={{ color: 'rgb(239, 68, 68)' }} />
+								<span>Discard Changes</span>
+							</button>
+						</div>
+					</div>,
+					document.body
+				)}
+
+			{/* Discard All confirmation modal */}
+			{showDiscardAllModal && (
+				<Modal
+					theme={theme}
+					title="Discard All Changes"
+					priority={MODAL_PRIORITIES.CONFIRM}
+					onClose={() => setShowDiscardAllModal(false)}
+					headerIcon={<AlertTriangle className="w-4 h-4" style={{ color: 'rgb(251, 146, 60)' }} />}
+					footer={
+						<ModalFooter
+							theme={theme}
+							onCancel={() => setShowDiscardAllModal(false)}
+							onConfirm={handleDiscardAll}
+							confirmLabel="Discard All"
+							destructive
+						/>
+					}
+				>
+					<p className="text-sm" style={{ color: theme.colors.textMain }}>
+						This will discard all unstaged changes ({unstagedFiles.length} file
+						{unstagedFiles.length === 1 ? '' : 's'}). This action cannot be undone.
+					</p>
+				</Modal>
 			)}
 		</div>
 	);

@@ -263,6 +263,44 @@ export const gitService = {
 	},
 
 	/**
+	 * Discard unstaged changes for a single file
+	 * @param cwd Working directory path
+	 * @param file File path to restore
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 * @param remoteCwd Optional remote working directory
+	 */
+	async restoreFile(
+		cwd: string,
+		file: string,
+		sshRemoteId?: string,
+		remoteCwd?: string
+	): Promise<{ success: boolean }> {
+		return createIpcMethod({
+			call: () => window.maestro.git.restore(cwd, file, sshRemoteId, remoteCwd),
+			errorContext: 'Git restore',
+			defaultValue: { success: false, stdout: '', stderr: '' },
+		});
+	},
+
+	/**
+	 * Discard all unstaged changes
+	 * @param cwd Working directory path
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 * @param remoteCwd Optional remote working directory
+	 */
+	async restoreAll(
+		cwd: string,
+		sshRemoteId?: string,
+		remoteCwd?: string
+	): Promise<{ success: boolean }> {
+		return createIpcMethod({
+			call: () => window.maestro.git.restoreAll(cwd, sshRemoteId, remoteCwd),
+			errorContext: 'Git restoreAll',
+			defaultValue: { success: false, stdout: '', stderr: '' },
+		});
+	},
+
+	/**
 	 * List git remotes for a repository
 	 * @param cwd Working directory path
 	 * @param sshRemoteId Optional SSH remote ID for remote execution
