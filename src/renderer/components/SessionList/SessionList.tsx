@@ -86,6 +86,7 @@ interface SessionListProps {
 	onOpenWorktreeConfig?: (session: Session) => void;
 	onDeleteWorktree?: (session: Session) => void;
 	onRunWorktreeScript?: (session: Session) => void;
+	onToggleWorktreeServer?: (session: Session) => void;
 }
 
 function SessionListInner(props: SessionListProps) {
@@ -166,6 +167,7 @@ function SessionListInner(props: SessionListProps) {
 		onOpenWorktreeConfig,
 		onDeleteWorktree,
 		onRunWorktreeScript,
+		onToggleWorktreeServer,
 		showSessionJumpNumbers = false,
 		visibleSessions = [],
 		sidebarContainerRef,
@@ -569,6 +571,10 @@ function SessionListInner(props: SessionListProps) {
 									onFinishRename={finishRenameHandlers.get(child.id)!}
 									onStartRename={() => startRenamingSession(`worktree-${session.id}-${child.id}`)}
 									onToggleBookmark={toggleBookmarkHandlers.get(child.id)!}
+									hasRunScript={!!parentProject?.worktreeConfig?.runScript}
+									onToggleServer={
+										onToggleWorktreeServer ? () => onToggleWorktreeServer(child) : undefined
+									}
 								/>
 							);
 						};

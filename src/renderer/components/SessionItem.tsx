@@ -1,5 +1,15 @@
 import React, { memo } from 'react';
-import { Activity, GitBranch, Bot, Bookmark, AlertCircle, Server, Link } from 'lucide-react';
+import {
+	Activity,
+	GitBranch,
+	Bot,
+	Bookmark,
+	AlertCircle,
+	Server,
+	Link,
+	Play,
+	Square,
+} from 'lucide-react';
 import type { Session, Project, Theme } from '../types';
 import type { WorktreeStatus } from '../../shared/types';
 import { getStatusColor } from '../utils/theme';
@@ -65,6 +75,10 @@ export interface SessionItemProps {
 	onFinishRename: (newName: string) => void;
 	onStartRename: () => void;
 	onToggleBookmark: () => void;
+
+	// Worktree server (only for worktree variant with runScript configured)
+	hasRunScript?: boolean;
+	onToggleServer?: () => void;
 }
 
 /**
@@ -103,6 +117,8 @@ export const SessionItem = memo(function SessionItem({
 	onFinishRename,
 	onStartRename,
 	onToggleBookmark,
+	hasRunScript,
+	onToggleServer,
 }: SessionItemProps) {
 	// Determine if we show the GIT/LOCAL badge (not shown in bookmark variant, terminal sessions, or worktree variant)
 	const showGitLocalBadge =
@@ -309,6 +325,21 @@ export const SessionItem = memo(function SessionItem({
 					</div>
 				)}
 
+				{/* SERVER Indicator Pill (worktree with active server) */}
+				{variant === 'worktree' && session.worktreeServerProcessId && (
+					<div
+						className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+						style={{
+							backgroundColor: theme.colors.success + '30',
+							color: theme.colors.success,
+						}}
+						title="Server running"
+					>
+						<Server className="w-2.5 h-2.5" />
+						SERVER
+					</div>
+				)}
+
 				{/* Agent Error Indicator */}
 				{session.agentError && (
 					<div
@@ -354,6 +385,32 @@ export const SessionItem = memo(function SessionItem({
 							/>
 						</button>
 					))}
+
+				{/* Play/Stop Server Button (worktree variant with runScript) */}
+				{variant === 'worktree' && hasRunScript && (
+					<button
+						onClick={(e) => {
+							e.stopPropagation();
+							onToggleServer?.();
+						}}
+						className="p-0.5 rounded hover:bg-white/10 transition-colors"
+						title={session.worktreeServerProcessId ? 'Stop server' : 'Run server'}
+					>
+						{session.worktreeServerProcessId ? (
+							<Square
+								className="w-3 h-3"
+								style={{ color: theme.colors.error }}
+								fill={theme.colors.error}
+							/>
+						) : (
+							<Play
+								className="w-3 h-3"
+								style={{ color: theme.colors.success }}
+								fill={theme.colors.success}
+							/>
+						)}
+					</button>
+				)}
 
 				{/* AI Status Indicator with Unread Badge - ml-auto ensures it aligns to right edge */}
 				<div className="relative ml-auto">

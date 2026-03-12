@@ -9,6 +9,7 @@ import {
 	Skull,
 	AlertTriangle,
 	Terminal,
+	Server,
 	Plus,
 	X,
 } from 'lucide-react';
@@ -192,6 +193,84 @@ function TerminalTabInstance({
 				fontSize={fontSize}
 				themeColors={themeColors}
 			/>
+		</div>
+	);
+}
+
+// ============================================================================
+// ServerTerminalTabInstance — read-only XTerminal that streams server output
+// Listens to ProcessManager `data` events (non-PTY) instead of spawning a shell.
+// ============================================================================
+
+interface ServerTerminalTabInstanceProps {
+	sessionId: string;
+	tabId: string;
+	serverProcessId: string;
+	visible: boolean;
+	fontFamily: string;
+	fontSize: number;
+	themeColors: import('../types').ThemeColors;
+}
+
+function ServerTerminalTabInstance({
+	sessionId,
+	tabId,
+	serverProcessId,
+	visible,
+	fontFamily,
+	fontSize,
+	themeColors,
+}: ServerTerminalTabInstanceProps) {
+	const xtermRef = useRef<import('./XTerminal').XTerminalHandle>(null);
+
+	// Subscribe to non-PTY data events for the server process
+	React.useEffect(() => {
+		const unsubData = window.maestro.process.onData((sid: string, data: string) => {
+			if (sid === serverProcessId && xtermRef.current) {
+				xtermRef.current.write(data);
+			}
+		});
+
+		return () => {
+			unsubData();
+		};
+	}, [serverProcessId]);
+
+	// Listen for server stopped to append a marker line
+	React.useEffect(() => {
+		const cleanup = window.maestro.git.onServerStopped((data) => {
+			if (data.processId === serverProcessId && xtermRef.current) {
+				xtermRef.current.write(`\r\n\x1b[2m[Server stopped]\x1b[0m\r\n`);
+			}
+		});
+		return cleanup;
+	}, [serverProcessId]);
+
+	// Track whether the tab has ever been visible so we mount the terminal once
+	// and keep it alive, but never mount into a display:none container (which
+	// causes xterm to crash accessing dimensions on an uninitialised renderer).
+	const [hasBeenVisible, setHasBeenVisible] = React.useState(visible);
+	React.useEffect(() => {
+		if (visible) setHasBeenVisible(true);
+	}, [visible]);
+
+	return (
+		<div
+			style={{
+				width: '100%',
+				height: '100%',
+				display: visible ? 'block' : 'none',
+			}}
+		>
+			{hasBeenVisible && (
+				<XTerminal
+					ref={xtermRef}
+					sessionId={`${sessionId}-terminal-${tabId}`}
+					fontFamily={fontFamily}
+					fontSize={fontSize}
+					themeColors={themeColors}
+				/>
+			)}
 		</div>
 	);
 }
@@ -594,6 +673,8 @@ export const RightPanel = memo(
 							currentBranch={changesPanel.currentBranch}
 							baseBranch={changesPanel.baseBranch}
 							isLoading={changesPanel.isLoading}
+							cwd={session?.fullPath}
+							sshRemoteId={sshRemoteId}
 							onRefresh={changesPanel.refresh}
 							onOpenDiff={handleChangesPanelOpenDiff}
 						/>
@@ -655,10 +736,14 @@ export const RightPanel = memo(
 									}}
 									onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
 								>
-									<Terminal className="w-3 h-3" />
+									{tab.serverProcessId ? (
+										<Server className="w-3 h-3" />
+									) : (
+										<Terminal className="w-3 h-3" />
+									)}
 									<span>{tab.name}</span>
-									{/* Loading spinner for this tab */}
-									{!tabReadyMap[tab.id] && (
+									{/* Loading spinner for this tab (only for shell tabs) */}
+									{!tab.serverProcessId && !tabReadyMap[tab.id] && (
 										<Loader2
 											className="w-3 h-3 animate-spin"
 											style={{ color: theme.colors.textDim }}
@@ -710,20 +795,36 @@ export const RightPanel = memo(
 					{/* Terminal instances — all rendered, only active visible */}
 					<div className="flex-1 overflow-hidden relative">
 						{session &&
-							terminalTabs.map((tab) => (
-								<TerminalTabInstance
-									key={tab.id}
-									sessionId={session.id}
-									tabId={tab.id}
-									cwd={session.fullPath ?? ''}
-									enabled={rightPanelOpen}
-									visible={tab.id === activeTerminalTabId}
-									fontFamily={fontFamily}
-									fontSize={fontSize}
-									themeColors={theme.colors}
-									onReady={handleTabReady}
-								/>
-							))}
+							terminalTabs.map((tab) => {
+								if (tab.serverProcessId) {
+									return (
+										<ServerTerminalTabInstance
+											key={tab.id}
+											sessionId={session.id}
+											tabId={tab.id}
+											serverProcessId={tab.serverProcessId}
+											visible={tab.id === activeTerminalTabId}
+											fontFamily={fontFamily}
+											fontSize={fontSize}
+											themeColors={theme.colors}
+										/>
+									);
+								}
+								return (
+									<TerminalTabInstance
+										key={tab.id}
+										sessionId={session.id}
+										tabId={tab.id}
+										cwd={session.fullPath ?? ''}
+										enabled={rightPanelOpen}
+										visible={tab.id === activeTerminalTabId}
+										fontFamily={fontFamily}
+										fontSize={fontSize}
+										themeColors={theme.colors}
+										onReady={handleTabReady}
+									/>
+								);
+							})}
 					</div>
 
 					{/* Batch Run Progress — overlays the terminal area */}

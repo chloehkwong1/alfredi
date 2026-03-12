@@ -625,6 +625,7 @@ export interface Session {
 	worktreePrUrl?: string; // PR URL for quick access (e.g., open in browser)
 	worktreeArchivedAt?: number; // Timestamp when moved to Done (for auto-archive countdown)
 	worktreeArchived?: boolean; // True when auto-archived (hidden from sidebar, worktree dir kept on disk)
+	worktreeServerProcessId?: string; // ProcessManager key (e.g., `${sessionId}-server`) when a server is running
 	// Whether worktree children are expanded in the sidebar (only on parent sessions)
 	worktreesExpanded?: boolean;
 	// Legacy: Worktree parent path for auto-discovery (will be migrated to worktreeConfig)

@@ -749,6 +749,7 @@ function MaestroConsoleInner() {
 		handleConfirmDeleteWorktree,
 		handleConfirmAndDeleteWorktreeOnDisk,
 		handleRunWorktreeScript,
+		handleToggleWorktreeServer,
 	} = useWorktreeHandlers();
 
 	// --- WORKTREE AUTO-STATUS & AUTO-ARCHIVE ---
@@ -2006,6 +2007,7 @@ function MaestroConsoleInner() {
 		handleDeleteWorktreeSession,
 		handleRunWorktreeScript,
 		handleToggleWorktreeExpanded,
+		handleToggleWorktreeServer,
 	});
 
 	const rightPanelProps = useRightPanelProps({

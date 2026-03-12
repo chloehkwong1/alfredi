@@ -35,6 +35,7 @@ import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { gitService } from '../../../renderer/services/git';
 import { notifyToast } from '../../../renderer/stores/notificationStore';
+import { useUIStore } from '../../../renderer/stores/uiStore';
 import type { Session, Project } from '../../../renderer/types';
 
 // ============================================================================
@@ -46,8 +47,12 @@ const mockGit = {
 	watchWorktreeDirectory: vi.fn(),
 	unwatchWorktreeDirectory: vi.fn(),
 	onWorktreeDiscovered: vi.fn().mockReturnValue(() => {}),
+	onServerStopped: vi.fn().mockReturnValue(() => {}),
 	worktreeSetup: vi.fn().mockResolvedValue({ success: true }),
 	removeWorktree: vi.fn().mockResolvedValue({ success: true }),
+	startServer: vi.fn().mockResolvedValue({ success: true, processId: 'test-session-server' }),
+	stopServer: vi.fn().mockResolvedValue({ success: true }),
+	runWorktreeScript: vi.fn().mockResolvedValue({ success: true }),
 };
 
 const mockProject: Project = {
@@ -921,6 +926,216 @@ describe('handleToggleWorktreeExpanded', () => {
 });
 
 // ============================================================================
+// handleToggleWorktreeServer
+// ============================================================================
+
+describe('handleToggleWorktreeServer', () => {
+	it('calls startServer when no process is running', async () => {
+		const child = createChildSession({
+			id: 'wt-child-1',
+			cwd: '/projects/worktrees/feature-1',
+			worktreeServerProcessId: undefined,
+		});
+
+		useSessionStore.setState({
+			sessions: [mockParentSession, child],
+			projects: [
+				{
+					...mockProject,
+					worktreeConfig: {
+						basePath: '/projects/worktrees',
+						watchEnabled: true,
+						runScript: 'npm run dev',
+					},
+				},
+			],
+			activeSessionId: 'parent-1',
+		} as any);
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+
+		await act(async () => {
+			result.current.handleToggleWorktreeServer(child);
+			// Wait for the promise chain to complete
+			await new Promise((r) => setTimeout(r, 0));
+		});
+
+		expect(mockGit.startServer).toHaveBeenCalledWith(
+			'wt-child-1',
+			'/projects/worktrees/feature-1',
+			'npm run dev',
+			undefined
+		);
+	});
+
+	it('sets worktreeServerProcessId on session after successful start', async () => {
+		mockGit.startServer.mockResolvedValueOnce({ success: true, processId: 'wt-child-1-server' });
+
+		const child = createChildSession({
+			id: 'wt-child-1',
+			cwd: '/projects/worktrees/feature-1',
+			worktreeServerProcessId: undefined,
+		});
+
+		useSessionStore.setState({
+			sessions: [mockParentSession, child],
+			projects: [
+				{
+					...mockProject,
+					worktreeConfig: {
+						basePath: '/projects/worktrees',
+						watchEnabled: true,
+						runScript: 'npm run dev',
+					},
+				},
+			],
+			activeSessionId: 'parent-1',
+		} as any);
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+
+		await act(async () => {
+			result.current.handleToggleWorktreeServer(child);
+			// Wait for the promise chain to complete
+			await new Promise((r) => setTimeout(r, 0));
+		});
+
+		const session = useSessionStore.getState().sessions.find((s) => s.id === 'wt-child-1');
+		expect(session?.worktreeServerProcessId).toBe('wt-child-1-server');
+	});
+
+	it('calls stopServer when process is already running', async () => {
+		const child = createChildSession({
+			id: 'wt-child-1',
+			cwd: '/projects/worktrees/feature-1',
+			worktreeServerProcessId: 'wt-child-1-server',
+		});
+
+		useSessionStore.setState({
+			sessions: [mockParentSession, child],
+			projects: [
+				{
+					...mockProject,
+					worktreeConfig: {
+						basePath: '/projects/worktrees',
+						watchEnabled: true,
+						runScript: 'npm run dev',
+					},
+				},
+			],
+			activeSessionId: 'parent-1',
+		} as any);
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+
+		await act(async () => {
+			result.current.handleToggleWorktreeServer(child);
+			await new Promise((r) => setTimeout(r, 0));
+		});
+
+		expect(mockGit.stopServer).toHaveBeenCalledWith('wt-child-1-server');
+	});
+
+	it('clears worktreeServerProcessId after stop', async () => {
+		const child = createChildSession({
+			id: 'wt-child-1',
+			cwd: '/projects/worktrees/feature-1',
+			worktreeServerProcessId: 'wt-child-1-server',
+		});
+
+		useSessionStore.setState({
+			sessions: [mockParentSession, child],
+			projects: [
+				{
+					...mockProject,
+					worktreeConfig: {
+						basePath: '/projects/worktrees',
+						watchEnabled: true,
+						runScript: 'npm run dev',
+					},
+				},
+			],
+			activeSessionId: 'parent-1',
+		} as any);
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+
+		await act(async () => {
+			result.current.handleToggleWorktreeServer(child);
+			await new Promise((r) => setTimeout(r, 0));
+		});
+
+		const session = useSessionStore.getState().sessions.find((s) => s.id === 'wt-child-1');
+		expect(session?.worktreeServerProcessId).toBeUndefined();
+	});
+
+	it('does nothing when no runScript is configured', async () => {
+		const child = createChildSession({
+			id: 'wt-child-1',
+			cwd: '/projects/worktrees/feature-1',
+			worktreeServerProcessId: undefined,
+		});
+
+		useSessionStore.setState({
+			sessions: [mockParentSession, child],
+			projects: [
+				{ ...mockProject, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true } },
+			],
+			activeSessionId: 'parent-1',
+		} as any);
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+
+		await act(async () => {
+			result.current.handleToggleWorktreeServer(child);
+			await new Promise((r) => setTimeout(r, 0));
+		});
+
+		expect(mockGit.startServer).not.toHaveBeenCalled();
+	});
+
+	it('shows error toast when startServer fails', async () => {
+		mockGit.startServer.mockResolvedValueOnce({ success: false, error: 'port in use' });
+
+		const child = createChildSession({
+			id: 'wt-child-1',
+			cwd: '/projects/worktrees/feature-1',
+			worktreeServerProcessId: undefined,
+		});
+
+		useSessionStore.setState({
+			sessions: [mockParentSession, child],
+			projects: [
+				{
+					...mockProject,
+					worktreeConfig: {
+						basePath: '/projects/worktrees',
+						watchEnabled: true,
+						runScript: 'npm run dev',
+					},
+				},
+			],
+			activeSessionId: 'parent-1',
+		} as any);
+
+		const { result } = renderHook(() => useWorktreeHandlers());
+
+		await act(async () => {
+			result.current.handleToggleWorktreeServer(child);
+			await new Promise((r) => setTimeout(r, 0));
+		});
+
+		expect(notifyToast).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'error',
+				title: 'Start Server Failed',
+				message: 'port in use',
+			})
+		);
+	});
+});
+
+// ============================================================================
 // Session inheritance via buildWorktreeSession (tested through handler behavior)
 // ============================================================================
 
@@ -1149,6 +1364,54 @@ describe('Effects', () => {
 			expect(worktreeSessions.length).toBe(2);
 			expect(worktreeSessions.some((s) => s.id === 'existing-startup')).toBe(true);
 			expect(worktreeSessions.some((s) => s.worktreeBranch === 'new-branch')).toBe(true);
+		});
+	});
+
+	describe('Server exit effect', () => {
+		it('registers onServerStopped listener on mount', () => {
+			renderHook(() => useWorktreeHandlers());
+
+			expect(mockGit.onServerStopped).toHaveBeenCalledWith(expect.any(Function));
+		});
+
+		it('clears worktreeServerProcessId when server exits', () => {
+			// Capture the callback
+			let serverStoppedCallback: (data: { processId: string }) => void = () => {};
+			mockGit.onServerStopped.mockImplementation((cb: any) => {
+				serverStoppedCallback = cb;
+				return () => {};
+			});
+
+			const child = createChildSession({
+				id: 'server-child',
+				worktreeServerProcessId: 'server-child-server',
+			});
+
+			useSessionStore.setState({
+				sessions: [mockParentSession, child],
+				activeSessionId: 'parent-1',
+			} as any);
+
+			renderHook(() => useWorktreeHandlers());
+
+			// Simulate server exit
+			act(() => {
+				serverStoppedCallback({ processId: 'server-child-server' });
+			});
+
+			const session = useSessionStore.getState().sessions.find((s) => s.id === 'server-child');
+			expect(session?.worktreeServerProcessId).toBeUndefined();
+		});
+
+		it('cleans up onServerStopped listener on unmount', () => {
+			const cleanupFn = vi.fn();
+			mockGit.onServerStopped.mockReturnValue(cleanupFn);
+
+			const { unmount } = renderHook(() => useWorktreeHandlers());
+
+			unmount();
+
+			expect(cleanupFn).toHaveBeenCalled();
 		});
 	});
 

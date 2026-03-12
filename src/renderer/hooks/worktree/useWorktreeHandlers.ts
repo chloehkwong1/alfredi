@@ -21,6 +21,7 @@ import type { Session, Project, ProjectWorktreeConfig } from '../../types';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useUIStore } from '../../stores/uiStore';
 import { gitService } from '../../services/git';
 import { notifyToast } from '../../stores/notificationStore';
 import { buildWorktreeSession } from '../../utils/worktreeSession';
@@ -46,6 +47,7 @@ export interface WorktreeHandlersReturn {
 	handleConfirmDeleteWorktree: () => void;
 	handleConfirmAndDeleteWorktreeOnDisk: () => Promise<void>;
 	handleRunWorktreeScript: (session: Session) => Promise<void>;
+	handleToggleWorktreeServer: (session: Session) => void;
 }
 
 // ============================================================================
@@ -672,8 +674,102 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	}, []);
 
 	// ---------------------------------------------------------------------------
+	// Toggle server handler (start/stop long-lived server process)
+	// ---------------------------------------------------------------------------
+
+	const handleToggleWorktreeServer = useCallback((session: Session) => {
+		if (session.worktreeServerProcessId) {
+			// Stop the running server
+			window.maestro.git
+				.stopServer(session.worktreeServerProcessId)
+				.then((result) => {
+					if (!result.success) {
+						notifyToast({
+							type: 'error',
+							title: 'Stop Server Failed',
+							message: result.error || 'Unknown error',
+						});
+					}
+					// Clear processId from session (onServerStopped will also handle this,
+					// but clear eagerly for immediate UI feedback)
+					useSessionStore
+						.getState()
+						.setSessions((prev) =>
+							prev.map((s) =>
+								s.id === session.id ? { ...s, worktreeServerProcessId: undefined } : s
+							)
+						);
+				})
+				.catch((err) => {
+					notifyToast({
+						type: 'error',
+						title: 'Stop Server Failed',
+						message: err instanceof Error ? err.message : String(err),
+					});
+				});
+		} else {
+			// Start the server
+			const projectConfig = getProjectWorktreeConfig(session);
+			if (!projectConfig?.runScript) return;
+
+			const sshRemoteId = getSshRemoteId(session);
+			window.maestro.git
+				.startServer(session.id, session.cwd, projectConfig.runScript, sshRemoteId)
+				.then((result) => {
+					if (result.success && result.processId) {
+						useSessionStore
+							.getState()
+							.setSessions((prev) =>
+								prev.map((s) =>
+									s.id === session.id ? { ...s, worktreeServerProcessId: result.processId } : s
+								)
+							);
+
+						// Open a "Server" terminal tab to stream output
+						useSessionStore.getState().addServerTerminalTab(session.id, result.processId, 'Server');
+
+						// Activate the worktree session so the Right Panel shows its tabs
+						useSessionStore.getState().setActiveSessionId(session.id);
+
+						// Ensure the Right Panel is open so the user sees the output
+						useUIStore.getState().setRightPanelOpen(true);
+					} else {
+						notifyToast({
+							type: 'error',
+							title: 'Start Server Failed',
+							message: result.error || 'Unknown error',
+						});
+					}
+				})
+				.catch((err) => {
+					notifyToast({
+						type: 'error',
+						title: 'Start Server Failed',
+						message: err instanceof Error ? err.message : String(err),
+					});
+				});
+		}
+	}, []);
+
+	// ---------------------------------------------------------------------------
 	// Effects
 	// ---------------------------------------------------------------------------
+
+	// Effect 0: Listen for server process exit events to auto-clear worktreeServerProcessId
+	useEffect(() => {
+		const cleanup = window.maestro.git.onServerStopped((data) => {
+			useSessionStore
+				.getState()
+				.setSessions((prev) =>
+					prev.map((s) =>
+						s.worktreeServerProcessId === data.processId
+							? { ...s, worktreeServerProcessId: undefined }
+							: s
+					)
+				);
+		});
+		return cleanup;
+	}, []);
 
 	// Effect 1: Startup worktree config scan
 	// Migrates session-level worktreeConfig to project-level, then scans configured directories.
@@ -1076,5 +1172,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		handleConfirmDeleteWorktree,
 		handleConfirmAndDeleteWorktreeOnDisk,
 		handleRunWorktreeScript,
+		handleToggleWorktreeServer,
 	};
 }

@@ -130,6 +130,16 @@ export interface SessionStoreActions {
 	/** Set the active terminal tab for a session. */
 	setActiveTerminalTab: (sessionId: string, tabId: string) => void;
 
+	/** Add (or focus existing) server output terminal tab. Returns the tab. */
+	addServerTerminalTab: (
+		sessionId: string,
+		serverProcessId: string,
+		name?: string
+	) => TerminalTab | null;
+
+	/** Remove the server terminal tab for a given serverProcessId. */
+	removeServerTerminalTab: (sessionId: string, serverProcessId: string) => void;
+
 	// === Log management ===
 
 	/**
@@ -357,6 +367,78 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 			),
 		})),
 
+	addServerTerminalTab: (sessionId, serverProcessId, name = 'Server') => {
+		const MAX_TERMINAL_TABS = 5;
+		let resultTab: TerminalTab | null = null;
+
+		set((s) => {
+			const session = s.sessions.find((sess) => sess.id === sessionId);
+			if (!session) return s;
+
+			const existing = session.terminalTabs ?? [{ id: 'default', name: 'Terminal 1' }];
+
+			// If a tab for this serverProcessId already exists, just focus it
+			const existingServer = existing.find((t) => t.serverProcessId === serverProcessId);
+			if (existingServer) {
+				resultTab = existingServer;
+				return {
+					sessions: s.sessions.map((sess) =>
+						sess.id === sessionId ? { ...sess, activeTerminalTabId: existingServer.id } : sess
+					),
+				};
+			}
+
+			if (existing.length >= MAX_TERMINAL_TABS) return s;
+
+			resultTab = { id: generateId(), name, serverProcessId };
+
+			return {
+				sessions: s.sessions.map((sess) =>
+					sess.id === sessionId
+						? {
+								...sess,
+								terminalTabs: [...existing, resultTab!],
+								activeTerminalTabId: resultTab!.id,
+							}
+						: sess
+				),
+			};
+		});
+
+		return resultTab;
+	},
+
+	removeServerTerminalTab: (sessionId, serverProcessId) =>
+		set((s) => {
+			const session = s.sessions.find((sess) => sess.id === sessionId);
+			if (!session) return s;
+
+			const existing = session.terminalTabs ?? [];
+			const filtered = existing.filter((t) => t.serverProcessId !== serverProcessId);
+			if (filtered.length === existing.length) return s; // not found
+
+			// If the removed tab was active, select another
+			const removedTab = existing.find((t) => t.serverProcessId === serverProcessId);
+			let nextActiveId = session.activeTerminalTabId;
+			if (removedTab && nextActiveId === removedTab.id) {
+				const removedIdx = existing.findIndex((t) => t.id === removedTab.id);
+				const newIdx = Math.min(removedIdx, filtered.length - 1);
+				nextActiveId = filtered[newIdx]?.id ?? filtered[0]?.id;
+			}
+
+			// If no tabs left, keep a default
+			const finalTabs = filtered.length > 0 ? filtered : [{ id: 'default', name: 'Terminal 1' }];
+			const finalActive = filtered.length > 0 ? nextActiveId : 'default';
+
+			return {
+				sessions: s.sessions.map((sess) =>
+					sess.id === sessionId
+						? { ...sess, terminalTabs: finalTabs, activeTerminalTabId: finalActive }
+						: sess
+				),
+			};
+		}),
+
 	// Log management
 	addLogToTab: (sessionId, logEntry, tabId?) =>
 		set((s) => {
@@ -555,6 +637,8 @@ export function getSessionActions() {
 		addTerminalTab: state.addTerminalTab,
 		removeTerminalTab: state.removeTerminalTab,
 		setActiveTerminalTab: state.setActiveTerminalTab,
+		addServerTerminalTab: state.addServerTerminalTab,
+		removeServerTerminalTab: state.removeServerTerminalTab,
 		addLogToTab: state.addLogToTab,
 		clearActiveTabLogs: state.clearActiveTabLogs,
 	};
