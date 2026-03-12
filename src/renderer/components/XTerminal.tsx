@@ -135,7 +135,16 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			terminal.loadAddon(fitAddon);
 			terminal.loadAddon(webLinksAddon);
 			terminal.loadAddon(searchAddon);
-			terminal.open(container);
+
+			// open() can throw if the container has zero dimensions (e.g. hidden
+			// behind the splash screen). Retry on the next ResizeObserver callback.
+			let opened = false;
+			try {
+				terminal.open(container);
+				opened = true;
+			} catch {
+				// Will retry in ResizeObserver below.
+			}
 
 			terminalRef.current = terminal;
 			fitAddonRef.current = fitAddon;
@@ -143,13 +152,15 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 
 			// Initial fit after a frame so the container has dimensions.
 			// Guard with try/catch — the renderer may not be fully initialised yet.
-			requestAnimationFrame(() => {
-				try {
-					fitAddon.fit();
-				} catch {
-					// Renderer not ready; the ResizeObserver will fit later.
-				}
-			});
+			if (opened) {
+				requestAnimationFrame(() => {
+					try {
+						fitAddon.fit();
+					} catch {
+						// Renderer not ready; the ResizeObserver will fit later.
+					}
+				});
+			}
 
 			// Handle terminal-native keybindings (e.g., Cmd+K to clear scrollback)
 			terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => {
@@ -181,6 +192,10 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 				// debounce via rAF to avoid excessive fitting
 				requestAnimationFrame(() => {
 					try {
+						if (!opened) {
+							terminal.open(container);
+							opened = true;
+						}
 						fitAddon.fit();
 					} catch {
 						// Terminal renderer may not be ready yet
