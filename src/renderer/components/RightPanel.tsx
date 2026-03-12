@@ -5,22 +5,27 @@ import {
 	FolderTree,
 	Loader2,
 	GitBranch,
+	GitCommitHorizontal,
 	Skull,
 	AlertTriangle,
 	Terminal,
 	Plus,
 	X,
 } from 'lucide-react';
-import type { Session, Theme, RightPanelTab, BatchRunState } from '../types';
+import type { Session, Theme, RightPanelTab, BatchRunState, DiffViewTab } from '../types';
 import type { FileTreeChanges } from '../utils/fileExplorer';
 import { FileExplorerPanel } from './FileExplorerPanel';
+import { ChangesPanel } from './ChangesPanel';
+import type { DiffOpenType } from './ChangesPanel';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { ConfirmModal } from './ConfirmModal';
 import { useResizablePanel } from '../hooks';
+import { useChangesPanel } from '../hooks/useChangesPanel';
 import { useUIStore } from '../stores/uiStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { getSessionSshRemoteId } from '../utils/sessionHelpers';
 import XTerminal from './XTerminal';
 import {
 	usePersistentTerminal,
@@ -100,6 +105,19 @@ interface RightPanelProps {
 	// Document Graph handlers
 	onFocusFileInGraph?: (relativePath: string) => void;
 	onOpenLastDocumentGraph?: () => void;
+
+	// Diff tab handler (from useTabHandlers)
+	onOpenDiffTab?: (params: {
+		filePath: string;
+		fileName: string;
+		oldContent: string;
+		newContent: string;
+		oldRef: string;
+		newRef: string;
+		diffType: DiffViewTab['diffType'];
+		commitHash?: string;
+		rawDiff?: string;
+	}) => void;
 }
 
 // ============================================================================
@@ -232,6 +250,7 @@ export const RightPanel = memo(
 			onKillBatchRun,
 			onFocusFileInGraph,
 			onOpenLastDocumentGraph,
+			onOpenDiffTab,
 		} = props;
 
 		const {
@@ -264,7 +283,19 @@ export const RightPanel = memo(
 		// Initialize default tab in store on first render when session has no tabs
 		React.useEffect(() => {
 			if (session && (!session.terminalTabs || session.terminalTabs.length === 0)) {
-				addTerminalTab(session.id);
+				// Set a single default tab directly instead of addTerminalTab(),
+				// which would create a fallback + a new tab = 2 tabs
+				setSessions((prev) =>
+					prev.map((s) =>
+						s.id === session.id && (!s.terminalTabs || s.terminalTabs.length === 0)
+							? {
+									...s,
+									terminalTabs: [{ id: 'default', name: 'Terminal 1' }],
+									activeTerminalTabId: 'default',
+								}
+							: s
+					)
+				);
 			}
 		}, [session?.id]); // Only run when session identity changes
 
@@ -275,6 +306,81 @@ export const RightPanel = memo(
 		}, []);
 
 		const MAX_TERMINAL_TABS = 5;
+
+		// ------------------------------------------------------------------
+		// Changes Panel — git changes data + bridge callback
+		// ------------------------------------------------------------------
+		const sshRemoteId = session ? getSessionSshRemoteId(session) : undefined;
+		const changesPanel = useChangesPanel(
+			activeRightTopTab === 'changes' ? session?.fullPath : undefined,
+			sshRemoteId
+		);
+
+		/** Bridge ChangesPanel's onOpenDiff to the full DiffTabOpenParams expected by handleOpenDiffTab */
+		const handleChangesPanelOpenDiff = useCallback(
+			async (filePath: string, diffType: DiffOpenType, commitHash?: string) => {
+				if (!onOpenDiffTab || !session?.fullPath) return;
+
+				const cwd = session.fullPath;
+				const name = filePath.split('/').pop() || filePath;
+
+				let oldContent = '';
+				let newContent = '';
+				let oldRef = '';
+				let newRef = '';
+				let rawDiff: string | undefined;
+
+				try {
+					if (diffType === 'uncommitted-staged') {
+						// Use `git diff --cached -- file` for staged changes (most reliable)
+						oldRef = 'HEAD';
+						newRef = 'Staged';
+						const result = await window.maestro.git.diffStaged(cwd, filePath);
+						rawDiff = result.stdout || undefined;
+					} else if (diffType === 'uncommitted-unstaged') {
+						// Use `git diff -- file` for unstaged changes (most reliable)
+						oldRef = 'Index';
+						newRef = 'Working Tree';
+						const result = await window.maestro.git.diff(cwd, filePath);
+						rawDiff = result.stdout || undefined;
+					} else if (diffType === 'committed') {
+						// Use `git diff mergeBase...HEAD -- file` for committed changes
+						const base = changesPanel.mergeBase || changesPanel.baseBranch || 'main';
+						oldRef = changesPanel.baseBranch || 'main';
+						newRef = 'HEAD';
+						const result = await window.maestro.git.diffRefs(cwd, base, 'HEAD', filePath);
+						rawDiff = result.stdout || undefined;
+					} else if (diffType === 'commit' && commitHash) {
+						// Old = parent commit, New = commit
+						oldRef = commitHash.slice(0, 7) + '~1';
+						newRef = commitHash.slice(0, 7);
+						const [oldResult, newResult] = await Promise.all([
+							window.maestro.git
+								.showFile(cwd, commitHash + '~1', filePath)
+								.catch(() => ({ content: '' })),
+							window.maestro.git.showFile(cwd, commitHash, filePath).catch(() => ({ content: '' })),
+						]);
+						oldContent = oldResult.content || '';
+						newContent = newResult.content || '';
+					}
+				} catch {
+					// Graceful fallback — open with empty content
+				}
+
+				onOpenDiffTab({
+					filePath,
+					fileName: name,
+					oldContent,
+					newContent,
+					oldRef,
+					newRef,
+					diffType,
+					commitHash,
+					rawDiff,
+				});
+			},
+			[onOpenDiffTab, session, changesPanel.mergeBase, changesPanel.baseBranch]
+		);
 
 		// ------------------------------------------------------------------
 		// Vertical split drag handler
@@ -360,6 +466,19 @@ export const RightPanel = memo(
 					>
 						<FolderTree className="w-3.5 h-3.5" />
 						Explorer
+					</button>
+
+					{/* Changes tab */}
+					<button
+						onClick={() => setActiveRightTopTab('changes')}
+						className="flex items-center gap-1.5 px-3 text-xs font-bold border-b-2 transition-colors"
+						style={{
+							borderColor: activeRightTopTab === 'changes' ? theme.colors.accent : 'transparent',
+							color: activeRightTopTab === 'changes' ? theme.colors.textMain : theme.colors.textDim,
+						}}
+					>
+						<GitCommitHorizontal className="w-3.5 h-3.5" />
+						Changes
 					</button>
 
 					{/* File preview tabs from the session */}
@@ -455,6 +574,19 @@ export const RightPanel = memo(
 								/>
 							</div>
 						</div>
+					) : activeRightTopTab === 'changes' ? (
+						<ChangesPanel
+							theme={theme}
+							stagedFiles={changesPanel.stagedFiles}
+							unstagedFiles={changesPanel.unstagedFiles}
+							committedFiles={changesPanel.committedFiles}
+							commits={changesPanel.commits}
+							currentBranch={changesPanel.currentBranch}
+							baseBranch={changesPanel.baseBranch}
+							isLoading={changesPanel.isLoading}
+							onRefresh={changesPanel.refresh}
+							onOpenDiff={handleChangesPanelOpenDiff}
+						/>
 					) : (
 						/* File preview tab content — placeholder for now; FilePreview will be wired in a later section */
 						<div
@@ -480,37 +612,49 @@ export const RightPanel = memo(
 
 				{/* ====== Bottom Section: Persistent Terminal ====== */}
 				<div
-					className="overflow-hidden relative flex flex-col"
+					className="overflow-hidden relative flex flex-col outline-none"
 					style={{ height: `${bottomHeightPercent}%` }}
+					tabIndex={-1}
+					onKeyDown={(e) => {
+						// Cmd+T to add a new terminal tab
+						if (e.metaKey && !e.shiftKey && !e.altKey && e.key === 't') {
+							e.preventDefault();
+							e.stopPropagation();
+							if (session && terminalTabs.length < MAX_TERMINAL_TABS) {
+								addTerminalTab(session.id);
+							}
+						}
+					}}
 				>
-					{/* Terminal tab bar */}
-					<div
-						className="flex items-center h-8 shrink-0 border-b overflow-x-auto"
-						style={{ borderColor: theme.colors.border }}
-					>
-						{terminalTabs.map((tab) => (
-							<button
-								key={tab.id}
-								className="flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors"
-								style={{
-									color:
-										tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
-									borderColor: tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
-									backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
-								}}
-								onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
-							>
-								<Terminal className="w-3 h-3" />
-								<span>{tab.name}</span>
-								{/* Loading spinner for this tab */}
-								{!tabReadyMap[tab.id] && (
-									<Loader2
-										className="w-3 h-3 animate-spin"
-										style={{ color: theme.colors.textDim }}
-									/>
-								)}
-								{/* Close button — hidden when only one tab */}
-								{terminalTabs.length > 1 && (
+					{/* Terminal tab bar — only shown when 2+ tabs */}
+					{terminalTabs.length >= 2 ? (
+						<div
+							className="flex items-center h-8 shrink-0 border-b overflow-x-auto"
+							style={{ borderColor: theme.colors.border }}
+						>
+							{terminalTabs.map((tab) => (
+								<button
+									key={tab.id}
+									className="flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors"
+									style={{
+										color:
+											tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
+										borderColor:
+											tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
+										backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
+									}}
+									onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
+								>
+									<Terminal className="w-3 h-3" />
+									<span>{tab.name}</span>
+									{/* Loading spinner for this tab */}
+									{!tabReadyMap[tab.id] && (
+										<Loader2
+											className="w-3 h-3 animate-spin"
+											style={{ color: theme.colors.textDim }}
+										/>
+									)}
+									{/* Close button */}
 									<span
 										className="ml-0.5 rounded hover:bg-white/10 p-0.5"
 										onClick={(e) => {
@@ -520,21 +664,38 @@ export const RightPanel = memo(
 									>
 										<X className="w-3 h-3" />
 									</span>
-								)}
-							</button>
-						))}
-						{/* Add tab button */}
-						{terminalTabs.length < MAX_TERMINAL_TABS && (
-							<button
-								className="flex items-center justify-center w-7 h-full shrink-0 transition-colors"
-								style={{ color: theme.colors.textDim }}
-								title="New terminal tab"
-								onClick={() => session && addTerminalTab(session.id)}
-							>
-								<Plus className="w-3.5 h-3.5" />
-							</button>
-						)}
-					</div>
+								</button>
+							))}
+							{/* Add tab button */}
+							{terminalTabs.length < MAX_TERMINAL_TABS && (
+								<button
+									className="flex items-center justify-center w-7 h-full shrink-0 transition-colors"
+									style={{ color: theme.colors.textDim }}
+									title="New terminal tab (⌘T)"
+									onClick={() => session && addTerminalTab(session.id)}
+								>
+									<Plus className="w-3.5 h-3.5" />
+								</button>
+							)}
+						</div>
+					) : (
+						/* Single tab — minimal "+" button only */
+						<div
+							className="flex items-center justify-end h-6 shrink-0 border-b px-1"
+							style={{ borderColor: theme.colors.border }}
+						>
+							{terminalTabs.length < MAX_TERMINAL_TABS && (
+								<button
+									className="flex items-center justify-center w-5 h-5 rounded transition-colors hover:bg-white/10"
+									style={{ color: theme.colors.textDim }}
+									title="New terminal tab (⌘T)"
+									onClick={() => session && addTerminalTab(session.id)}
+								>
+									<Plus className="w-3 h-3" />
+								</button>
+							)}
+						</div>
+					)}
 
 					{/* Terminal instances — all rendered, only active visible */}
 					<div className="flex-1 overflow-hidden relative">

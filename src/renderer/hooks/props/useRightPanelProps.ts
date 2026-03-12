@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react';
-import type { Session, Theme, RightPanelTab, BatchRunState } from '../../types';
+import type { Session, Theme, RightPanelTab, BatchRunState, DiffViewTab } from '../../types';
 import type { FileTreeChanges } from '../../utils/fileExplorer';
 
 /**
@@ -84,6 +84,19 @@ export interface UseRightPanelPropsDeps {
 	// Document Graph handlers
 	handleFocusFileInGraph: (relativePath: string) => void;
 	handleOpenLastDocumentGraph: () => void;
+
+	// Diff tab handler (from useTabHandlers)
+	handleOpenDiffTab: (params: {
+		filePath: string;
+		fileName: string;
+		oldContent: string;
+		newContent: string;
+		oldRef: string;
+		newRef: string;
+		diffType: DiffViewTab['diffType'];
+		commitHash?: string;
+		rawDiff?: string;
+	}) => void;
 }
 
 /**
@@ -143,6 +156,9 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			// Document Graph
 			onFocusFileInGraph: deps.handleFocusFileInGraph,
 			onOpenLastDocumentGraph: deps.handleOpenLastDocumentGraph,
+
+			// Diff tab
+			onOpenDiffTab: deps.handleOpenDiffTab,
 		}),
 		[
 			deps.theme,
@@ -176,6 +192,7 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			deps.handleMainPanelFileClick,
 			deps.handleFocusFileInGraph,
 			deps.handleOpenLastDocumentGraph,
+			deps.handleOpenDiffTab,
 			// Refs (stable)
 			deps.fileTreeContainerRef,
 			deps.fileTreeFilterInputRef,
