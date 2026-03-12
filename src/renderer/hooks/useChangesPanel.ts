@@ -162,10 +162,18 @@ export function useChangesPanel(
 				const defaultBranch = defaultBranchResult.branch || 'main';
 				setBaseBranch(defaultBranch);
 
+				// Use origin/<branch> for merge-base to avoid stale local branch refs.
+				// After rebasing onto origin/main, the local main may be behind,
+				// causing the diff to include unrelated commits from main.
+				const compareRef = `origin/${defaultBranch}`;
+
 				// Only fetch committed changes if we're on a different branch
 				if (statusResult.branch && statusResult.branch !== defaultBranch) {
 					const [mergeBaseResult, logResult] = await Promise.all([
-						gitService.getMergeBase(cwd, defaultBranch, 'HEAD', sshRemoteId),
+						gitService.getMergeBase(cwd, compareRef, 'HEAD', sshRemoteId).catch(() =>
+							// Fallback to local branch if origin ref doesn't exist
+							gitService.getMergeBase(cwd, defaultBranch, 'HEAD', sshRemoteId)
+						),
 						window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId),
 					]);
 
