@@ -28,6 +28,7 @@ const selectActiveBatchSessionIds = (s: any) => s.activeBatchSessionIds ?? [];
 import { useShallow } from 'zustand/react/shallow';
 import { getModalActions } from '../../stores/modalStore';
 import { SessionContextMenu } from './SessionContextMenu';
+import { getActiveTab } from '../../utils/tabHelpers';
 import { HamburgerMenuContent } from './HamburgerMenuContent';
 import { CollapsedSessionPill } from './CollapsedSessionPill';
 import { SidebarActions } from './SidebarActions';
@@ -1352,7 +1353,22 @@ function SessionListInner(props: SessionListProps) {
 						hasContextMenuCapability('supportsClearContext')
 							? () => {
 									window.maestro.process.write(contextMenuSession.id, '/clear\n');
-									useSessionStore.getState().clearActiveTabLogs(contextMenuSession.id);
+									const activeTab = getActiveTab(contextMenuSession);
+									const { setSessions } = useSessionStore.getState();
+									setSessions((prev) =>
+										prev.map((s) => {
+											if (s.id !== contextMenuSession.id) return s;
+											return {
+												...s,
+												agentSessionId: undefined,
+												contextUsage: 0,
+												aiTabs: s.aiTabs.map((tab) => {
+													if (tab.id !== activeTab?.id) return tab;
+													return { ...tab, agentSessionId: null, logs: [] };
+												}),
+											};
+										})
+									);
 									setContextMenu(null);
 								}
 							: undefined

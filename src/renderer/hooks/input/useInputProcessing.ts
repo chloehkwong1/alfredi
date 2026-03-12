@@ -20,7 +20,6 @@ import {
 	outputStyleLearningPrompt,
 } from '../../../prompts';
 import type { OutputStyle } from '../../../shared/types';
-import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 
 /** Map of output style to its prompt text (default has no extra prompt). */
@@ -190,26 +189,28 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					syncAiInputToSession('');
 					if (inputRef.current) inputRef.current.style.height = 'auto';
 
-					// Clear the active tab's logs in the store
-					useSessionStore.getState().clearActiveTabLogs(activeSession.id);
+					// Write /clear to the agent's process stdin (resets context for interactive processes)
+					window.maestro.process.write(activeSession.id, '/clear\n');
 
-					// Reset the active tab's agentSessionId so the next message starts a fresh conversation
-					// For batch mode agents (Claude Code, Codex, etc.), this prevents --resume from being passed
-					// For stdin agents, also write /clear to the process
+					// Atomically clear logs AND reset agentSessionId in a single store update.
+					// Resetting agentSessionId at both tab and session level prevents --resume
+					// from being passed on the next batch-mode spawn (fresh conversation).
 					const activeTabForClear = getActiveTab(activeSession);
-					if (activeTabForClear) {
-						setSessions((prev) =>
-							prev.map((s) => {
-								if (s.id !== activeSession.id) return s;
-								return {
-									...s,
-									aiTabs: s.aiTabs.map((tab) =>
-										tab.id === activeTabForClear.id ? { ...tab, agentSessionId: null } : tab
-									),
-								};
-							})
-						);
-					}
+					setSessions((prev) =>
+						prev.map((s) => {
+							if (s.id !== activeSession.id) return s;
+							const tabId = activeTabForClear?.id;
+							return {
+								...s,
+								agentSessionId: undefined,
+								contextUsage: 0,
+								aiTabs: s.aiTabs.map((tab) => {
+									if (tab.id !== tabId) return tab;
+									return { ...tab, agentSessionId: null, logs: [] };
+								}),
+							};
+						})
+					);
 
 					return;
 				}

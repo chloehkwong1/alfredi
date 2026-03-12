@@ -896,7 +896,10 @@ function MaestroConsoleInner() {
 		const filteredSlashCommands = slashCommands.filter(
 			(cmd) => !cmd.agentTypes || (currentAgentType && cmd.agentTypes.includes(currentAgentType))
 		);
-		return [...filteredSlashCommands, ...agentCommands];
+		// Deduplicate: built-in commands take precedence over agent-reported ones
+		const builtInNames = new Set(filteredSlashCommands.map((cmd) => cmd.command));
+		const uniqueAgentCommands = agentCommands.filter((cmd) => !builtInNames.has(cmd.command));
+		return [...filteredSlashCommands, ...uniqueAgentCommands];
 	}, [activeSession?.agentCommands, activeSession?.toolType, hasActiveSessionCapability]);
 
 	const canAttachImages = useMemo(() => {
@@ -1543,20 +1546,32 @@ function MaestroConsoleInner() {
 	// Symphony stripped - stub
 	const handleStartContribution = useCallback(async () => {}, []);
 
-	// Clear context: writes /clear to agent PTY and clears active tab logs
+	// Clear context: writes /clear to agent PTY, clears logs, and resets agentSessionId
 	const clearContext = useCallback(() => {
-		const session = useSessionStore
-			.getState()
-			.sessions.find((s) => s.id === useSessionStore.getState().activeSessionId);
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
 		const activeTab = session.aiTabs.find((t) => t.id === session.activeTabId);
 		if (!activeTab) return;
 
-		// Write /clear to the agent's PTY stdin
+		// Write /clear to the agent's PTY stdin (resets context for interactive processes)
 		window.maestro.process.write(session.id, '/clear\n');
 
-		// Clear the active tab's logs (store action created in Section 3)
-		useSessionStore.getState().clearActiveTabLogs(session.id);
+		// Atomically clear logs AND reset agentSessionId (prevents --resume on next batch spawn)
+		setSessions((prev) =>
+			prev.map((s) => {
+				if (s.id !== session.id) return s;
+				return {
+					...s,
+					agentSessionId: undefined,
+					contextUsage: 0,
+					aiTabs: s.aiTabs.map((tab) => {
+						if (tab.id !== activeTab.id) return tab;
+						return { ...tab, agentSessionId: null, logs: [] };
+					}),
+				};
+			})
+		);
 
 		notifyToast({ type: 'success', title: 'Context cleared', message: 'Sent /clear to agent' });
 	}, []);
