@@ -206,7 +206,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 								contextUsage: 0,
 								aiTabs: s.aiTabs.map((tab) => {
 									if (tab.id !== tabId) return tab;
-									return { ...tab, agentSessionId: null, logs: [] };
+									return { ...tab, agentSessionId: null, logs: [], usageStats: undefined };
 								}),
 							};
 						})
