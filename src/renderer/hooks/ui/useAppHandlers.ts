@@ -19,6 +19,7 @@ export interface FileTabInfo {
 	content: string;
 	sshRemoteId?: string;
 	lastModified?: number;
+	isPreview?: boolean;
 }
 
 export interface UseAppHandlersDeps {
@@ -62,8 +63,14 @@ export interface UseAppHandlersReturn {
 	dragCounterRef: React.MutableRefObject<number>;
 
 	// File handlers
-	/** Handle file click in file explorer */
-	handleFileClick: (node: { name: string; type: string }, path: string) => Promise<void>;
+	/** Handle file click in file explorer (opens as preview by default) */
+	handleFileClick: (
+		node: { name: string; type: string },
+		path: string,
+		options?: { isPreview?: boolean }
+	) => Promise<void>;
+	/** Handle file double-click in file explorer (opens as permanent/pinned tab) */
+	handleFileDoubleClick: (node: { name: string; type: string }, path: string) => Promise<void>;
 	/** Update working directory via folder selection dialog */
 	updateSessionWorkingDirectory: () => Promise<void>;
 
@@ -180,8 +187,13 @@ export function useAppHandlers(deps: UseAppHandlersDeps): UseAppHandlersReturn {
 	// --- FILE HANDLERS ---
 
 	const handleFileClick = useCallback(
-		async (node: { name: string; type: string }, path: string) => {
+		async (
+			node: { name: string; type: string },
+			path: string,
+			options?: { isPreview?: boolean }
+		) => {
 			if (!activeSession) return; // Guard against null session
+			const isPreview = options?.isPreview ?? true; // Default to preview for single-click
 			if (node.type === 'file') {
 				// Construct full file path using projectRoot (not fullPath which can diverge from file tree root)
 				// The file tree is rooted at projectRoot, so paths are relative to it
@@ -229,6 +241,7 @@ export function useAppHandlers(deps: UseAppHandlersDeps): UseAppHandlersReturn {
 						content,
 						sshRemoteId,
 						lastModified,
+						isPreview,
 					});
 					setActiveFocus('main');
 				} catch (error) {
@@ -247,6 +260,16 @@ export function useAppHandlers(deps: UseAppHandlersDeps): UseAppHandlersReturn {
 			setActiveFocus,
 			onOpenFileTab,
 		]
+	);
+
+	/**
+	 * Handle file double-click — opens the file as a permanent (non-preview) tab.
+	 */
+	const handleFileDoubleClick = useCallback(
+		async (node: { name: string; type: string }, path: string) => {
+			return handleFileClick(node, path, { isPreview: false });
+		},
+		[handleFileClick]
 	);
 
 	const updateSessionWorkingDirectory = useCallback(async () => {
@@ -342,6 +365,7 @@ export function useAppHandlers(deps: UseAppHandlersDeps): UseAppHandlersReturn {
 
 		// File handlers
 		handleFileClick,
+		handleFileDoubleClick,
 		updateSessionWorkingDirectory,
 
 		// Folder handlers

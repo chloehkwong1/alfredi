@@ -52,7 +52,8 @@ interface RightPanelProps {
 		activeSessionId: string,
 		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
 	) => void;
-	handleFileClick: (node: any, path: string, activeSession: Session) => Promise<void>;
+	handleFileClick: (node: any, path: string, options?: { isPreview?: boolean }) => Promise<void>;
+	handleFileDoubleClick: (node: any, path: string) => Promise<void>;
 	expandAllFolders: (
 		activeSessionId: string,
 		activeSession: Session,
@@ -117,6 +118,7 @@ interface RightPanelProps {
 		diffType: DiffViewTab['diffType'];
 		commitHash?: string;
 		rawDiff?: string;
+		isPreview?: boolean;
 	}) => void;
 }
 
@@ -240,6 +242,7 @@ export const RightPanel = memo(
 			fileTreeFilterInputRef,
 			toggleFolder,
 			handleFileClick,
+			handleFileDoubleClick,
 			expandAllFolders,
 			collapseAllFolders,
 			updateSessionWorkingDirectory,
@@ -318,7 +321,12 @@ export const RightPanel = memo(
 
 		/** Bridge ChangesPanel's onOpenDiff to the full DiffTabOpenParams expected by handleOpenDiffTab */
 		const handleChangesPanelOpenDiff = useCallback(
-			async (filePath: string, diffType: DiffOpenType, commitHash?: string) => {
+			async (
+				filePath: string,
+				diffType: DiffOpenType,
+				commitHash?: string,
+				isPreview?: boolean
+			) => {
 				if (!onOpenDiffTab || !session?.fullPath) return;
 
 				const cwd = session.fullPath;
@@ -377,6 +385,7 @@ export const RightPanel = memo(
 					diffType,
 					commitHash,
 					rawDiff,
+					isPreview,
 				});
 			},
 			[onOpenDiffTab, session, changesPanel.mergeBase, changesPanel.baseBranch]
@@ -559,6 +568,7 @@ export const RightPanel = memo(
 									fileTreeFilterInputRef={fileTreeFilterInputRef}
 									toggleFolder={toggleFolder}
 									handleFileClick={handleFileClick}
+									handleFileDoubleClick={handleFileDoubleClick}
 									expandAllFolders={expandAllFolders}
 									collapseAllFolders={collapseAllFolders}
 									updateSessionWorkingDirectory={updateSessionWorkingDirectory}

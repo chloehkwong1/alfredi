@@ -202,6 +202,8 @@ interface MainPanelProps {
 	activeDiffTab?: DiffViewTab | null;
 	onDiffTabSelect?: (tabId: string) => void;
 	onDiffTabClose?: (tabId: string) => void;
+	/** Handler to pin a preview tab (remove isPreview flag) */
+	onPinTab?: (tabId: string) => void;
 	onDiffTabViewModeChange?: (tabId: string, viewMode: 'unified' | 'split') => void;
 	onDiffTabScrollPositionChange?: (tabId: string, scrollTop: number) => void;
 	onOpenFileTab?: (filePath: string) => void;
@@ -491,6 +493,7 @@ export const MainPanel = React.memo(
 			activeDiffTab,
 			onDiffTabSelect,
 			onDiffTabClose,
+			onPinTab,
 			onDiffTabViewModeChange,
 			onDiffTabScrollPositionChange,
 		} = props;
@@ -1534,6 +1537,7 @@ export const MainPanel = React.memo(
 									activeDiffTabId={activeDiffTabId}
 									onDiffTabSelect={onDiffTabSelect}
 									onDiffTabClose={onDiffTabClose}
+									onPinTab={onPinTab}
 									// Accessibility
 									colorBlindMode={colorBlindMode}
 								/>

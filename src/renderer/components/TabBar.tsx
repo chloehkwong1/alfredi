@@ -83,6 +83,8 @@ interface TabBarProps {
 	onDiffTabSelect?: (tabId: string) => void;
 	/** Handler to close a diff view tab */
 	onDiffTabClose?: (tabId: string) => void;
+	/** Handler to pin a preview tab (remove isPreview flag) */
+	onPinTab?: (tabId: string) => void;
 
 	// === Accessibility ===
 	/** Whether colorblind-friendly colors should be used for extension badges */
@@ -973,6 +975,8 @@ interface FileTabProps {
 	colorBlindMode?: boolean;
 	/** Shortcut hint badge number (1-9 for Cmd+1-9, 0 for Cmd+0/last tab) */
 	shortcutHint?: number | null;
+	/** Handler to pin a preview tab (double-click) */
+	onPinTab?: (tabId: string) => void;
 }
 
 /**
@@ -1009,6 +1013,7 @@ const FileTab = memo(function FileTab({
 	tabIndex,
 	colorBlindMode,
 	shortcutHint,
+	onPinTab,
 }: FileTabProps) {
 	const [isHovered, setIsHovered] = useState(false);
 	const [overlayOpen, setOverlayOpen] = useState(false);
@@ -1260,6 +1265,7 @@ const FileTab = memo(function FileTab({
       `}
 			style={tabStyle}
 			onClick={handleTabSelect}
+			onDoubleClick={tab.isPreview && onPinTab ? () => onPinTab(tab.id) : undefined}
 			onMouseDown={handleMouseDown}
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}
@@ -1289,10 +1295,13 @@ const FileTab = memo(function FileTab({
 				</span>
 			)}
 
-			{/* Tab name - filename without extension */}
+			{/* Tab name - filename without extension (italic when preview/transient) */}
 			<span
 				className={`text-xs font-medium ${isActive ? 'whitespace-nowrap' : 'truncate max-w-[120px]'}`}
-				style={{ color: isActive ? theme.colors.textMain : theme.colors.textDim }}
+				style={{
+					color: isActive ? theme.colors.textMain : theme.colors.textDim,
+					fontStyle: tab.isPreview ? 'italic' : 'normal',
+				}}
 			>
 				{tab.name}
 			</span>
@@ -1532,6 +1541,8 @@ interface DiffTabProps {
 	totalTabs?: number;
 	tabIndex?: number;
 	shortcutHint?: number | null;
+	/** Handler to pin a preview tab (double-click) */
+	onPinTab?: (tabId: string) => void;
 }
 
 /**
@@ -1552,6 +1563,7 @@ const DiffTab = memo(function DiffTab({
 	isDragOver,
 	registerRef,
 	shortcutHint,
+	onPinTab,
 }: DiffTabProps) {
 	const [isHovered, setIsHovered] = useState(false);
 	const tabRef = useRef<HTMLDivElement>(null);
@@ -1659,6 +1671,7 @@ const DiffTab = memo(function DiffTab({
 			`}
 			style={tabStyle}
 			onClick={handleTabSelect}
+			onDoubleClick={tab.isPreview && onPinTab ? () => onPinTab(tab.id) : undefined}
 			onMouseDown={handleMouseDown}
 			onMouseEnter={handleMouseEnter}
 			onMouseLeave={handleMouseLeave}
@@ -1687,10 +1700,13 @@ const DiffTab = memo(function DiffTab({
 				</span>
 			)}
 
-			{/* Tab name - filename */}
+			{/* Tab name - filename (italic when preview/transient) */}
 			<span
 				className={`text-xs font-medium ${isActive ? 'whitespace-nowrap' : 'truncate max-w-[120px]'}`}
-				style={{ color: isActive ? theme.colors.textMain : theme.colors.textDim }}
+				style={{
+					color: isActive ? theme.colors.textMain : theme.colors.textDim,
+					fontStyle: tab.isPreview ? 'italic' : 'normal',
+				}}
 			>
 				{tab.fileName}
 			</span>
@@ -1761,6 +1777,7 @@ function TabBarInner({
 	activeDiffTabId,
 	onDiffTabSelect,
 	onDiffTabClose,
+	onPinTab,
 	onUnifiedTabReorder,
 	// Accessibility
 	colorBlindMode,
@@ -2263,6 +2280,7 @@ function TabBarInner({
 										tabIndex={originalIndex}
 										colorBlindMode={colorBlindMode}
 										shortcutHint={shortcutHint}
+										onPinTab={onPinTab}
 									/>
 								</React.Fragment>
 							);
@@ -2302,6 +2320,7 @@ function TabBarInner({
 										totalTabs={allTabs.length}
 										tabIndex={originalIndex}
 										shortcutHint={shortcutHint}
+										onPinTab={onPinTab}
 									/>
 								</React.Fragment>
 							);

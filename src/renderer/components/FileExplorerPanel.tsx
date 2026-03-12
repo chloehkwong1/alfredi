@@ -337,7 +337,8 @@ interface FileExplorerPanelProps {
 		activeSessionId: string,
 		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
 	) => void;
-	handleFileClick: (node: any, path: string, activeSession: Session) => Promise<void>;
+	handleFileClick: (node: any, path: string, options?: { isPreview?: boolean }) => Promise<void>;
+	handleFileDoubleClick: (node: any, path: string) => Promise<void>;
 	expandAllFolders: (
 		activeSessionId: string,
 		activeSession: Session,
@@ -382,6 +383,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		fileTreeFilterInputRef,
 		toggleFolder,
 		handleFileClick,
+		handleFileDoubleClick,
 		expandAllFolders,
 		collapseAllFolders,
 		updateSessionWorkingDirectory,
@@ -605,10 +607,10 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 
 	const handlePreviewFile = useCallback(() => {
 		if (contextMenu && contextMenu.node.type === 'file') {
-			handleFileClick(contextMenu.node, contextMenu.path, session);
+			handleFileClick(contextMenu.node, contextMenu.path);
 		}
 		setContextMenu(null);
-	}, [contextMenu, handleFileClick, session]);
+	}, [contextMenu, handleFileClick]);
 
 	const handleCopyPath = useCallback(() => {
 		if (contextMenu) {
@@ -996,11 +998,14 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 							if (fileTreeFilter.length === 0) {
 								setActiveFocus('right');
 							}
+							// Single-click opens file as preview (transient) tab
+							handleFileClick(node, fullPath, { isPreview: true });
 						}
 					}}
 					onDoubleClick={() => {
 						if (!isFolder) {
-							handleFileClick(node, fullPath, session);
+							// Double-click opens file as permanent (pinned) tab
+							handleFileDoubleClick(node, fullPath);
 						}
 					}}
 					onContextMenu={(e) => handleContextMenu(e, node, fullPath, globalIndex)}

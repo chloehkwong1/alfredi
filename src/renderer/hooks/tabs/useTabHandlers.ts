@@ -22,6 +22,8 @@ import {
 	hasActiveWizard,
 	buildUnifiedTabs,
 	ensureInUnifiedTabOrder,
+	closeExistingPreviewTab,
+	pinTab,
 } from '../../utils/tabHelpers';
 import { generateId } from '../../utils/ids';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
@@ -44,6 +46,7 @@ interface FileTabOpenParams {
 	content: string;
 	sshRemoteId?: string;
 	lastModified?: number;
+	isPreview?: boolean;
 }
 
 interface DiffTabOpenParams {
@@ -56,6 +59,7 @@ interface DiffTabOpenParams {
 	diffType: DiffViewTab['diffType'];
 	commitHash?: string;
 	rawDiff?: string;
+	isPreview?: boolean;
 }
 
 export interface TabHandlersReturn {
@@ -102,6 +106,9 @@ export interface TabHandlersReturn {
 	handleOpenFileTab: (file: FileTabOpenParams, options?: { openInNewTab?: boolean }) => void;
 	handleSelectFileTab: (tabId: string) => Promise<void>;
 	handleCloseFileTab: (tabId: string) => void;
+
+	// Preview Tab handlers
+	handlePinTab: (tabId: string) => void;
 
 	// Diff Tab handlers
 	handleOpenDiffTab: (params: DiffTabOpenParams) => void;
@@ -214,6 +221,7 @@ export function useTabHandlers(): TabHandlersReturn {
 			}
 		) => {
 			const openInNewTab = options?.openInNewTab ?? true;
+			const isPreview = file.isPreview ?? false;
 			const { setSessions } = useSessionStore.getState();
 			const activeSessionId = useSessionStore.getState().activeSessionId;
 
@@ -225,6 +233,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					const existingTab = s.filePreviewTabs.find((tab) => tab.path === file.path);
 					if (existingTab) {
 						// Tab exists - update content and lastModified if provided and select it
+						// If opening as non-preview, also pin it
 						const updatedTabs = s.filePreviewTabs.map((tab) =>
 							tab.id === existingTab.id
 								? {
@@ -232,15 +241,27 @@ export function useTabHandlers(): TabHandlersReturn {
 										content: file.content,
 										lastModified: file.lastModified ?? tab.lastModified,
 										isLoading: false,
+										...(!isPreview ? { isPreview: false } : {}),
 									}
 								: tab
 						);
+
+						// If reusing an existing tab for a non-preview open, close any other preview tab
+						let sessionWithPreviewClosed = { ...s, filePreviewTabs: updatedTabs };
+						if (!isPreview) {
+							const { session: cleaned } = closeExistingPreviewTab(sessionWithPreviewClosed);
+							sessionWithPreviewClosed = cleaned;
+						}
+
 						return {
-							...s,
-							filePreviewTabs: updatedTabs,
+							...sessionWithPreviewClosed,
 							activeFileTabId: existingTab.id,
 							activeTabId: s.activeTabId,
-							unifiedTabOrder: ensureInUnifiedTabOrder(s.unifiedTabOrder, 'file', existingTab.id),
+							unifiedTabOrder: ensureInUnifiedTabOrder(
+								sessionWithPreviewClosed.unifiedTabOrder,
+								'file',
+								existingTab.id
+							),
 						};
 					}
 
@@ -319,6 +340,15 @@ export function useTabHandlers(): TabHandlersReturn {
 						};
 					}
 
+					// If opening as preview, close any existing preview tab first
+					let sessionForNewTab = s;
+					let replacedIndex = -1;
+					if (isPreview) {
+						const result = closeExistingPreviewTab(s);
+						sessionForNewTab = result.session;
+						replacedIndex = result.replacedIndex;
+					}
+
 					// Create a new file preview tab
 					const newTabId = generateId();
 					const extension = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
@@ -342,33 +372,42 @@ export function useTabHandlers(): TabHandlersReturn {
 						isLoading: false,
 						navigationHistory: [{ path: file.path, name: nameWithoutExtension, scrollTop: 0 }],
 						navigationIndex: 0,
+						...(isPreview ? { isPreview: true } : {}),
 					};
 
 					// Create the unified tab reference
 					const newTabRef: UnifiedTabRef = { type: 'file', id: newTabId };
 
-					// If opening in new tab and there's an active file tab, insert adjacent to it
+					// Determine insertion position for the new tab
 					let updatedUnifiedTabOrder: UnifiedTabRef[];
-					if (openInNewTab && s.activeFileTabId) {
-						const currentIndex = s.unifiedTabOrder.findIndex(
-							(ref) => ref.type === 'file' && ref.id === s.activeFileTabId
+					if (isPreview && replacedIndex !== -1) {
+						// Insert at the position of the replaced preview tab
+						updatedUnifiedTabOrder = [
+							...sessionForNewTab.unifiedTabOrder.slice(0, replacedIndex),
+							newTabRef,
+							...sessionForNewTab.unifiedTabOrder.slice(replacedIndex),
+						];
+					} else if (openInNewTab && sessionForNewTab.activeFileTabId) {
+						// If opening in new tab and there's an active file tab, insert adjacent to it
+						const currentIndex = sessionForNewTab.unifiedTabOrder.findIndex(
+							(ref) => ref.type === 'file' && ref.id === sessionForNewTab.activeFileTabId
 						);
 						if (currentIndex !== -1) {
 							updatedUnifiedTabOrder = [
-								...s.unifiedTabOrder.slice(0, currentIndex + 1),
+								...sessionForNewTab.unifiedTabOrder.slice(0, currentIndex + 1),
 								newTabRef,
-								...s.unifiedTabOrder.slice(currentIndex + 1),
+								...sessionForNewTab.unifiedTabOrder.slice(currentIndex + 1),
 							];
 						} else {
-							updatedUnifiedTabOrder = [...s.unifiedTabOrder, newTabRef];
+							updatedUnifiedTabOrder = [...sessionForNewTab.unifiedTabOrder, newTabRef];
 						}
 					} else {
-						updatedUnifiedTabOrder = [...s.unifiedTabOrder, newTabRef];
+						updatedUnifiedTabOrder = [...sessionForNewTab.unifiedTabOrder, newTabRef];
 					}
 
 					return {
-						...s,
-						filePreviewTabs: [...s.filePreviewTabs, newFileTab],
+						...sessionForNewTab,
+						filePreviewTabs: [...sessionForNewTab.filePreviewTabs, newFileTab],
 						unifiedTabOrder: updatedUnifiedTabOrder,
 						activeFileTabId: newTabId,
 					};
@@ -476,6 +515,7 @@ export function useTabHandlers(): TabHandlersReturn {
 	const handleOpenDiffTab = useCallback((params: DiffTabOpenParams) => {
 		const { setSessions } = useSessionStore.getState();
 		const activeSessionId = useSessionStore.getState().activeSessionId;
+		const isPreview = params.isPreview ?? false;
 
 		setSessions((prev: Session[]) =>
 			prev.map((s) => {
@@ -493,6 +533,7 @@ export function useTabHandlers(): TabHandlersReturn {
 				);
 				if (existingTab) {
 					// Update content and select it
+					// If opening as non-preview, also pin it
 					const updatedTabs = diffTabs.map((tab) =>
 						tab.id === existingTab.id
 							? {
@@ -500,16 +541,37 @@ export function useTabHandlers(): TabHandlersReturn {
 									oldContent: params.oldContent,
 									newContent: params.newContent,
 									rawDiff: params.rawDiff,
+									...(!isPreview ? { isPreview: false } : {}),
 								}
 							: tab
 					);
+
+					// If reusing an existing tab for a non-preview open, close any other preview tab
+					let sessionWithUpdatedTabs = { ...s, diffViewTabs: updatedTabs };
+					if (!isPreview) {
+						const { session: cleaned } = closeExistingPreviewTab(sessionWithUpdatedTabs);
+						sessionWithUpdatedTabs = cleaned;
+					}
+
 					return {
-						...s,
-						diffViewTabs: updatedTabs,
+						...sessionWithUpdatedTabs,
 						activeDiffTabId: existingTab.id,
 						activeFileTabId: null,
-						unifiedTabOrder: ensureInUnifiedTabOrder(s.unifiedTabOrder, 'diff', existingTab.id),
+						unifiedTabOrder: ensureInUnifiedTabOrder(
+							sessionWithUpdatedTabs.unifiedTabOrder,
+							'diff',
+							existingTab.id
+						),
 					};
+				}
+
+				// If opening as preview, close any existing preview tab first
+				let sessionForNewTab = s;
+				let replacedIndex = -1;
+				if (isPreview) {
+					const result = closeExistingPreviewTab(s);
+					sessionForNewTab = result.session;
+					replacedIndex = result.replacedIndex;
 				}
 
 				// Create new diff tab
@@ -527,14 +589,29 @@ export function useTabHandlers(): TabHandlersReturn {
 					viewMode: 'unified',
 					scrollTop: 0,
 					createdAt: Date.now(),
+					...(isPreview ? { isPreview: true } : {}),
 				};
 
+				const newTabRef: UnifiedTabRef = { type: 'diff' as const, id: newTab.id };
+
+				// Determine insertion position
+				let updatedUnifiedTabOrder: UnifiedTabRef[];
+				if (isPreview && replacedIndex !== -1) {
+					updatedUnifiedTabOrder = [
+						...sessionForNewTab.unifiedTabOrder.slice(0, replacedIndex),
+						newTabRef,
+						...sessionForNewTab.unifiedTabOrder.slice(replacedIndex),
+					];
+				} else {
+					updatedUnifiedTabOrder = [...sessionForNewTab.unifiedTabOrder, newTabRef];
+				}
+
 				return {
-					...s,
-					diffViewTabs: [...diffTabs, newTab],
+					...sessionForNewTab,
+					diffViewTabs: [...(sessionForNewTab.diffViewTabs || []), newTab],
 					activeDiffTabId: newTab.id,
 					activeFileTabId: null,
-					unifiedTabOrder: [...s.unifiedTabOrder, { type: 'diff' as const, id: newTab.id }],
+					unifiedTabOrder: updatedUnifiedTabOrder,
 				};
 			})
 		);
@@ -564,6 +641,24 @@ export function useTabHandlers(): TabHandlersReturn {
 		}
 	}, []);
 
+	// ========================================================================
+	// Preview Tab Pinning
+	// ========================================================================
+
+	/**
+	 * Pin a preview tab (make it permanent) by removing the isPreview flag.
+	 * Works for both file preview tabs and diff view tabs.
+	 */
+	const handlePinTab = useCallback((tabId: string) => {
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				return pinTab(s, tabId);
+			})
+		);
+	}, []);
+
 	const handleFileTabEditModeChange = useCallback((tabId: string, editMode: boolean) => {
 		const { setSessions, activeSessionId } = useSessionStore.getState();
 		setSessions((prev: Session[]) =>
@@ -571,7 +666,8 @@ export function useTabHandlers(): TabHandlersReturn {
 				if (s.id !== activeSessionId) return s;
 				const updatedFileTabs = s.filePreviewTabs.map((tab) => {
 					if (tab.id !== tabId) return tab;
-					return { ...tab, editMode };
+					// Auto-pin preview tab when entering edit mode
+					return { ...tab, editMode, ...(editMode && tab.isPreview ? { isPreview: false } : {}) };
 				});
 				return { ...s, filePreviewTabs: updatedFileTabs };
 			})
@@ -586,10 +682,13 @@ export function useTabHandlers(): TabHandlersReturn {
 					if (s.id !== activeSessionId) return s;
 					const updatedFileTabs = s.filePreviewTabs.map((tab) => {
 						if (tab.id !== tabId) return tab;
+						// Auto-pin preview tab when content is edited
+						const pinUpdate =
+							editContent !== undefined && tab.isPreview ? { isPreview: false } : {};
 						if (savedContent !== undefined) {
-							return { ...tab, editContent, content: savedContent };
+							return { ...tab, editContent, content: savedContent, ...pinUpdate };
 						}
-						return { ...tab, editContent };
+						return { ...tab, editContent, ...pinUpdate };
 					});
 					return { ...s, filePreviewTabs: updatedFileTabs };
 				})
@@ -1553,6 +1652,9 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleOpenDiffTab,
 		handleSelectDiffTab,
 		handleCloseDiffTab,
+
+		// Preview Tab handlers
+		handlePinTab,
 
 		handleFileTabEditModeChange,
 		handleFileTabEditContentChange,

@@ -208,6 +208,7 @@ export interface UseMainPanelPropsDeps {
 	activeDiffTab: DiffViewTab | null;
 	handleSelectDiffTab: (tabId: string) => void;
 	handleCloseDiffTab: (tabId: string) => void;
+	handlePinTab: (tabId: string) => void;
 	handleDiffTabViewModeChange: (tabId: string, viewMode: 'unified' | 'split') => void;
 	handleDiffTabScrollPositionChange: (tabId: string, scrollTop: number) => void;
 
@@ -386,6 +387,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			activeDiffTab: deps.activeDiffTab,
 			onDiffTabSelect: deps.handleSelectDiffTab,
 			onDiffTabClose: deps.handleCloseDiffTab,
+			onPinTab: deps.handlePinTab,
 			onDiffTabViewModeChange: deps.handleDiffTabViewModeChange,
 			onDiffTabScrollPositionChange: deps.handleDiffTabScrollPositionChange,
 			onToggleTabShowThinking: deps.handleToggleTabShowThinking,
@@ -589,6 +591,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.activeDiffTab,
 			deps.handleSelectDiffTab,
 			deps.handleCloseDiffTab,
+			deps.handlePinTab,
 			deps.handleDiffTabViewModeChange,
 			deps.handleDiffTabScrollPositionChange,
 			deps.handleScrollPositionChange,

@@ -678,6 +678,7 @@ function MaestroConsoleInner() {
 		handleOpenDiffTab,
 		handleSelectDiffTab,
 		handleCloseDiffTab,
+		handlePinTab,
 	} = useTabHandlers();
 
 	// --- MODAL HANDLERS (open/close, error recovery, lightbox) ---
@@ -763,6 +764,7 @@ function MaestroConsoleInner() {
 		setIsDraggingImage,
 		dragCounterRef,
 		handleFileClick,
+		handleFileDoubleClick,
 		updateSessionWorkingDirectory,
 		toggleFolder,
 		expandAllFolders,
@@ -1908,6 +1910,7 @@ function MaestroConsoleInner() {
 		activeDiffTab,
 		handleSelectDiffTab,
 		handleCloseDiffTab,
+		handlePinTab,
 		handleDiffTabViewModeChange: useTabStore.getState().updateDiffTabViewMode,
 		handleDiffTabScrollPositionChange: useTabStore.getState().updateDiffTabScrollPosition,
 
@@ -2019,6 +2022,7 @@ function MaestroConsoleInner() {
 		// File explorer handlers
 		toggleFolder,
 		handleFileClick,
+		handleFileDoubleClick,
 		expandAllFolders,
 		collapseAllFolders,
 		updateSessionWorkingDirectory,

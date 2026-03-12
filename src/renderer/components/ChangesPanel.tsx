@@ -28,7 +28,12 @@ export interface ChangesPanelProps {
 	baseBranch: string | undefined;
 	isLoading: boolean;
 	onRefresh: () => void;
-	onOpenDiff: (filePath: string, diffType: DiffOpenType, commitHash?: string) => void;
+	onOpenDiff: (
+		filePath: string,
+		diffType: DiffOpenType,
+		commitHash?: string,
+		isPreview?: boolean
+	) => void;
 }
 
 // --- Helpers ---
@@ -95,6 +100,7 @@ const FileRow = memo(function FileRow({
 	theme,
 	selected,
 	onClick,
+	onDoubleClick,
 	onRef,
 }: {
 	filePath: string;
@@ -105,6 +111,7 @@ const FileRow = memo(function FileRow({
 	theme: Theme;
 	selected: boolean;
 	onClick: () => void;
+	onDoubleClick?: () => void;
 	onRef?: (el: HTMLDivElement | null) => void;
 }) {
 	return (
@@ -117,6 +124,7 @@ const FileRow = memo(function FileRow({
 				backgroundColor: selected ? theme.colors.bgActivity : 'transparent',
 			}}
 			onClick={onClick}
+			onDoubleClick={onDoubleClick}
 		>
 			{/* Status badge */}
 			<span
@@ -283,7 +291,14 @@ function ChangesPanelInner({
 
 	const handleFileClick = useCallback(
 		(filePath: string, diffType: DiffOpenType, commitHash?: string) => {
-			onOpenDiff(filePath, diffType, commitHash);
+			onOpenDiff(filePath, diffType, commitHash, true);
+		},
+		[onOpenDiff]
+	);
+
+	const handleFileDoubleClick = useCallback(
+		(filePath: string, diffType: DiffOpenType, commitHash?: string) => {
+			onOpenDiff(filePath, diffType, commitHash, false);
 		},
 		[onOpenDiff]
 	);
@@ -372,6 +387,7 @@ function ChangesPanelInner({
 									theme={theme}
 									selected={selectedIndex === idx}
 									onClick={() => handleFileClick(file.path, 'uncommitted-staged')}
+									onDoubleClick={() => handleFileDoubleClick(file.path, 'uncommitted-staged')}
 								/>
 							);
 						})}
@@ -403,6 +419,7 @@ function ChangesPanelInner({
 									theme={theme}
 									selected={selectedIndex === idx}
 									onClick={() => handleFileClick(file.path, 'uncommitted-unstaged')}
+									onDoubleClick={() => handleFileDoubleClick(file.path, 'uncommitted-unstaged')}
 								/>
 							);
 						})}
@@ -461,6 +478,13 @@ function ChangesPanelInner({
 										selected={selectedIndex === idx}
 										onClick={() =>
 											handleFileClick(
+												file.path,
+												selectedCommitHash ? 'commit' : 'committed',
+												selectedCommitHash || undefined
+											)
+										}
+										onDoubleClick={() =>
+											handleFileDoubleClick(
 												file.path,
 												selectedCommitHash ? 'commit' : 'committed',
 												selectedCommitHash || undefined

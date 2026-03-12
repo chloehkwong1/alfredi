@@ -524,6 +524,8 @@ export interface FilePreviewTab {
 	// Navigation history for breadcrumb navigation (per-tab)
 	navigationHistory?: FilePreviewHistoryEntry[]; // Stack of visited files
 	navigationIndex?: number; // Current position in history (-1 or undefined = at end)
+	// Preview (transient) tab support — italic title, replaced by next preview open
+	isPreview?: boolean;
 }
 
 /**
@@ -544,6 +546,8 @@ export interface DiffViewTab {
 	viewMode: 'unified' | 'split';
 	scrollTop: number; // Saved scroll position
 	createdAt: number; // Timestamp for ordering
+	// Preview (transient) tab support — italic title, replaced by next preview open
+	isPreview?: boolean;
 }
 
 /**

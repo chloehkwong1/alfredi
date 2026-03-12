@@ -1930,3 +1930,127 @@ export function createMergedSession(
 
 	return { session, tabId };
 }
+
+// ─── Preview (transient) tab helpers ────────────────────────────────────────
+
+/**
+ * Find the current preview tab across both file and diff tab arrays.
+ * Returns the tab reference (type + id) or null if no preview tab exists.
+ *
+ * @param session - The Maestro session to search
+ * @returns UnifiedTabRef for the preview tab, or null if none found
+ */
+export function findPreviewTab(session: Session): UnifiedTabRef | null {
+	if (!session) return null;
+
+	const filePreview = (session.filePreviewTabs || []).find((tab) => tab.isPreview);
+	if (filePreview) {
+		return { type: 'file', id: filePreview.id };
+	}
+
+	const diffPreview = (session.diffViewTabs || []).find((tab) => tab.isPreview);
+	if (diffPreview) {
+		return { type: 'diff', id: diffPreview.id };
+	}
+
+	return null;
+}
+
+/**
+ * Pin a preview tab by setting isPreview to false.
+ * Works for both file preview tabs and diff view tabs.
+ *
+ * @param session - The Maestro session containing the tab
+ * @param tabId - The ID of the tab to pin
+ * @returns Updated session with the tab pinned, or the original session if tab not found
+ */
+export function pinTab(session: Session, tabId: string): Session {
+	if (!session) return session;
+
+	// Check file preview tabs
+	const fileTabIndex = (session.filePreviewTabs || []).findIndex((tab) => tab.id === tabId);
+	if (fileTabIndex !== -1) {
+		const updatedFileTabs = session.filePreviewTabs.map((tab) =>
+			tab.id === tabId ? { ...tab, isPreview: false } : tab
+		);
+		return { ...session, filePreviewTabs: updatedFileTabs };
+	}
+
+	// Check diff view tabs
+	const diffTabIndex = (session.diffViewTabs || []).findIndex((tab) => tab.id === tabId);
+	if (diffTabIndex !== -1) {
+		const updatedDiffTabs = session.diffViewTabs.map((tab) =>
+			tab.id === tabId ? { ...tab, isPreview: false } : tab
+		);
+		return { ...session, diffViewTabs: updatedDiffTabs };
+	}
+
+	return session;
+}
+
+/**
+ * Close the existing preview tab (if any) and return the updated session
+ * along with the unified-order index where the old preview lived.
+ * Used internally before inserting a new preview tab.
+ *
+ * @param session - The Maestro session
+ * @returns Object with updated session and the index of the removed preview (or -1)
+ */
+export function closeExistingPreviewTab(session: Session): {
+	session: Session;
+	replacedIndex: number;
+} {
+	const existing = findPreviewTab(session);
+	if (!existing) {
+		return { session, replacedIndex: -1 };
+	}
+
+	// Find the position in unified tab order before closing
+	const unifiedIndex = (session.unifiedTabOrder || []).findIndex(
+		(ref) => ref.type === existing.type && ref.id === existing.id
+	);
+
+	if (existing.type === 'file') {
+		// Remove from filePreviewTabs and unifiedTabOrder (skip closed-tab history for preview tabs)
+		const updatedFilePreviewTabs = session.filePreviewTabs.filter((tab) => tab.id !== existing.id);
+		const updatedUnifiedTabOrder = (session.unifiedTabOrder || []).filter(
+			(ref) => !(ref.type === 'file' && ref.id === existing.id)
+		);
+
+		// If the closed preview was the active tab, clear the active file tab
+		const newActiveFileTabId =
+			session.activeFileTabId === existing.id ? null : session.activeFileTabId;
+
+		return {
+			session: {
+				...session,
+				filePreviewTabs: updatedFilePreviewTabs,
+				unifiedTabOrder: updatedUnifiedTabOrder,
+				activeFileTabId: newActiveFileTabId,
+			},
+			replacedIndex: unifiedIndex,
+		};
+	} else {
+		// Remove from diffViewTabs and unifiedTabOrder (skip closed-tab history for preview tabs)
+		const updatedDiffViewTabs = (session.diffViewTabs || []).filter(
+			(tab) => tab.id !== existing.id
+		);
+		const updatedUnifiedTabOrder = (session.unifiedTabOrder || []).filter(
+			(ref) => !(ref.type === 'diff' && ref.id === existing.id)
+		);
+
+		// If the closed preview was the active tab, clear the active diff tab
+		const newActiveDiffTabId =
+			session.activeDiffTabId === existing.id ? null : session.activeDiffTabId;
+
+		return {
+			session: {
+				...session,
+				diffViewTabs: updatedDiffViewTabs,
+				unifiedTabOrder: updatedUnifiedTabOrder,
+				activeDiffTabId: newActiveDiffTabId,
+			},
+			replacedIndex: unifiedIndex,
+		};
+	}
+}

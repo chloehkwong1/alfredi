@@ -32,7 +32,8 @@ export interface UseRightPanelPropsDeps {
 		activeSessionId: string,
 		setSessions: React.Dispatch<React.SetStateAction<Session[]>>
 	) => void;
-	handleFileClick: (node: any, path: string, activeSession: Session) => Promise<void>;
+	handleFileClick: (node: any, path: string, options?: { isPreview?: boolean }) => Promise<void>;
+	handleFileDoubleClick: (node: any, path: string) => Promise<void>;
 	expandAllFolders: (
 		activeSessionId: string,
 		activeSession: Session,
@@ -119,6 +120,7 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			// File explorer handlers
 			toggleFolder: deps.toggleFolder,
 			handleFileClick: deps.handleFileClick,
+			handleFileDoubleClick: deps.handleFileDoubleClick,
 			expandAllFolders: deps.expandAllFolders,
 			collapseAllFolders: deps.collapseAllFolders,
 			updateSessionWorkingDirectory: deps.updateSessionWorkingDirectory,
@@ -167,6 +169,7 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			deps.handleSetActiveRightTab,
 			deps.toggleFolder,
 			deps.handleFileClick,
+			deps.handleFileDoubleClick,
 			deps.expandAllFolders,
 			deps.collapseAllFolders,
 			deps.updateSessionWorkingDirectory,
