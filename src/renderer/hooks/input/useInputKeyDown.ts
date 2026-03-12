@@ -223,9 +223,19 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 				} else if (e.key === 'Tab' || e.key === 'Enter') {
 					e.preventDefault();
 					if (filteredCommands[selectedSlashCommandIndex]) {
-						setInputValue(filteredCommands[selectedSlashCommandIndex].command);
-						setSlashCommandOpen(false);
-						inputRef.current?.focus();
+						const selectedCommand = filteredCommands[selectedSlashCommandIndex].command;
+						// If Enter on an exact match, execute immediately instead of just filling input
+						if (
+							e.key === 'Enter' &&
+							inputValue.trim().toLowerCase() === selectedCommand.toLowerCase()
+						) {
+							setSlashCommandOpen(false);
+							processInput();
+						} else {
+							setInputValue(selectedCommand);
+							setSlashCommandOpen(false);
+							inputRef.current?.focus();
+						}
 					}
 				} else if (e.key === 'Escape') {
 					e.preventDefault();

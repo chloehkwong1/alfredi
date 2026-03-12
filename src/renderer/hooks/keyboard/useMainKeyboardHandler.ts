@@ -228,7 +228,18 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				trackShortcut('toggleRightPanel');
 			} else if (ctx.isShortcut(e, 'newInstance')) {
 				e.preventDefault();
-				ctx.addNewSession();
+				// Check if active session belongs to a worktree-enabled project
+				const activeProject = ctx.activeSession?.projectId
+					? ctx.projects?.find((p: any) => p.id === ctx.activeSession.projectId)
+					: null;
+				const hasWorktreeConfig =
+					ctx.activeSession?.worktreeConfig || activeProject?.worktreeConfig;
+				if (hasWorktreeConfig && ctx.activeSession) {
+					// Open CreateWorktreeModal for worktree-enabled projects
+					useModalStore.getState().openModal('createWorktree', { session: ctx.activeSession });
+				} else {
+					ctx.addNewSession();
+				}
 				trackShortcut('newInstance');
 			} else if (ctx.isShortcut(e, 'killInstance')) {
 				if (ctx.activeSessionId) {
@@ -336,10 +347,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 				ctx.toggleTabStar();
 				trackShortcut('toggleTabStar');
-			} else if (ctx.isShortcut(e, 'openWizard')) {
-				e.preventDefault();
-				ctx.openWizardModal();
-				trackShortcut('openWizard');
 			} else if (ctx.isShortcut(e, 'focusInput')) {
 				e.preventDefault();
 				// Toggle between input and main panel output for keyboard scrolling

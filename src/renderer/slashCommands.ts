@@ -20,14 +20,14 @@ export const slashCommands: SlashCommand[] = [
 		aiOnly: true,
 	},
 	{
-		command: '/wizard',
-		description: 'Start the planning wizard for Auto Run documents',
-		aiOnly: true,
-	},
-	{
 		command: '/skills',
 		description: 'List available Claude Code skills for this project',
 		aiOnly: true,
 		agentTypes: ['claude-code'],
+	},
+	{
+		command: '/clear',
+		description: 'Clear the current tab and reset agent context',
+		aiOnly: true,
 	},
 ];
