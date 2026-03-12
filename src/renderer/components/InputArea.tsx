@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, startTransition } from 'react';
 import {
 	Cpu,
-	ImageIcon,
+	Paperclip,
 	X,
 	ArrowUp,
 	Eye,
@@ -11,11 +11,18 @@ import {
 	GitBranch,
 	Tag,
 	Brain,
-	Wand2,
 	Pin,
 	BookOpen,
 } from 'lucide-react';
-import type { Session, Theme, BatchRunState, Shortcut, ThinkingMode, ThinkingItem } from '../types';
+import type {
+	Session,
+	Theme,
+	BatchRunState,
+	Shortcut,
+	ThinkingMode,
+	ThinkingItem,
+	StagedFile,
+} from '../types';
 import type { OutputStyle } from '../../shared/types';
 import { OUTPUT_STYLE_OPTIONS } from '../../shared/types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
@@ -51,6 +58,8 @@ interface InputAreaProps {
 	setEnterToSend: (value: boolean) => void;
 	stagedImages: string[];
 	setStagedImages: React.Dispatch<React.SetStateAction<string[]>>;
+	stagedFiles?: StagedFile[];
+	setStagedFiles?: (files: StagedFile[] | ((prev: StagedFile[]) => StagedFile[])) => void;
 	setLightboxImage: (
 		image: string | null,
 		contextImages?: string[],
@@ -165,6 +174,8 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		setEnterToSend,
 		stagedImages,
 		setStagedImages,
+		stagedFiles,
+		setStagedFiles,
 		setLightboxImage,
 		commandHistoryOpen,
 		setCommandHistoryOpen,
@@ -541,6 +552,36 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 				</div>
 			)}
 
+			{/* Staged file attachments (non-image) */}
+			{session.inputMode === 'ai' && stagedFiles && stagedFiles.length > 0 && (
+				<div className="flex gap-2 mb-3 pb-2 overflow-x-auto scrollbar-thin flex-wrap">
+					{stagedFiles.map((file, idx) => (
+						<div
+							key={`${file.name}-${idx}`}
+							className="flex items-center gap-1.5 px-2 py-1 rounded border text-xs max-w-[200px]"
+							style={{
+								backgroundColor: `${theme.colors.bgSidebar}`,
+								borderColor: theme.colors.border,
+								color: theme.colors.textMain,
+							}}
+							title={`${file.name} (${file.size < 1024 ? `${file.size} B` : `${Math.round(file.size / 1024)} KB`})${file.content ? ' — text content' : file.path ? ` — ${file.path}` : ' — binary'}`}
+						>
+							<File className="w-3 h-3 shrink-0 opacity-60" />
+							<span className="truncate">{file.name}</span>
+							<button
+								onClick={(e) => {
+									e.stopPropagation();
+									setStagedFiles?.((prev) => prev.filter((_, i) => i !== idx));
+								}}
+								className="shrink-0 hover:text-red-400 transition-colors opacity-60 hover:opacity-100 outline-none"
+							>
+								<X className="w-3 h-3" />
+							</button>
+						</div>
+					))}
+				</div>
+			)}
+
 			{/* Slash Command Autocomplete - shows built-in and custom commands for all agents */}
 			{slashCommandOpen && filteredSlashCommands.length > 0 && (
 				<div
@@ -838,36 +879,93 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 							<div className="flex gap-1 items-center">
 								{session.inputMode === 'ai' && canAttachImages && (
 									<button
-										onClick={() => document.getElementById('image-file-input')?.click()}
+										onClick={() => document.getElementById('file-input')?.click()}
 										className="p-1 hover:bg-white/10 rounded opacity-50 hover:opacity-100"
-										title="Attach Image"
+										title="Attach File"
 									>
-										<ImageIcon className="w-4 h-4" />
+										<Paperclip className="w-4 h-4" />
 									</button>
 								)}
 								<input
-									id="image-file-input"
+									id="file-input"
 									type="file"
-									accept="image/*"
 									multiple
 									className="hidden"
 									onChange={(e) => {
 										const files = Array.from(e.target.files || []);
 										files.forEach((file) => {
-											const reader = new FileReader();
-											reader.onload = (event) => {
-												if (event.target?.result) {
-													const imageData = event.target!.result as string;
-													setStagedImages((prev) => {
-														if (prev.includes(imageData)) {
-															showFlashNotification?.('Duplicate image ignored');
+											if (file.type.startsWith('image/')) {
+												// Image files: read as data URL
+												const reader = new FileReader();
+												reader.onload = (event) => {
+													if (event.target?.result) {
+														const imageData = event.target!.result as string;
+														setStagedImages((prev) => {
+															if (prev.includes(imageData)) {
+																showFlashNotification?.('Duplicate image ignored');
+																return prev;
+															}
+															return [...prev, imageData];
+														});
+													}
+												};
+												reader.readAsDataURL(file);
+											} else if (setStagedFiles) {
+												// Non-image files: text (<1MB) read inline, binary/large as path reference
+												const isTextType =
+													file.type.startsWith('text/') ||
+													file.type === 'application/json' ||
+													file.type === 'application/xml' ||
+													file.type === 'application/javascript' ||
+													file.type === 'application/typescript' ||
+													file.type === '';
+												const isSmall = file.size < 1_000_000;
+
+												if (isTextType && isSmall) {
+													const reader = new FileReader();
+													reader.onload = (event) => {
+														if (event.target?.result) {
+															const textContent = event.target!.result as string;
+															setStagedFiles((prev) => {
+																if (
+																	prev.some((f) => f.name === file.name && f.size === file.size)
+																) {
+																	showFlashNotification?.('Duplicate file ignored');
+																	return prev;
+																}
+																return [
+																	...prev,
+																	{
+																		name: file.name,
+																		content: textContent,
+																		mimeType: file.type || 'text/plain',
+																		size: file.size,
+																	},
+																];
+															});
+														}
+													};
+													reader.readAsText(file);
+												} else {
+													// Binary or large file: store with path if available from Electron
+													const filePath = (file as File & { path?: string }).path;
+													setStagedFiles((prev) => {
+														if (prev.some((f) => f.name === file.name && f.size === file.size)) {
+															showFlashNotification?.('Duplicate file ignored');
 															return prev;
 														}
-														return [...prev, imageData];
+														return [
+															...prev,
+															{
+																name: file.name,
+																path: filePath || undefined,
+																mimeType: file.type || 'application/octet-stream',
+																size: file.size,
+															},
+														];
 													});
 												}
-											};
-											reader.readAsDataURL(file);
+											}
 										});
 										e.target.value = '';
 									}}
@@ -1007,22 +1105,8 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 					)}
 				</div>
 
-				{/* Mode Indicator & Send/Interrupt Button - Right Side */}
-				<div className="flex flex-col gap-2">
-					<div
-						className="p-2 rounded-lg border"
-						style={{
-							backgroundColor: theme.colors.bgMain,
-							borderColor: theme.colors.border,
-							color: theme.colors.textDim,
-						}}
-					>
-						{wizardState?.isActive ? (
-							<Wand2 className="w-4 h-4" style={{ color: theme.colors.accent }} />
-						) : (
-							<Cpu className="w-4 h-4" />
-						)}
-					</div>
+				{/* Send/Interrupt Button - Right Side */}
+				<div className="flex flex-col">
 					{/* Send button - always visible. Stop button is now in ThinkingStatusPill */}
 					<button
 						type="button"

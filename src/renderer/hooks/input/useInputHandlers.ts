@@ -14,7 +14,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo, useDeferredValue } from 'react';
-import type { Session, BatchRunState, QueuedItem, CustomAICommand } from '../../types';
+import type { Session, BatchRunState, QueuedItem, CustomAICommand, StagedFile } from '../../types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -98,6 +98,10 @@ export interface UseInputHandlersReturn {
 	stagedImages: string[];
 	/** Set staged images for the current message */
 	setStagedImages: (images: string[] | ((prev: string[]) => string[])) => void;
+	/** Staged non-image file attachments for the current message */
+	stagedFiles: StagedFile[];
+	/** Set staged non-image file attachments for the current message */
+	setStagedFiles: (files: StagedFile[] | ((prev: StagedFile[]) => StagedFile[])) => void;
 	/** Process and send the current input */
 	processInput: (text?: string) => void;
 	/** Ref to latest processInput for use in memoized callbacks */
@@ -242,6 +246,39 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 									? imagesOrUpdater(currentImages)
 									: imagesOrUpdater;
 							return { ...tab, stagedImages: newImages };
+						}),
+					};
+				})
+			);
+		},
+		[activeSession]
+	);
+
+	// ====================================================================
+	// Staged Files (non-image attachments)
+	// ====================================================================
+
+	const stagedFiles = useMemo(() => {
+		if (!activeSession || activeSession.inputMode !== 'ai') return [];
+		return activeTab?.stagedFiles || [];
+	}, [activeTab?.stagedFiles, activeSession?.inputMode]);
+
+	const setStagedFiles = useCallback(
+		(filesOrUpdater: StagedFile[] | ((prev: StagedFile[]) => StagedFile[])) => {
+			if (!activeSession) return;
+			setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== activeSession.id) return s;
+					return {
+						...s,
+						aiTabs: s.aiTabs.map((tab) => {
+							if (tab.id !== s.activeTabId) return tab;
+							const currentFiles = tab.stagedFiles || [];
+							const newFiles =
+								typeof filesOrUpdater === 'function'
+									? filesOrUpdater(currentFiles)
+									: filesOrUpdater;
+							return { ...tab, stagedFiles: newFiles };
 						}),
 					};
 				})
@@ -465,10 +502,10 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 			const isDirectAIMode = activeSession && activeSession.inputMode === 'ai';
 
 			const items = e.clipboardData.items;
-			const hasImage = Array.from(items).some((item) => item.type.startsWith('image/'));
+			const hasFile = Array.from(items).some((item) => item.kind === 'file');
 
 			// Handle text paste with whitespace trimming
-			if (!hasImage) {
+			if (!hasFile) {
 				const text = e.clipboardData.getData('text/plain');
 				if (text) {
 					const trimmedText = text.trim();
@@ -488,34 +525,90 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 				return;
 			}
 
-			// Image handling requires AI mode
+			// File handling requires AI mode
 			if (!isDirectAIMode) return;
 
 			for (let i = 0; i < items.length; i++) {
-				if (items[i].type.indexOf('image') !== -1) {
-					e.preventDefault();
-					const blob = items[i].getAsFile();
-					if (blob) {
+				if (items[i].kind !== 'file') continue;
+				const blob = items[i].getAsFile();
+				if (!blob) continue;
+
+				e.preventDefault();
+
+				if (items[i].type.startsWith('image/')) {
+					// Image files: read as data URL, add to stagedImages
+					const reader = new FileReader();
+					reader.onload = (event) => {
+						if (event.target?.result) {
+							const imageData = event.target!.result as string;
+							setStagedImages((prev) => {
+								if (prev.includes(imageData)) {
+									setSuccessFlashNotification('Duplicate image ignored');
+									setTimeout(() => setSuccessFlashNotification(null), 2000);
+									return prev;
+								}
+								return [...prev, imageData];
+							});
+						}
+					};
+					reader.readAsDataURL(blob);
+				} else {
+					// Non-image files: text (<1MB) read inline, binary/large as path reference
+					const isTextType =
+						blob.type.startsWith('text/') ||
+						blob.type === 'application/json' ||
+						blob.type === 'application/xml' ||
+						blob.type === 'application/javascript' ||
+						blob.type === 'application/typescript' ||
+						blob.type === '';
+					const isSmall = blob.size < 1_000_000; // 1MB threshold
+
+					if (isTextType && isSmall) {
 						const reader = new FileReader();
 						reader.onload = (event) => {
 							if (event.target?.result) {
-								const imageData = event.target!.result as string;
-								setStagedImages((prev) => {
-									if (prev.includes(imageData)) {
-										setSuccessFlashNotification('Duplicate image ignored');
+								const textContent = event.target!.result as string;
+								setStagedFiles((prev) => {
+									if (prev.some((f) => f.name === blob.name && f.size === blob.size)) {
+										setSuccessFlashNotification('Duplicate file ignored');
 										setTimeout(() => setSuccessFlashNotification(null), 2000);
 										return prev;
 									}
-									return [...prev, imageData];
+									return [
+										...prev,
+										{
+											name: blob.name,
+											content: textContent,
+											mimeType: blob.type || 'text/plain',
+											size: blob.size,
+										},
+									];
 								});
 							}
 						};
-						reader.readAsDataURL(blob);
+						reader.readAsText(blob);
+					} else {
+						// Binary or large file: store as path reference
+						setStagedFiles((prev) => {
+							if (prev.some((f) => f.name === blob.name && f.size === blob.size)) {
+								setSuccessFlashNotification('Duplicate file ignored');
+								setTimeout(() => setSuccessFlashNotification(null), 2000);
+								return prev;
+							}
+							return [
+								...prev,
+								{
+									name: blob.name,
+									mimeType: blob.type || 'application/octet-stream',
+									size: blob.size,
+								},
+							];
+						});
 					}
 				}
 			}
 		},
-		[activeSession, setInputValue, setStagedImages]
+		[activeSession, setInputValue, setStagedImages, setStagedFiles]
 	);
 
 	const handleDrop = useCallback(
@@ -531,7 +624,9 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 			const files = e.dataTransfer.files;
 
 			for (let i = 0; i < files.length; i++) {
-				if (files[i].type.startsWith('image/')) {
+				const file = files[i];
+				if (file.type.startsWith('image/')) {
+					// Image files: read as data URL, add to stagedImages
 					const reader = new FileReader();
 					reader.onload = (event) => {
 						if (event.target?.result) {
@@ -546,11 +641,69 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 							});
 						}
 					};
-					reader.readAsDataURL(files[i]);
+					reader.readAsDataURL(file);
+				} else {
+					// Non-image files: text (<1MB) read inline, binary/large as path reference
+					const isTextType =
+						file.type.startsWith('text/') ||
+						file.type === 'application/json' ||
+						file.type === 'application/xml' ||
+						file.type === 'application/javascript' ||
+						file.type === 'application/typescript' ||
+						file.type === '';
+					const isSmall = file.size < 1_000_000;
+
+					if (isTextType && isSmall) {
+						const droppedFile = file;
+						const reader = new FileReader();
+						reader.onload = (event) => {
+							if (event.target?.result) {
+								const textContent = event.target!.result as string;
+								setStagedFiles((prev) => {
+									if (
+										prev.some((f) => f.name === droppedFile.name && f.size === droppedFile.size)
+									) {
+										setSuccessFlashNotification('Duplicate file ignored');
+										setTimeout(() => setSuccessFlashNotification(null), 2000);
+										return prev;
+									}
+									return [
+										...prev,
+										{
+											name: droppedFile.name,
+											content: textContent,
+											mimeType: droppedFile.type || 'text/plain',
+											size: droppedFile.size,
+										},
+									];
+								});
+							}
+						};
+						reader.readAsText(file);
+					} else {
+						// Binary or large file: store with path if available
+						const filePath = (file as File & { path?: string }).path;
+						setStagedFiles((prev) => {
+							if (prev.some((f) => f.name === file.name && f.size === file.size)) {
+								setSuccessFlashNotification('Duplicate file ignored');
+								setTimeout(() => setSuccessFlashNotification(null), 2000);
+								return prev;
+							}
+							return [
+								...prev,
+								{
+									name: file.name,
+									path: filePath || undefined,
+									mimeType: file.type || 'application/octet-stream',
+									size: file.size,
+								},
+							];
+						});
+					}
 				}
 			}
 		},
-		[activeSession, setStagedImages]
+		[activeSession, setStagedImages, setStagedFiles]
 	);
 
 	// ====================================================================
@@ -563,6 +716,8 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 		setInputValue,
 		stagedImages,
 		setStagedImages,
+		stagedFiles,
+		setStagedFiles,
 		processInput,
 		processInputRef,
 		handleInputKeyDown,

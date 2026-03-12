@@ -255,7 +255,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			expect(screen.getByTitle('Attach Image')).toBeInTheDocument();
+			expect(screen.getByTitle('Attach File')).toBeInTheDocument();
 		});
 
 		it('hides attach image button when agent does not support image input', async () => {
@@ -292,7 +292,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			expect(screen.queryByTitle('Attach Image')).not.toBeInTheDocument();
+			expect(screen.queryByTitle('Attach File')).not.toBeInTheDocument();
 		});
 
 		it('shows read-only toggle when onToggleTabReadOnlyMode is provided', () => {
@@ -1166,7 +1166,7 @@ describe('InputArea', () => {
 		});
 	});
 
-	describe('Image File Input', () => {
+	describe('File Input', () => {
 		it('renders hidden file input in AI mode', () => {
 			const props = createDefaultProps({
 				session: createMockSession({ inputMode: 'ai' }),
@@ -1174,10 +1174,9 @@ describe('InputArea', () => {
 			render(<InputArea {...props} />);
 
 			// Get the hidden file input
-			const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+			const fileInput = document.getElementById('file-input') as HTMLInputElement;
 			expect(fileInput).toBeInTheDocument();
 			expect(fileInput).toHaveAttribute('type', 'file');
-			expect(fileInput).toHaveAttribute('accept', 'image/*');
 			expect(fileInput).toHaveAttribute('multiple');
 		});
 
@@ -1187,10 +1186,10 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+			const fileInput = document.getElementById('file-input') as HTMLInputElement;
 			const clickSpy = vi.spyOn(fileInput, 'click');
 
-			fireEvent.click(screen.getByTitle('Attach Image'));
+			fireEvent.click(screen.getByTitle('Attach File'));
 
 			expect(clickSpy).toHaveBeenCalled();
 		});
@@ -1203,7 +1202,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+			const fileInput = document.getElementById('file-input') as HTMLInputElement;
 
 			// Create a mock file
 			const file = new File(['fake image content'], 'test.png', { type: 'image/png' });
@@ -1227,7 +1226,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+			const fileInput = document.getElementById('file-input') as HTMLInputElement;
 
 			// Create multiple mock files
 			const file1 = new File(['image1'], 'test1.png', { type: 'image/png' });
@@ -1252,7 +1251,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+			const fileInput = document.getElementById('file-input') as HTMLInputElement;
 			const file = new File(['content'], 'test.png', { type: 'image/png' });
 
 			await act(async () => {
@@ -1272,7 +1271,7 @@ describe('InputArea', () => {
 			});
 			render(<InputArea {...props} />);
 
-			const fileInput = document.getElementById('image-file-input') as HTMLInputElement;
+			const fileInput = document.getElementById('file-input') as HTMLInputElement;
 
 			// Trigger with empty/null files
 			await act(async () => {

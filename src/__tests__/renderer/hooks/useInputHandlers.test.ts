@@ -1305,6 +1305,7 @@ describe('useInputHandlers', () => {
 
 				const mockBlob = new Blob(['image-data'], { type: 'image/png' });
 				const mockItem = {
+					kind: 'file',
 					type: 'image/png',
 					getAsFile: vi.fn().mockReturnValue(mockBlob),
 				};
