@@ -121,6 +121,69 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// Diff between two refs (e.g., git diff baseRef...headRef -- [file])
+	ipcMain.handle(
+		'git:diffRefs',
+		withIpcErrorLogging(
+			handlerOpts('diffRefs'),
+			async (
+				cwd: string,
+				baseRef: string,
+				headRef?: string,
+				file?: string,
+				sshRemoteId?: string,
+				remoteCwd?: string
+			) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const refSpec = headRef ? `${baseRef}...${headRef}` : baseRef;
+				const args = ['diff', refSpec];
+				if (file) {
+					args.push('--', file);
+				}
+				const result = await execGit(args, cwd, sshRemote, effectiveRemoteCwd);
+				return { stdout: result.stdout, stderr: result.stderr };
+			}
+		)
+	);
+
+	// Diff of staged changes (git diff --cached [file])
+	ipcMain.handle(
+		'git:diffStaged',
+		withIpcErrorLogging(
+			handlerOpts('diffStaged'),
+			async (cwd: string, file?: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const args = ['diff', '--cached'];
+				if (file) {
+					args.push('--', file);
+				}
+				const result = await execGit(args, cwd, sshRemote, effectiveRemoteCwd);
+				return { stdout: result.stdout, stderr: result.stderr };
+			}
+		)
+	);
+
+	// Find merge base between two refs
+	ipcMain.handle(
+		'git:mergeBase',
+		withIpcErrorLogging(
+			handlerOpts('mergeBase'),
+			async (cwd: string, ref1: string, ref2: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const result = await execGit(
+					['merge-base', ref1, ref2],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				return { stdout: result.stdout.trim(), stderr: result.stderr };
+			}
+		)
+	);
+
 	ipcMain.handle(
 		'git:isRepo',
 		withIpcErrorLogging(
@@ -673,7 +736,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				}
 
 				// Worktree doesn't exist, create it
-				// First check if the branch exists
+				// First check if the branch exists locally
 				const branchExistsResult = await execFileNoThrow(
 					'git',
 					['rev-parse', '--verify', branchName],
@@ -681,16 +744,36 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				);
 				const branchExists = branchExistsResult.exitCode === 0;
 
+				// If not local, check if it exists on remote and set up tracking
+				let remoteBranchExists = false;
+				if (!branchExists) {
+					const remoteBranchResult = await execFileNoThrow(
+						'git',
+						['rev-parse', '--verify', `origin/${branchName}`],
+						mainRepoCwd
+					);
+					remoteBranchExists = remoteBranchResult.exitCode === 0;
+					if (remoteBranchExists) {
+						// Fetch latest and create a local tracking branch
+						await execFileNoThrow('git', ['fetch', 'origin', branchName], mainRepoCwd);
+						await execFileNoThrow(
+							'git',
+							['branch', '--track', branchName, `origin/${branchName}`],
+							mainRepoCwd
+						);
+					}
+				}
+
 				let createResult;
-				if (branchExists) {
-					// Branch exists, just add worktree pointing to it
+				if (branchExists || remoteBranchExists) {
+					// Branch exists (locally or just fetched from remote), add worktree pointing to it
 					createResult = await execFileNoThrow(
 						'git',
 						['worktree', 'add', worktreePath, branchName],
 						mainRepoCwd
 					);
 				} else {
-					// Branch doesn't exist, create it with -b flag
+					// Branch doesn't exist anywhere, create it with -b flag
 					// If baseBranch is specified, use it as the starting point for the new branch
 					const args = ['worktree', 'add', '-b', branchName, worktreePath];
 					if (baseBranch) {
@@ -1522,6 +1605,51 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 			}
 			return { remotes };
 		})
+	);
+
+	// Get PR status for a branch using gh CLI
+	// Returns PR state, URL, and number, or null if no PR exists
+	ipcMain.handle(
+		'git:prStatus',
+		withIpcErrorLogging(
+			{ context: LOG_CONTEXT, operation: 'prStatus' },
+			async (repoPath: string, branch: string) => {
+				let ghCommand: string;
+				try {
+					ghCommand = await resolveGhPath();
+				} catch {
+					// gh CLI not installed
+					return null;
+				}
+
+				const result = await execFileNoThrow(
+					ghCommand,
+					['pr', 'view', branch, '--json', 'state,url,number,headRefName'],
+					repoPath
+				);
+
+				if (result.exitCode !== 0) {
+					// No PR exists for this branch, or other error
+					return null;
+				}
+
+				try {
+					const data = JSON.parse(result.stdout.trim());
+					return {
+						state: data.state as 'OPEN' | 'MERGED' | 'CLOSED',
+						url: data.url as string,
+						number: data.number as number,
+					};
+				} catch {
+					logger.warn(
+						`${LOG_CONTEXT} Failed to parse gh pr view output for branch ${branch}`,
+						LOG_CONTEXT,
+						result.stdout
+					);
+					return null;
+				}
+			}
+		)
 	);
 
 	logger.debug(`${LOG_CONTEXT} Git IPC handlers registered`);

@@ -86,6 +86,42 @@ export function createGitApi() {
 			ipcRenderer.invoke('git:diff', cwd, file, sshRemoteId, remoteCwd),
 
 		/**
+		 * Get diff between two refs (e.g., git diff baseRef...headRef -- [file])
+		 */
+		diffRefs: (
+			cwd: string,
+			baseRef: string,
+			headRef?: string,
+			file?: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ stdout: string; stderr: string }> =>
+			ipcRenderer.invoke('git:diffRefs', cwd, baseRef, headRef, file, sshRemoteId, remoteCwd),
+
+		/**
+		 * Get diff of staged changes (git diff --cached [file])
+		 */
+		diffStaged: (
+			cwd: string,
+			file?: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ stdout: string; stderr: string }> =>
+			ipcRenderer.invoke('git:diffStaged', cwd, file, sshRemoteId, remoteCwd),
+
+		/**
+		 * Find the merge base between two refs
+		 */
+		mergeBase: (
+			cwd: string,
+			ref1: string,
+			ref2: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ stdout: string; stderr: string }> =>
+			ipcRenderer.invoke('git:mergeBase', cwd, ref1, ref2, sshRemoteId, remoteCwd),
+
+		/**
 		 * Check if a directory is a git repository
 		 */
 		isRepo: (cwd: string, sshRemoteId?: string, remoteCwd?: string): Promise<boolean> =>
@@ -377,6 +413,16 @@ export function createGitApi() {
 			sshRemoteId?: string
 		): Promise<{ remotes: { name: string; url: string }[] }> =>
 			ipcRenderer.invoke('git:listRemotes', cwd, sshRemoteId),
+
+		/**
+		 * Get PR status for a branch using GitHub CLI
+		 * Returns PR state, URL, and number, or null if no PR exists
+		 */
+		getPrStatus: (
+			repoPath: string,
+			branch: string
+		): Promise<{ state: 'OPEN' | 'MERGED' | 'CLOSED'; url: string; number: number } | null> =>
+			ipcRenderer.invoke('git:prStatus', repoPath, branch),
 
 		/**
 		 * Subscribe to discovered worktrees

@@ -97,6 +97,71 @@ export const gitService = {
 	},
 
 	/**
+	 * Get diff between two refs (e.g., branch divergence point)
+	 * @param cwd Working directory path
+	 * @param baseRef Base ref for the diff (e.g., 'main')
+	 * @param headRef Optional head ref (defaults to HEAD)
+	 * @param file Optional file path to restrict diff
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async getDiffRefs(
+		cwd: string,
+		baseRef: string,
+		headRef?: string,
+		file?: string,
+		sshRemoteId?: string
+	): Promise<GitDiff> {
+		return createIpcMethod({
+			call: async () => {
+				const result = await window.maestro.git.diffRefs(cwd, baseRef, headRef, file, sshRemoteId);
+				return { diff: result.stdout };
+			},
+			errorContext: 'Git diffRefs',
+			defaultValue: { diff: '' },
+		});
+	},
+
+	/**
+	 * Get diff of staged changes
+	 * @param cwd Working directory path
+	 * @param file Optional file path to restrict diff
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async getDiffStaged(cwd: string, file?: string, sshRemoteId?: string): Promise<GitDiff> {
+		return createIpcMethod({
+			call: async () => {
+				const result = await window.maestro.git.diffStaged(cwd, file, sshRemoteId);
+				return { diff: result.stdout };
+			},
+			errorContext: 'Git diffStaged',
+			defaultValue: { diff: '' },
+		});
+	},
+
+	/**
+	 * Find the merge base between two refs
+	 * @param cwd Working directory path
+	 * @param ref1 First ref
+	 * @param ref2 Second ref
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async getMergeBase(
+		cwd: string,
+		ref1: string,
+		ref2: string,
+		sshRemoteId?: string
+	): Promise<string> {
+		return createIpcMethod({
+			call: async () => {
+				const result = await window.maestro.git.mergeBase(cwd, ref1, ref2, sshRemoteId);
+				return result.stdout;
+			},
+			errorContext: 'Git mergeBase',
+			defaultValue: '',
+		});
+	},
+
+	/**
 	 * Get line-level statistics for all changes
 	 * @param cwd Working directory path
 	 * @param sshRemoteId Optional SSH remote ID for remote execution
@@ -177,6 +242,23 @@ export const gitService = {
 			call: () => window.maestro.git.runWorktreeScript(script, cwd, sshRemoteId),
 			errorContext: 'Git runWorktreeScript',
 			defaultValue: { success: false, error: 'IPC call failed' },
+		});
+	},
+
+	/**
+	 * Get PR status for a branch using GitHub CLI
+	 * Returns PR state, URL, and number, or null if no PR exists
+	 * @param repoPath Path to the git repository
+	 * @param branch Branch name to check for PRs
+	 */
+	async getPrStatus(
+		repoPath: string,
+		branch: string
+	): Promise<{ state: 'OPEN' | 'MERGED' | 'CLOSED'; url: string; number: number } | null> {
+		return createIpcMethod({
+			call: () => window.maestro.git.getPrStatus(repoPath, branch),
+			errorContext: 'Git getPrStatus',
+			defaultValue: null,
 		});
 	},
 

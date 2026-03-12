@@ -20,6 +20,7 @@ export type {
 	BatchDocumentEntry,
 	ThinkingMode,
 	WorktreeRunTarget,
+	WorktreeStatus,
 } from '../../shared/types';
 
 // Import for extension in this file
@@ -36,11 +37,23 @@ import type {
 // Import AgentError for use within this file
 import type { AgentError } from '../../shared/types';
 
+/**
+ * A staged file attachment for sending with AI messages.
+ * Text files (<1MB) include inline content; binary/large files include only the path.
+ */
+export interface StagedFile {
+	name: string;
+	content?: string; // Inline text content (for text files <1MB)
+	path?: string; // File path reference (for binary/large files)
+	mimeType: string;
+	size: number;
+}
+
 export type SessionState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'error';
 export type FileChangeType = 'modified' | 'added' | 'deleted';
 export type RightPanelTab = 'files';
-/** Active tab in the top section of the right panel (file explorer or a file preview tab) */
-export type RightTopTab = 'explorer' | string;
+/** Active tab in the top section of the right panel (file explorer, changes, or a file preview tab) */
+export type RightTopTab = 'explorer' | 'changes' | string;
 export type SettingsTab =
 	| 'general'
 	| 'shortcuts'
@@ -443,6 +456,7 @@ export interface AITab {
 	agentError?: AgentError; // Tab-specific agent error (shown in banner)
 	inputValue: string; // Pending input text for this tab
 	stagedImages: string[]; // Staged images (base64) for this tab
+	stagedFiles?: StagedFile[]; // Staged non-image file attachments for this tab
 	usageStats?: UsageStats; // Token usage for this tab
 	createdAt: number; // Timestamp for ordering
 	state: 'idle' | 'busy'; // Tab-level state for write-mode tracking
@@ -513,10 +527,30 @@ export interface FilePreviewTab {
 }
 
 /**
+ * Diff View Tab for viewing git diffs in the main panel.
+ * Supports uncommitted (staged/unstaged) and committed diffs.
+ */
+export interface DiffViewTab {
+	id: string; // Unique tab ID (UUID)
+	filePath: string; // Full file path being diffed
+	fileName: string; // Filename for display in tab
+	oldContent: string; // Content of the file at the base ref
+	newContent: string; // Content of the file at the head ref (or working tree)
+	oldRef: string; // Label for the base ref (e.g., 'HEAD', commit hash, branch name)
+	newRef: string; // Label for the head ref (e.g., 'Working Tree', 'Staged', commit hash)
+	diffType: 'uncommitted-staged' | 'uncommitted-unstaged' | 'committed' | 'commit';
+	commitHash?: string; // Commit hash (for 'commit' diffType)
+	rawDiff?: string; // Pre-computed unified diff text (used instead of oldContent/newContent when present)
+	viewMode: 'unified' | 'split';
+	scrollTop: number; // Saved scroll position
+	createdAt: number; // Timestamp for ordering
+}
+
+/**
  * Reference to any tab in the unified tab system.
  * Used for unified tab ordering across different tab types.
  */
-export type UnifiedTabRef = { type: 'ai' | 'file'; id: string };
+export type UnifiedTabRef = { type: 'ai' | 'file' | 'diff'; id: string };
 
 /**
  * Unified tab entry for rendering in TabBar.
@@ -525,16 +559,18 @@ export type UnifiedTabRef = { type: 'ai' | 'file'; id: string };
  */
 export type UnifiedTab =
 	| { type: 'ai'; id: string; data: AITab }
-	| { type: 'file'; id: string; data: FilePreviewTab };
+	| { type: 'file'; id: string; data: FilePreviewTab }
+	| { type: 'diff'; id: string; data: DiffViewTab };
 
 /**
  * Unified closed tab entry for undo functionality (Cmd+Shift+T).
- * Can hold either an AITab or FilePreviewTab with type discrimination.
+ * Can hold either an AITab, FilePreviewTab, or DiffViewTab with type discrimination.
  * Uses unifiedIndex for restoring position in the unified tab order.
  */
 export type ClosedTabEntry =
 	| { type: 'ai'; tab: AITab; unifiedIndex: number; closedAt: number }
-	| { type: 'file'; tab: FilePreviewTab; unifiedIndex: number; closedAt: number };
+	| { type: 'file'; tab: FilePreviewTab; unifiedIndex: number; closedAt: number }
+	| { type: 'diff'; tab: DiffViewTab; unifiedIndex: number; closedAt: number };
 
 export interface Session {
 	id: string;
@@ -579,6 +615,12 @@ export interface Session {
 	// Worktree child indicator (only set on worktree child sessions)
 	parentSessionId?: string; // Links back to parent agent session
 	worktreeBranch?: string; // The git branch this worktree is checked out to
+	worktreeStatus?: import('../../shared/types').WorktreeStatus; // Kanban column (todo/in_progress/in_review/done)
+	worktreeManualStatus?: boolean; // True when status was manually set via drag-and-drop (overrides auto-detection)
+	worktreePrNumber?: number; // Linked PR number (for status detection and quick access)
+	worktreePrUrl?: string; // PR URL for quick access (e.g., open in browser)
+	worktreeArchivedAt?: number; // Timestamp when moved to Done (for auto-archive countdown)
+	worktreeArchived?: boolean; // True when auto-archived (hidden from sidebar, worktree dir kept on disk)
 	// Whether worktree children are expanded in the sidebar (only on parent sessions)
 	worktreesExpanded?: boolean;
 	// Legacy: Worktree parent path for auto-discovery (will be migrated to worktreeConfig)
@@ -658,9 +700,16 @@ export interface Session {
 	filePreviewTabs: FilePreviewTab[];
 	// Currently active file tab ID (null if an AI tab is active)
 	activeFileTabId: string | null;
-	// Unified tab ordering - determines visual order of all tabs (AI and file)
+
+	// Diff View Tabs - in-tab diff viewing for git changes
+	// Stored separately for type safety, interspersed visually via unifiedTabOrder
+	diffViewTabs: DiffViewTab[];
+	// Currently active diff tab ID (null if an AI or file tab is active)
+	activeDiffTabId: string | null;
+
+	// Unified tab ordering - determines visual order of all tabs (AI, file, and diff)
 	unifiedTabOrder: UnifiedTabRef[];
-	// Stack of recently closed tabs (both AI and file) for undo (max 25, runtime-only, not persisted)
+	// Stack of recently closed tabs (AI, file, and diff) for undo (max 25, runtime-only, not persisted)
 	// Used by Cmd+Shift+T to restore any recently closed tab
 	unifiedClosedTabHistory: ClosedTabEntry[];
 

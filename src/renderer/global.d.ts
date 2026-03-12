@@ -364,6 +364,27 @@ interface MaestroAPI {
 			sshRemoteId?: string,
 			remoteCwd?: string
 		) => Promise<{ stdout: string; stderr: string }>;
+		diffRefs: (
+			cwd: string,
+			baseRef: string,
+			headRef?: string,
+			file?: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ stdout: string; stderr: string }>;
+		diffStaged: (
+			cwd: string,
+			file?: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ stdout: string; stderr: string }>;
+		mergeBase: (
+			cwd: string,
+			ref1: string,
+			ref2: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ stdout: string; stderr: string }>;
 		isRepo: (cwd: string, sshRemoteId?: string, remoteCwd?: string) => Promise<boolean>;
 		numstat: (
 			cwd: string,
@@ -586,6 +607,17 @@ interface MaestroAPI {
 		) => Promise<{
 			remotes: Array<{ name: string; url: string }>;
 		}>;
+		/**
+		 * Get PR status for a branch using GitHub CLI
+		 */
+		getPrStatus: (
+			repoPath: string,
+			branch: string
+		) => Promise<{
+			state: 'OPEN' | 'MERGED' | 'CLOSED';
+			url: string;
+			number: number;
+		} | null>;
 		onWorktreeDiscovered: (
 			callback: (data: {
 				sessionId: string;

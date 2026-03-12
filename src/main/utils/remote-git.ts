@@ -406,7 +406,7 @@ export async function worktreeSetupRemote(
 	}
 
 	// Worktree doesn't exist, create it
-	// First check if branch exists
+	// First check if branch exists locally
 	const branchExistsResult = await execGitRemote(['rev-parse', '--verify', branchName], {
 		sshRemote,
 		remoteCwd: mainRepoCwd,
@@ -414,8 +414,28 @@ export async function worktreeSetupRemote(
 
 	const branchExists = branchExistsResult.exitCode === 0;
 
+	// If not local, check if it exists on remote and set up tracking
+	let remoteBranchExists = false;
+	if (!branchExists) {
+		const remoteBranchResult = await execGitRemote(
+			['rev-parse', '--verify', `origin/${branchName}`],
+			{ sshRemote, remoteCwd: mainRepoCwd }
+		);
+		remoteBranchExists = remoteBranchResult.exitCode === 0;
+		if (remoteBranchExists) {
+			await execGitRemote(['fetch', 'origin', branchName], {
+				sshRemote,
+				remoteCwd: mainRepoCwd,
+			});
+			await execGitRemote(['branch', '--track', branchName, `origin/${branchName}`], {
+				sshRemote,
+				remoteCwd: mainRepoCwd,
+			});
+		}
+	}
+
 	let createResult: ExecResult;
-	if (branchExists) {
+	if (branchExists || remoteBranchExists) {
 		createResult = await execGitRemote(['worktree', 'add', worktreePath, branchName], {
 			sshRemote,
 			remoteCwd: mainRepoCwd,

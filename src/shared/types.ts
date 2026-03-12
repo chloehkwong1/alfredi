@@ -25,6 +25,13 @@ export const OUTPUT_STYLE_OPTIONS: { id: OutputStyle; label: string; description
 	{ id: 'learning', label: 'Learning', description: 'Collaborative with TODO(human) prompts' },
 ];
 
+/**
+ * Kanban-style status for worktree children in the Left Bar.
+ * Worktrees flow: todo → in_progress → in_review → done.
+ * Auto-detected from PR status and agent activity, or set manually via drag-and-drop.
+ */
+export type WorktreeStatus = 'todo' | 'in_progress' | 'in_review' | 'done';
+
 // Worktree configuration at the Project level.
 // Persists across sessions — agents inherit this from their project.
 export interface ProjectWorktreeConfig {
@@ -35,6 +42,7 @@ export interface ProjectWorktreeConfig {
 	setupScript?: string; // Runs after worktree creation (e.g., "npm install")
 	runScript?: string; // Runs on play/start action (e.g., "npm run dev")
 	archiveScript?: string; // Runs before worktree removal (e.g., "rm -rf node_modules")
+	autoArchiveDays?: number; // Days after a worktree reaches 'done' before auto-archiving (default: 7)
 }
 
 // Project (repo-aware grouping with a root directory)
