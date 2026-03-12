@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type {
 	Session,
 	AITab,
+	DiffViewTab,
 	FilePreviewTab,
 	UnifiedTab,
 	UnifiedTabRef,
@@ -14,6 +15,7 @@ import {
 	createTab,
 	closeTab,
 	closeFileTab as closeFileTabHelper,
+	closeDiffTab as closeDiffTabHelper,
 	addAiTabToUnifiedHistory,
 	getActiveTab,
 	getInitialRenameValue,
@@ -31,7 +33,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 // ============================================================================
 
 export interface CloseCurrentTabResult {
-	type: 'file' | 'ai' | 'prevented' | 'none';
+	type: 'file' | 'ai' | 'diff' | 'prevented' | 'none';
 	tabId?: string;
 	isWizardTab?: boolean;
 }
@@ -44,11 +46,24 @@ interface FileTabOpenParams {
 	lastModified?: number;
 }
 
+interface DiffTabOpenParams {
+	filePath: string;
+	fileName: string;
+	oldContent: string;
+	newContent: string;
+	oldRef: string;
+	newRef: string;
+	diffType: DiffViewTab['diffType'];
+	commitHash?: string;
+	rawDiff?: string;
+}
+
 export interface TabHandlersReturn {
 	// Derived state
 	activeTab: AITab | undefined;
 	unifiedTabs: UnifiedTab[];
 	activeFileTab: FilePreviewTab | null;
+	activeDiffTab: DiffViewTab | null;
 	isResumingSession: boolean;
 	fileTabBackHistory: FilePreviewHistoryEntry[];
 	fileTabForwardHistory: FilePreviewHistoryEntry[];
@@ -87,6 +102,11 @@ export interface TabHandlersReturn {
 	handleOpenFileTab: (file: FileTabOpenParams, options?: { openInNewTab?: boolean }) => void;
 	handleSelectFileTab: (tabId: string) => Promise<void>;
 	handleCloseFileTab: (tabId: string) => void;
+
+	// Diff Tab handlers
+	handleOpenDiffTab: (params: DiffTabOpenParams) => void;
+	handleSelectDiffTab: (tabId: string) => void;
+	handleCloseDiffTab: (tabId: string) => void;
 	handleFileTabEditModeChange: (tabId: string, editMode: boolean) => void;
 	handleFileTabEditContentChange: (
 		tabId: string,
@@ -163,6 +183,14 @@ export function useTabHandlers(): TabHandlersReturn {
 			activeSession.filePreviewTabs.find((tab) => tab.id === activeSession.activeFileTabId) ?? null
 		);
 	}, [activeSession?.activeFileTabId, activeSession?.filePreviewTabs]);
+
+	const activeDiffTab = useMemo((): DiffViewTab | null => {
+		if (!activeSession?.activeDiffTabId) return null;
+		return (
+			(activeSession.diffViewTabs || []).find((tab) => tab.id === activeSession.activeDiffTabId) ??
+			null
+		);
+	}, [activeSession?.activeDiffTabId, activeSession?.diffViewTabs]);
 
 	const isResumingSession = !!activeTab?.agentSessionId;
 
@@ -435,6 +463,106 @@ export function useTabHandlers(): TabHandlersReturn {
 		},
 		[forceCloseFileTab]
 	);
+
+	// ========================================================================
+	// Diff Tab Handlers
+	// ========================================================================
+
+	/**
+	 * Open a diff view tab. If a tab with the same filePath+refs already exists, select it.
+	 * Otherwise, create a new DiffViewTab, add to diffViewTabs and unifiedTabOrder,
+	 * and set it as the active diff tab.
+	 */
+	const handleOpenDiffTab = useCallback((params: DiffTabOpenParams) => {
+		const { setSessions } = useSessionStore.getState();
+		const activeSessionId = useSessionStore.getState().activeSessionId;
+
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+
+				const diffTabs = s.diffViewTabs || [];
+
+				// Check if a tab with same file+refs already exists
+				const existingTab = diffTabs.find(
+					(tab) =>
+						tab.filePath === params.filePath &&
+						tab.oldRef === params.oldRef &&
+						tab.newRef === params.newRef &&
+						tab.diffType === params.diffType
+				);
+				if (existingTab) {
+					// Update content and select it
+					const updatedTabs = diffTabs.map((tab) =>
+						tab.id === existingTab.id
+							? {
+									...tab,
+									oldContent: params.oldContent,
+									newContent: params.newContent,
+									rawDiff: params.rawDiff,
+								}
+							: tab
+					);
+					return {
+						...s,
+						diffViewTabs: updatedTabs,
+						activeDiffTabId: existingTab.id,
+						activeFileTabId: null,
+						unifiedTabOrder: ensureInUnifiedTabOrder(s.unifiedTabOrder, 'diff', existingTab.id),
+					};
+				}
+
+				// Create new diff tab
+				const newTab: DiffViewTab = {
+					id: generateId(),
+					filePath: params.filePath,
+					fileName: params.fileName,
+					oldContent: params.oldContent,
+					newContent: params.newContent,
+					oldRef: params.oldRef,
+					newRef: params.newRef,
+					diffType: params.diffType,
+					commitHash: params.commitHash,
+					rawDiff: params.rawDiff,
+					viewMode: 'unified',
+					scrollTop: 0,
+					createdAt: Date.now(),
+				};
+
+				return {
+					...s,
+					diffViewTabs: [...diffTabs, newTab],
+					activeDiffTabId: newTab.id,
+					activeFileTabId: null,
+					unifiedTabOrder: [...s.unifiedTabOrder, { type: 'diff' as const, id: newTab.id }],
+				};
+			})
+		);
+	}, []);
+
+	const handleSelectDiffTab = useCallback((tabId: string) => {
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				if (!(s.diffViewTabs || []).some((t) => t.id === tabId)) return s;
+				return { ...s, activeDiffTabId: tabId, activeFileTabId: null };
+			})
+		);
+	}, []);
+
+	const handleCloseDiffTab = useCallback((tabId: string) => {
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const currentSession = sessions.find((s) => s.id === activeSessionId);
+		if (!currentSession) return;
+
+		const result = closeDiffTabHelper(currentSession, tabId);
+		if (result) {
+			setSessions((prev: Session[]) =>
+				prev.map((s) => (s.id === activeSessionId ? result.session : s))
+			);
+		}
+	}, []);
 
 	const handleFileTabEditModeChange = useCallback((tabId: string, editMode: boolean) => {
 		const { setSessions, activeSessionId } = useSessionStore.getState();
@@ -836,7 +964,21 @@ export function useTabHandlers(): TabHandlersReturn {
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return { type: 'none' };
 
-		// Check if a file tab is active first
+		// Check if a diff tab is active first
+		if (session.activeDiffTabId) {
+			const tabId = session.activeDiffTabId;
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					const result = closeDiffTabHelper(s, tabId);
+					if (!result) return s;
+					return result.session;
+				})
+			);
+			return { type: 'diff', tabId };
+		}
+
+		// Check if a file tab is active
 		if (session.activeFileTabId) {
 			const tabId = session.activeFileTabId;
 			setSessions((prev: Session[]) =>
@@ -1370,6 +1512,7 @@ export function useTabHandlers(): TabHandlersReturn {
 		activeTab,
 		unifiedTabs,
 		activeFileTab,
+		activeDiffTab,
 		isResumingSession,
 		fileTabBackHistory,
 		fileTabForwardHistory,
@@ -1405,6 +1548,12 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleOpenFileTab,
 		handleSelectFileTab,
 		handleCloseFileTab,
+
+		// Diff Tab handlers
+		handleOpenDiffTab,
+		handleSelectDiffTab,
+		handleCloseDiffTab,
+
 		handleFileTabEditModeChange,
 		handleFileTabEditContentChange,
 		handleFileTabScrollPositionChange,

@@ -6,6 +6,7 @@ import {
 	AITab,
 	ClosedTab,
 	ClosedTabEntry,
+	DiffViewTab,
 	FilePreviewTab,
 	UnifiedTab,
 	UnifiedTabRef,
@@ -26,10 +27,11 @@ import { getAutoRunFolderPath } from './existingDocsDetector';
  */
 export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	if (!session) return [];
-	const { aiTabs, filePreviewTabs, unifiedTabOrder } = session;
+	const { aiTabs, filePreviewTabs, diffViewTabs, unifiedTabOrder } = session;
 
 	const aiTabMap = new Map((aiTabs || []).map((tab) => [tab.id, tab]));
 	const fileTabMap = new Map((filePreviewTabs || []).map((tab) => [tab.id, tab]));
+	const diffTabMap = new Map((diffViewTabs || []).map((tab) => [tab.id, tab]));
 
 	const result: UnifiedTab[] = [];
 
@@ -41,11 +43,17 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 				result.push({ type: 'ai', id: ref.id, data: tab });
 				aiTabMap.delete(ref.id);
 			}
-		} else {
+		} else if (ref.type === 'file') {
 			const tab = fileTabMap.get(ref.id);
 			if (tab) {
 				result.push({ type: 'file', id: ref.id, data: tab });
 				fileTabMap.delete(ref.id);
+			}
+		} else if (ref.type === 'diff') {
+			const tab = diffTabMap.get(ref.id);
+			if (tab) {
+				result.push({ type: 'diff', id: ref.id, data: tab });
+				diffTabMap.delete(ref.id);
 			}
 		}
 	}
@@ -57,6 +65,9 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	for (const [id, tab] of fileTabMap) {
 		result.push({ type: 'file', id, data: tab });
 	}
+	for (const [id, tab] of diffTabMap) {
+		result.push({ type: 'diff', id, data: tab });
+	}
 
 	return result;
 }
@@ -67,7 +78,7 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
  */
 export function ensureInUnifiedTabOrder(
 	unifiedTabOrder: UnifiedTabRef[],
-	type: 'ai' | 'file',
+	type: 'ai' | 'file' | 'diff',
 	id: string
 ): UnifiedTabRef[] {
 	const exists = unifiedTabOrder.some((ref) => ref.type === type && ref.id === id);
@@ -87,13 +98,16 @@ export function getRepairedUnifiedTabOrder(session: Session): UnifiedTabRef[] {
 	const order = session.unifiedTabOrder || [];
 	const aiTabs = session.aiTabs || [];
 	const fileTabs = session.filePreviewTabs || [];
+	const diffTabs = session.diffViewTabs || [];
 
 	// Build sets of IDs already in the order
 	const aiIdsInOrder = new Set<string>();
 	const fileIdsInOrder = new Set<string>();
+	const diffIdsInOrder = new Set<string>();
 	for (const ref of order) {
 		if (ref.type === 'ai') aiIdsInOrder.add(ref.id);
-		else fileIdsInOrder.add(ref.id);
+		else if (ref.type === 'file') fileIdsInOrder.add(ref.id);
+		else if (ref.type === 'diff') diffIdsInOrder.add(ref.id);
 	}
 
 	// Collect orphaned tabs
@@ -106,6 +120,11 @@ export function getRepairedUnifiedTabOrder(session: Session): UnifiedTabRef[] {
 	for (const tab of fileTabs) {
 		if (!fileIdsInOrder.has(tab.id)) {
 			orphanedRefs.push({ type: 'file', id: tab.id });
+		}
+	}
+	for (const tab of diffTabs) {
+		if (!diffIdsInOrder.has(tab.id)) {
+			orphanedRefs.push({ type: 'diff', id: tab.id });
 		}
 	}
 
@@ -649,36 +668,34 @@ export function closeFileTab(session: Session, tabId: string): CloseFileTabResul
 
 	// Determine new active tab if we closed the active file tab
 	let newActiveFileTabId = session.activeFileTabId;
+	let newActiveDiffTabId = session.activeDiffTabId;
 	let newActiveTabId = session.activeTabId;
 
 	if (session.activeFileTabId === tabId) {
 		// This was the active tab - select the tab to the left in unifiedTabOrder
-		// If closing the first tab, select the new first tab
+		newActiveFileTabId = null;
 		if (updatedUnifiedTabOrder.length > 0 && unifiedIndex !== -1) {
 			// Select the tab to the left (previous tab), or first tab if we were at position 0
 			const newIndex = Math.max(0, unifiedIndex - 1);
 			const nextTabRef = updatedUnifiedTabOrder[newIndex];
 
 			if (nextTabRef.type === 'file') {
-				// Previous tab is a file tab
 				newActiveFileTabId = nextTabRef.id;
+			} else if (nextTabRef.type === 'diff') {
+				newActiveDiffTabId = nextTabRef.id;
 			} else {
-				// Previous tab is an AI tab - switch to it
 				newActiveTabId = nextTabRef.id;
-				newActiveFileTabId = null;
 			}
 		} else if (updatedUnifiedTabOrder.length > 0) {
 			// Fallback: just select the first available tab
 			const firstTabRef = updatedUnifiedTabOrder[0];
 			if (firstTabRef.type === 'file') {
 				newActiveFileTabId = firstTabRef.id;
+			} else if (firstTabRef.type === 'diff') {
+				newActiveDiffTabId = firstTabRef.id;
 			} else {
 				newActiveTabId = firstTabRef.id;
-				newActiveFileTabId = null;
 			}
-		} else {
-			// No tabs left - shouldn't happen as AI tabs should always exist
-			newActiveFileTabId = null;
 		}
 	}
 
@@ -694,6 +711,109 @@ export function closeFileTab(session: Session, tabId: string): CloseFileTabResul
 			...session,
 			filePreviewTabs: updatedFilePreviewTabs,
 			unifiedTabOrder: updatedUnifiedTabOrder,
+			activeFileTabId: newActiveFileTabId,
+			activeDiffTabId: newActiveDiffTabId,
+			activeTabId: newActiveTabId,
+			unifiedClosedTabHistory: updatedUnifiedHistory,
+		},
+	};
+}
+
+/**
+ * Result of closing a diff tab - contains the closed tab entry and updated session.
+ */
+export interface CloseDiffTabResult {
+	closedTabEntry: ClosedTabEntry; // The closed tab data with unified index
+	session: Session; // Updated session with tab removed
+}
+
+/**
+ * Close a diff view tab in a session.
+ * Removes the tab from diffViewTabs and unifiedTabOrder, adds it to unifiedClosedTabHistory.
+ * When the closed tab was active, selects the next tab in unifiedTabOrder.
+ *
+ * @param session - The Maestro session containing the diff tab
+ * @param tabId - The ID of the diff tab to close
+ * @returns Object containing the closed tab entry and updated session, or null if tab not found
+ */
+export function closeDiffTab(session: Session, tabId: string): CloseDiffTabResult | null {
+	if (!session || !session.diffViewTabs || session.diffViewTabs.length === 0) {
+		return null;
+	}
+
+	// Find the tab to close
+	const tabToClose = session.diffViewTabs.find((tab) => tab.id === tabId);
+	if (!tabToClose) {
+		return null;
+	}
+
+	// Find the position in unifiedTabOrder
+	const unifiedIndex = session.unifiedTabOrder.findIndex(
+		(ref) => ref.type === 'diff' && ref.id === tabId
+	);
+
+	// Create closed tab entry
+	const closedTabEntry: ClosedTabEntry = {
+		type: 'diff',
+		tab: { ...tabToClose },
+		unifiedIndex: unifiedIndex !== -1 ? unifiedIndex : session.unifiedTabOrder.length,
+		closedAt: Date.now(),
+	};
+
+	// Remove from diffViewTabs
+	const updatedDiffViewTabs = session.diffViewTabs.filter((tab) => tab.id !== tabId);
+
+	// Remove from unifiedTabOrder
+	const updatedUnifiedTabOrder = session.unifiedTabOrder.filter(
+		(ref) => !(ref.type === 'diff' && ref.id === tabId)
+	);
+
+	// Determine new active tab if we closed the active diff tab
+	let newActiveDiffTabId = session.activeDiffTabId;
+	let newActiveFileTabId = session.activeFileTabId;
+	let newActiveTabId = session.activeTabId;
+
+	if (session.activeDiffTabId === tabId) {
+		// This was the active tab - select the tab to the left in unifiedTabOrder
+		newActiveDiffTabId = null;
+		if (updatedUnifiedTabOrder.length > 0 && unifiedIndex !== -1) {
+			const newIndex = Math.max(0, unifiedIndex - 1);
+			const nextTabRef = updatedUnifiedTabOrder[newIndex];
+
+			if (nextTabRef.type === 'diff') {
+				newActiveDiffTabId = nextTabRef.id;
+			} else if (nextTabRef.type === 'file') {
+				newActiveFileTabId = nextTabRef.id;
+			} else {
+				newActiveTabId = nextTabRef.id;
+				newActiveFileTabId = null;
+			}
+		} else if (updatedUnifiedTabOrder.length > 0) {
+			const firstTabRef = updatedUnifiedTabOrder[0];
+			if (firstTabRef.type === 'diff') {
+				newActiveDiffTabId = firstTabRef.id;
+			} else if (firstTabRef.type === 'file') {
+				newActiveFileTabId = firstTabRef.id;
+			} else {
+				newActiveTabId = firstTabRef.id;
+				newActiveFileTabId = null;
+			}
+		}
+	}
+
+	// Add to unified closed tab history
+	const updatedUnifiedHistory = [closedTabEntry, ...(session.unifiedClosedTabHistory || [])].slice(
+		0,
+		MAX_CLOSED_TAB_HISTORY
+	);
+
+	return {
+		closedTabEntry,
+		session: {
+			...session,
+			diffViewTabs: updatedDiffViewTabs,
+			unifiedTabOrder: updatedUnifiedTabOrder,
+			activeDiffTabId: newActiveDiffTabId,
 			activeFileTabId: newActiveFileTabId,
 			activeTabId: newActiveTabId,
 			unifiedClosedTabHistory: updatedUnifiedHistory,
@@ -739,7 +859,7 @@ export function addAiTabToUnifiedHistory(
  * Result of reopening a tab from unified closed tab history.
  */
 export interface ReopenUnifiedClosedTabResult {
-	tabType: 'ai' | 'file'; // Type of tab that was reopened
+	tabType: 'ai' | 'file' | 'diff'; // Type of tab that was reopened
 	tabId: string; // ID of the restored or existing tab
 	session: Session; // Updated session with tab restored/selected
 	wasDuplicate: boolean; // True if we switched to an existing tab instead of restoring
@@ -860,7 +980,7 @@ export function reopenUnifiedClosedTab(session: Session): ReopenUnifiedClosedTab
 			},
 			wasDuplicate: false,
 		};
-	} else {
+	} else if (closedEntry.type === 'file') {
 		// Restoring a file tab
 		const tabToRestore = closedEntry.tab;
 
@@ -921,6 +1041,65 @@ export function reopenUnifiedClosedTab(session: Session): ReopenUnifiedClosedTab
 			},
 			wasDuplicate: false,
 		};
+	} else {
+		// Restoring a diff tab
+		const tabToRestore = closedEntry.tab as DiffViewTab;
+
+		// Check for duplicate: does a tab with the same filePath + refs already exist?
+		const existingTab = (session.diffViewTabs || []).find(
+			(tab) =>
+				tab.filePath === tabToRestore.filePath &&
+				tab.oldRef === tabToRestore.oldRef &&
+				tab.newRef === tabToRestore.newRef
+		);
+
+		if (existingTab) {
+			// Duplicate found - switch to existing tab instead of restoring
+			return {
+				tabType: 'diff',
+				tabId: existingTab.id,
+				session: {
+					...session,
+					activeDiffTabId: existingTab.id,
+					activeFileTabId: null,
+					unifiedTabOrder: ensureInUnifiedTabOrder(session.unifiedTabOrder, 'diff', existingTab.id),
+					unifiedClosedTabHistory: remainingHistory,
+				},
+				wasDuplicate: true,
+			};
+		}
+
+		// No duplicate - restore the tab
+		const restoredTab: DiffViewTab = {
+			...tabToRestore,
+			id: generateId(),
+		};
+
+		// Add to diffViewTabs
+		const updatedDiffViewTabs = [...(session.diffViewTabs || []), restoredTab];
+
+		// Insert into unifiedTabOrder at the original position
+		const targetUnifiedIndex = Math.min(closedEntry.unifiedIndex, session.unifiedTabOrder.length);
+		const newTabRef: UnifiedTabRef = { type: 'diff', id: restoredTab.id };
+		const updatedUnifiedTabOrder = [
+			...session.unifiedTabOrder.slice(0, targetUnifiedIndex),
+			newTabRef,
+			...session.unifiedTabOrder.slice(targetUnifiedIndex),
+		];
+
+		return {
+			tabType: 'diff',
+			tabId: restoredTab.id,
+			session: {
+				...session,
+				diffViewTabs: updatedDiffViewTabs,
+				activeDiffTabId: restoredTab.id,
+				activeFileTabId: null,
+				unifiedTabOrder: updatedUnifiedTabOrder,
+				unifiedClosedTabHistory: remainingHistory,
+			},
+			wasDuplicate: false,
+		};
 	}
 }
 
@@ -958,22 +1137,27 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 		return null;
 	}
 
-	// If already active and no file tab is selected, return current state (no mutation needed)
-	if (session.activeTabId === tabId && session.activeFileTabId === null) {
+	// If already active and no file/diff tab is selected, return current state (no mutation needed)
+	if (
+		session.activeTabId === tabId &&
+		session.activeFileTabId === null &&
+		session.activeDiffTabId === null
+	) {
 		return {
 			tab: targetTab,
 			session,
 		};
 	}
 
-	// When selecting an AI tab, deselect any active file preview tab
-	// This ensures only one tab type (AI or file) is active at a time
+	// When selecting an AI tab, deselect any active file preview or diff tab
+	// This ensures only one tab type (AI, file, or diff) is active at a time
 	return {
 		tab: targetTab,
 		session: {
 			...session,
 			activeTabId: tabId,
 			activeFileTabId: null,
+			activeDiffTabId: null,
 		},
 	};
 }
@@ -1238,7 +1422,7 @@ export function navigateToLastTab(
  * Result of navigating to a unified tab (can be AI or file tab).
  */
 export interface NavigateToUnifiedTabResult {
-	type: 'ai' | 'file';
+	type: 'ai' | 'file' | 'diff';
 	id: string;
 	session: Session;
 }
@@ -1293,7 +1477,11 @@ export function navigateToUnifiedTabByIndex(
 		if (!aiTab) return null;
 
 		// If already active, return current state (with repair if needed)
-		if (session.activeTabId === targetTabRef.id && session.activeFileTabId === null) {
+		if (
+			session.activeTabId === targetTabRef.id &&
+			session.activeFileTabId === null &&
+			session.activeDiffTabId === null
+		) {
 			return {
 				type: 'ai',
 				id: targetTabRef.id,
@@ -1301,7 +1489,7 @@ export function navigateToUnifiedTabByIndex(
 			};
 		}
 
-		// Set the AI tab as active and clear file tab selection
+		// Set the AI tab as active and clear file/diff tab selection
 		return {
 			type: 'ai',
 			id: targetTabRef.id,
@@ -1309,9 +1497,10 @@ export function navigateToUnifiedTabByIndex(
 				...repairedSession,
 				activeTabId: targetTabRef.id,
 				activeFileTabId: null,
+				activeDiffTabId: null,
 			},
 		};
-	} else {
+	} else if (targetTabRef.type === 'file') {
 		// Navigate to file tab - verify it exists
 		const fileTab = session.filePreviewTabs.find((tab) => tab.id === targetTabRef.id);
 		if (!fileTab) return null;
@@ -1325,13 +1514,38 @@ export function navigateToUnifiedTabByIndex(
 			};
 		}
 
-		// Set the file tab as active (preserve activeTabId for switching back)
+		// Set the file tab as active (preserve activeTabId for switching back, clear diff)
 		return {
 			type: 'file',
 			id: targetTabRef.id,
 			session: {
 				...repairedSession,
 				activeFileTabId: targetTabRef.id,
+				activeDiffTabId: null,
+			},
+		};
+	} else {
+		// Navigate to diff tab - verify it exists
+		const diffTab = (session.diffViewTabs || []).find((tab) => tab.id === targetTabRef.id);
+		if (!diffTab) return null;
+
+		// If already active, return current state (with repair if needed)
+		if (session.activeDiffTabId === targetTabRef.id) {
+			return {
+				type: 'diff',
+				id: targetTabRef.id,
+				session: repairedSession,
+			};
+		}
+
+		// Set the diff tab as active (preserve activeTabId for switching back, clear file)
+		return {
+			type: 'diff',
+			id: targetTabRef.id,
+			session: {
+				...repairedSession,
+				activeFileTabId: null,
+				activeDiffTabId: targetTabRef.id,
 			},
 		};
 	}
@@ -1370,6 +1584,11 @@ function getCurrentUnifiedTabIndex(session: Session, effectiveOrder?: UnifiedTab
 	const order = effectiveOrder || getRepairedUnifiedTabOrder(session);
 	if (order.length === 0) {
 		return -1;
+	}
+
+	// If a diff tab is active, find it in the unified order
+	if (session.activeDiffTabId) {
+		return order.findIndex((ref) => ref.type === 'diff' && ref.id === session.activeDiffTabId);
 	}
 
 	// If a file tab is active, find it in the unified order
@@ -1427,11 +1646,11 @@ export function navigateToNextUnifiedTab(
 			const nextIndex = (currentIndex + offset) % length;
 			const tabRef = effectiveOrder[nextIndex];
 
-			// File tabs are always navigable (if they still exist)
-			if (tabRef.type === 'file') {
+			// File and diff tabs are always navigable (if they still exist)
+			if (tabRef.type === 'file' || tabRef.type === 'diff') {
 				const result = navigateToUnifiedTabByIndex(session, nextIndex);
 				if (result) return result;
-				continue; // Orphaned file tab, skip
+				continue; // Orphaned tab, skip
 			}
 
 			// For AI tabs, check if it's unread or has a draft
@@ -1499,8 +1718,8 @@ export function navigateToPrevUnifiedTab(
 			const prevIndex = (currentIndex - offset + length) % length;
 			const tabRef = effectiveOrder[prevIndex];
 
-			// File tabs are always navigable (if they still exist)
-			if (tabRef.type === 'file') {
+			// File and diff tabs are always navigable (if they still exist)
+			if (tabRef.type === 'file' || tabRef.type === 'diff') {
 				const result = navigateToUnifiedTabByIndex(session, prevIndex);
 				if (result) return result;
 				continue; // Orphaned file tab, skip
@@ -1701,6 +1920,8 @@ export function createMergedSession(
 		closedTabHistory: [],
 		filePreviewTabs: [],
 		activeFileTabId: null,
+		diffViewTabs: [],
+		activeDiffTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: tabId }],
 		unifiedClosedTabHistory: [],
 		// Default Auto Run folder path (user can change later)

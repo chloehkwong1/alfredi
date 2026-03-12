@@ -25,7 +25,7 @@
  */
 
 import { create } from 'zustand';
-import type { AITab, FilePreviewTab, UnifiedTab, Session } from '../types';
+import type { AITab, DiffViewTab, FilePreviewTab, UnifiedTab, Session } from '../types';
 /** Gist metadata for a published file */
 export interface GistInfo {
 	gistUrl: string;
@@ -36,6 +36,7 @@ import {
 	createTab as createTabHelper,
 	closeTab as closeTabHelper,
 	closeFileTab as closeFileTabHelper,
+	closeDiffTab as closeDiffTabHelper,
 	reopenUnifiedClosedTab as reopenUnifiedClosedTabHelper,
 	setActiveTab as setActiveTabHelper,
 	getActiveTab,
@@ -49,6 +50,7 @@ import {
 	type CloseTabOptions,
 	type CloseTabResult,
 	type CloseFileTabResult,
+	type CloseDiffTabResult,
 	type ReopenUnifiedClosedTabResult,
 	type SetActiveTabResult,
 	type NavigateToUnifiedTabResult,
@@ -92,6 +94,18 @@ export interface TabStoreActions {
 	 * Wraps tabHelpers.closeFileTab + updates sessionStore.
 	 */
 	closeFileTab: (tabId: string) => CloseFileTabResult | null;
+
+	/**
+	 * Close a diff view tab in the active session.
+	 * Wraps tabHelpers.closeDiffTab + updates sessionStore.
+	 */
+	closeDiffTab: (tabId: string) => CloseDiffTabResult | null;
+
+	/**
+	 * Select a diff view tab in the active session.
+	 * Updates session's activeDiffTabId directly.
+	 */
+	selectDiffTab: (tabId: string) => void;
 
 	/**
 	 * Reopen the most recently closed tab (AI or file) in the active session.
@@ -197,6 +211,18 @@ export interface TabStoreActions {
 	 * Toggle edit mode on a file preview tab.
 	 */
 	toggleFileTabEditMode: (tabId: string) => void;
+
+	// === Diff tab content operations ===
+
+	/**
+	 * Update the view mode (unified/split) of a diff view tab.
+	 */
+	updateDiffTabViewMode: (tabId: string, viewMode: 'unified' | 'split') => void;
+
+	/**
+	 * Update the scroll position of a diff view tab.
+	 */
+	updateDiffTabScrollPosition: (tabId: string, scrollTop: number) => void;
 }
 
 export type TabStore = TabStoreState & TabStoreActions;
@@ -238,6 +264,24 @@ function updateAiTab(tabId: string, updates: Partial<AITab>): void {
 			const newTabs = [...s.aiTabs];
 			newTabs[tabIndex] = { ...newTabs[tabIndex], ...updates };
 			return { ...s, aiTabs: newTabs };
+		})
+	);
+}
+
+/**
+ * Update a specific diff view tab within the active session.
+ */
+function updateDiffTab(tabId: string, updates: Partial<DiffViewTab>): void {
+	const { activeSessionId } = useSessionStore.getState();
+	useSessionStore.getState().setSessions((prev) =>
+		prev.map((s) => {
+			if (s.id !== activeSessionId) return s;
+			const tabs = s.diffViewTabs || [];
+			const tabIndex = tabs.findIndex((t) => t.id === tabId);
+			if (tabIndex === -1) return s;
+			const newTabs = [...tabs];
+			newTabs[tabIndex] = { ...newTabs[tabIndex], ...updates };
+			return { ...s, diffViewTabs: newTabs };
 		})
 	);
 }
@@ -316,6 +360,23 @@ export const useTabStore = create<TabStore>()((set) => ({
 		if (!result) return null;
 		updateActiveSession(result.session);
 		return result;
+	},
+
+	closeDiffTab: (tabId) => {
+		const session = getActiveSession();
+		if (!session) return null;
+		const result = closeDiffTabHelper(session, tabId);
+		if (!result) return null;
+		updateActiveSession(result.session);
+		return result;
+	},
+
+	selectDiffTab: (tabId) => {
+		const session = getActiveSession();
+		if (!session) return;
+		// Verify the diff tab exists
+		if (!(session.diffViewTabs || []).some((t) => t.id === tabId)) return;
+		updateActiveSession({ ...session, activeDiffTabId: tabId, activeFileTabId: null });
 	},
 
 	reopenClosedTab: () => {
@@ -448,6 +509,10 @@ export const useTabStore = create<TabStore>()((set) => ({
 		if (!tab) return;
 		updateFileTab(tabId, { editMode: !tab.editMode });
 	},
+
+	// Diff tab content operations
+	updateDiffTabViewMode: (tabId, viewMode) => updateDiffTab(tabId, { viewMode }),
+	updateDiffTabScrollPosition: (tabId, scrollTop) => updateDiffTab(tabId, { scrollTop }),
 }));
 
 // ============================================================================
@@ -481,6 +546,18 @@ export const selectActiveFileTab = (
 	const session = selectActiveSession(state);
 	if (!session || !session.activeFileTabId) return undefined;
 	return session.filePreviewTabs.find((t) => t.id === session.activeFileTabId);
+};
+
+/**
+ * Select the active diff view tab from the active session.
+ * Use with useSessionStore: `useSessionStore(selectActiveDiffTab)`
+ */
+export const selectActiveDiffTab = (
+	state: ReturnType<typeof useSessionStore.getState>
+): DiffViewTab | undefined => {
+	const session = selectActiveSession(state);
+	if (!session || !session.activeDiffTabId) return undefined;
+	return (session.diffViewTabs || []).find((t) => t.id === session.activeDiffTabId);
 };
 
 /**
@@ -591,10 +668,12 @@ export function getTabActions() {
 		createTab: state.createTab,
 		closeTab: state.closeTab,
 		closeFileTab: state.closeFileTab,
+		closeDiffTab: state.closeDiffTab,
 		reopenClosedTab: state.reopenClosedTab,
 		// Tab navigation
 		selectTab: state.selectTab,
 		selectFileTab: state.selectFileTab,
+		selectDiffTab: state.selectDiffTab,
 		navigateToNext: state.navigateToNext,
 		navigateToPrev: state.navigateToPrev,
 		navigateToIndex: state.navigateToIndex,
@@ -613,5 +692,8 @@ export function getTabActions() {
 		updateFileTabScrollPosition: state.updateFileTabScrollPosition,
 		updateFileTabSearchQuery: state.updateFileTabSearchQuery,
 		toggleFileTabEditMode: state.toggleFileTabEditMode,
+		// Diff tab operations
+		updateDiffTabViewMode: state.updateDiffTabViewMode,
+		updateDiffTabScrollPosition: state.updateDiffTabScrollPosition,
 	};
 }

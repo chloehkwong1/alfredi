@@ -20,8 +20,9 @@ import {
 	Loader2,
 	ExternalLink,
 	FolderOpen,
+	GitCompare,
 } from 'lucide-react';
-import type { AITab, Theme, FilePreviewTab, UnifiedTab } from '../types';
+import type { AITab, Theme, DiffViewTab, FilePreviewTab, UnifiedTab } from '../types';
 import { hasDraft } from '../utils/tabHelpers';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { getExtensionColor } from '../utils/extensionColors';
@@ -76,6 +77,12 @@ interface TabBarProps {
 	onFileTabSelect?: (tabId: string) => void;
 	/** Handler to close a file preview tab */
 	onFileTabClose?: (tabId: string) => void;
+	/** Currently active diff tab ID (null if a non-diff tab is active) */
+	activeDiffTabId?: string | null;
+	/** Handler to select a diff view tab */
+	onDiffTabSelect?: (tabId: string) => void;
+	/** Handler to close a diff view tab */
+	onDiffTabClose?: (tabId: string) => void;
 
 	// === Accessibility ===
 	/** Whether colorblind-friendly colors should be used for extension badges */
@@ -1500,6 +1507,223 @@ const FileTab = memo(function FileTab({
 });
 
 /**
+ * Props for the DiffTab component.
+ */
+interface DiffTabProps {
+	tab: DiffViewTab;
+	isActive: boolean;
+	theme: Theme;
+	onSelect: (tabId: string) => void;
+	onClose: (tabId: string) => void;
+	onDragStart: (tabId: string, e: React.DragEvent) => void;
+	onDragOver: (tabId: string, e: React.DragEvent) => void;
+	onDragEnd: () => void;
+	onDrop: (tabId: string, e: React.DragEvent) => void;
+	isDragging: boolean;
+	isDragOver: boolean;
+	registerRef?: (el: HTMLDivElement | null) => void;
+	onMoveToFirst?: (tabId: string) => void;
+	onMoveToLast?: (tabId: string) => void;
+	isFirstTab?: boolean;
+	isLastTab?: boolean;
+	onCloseOtherTabs?: (tabId: string) => void;
+	onCloseTabsLeft?: (tabId: string) => void;
+	onCloseTabsRight?: (tabId: string) => void;
+	totalTabs?: number;
+	tabIndex?: number;
+	shortcutHint?: number | null;
+}
+
+/**
+ * Individual diff tab component for diff view tabs.
+ * Displays a git compare icon with the filename and a colored diff type badge.
+ */
+const DiffTab = memo(function DiffTab({
+	tab,
+	isActive,
+	theme,
+	onSelect,
+	onClose,
+	onDragStart,
+	onDragOver,
+	onDragEnd,
+	onDrop,
+	isDragging,
+	isDragOver,
+	registerRef,
+	shortcutHint,
+}: DiffTabProps) {
+	const [isHovered, setIsHovered] = useState(false);
+	const tabRef = useRef<HTMLDivElement>(null);
+
+	const setTabRef = useCallback(
+		(el: HTMLDivElement | null) => {
+			(tabRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+			registerRef?.(el);
+		},
+		[registerRef]
+	);
+
+	const handleMouseEnter = () => setIsHovered(true);
+	const handleMouseLeave = () => setIsHovered(false);
+
+	const handleMouseDown = useCallback(
+		(e: React.MouseEvent) => {
+			if (e.button === 1) {
+				e.preventDefault();
+				onClose(tab.id);
+			}
+		},
+		[onClose, tab.id]
+	);
+
+	const handleCloseClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onClose(tab.id);
+		},
+		[onClose, tab.id]
+	);
+
+	const handleTabSelect = useCallback(() => {
+		onSelect(tab.id);
+	}, [onSelect, tab.id]);
+
+	const handleTabDragStart = useCallback(
+		(e: React.DragEvent) => {
+			onDragStart(tab.id, e);
+		},
+		[onDragStart, tab.id]
+	);
+
+	const handleTabDragOver = useCallback(
+		(e: React.DragEvent) => {
+			onDragOver(tab.id, e);
+		},
+		[onDragOver, tab.id]
+	);
+
+	const handleTabDrop = useCallback(
+		(e: React.DragEvent) => {
+			onDrop(tab.id, e);
+		},
+		[onDrop, tab.id]
+	);
+
+	const hoverBgColor = theme.mode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)';
+
+	const tabStyle = useMemo(
+		() =>
+			({
+				borderTopLeftRadius: '6px',
+				borderTopRightRadius: '6px',
+				backgroundColor: isActive ? theme.colors.bgMain : isHovered ? hoverBgColor : 'transparent',
+				borderTop: isActive ? `1px solid ${theme.colors.border}` : '1px solid transparent',
+				borderLeft: isActive ? `1px solid ${theme.colors.border}` : '1px solid transparent',
+				borderRight: isActive ? `1px solid ${theme.colors.border}` : '1px solid transparent',
+				borderBottom: isActive ? `1px solid ${theme.colors.bgMain}` : '1px solid transparent',
+				marginBottom: isActive ? '-1px' : '0',
+				zIndex: isActive ? 1 : 0,
+				'--tw-ring-color': isDragOver ? theme.colors.accent : 'transparent',
+			}) as React.CSSProperties,
+		[
+			isActive,
+			isHovered,
+			isDragOver,
+			theme.colors.bgMain,
+			theme.colors.border,
+			theme.colors.accent,
+			hoverBgColor,
+		]
+	);
+
+	// Badge color based on diff type
+	const badgeLabel =
+		tab.diffType === 'uncommitted-staged'
+			? 'STAGED'
+			: tab.diffType === 'uncommitted-unstaged'
+				? 'UNSTAGED'
+				: tab.diffType === 'commit'
+					? 'COMMIT'
+					: 'DIFF';
+
+	return (
+		<div
+			ref={setTabRef}
+			data-tab-id={tab.id}
+			className={`
+				relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer
+				transition-all duration-150 select-none shrink-0
+				${isDragging ? 'opacity-50' : ''}
+				${isDragOver ? 'ring-2 ring-inset' : ''}
+			`}
+			style={tabStyle}
+			onClick={handleTabSelect}
+			onMouseDown={handleMouseDown}
+			onMouseEnter={handleMouseEnter}
+			onMouseLeave={handleMouseLeave}
+			draggable
+			onDragStart={handleTabDragStart}
+			onDragOver={handleTabDragOver}
+			onDragEnd={onDragEnd}
+			onDrop={handleTabDrop}
+		>
+			{/* Git compare icon */}
+			<GitCompare
+				className="w-3 h-3 shrink-0"
+				style={{ color: isActive ? theme.colors.accent : theme.colors.textDim }}
+			/>
+
+			{/* Shortcut hint badge */}
+			{shortcutHint !== null && shortcutHint !== undefined && (
+				<span
+					className="w-4 h-4 flex items-center justify-center rounded text-[10px] font-medium shrink-0 opacity-50"
+					style={{
+						backgroundColor: theme.colors.border,
+						color: theme.colors.textMain,
+					}}
+				>
+					{shortcutHint}
+				</span>
+			)}
+
+			{/* Tab name - filename */}
+			<span
+				className={`text-xs font-medium ${isActive ? 'whitespace-nowrap' : 'truncate max-w-[120px]'}`}
+				style={{ color: isActive ? theme.colors.textMain : theme.colors.textDim }}
+			>
+				{tab.fileName}
+			</span>
+
+			{/* Diff type badge */}
+			<span
+				className="px-1 rounded text-[9px] font-semibold uppercase leading-none shrink-0"
+				style={{
+					backgroundColor:
+						theme.mode === 'light' ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.12)',
+					color: theme.colors.textDim,
+					paddingTop: '2px',
+					paddingBottom: '2px',
+				}}
+			>
+				{badgeLabel}
+			</span>
+
+			{/* Close button */}
+			{(isHovered || isActive) && (
+				<button
+					onClick={handleCloseClick}
+					className="flex items-center justify-center w-4 h-4 rounded-sm hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
+					style={{ color: theme.colors.textDim }}
+				>
+					<X className="w-3 h-3" />
+				</button>
+			)}
+		</div>
+	);
+});
+
+/**
  * TabBar component for displaying AI session tabs.
  * Shows tabs for each Claude Code conversation within a Maestro session.
  * Appears only in AI mode (hidden in terminal mode).
@@ -1534,6 +1758,9 @@ function TabBarInner({
 	activeFileTabId,
 	onFileTabSelect,
 	onFileTabClose,
+	activeDiffTabId,
+	onDiffTabSelect,
+	onDiffTabClose,
 	onUnifiedTabReorder,
 	// Accessibility
 	colorBlindMode,
@@ -1896,19 +2123,24 @@ function TabBarInner({
 			{displayedUnifiedTabs
 				? displayedUnifiedTabs.map((unifiedTab, index) => {
 						// Determine if this tab is active (based on type)
-						// AI tabs are active when: they match activeTabId AND no file tab is selected
+						// AI tabs are active when: they match activeTabId AND no file/diff tab is selected
 						// File tabs are active when: they match activeFileTabId
+						// Diff tabs are active when: they match activeDiffTabId
 						const isActive =
 							unifiedTab.type === 'ai'
-								? unifiedTab.id === activeTabId && !activeFileTabId
-								: unifiedTab.id === activeFileTabId;
+								? unifiedTab.id === activeTabId && !activeFileTabId && !activeDiffTabId
+								: unifiedTab.type === 'file'
+									? unifiedTab.id === activeFileTabId
+									: unifiedTab.id === activeDiffTabId;
 
 						// Check previous tab's active state for separator logic
 						const prevUnifiedTab = index > 0 ? displayedUnifiedTabs[index - 1] : null;
 						const isPrevActive = prevUnifiedTab
 							? prevUnifiedTab.type === 'ai'
-								? prevUnifiedTab.id === activeTabId && !activeFileTabId
-								: prevUnifiedTab.id === activeFileTabId
+								? prevUnifiedTab.id === activeTabId && !activeFileTabId && !activeDiffTabId
+								: prevUnifiedTab.type === 'file'
+									? prevUnifiedTab.id === activeFileTabId
+									: prevUnifiedTab.id === activeDiffTabId
 							: false;
 
 						// Get original index in the FULL unified list (not filtered)
@@ -1994,7 +2226,7 @@ function TabBarInner({
 									/>
 								</React.Fragment>
 							);
-						} else {
+						} else if (unifiedTab.type === 'file') {
 							// File tab
 							const fileTab = unifiedTab.data;
 							return (
@@ -2034,14 +2266,56 @@ function TabBarInner({
 									/>
 								</React.Fragment>
 							);
+						} else if (unifiedTab.type === 'diff') {
+							// Diff tab
+							const diffTab = unifiedTab.data;
+							return (
+								<React.Fragment key={unifiedTab.id}>
+									{showSeparator && (
+										<div
+											className="w-px h-4 self-center shrink-0"
+											style={{ backgroundColor: theme.colors.border }}
+										/>
+									)}
+									<DiffTab
+										tab={diffTab}
+										isActive={isActive}
+										theme={theme}
+										onSelect={onDiffTabSelect || (() => {})}
+										onClose={onDiffTabClose || (() => {})}
+										onDragStart={handleDragStart}
+										onDragOver={handleDragOver}
+										onDragEnd={handleDragEnd}
+										onDrop={handleDrop}
+										isDragging={draggingTabId === diffTab.id}
+										isDragOver={dragOverTabId === diffTab.id}
+										registerRef={(el) => registerTabRef(diffTab.id, el)}
+										onMoveToFirst={
+											!isFirstTab && onUnifiedTabReorder ? handleMoveToFirst : undefined
+										}
+										onMoveToLast={!isLastTab && onUnifiedTabReorder ? handleMoveToLast : undefined}
+										isFirstTab={isFirstTab}
+										isLastTab={isLastTab}
+										onCloseOtherTabs={onCloseOtherTabs ? handleTabCloseOther : undefined}
+										onCloseTabsLeft={onCloseTabsLeft ? handleTabCloseLeft : undefined}
+										onCloseTabsRight={onCloseTabsRight ? handleTabCloseRight : undefined}
+										totalTabs={allTabs.length}
+										tabIndex={originalIndex}
+										shortcutHint={shortcutHint}
+									/>
+								</React.Fragment>
+							);
+						} else {
+							return null;
 						}
 					})
 				: // Fallback: render AI tabs only (legacy mode when unifiedTabs not provided)
 					displayedTabs.map((tab, index) => {
-						// AI tabs are active when: they match activeTabId AND no file tab is selected
-						const isActive = tab.id === activeTabId && !activeFileTabId;
+						// AI tabs are active when: they match activeTabId AND no file/diff tab is selected
+						const isActive = tab.id === activeTabId && !activeFileTabId && !activeDiffTabId;
 						const prevTab = index > 0 ? displayedTabs[index - 1] : null;
-						const isPrevActive = prevTab?.id === activeTabId && !activeFileTabId;
+						const isPrevActive =
+							prevTab?.id === activeTabId && !activeFileTabId && !activeDiffTabId;
 						// Get original index for shortcut hints (Cmd+1-9)
 						const originalIndex = tabs.findIndex((t) => t.id === tab.id);
 
