@@ -183,17 +183,34 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				}
 
 				// Handle built-in /clear command
-				// Sends /clear to the agent process and clears the active tab's logs
+				// Clears the active tab's logs and resets the agent's conversation context
 				if (commandText === '/clear') {
 					setInputValue('');
 					setSlashCommandOpen(false);
 					syncAiInputToSession('');
 					if (inputRef.current) inputRef.current.style.height = 'auto';
 
-					// Write /clear to the agent's process stdin
-					window.maestro.process.write(activeSession.id, '/clear\n');
 					// Clear the active tab's logs in the store
 					useSessionStore.getState().clearActiveTabLogs(activeSession.id);
+
+					// Reset the active tab's agentSessionId so the next message starts a fresh conversation
+					// For batch mode agents (Claude Code, Codex, etc.), this prevents --resume from being passed
+					// For stdin agents, also write /clear to the process
+					const activeTabForClear = getActiveTab(activeSession);
+					if (activeTabForClear) {
+						setSessions((prev) =>
+							prev.map((s) => {
+								if (s.id !== activeSession.id) return s;
+								return {
+									...s,
+									aiTabs: s.aiTabs.map((tab) =>
+										tab.id === activeTabForClear.id ? { ...tab, agentSessionId: null } : tab
+									),
+								};
+							})
+						);
+					}
+
 					return;
 				}
 
