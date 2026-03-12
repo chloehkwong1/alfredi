@@ -1,7 +1,27 @@
 import React, { memo } from 'react';
-import { Activity, GitBranch, Bot, Bookmark, AlertCircle, Server } from 'lucide-react';
+import { Activity, GitBranch, Bot, Bookmark, AlertCircle, Server, Link } from 'lucide-react';
 import type { Session, Project, Theme } from '../types';
+import type { WorktreeStatus } from '../../shared/types';
 import { getStatusColor } from '../utils/theme';
+
+// Map worktree status to theme color for left border accent
+const getWorktreeStatusColor = (
+	status: WorktreeStatus | undefined,
+	theme: Theme
+): string | undefined => {
+	switch (status) {
+		case 'todo':
+			return theme.colors.textDim;
+		case 'in_progress':
+			return theme.colors.warning;
+		case 'in_review':
+			return theme.colors.accent;
+		case 'done':
+			return theme.colors.success;
+		default:
+			return undefined;
+	}
+};
 
 // ============================================================================
 // SessionItem - Unified session item component for all list contexts
@@ -113,7 +133,12 @@ export const SessionItem = memo(function SessionItem({
 			onContextMenu={onContextMenu}
 			className={getContainerClassName()}
 			style={{
-				borderColor: isActive || isKeyboardSelected ? theme.colors.accent : 'transparent',
+				borderColor:
+					isActive || isKeyboardSelected
+						? theme.colors.accent
+						: variant === 'worktree'
+							? (getWorktreeStatusColor(session.worktreeStatus, theme) ?? 'transparent')
+							: 'transparent',
 				backgroundColor: isActive
 					? theme.colors.bgActivity
 					: isKeyboardSelected
@@ -156,6 +181,23 @@ export const SessionItem = memo(function SessionItem({
 						>
 							{session.name}
 						</span>
+						{/* PR number badge for worktree children with linked PRs */}
+						{variant === 'worktree' && session.worktreePrNumber && (
+							<span
+								className="flex items-center gap-0.5 text-[9px] font-medium shrink-0 px-1 py-0.5 rounded"
+								style={{
+									backgroundColor: theme.colors.accent + '20',
+									color: theme.colors.accent,
+								}}
+								title={
+									session.worktreePrUrl
+										? `PR #${session.worktreePrNumber}`
+										: `PR #${session.worktreePrNumber}`
+								}
+							>
+								<Link className="w-2.5 h-2.5" />#{session.worktreePrNumber}
+							</span>
+						)}
 					</div>
 				)}
 

@@ -14,6 +14,7 @@ import {
 	Trash2,
 } from 'lucide-react';
 import type { Session, Project, Theme } from '../../types';
+import type { WorktreeStatus } from '../../../shared/types';
 
 import { SessionItem } from '../SessionItem';
 import { useLiveOverlay, useResizablePanel } from '../../hooks';
@@ -84,12 +85,6 @@ interface SessionListProps {
 	onOpenWorktreeConfig?: (session: Session) => void;
 	onDeleteWorktree?: (session: Session) => void;
 	onRunWorktreeScript?: (session: Session) => void;
-
-	// Wizard props
-	openWizard?: () => void;
-
-	// Tour props
-	startTour?: () => void;
 }
 
 function SessionListInner(props: SessionListProps) {
@@ -103,6 +98,7 @@ function SessionListInner(props: SessionListProps) {
 	const editingProjectId = useUIStore((s) => s.editingProjectId);
 	const editingSessionId = useUIStore((s) => s.editingSessionId);
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
+	const draggingWorktreeTargetStatus = useUIStore((s) => s.draggingWorktreeTargetStatus);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const leftSidebarWidthState = useSettingsStore((s) => s.leftSidebarWidth);
@@ -171,8 +167,6 @@ function SessionListInner(props: SessionListProps) {
 		onRunWorktreeScript,
 		showSessionJumpNumbers = false,
 		visibleSessions = [],
-		openWizard,
-		startTour,
 		sidebarContainerRef,
 	} = props;
 
@@ -228,6 +222,73 @@ function SessionListInner(props: SessionListProps) {
 	);
 	const menuRef = useRef<HTMLDivElement>(null);
 	const ignoreNextBlurRef = useRef(false);
+
+	// Kanban section collapse state: keyed by `${parentId}:${status}`
+	// DONE sections auto-collapse by default
+	const [kanbanCollapsed, setKanbanCollapsed] = useState<Record<string, boolean>>({});
+	const isKanbanSectionCollapsed = useCallback(
+		(parentId: string, status: WorktreeStatus): boolean => {
+			const key = `${parentId}:${status}`;
+			if (key in kanbanCollapsed) return kanbanCollapsed[key];
+			// DONE auto-collapses by default
+			return status === 'done';
+		},
+		[kanbanCollapsed]
+	);
+	const toggleKanbanSection = useCallback(
+		(parentId: string, status: WorktreeStatus) => {
+			const key = `${parentId}:${status}`;
+			setKanbanCollapsed((prev) => ({
+				...prev,
+				[key]: !isKanbanSectionCollapsed(parentId, status),
+			}));
+		},
+		[isKanbanSectionCollapsed]
+	);
+
+	// Kanban drag-and-drop handlers
+	const handleKanbanDragOver = useCallback((e: React.DragEvent, status: WorktreeStatus) => {
+		e.preventDefault();
+		e.stopPropagation();
+		useUIStore.getState().setDraggingWorktreeTargetStatus(status);
+	}, []);
+
+	const handleKanbanDragLeave = useCallback((e: React.DragEvent) => {
+		// Only clear if leaving the section entirely (not entering a child)
+		if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+			useUIStore.getState().setDraggingWorktreeTargetStatus(null);
+		}
+	}, []);
+
+	const handleKanbanDrop = useCallback(
+		(e: React.DragEvent, targetStatus: WorktreeStatus) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const sessionId = draggingSessionId;
+			useUIStore.getState().setDraggingWorktreeTargetStatus(null);
+			if (!sessionId) return;
+
+			setSessions((prev) =>
+				prev.map((s) => {
+					if (s.id !== sessionId) return s;
+					const updates: Partial<Session> = {
+						worktreeStatus: targetStatus,
+						worktreeManualStatus: true,
+					};
+					// Clear archivedAt when dragging out of DONE
+					if (targetStatus !== 'done' && s.worktreeArchivedAt) {
+						updates.worktreeArchivedAt = undefined;
+					}
+					// Set archivedAt when dragging into DONE
+					if (targetStatus === 'done' && !s.worktreeArchivedAt) {
+						updates.worktreeArchivedAt = Date.now();
+					}
+					return { ...s, ...updates };
+				})
+			);
+		},
+		[draggingSessionId, setSessions]
+	);
 
 	// Toggle bookmark for a session - memoized to prevent SessionItem re-renders
 	const toggleBookmark = useCallback(
@@ -343,6 +404,7 @@ function SessionListInner(props: SessionListProps) {
 		sortedWorktreeChildrenByParentId,
 		sortedSessionIndexById,
 		getWorktreeChildren,
+		worktreeChildrenByStatus,
 		bookmarkedSessions,
 		sortedBookmarkedSessions,
 		sortedBookmarkedParentSessions,
@@ -471,66 +533,163 @@ function SessionListInner(props: SessionListProps) {
 				)}
 
 				{/* Worktree children drawer (when expanded) */}
-				{hasWorktrees && worktreesExpanded && onToggleWorktreeExpanded && (
-					<div
-						className={`rounded-bl overflow-hidden ${needsWorktreeWrapper ? '' : 'ml-1'}`}
-						style={{
-							backgroundColor: theme.colors.accent + '10',
-							borderLeft: needsWorktreeWrapper ? 'none' : `1px solid ${theme.colors.accent}30`,
-							borderBottom: `1px solid ${theme.colors.accent}30`,
-						}}
-					>
-						{/* Worktree children list */}
-						<div>
-							{(sortedWorktreeChildrenByParentId.get(session.id) || []).map((child) => {
-								const childGlobalIdx = sortedSessionIndexById.get(child.id) ?? -1;
-								const isChildKeyboardSelected =
-									activeFocus === 'sidebar' && childGlobalIdx === selectedSidebarIndex;
-								return (
-									<SessionItem
-										key={`worktree-${session.id}-${child.id}`}
-										session={child}
-										variant="worktree"
-										theme={theme}
-										isActive={activeSessionId === child.id}
-										isKeyboardSelected={isChildKeyboardSelected}
-										isDragging={draggingSessionId === child.id}
-										isEditing={editingSessionId === `worktree-${session.id}-${child.id}`}
-										leftSidebarOpen={leftSidebarOpen}
-										gitFileCount={getFileCount(child.id)}
-										isInBatch={activeBatchSessionIds.includes(child.id)}
-										jumpNumber={getSessionJumpNumber(child.id)}
-										onSelect={selectHandlers.get(child.id)!}
-										onDragStart={dragStartHandlers.get(child.id)!}
-										onContextMenu={contextMenuHandlers.get(child.id)!}
-										onFinishRename={finishRenameHandlers.get(child.id)!}
-										onStartRename={() => startRenamingSession(`worktree-${session.id}-${child.id}`)}
-										onToggleBookmark={toggleBookmarkHandlers.get(child.id)!}
-									/>
-								);
-							})}
-						</div>
-						{/* Drawer handle at bottom - click to collapse */}
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								onToggleWorktreeExpanded(session.id);
-							}}
-							className="w-full flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
-							style={{
-								backgroundColor: theme.colors.accent + '20',
-								color: theme.colors.accent,
-							}}
-							title="Click to collapse worktrees"
-						>
-							<GitBranch className="w-2.5 h-2.5" />
-							<span>
-								{worktreeChildren.length} worktree{worktreeChildren.length > 1 ? 's' : ''}
-							</span>
-							<ChevronUp className="w-2.5 h-2.5" />
-						</button>
-					</div>
-				)}
+				{hasWorktrees &&
+					worktreesExpanded &&
+					onToggleWorktreeExpanded &&
+					(() => {
+						// Determine if this parent belongs to a project with worktreeConfig
+						const effectiveProjectId = options.projectId ?? session.projectId;
+						const parentProject =
+							options.project ??
+							(effectiveProjectId ? projects.find((p) => p.id === effectiveProjectId) : undefined);
+						const useKanban = hasWorktrees;
+
+						const renderWorktreeChild = (child: Session) => {
+							const childGlobalIdx = sortedSessionIndexById.get(child.id) ?? -1;
+							const isChildKeyboardSelected =
+								activeFocus === 'sidebar' && childGlobalIdx === selectedSidebarIndex;
+							return (
+								<SessionItem
+									key={`worktree-${session.id}-${child.id}`}
+									session={child}
+									variant="worktree"
+									theme={theme}
+									isActive={activeSessionId === child.id}
+									isKeyboardSelected={isChildKeyboardSelected}
+									isDragging={draggingSessionId === child.id}
+									isEditing={editingSessionId === `worktree-${session.id}-${child.id}`}
+									leftSidebarOpen={leftSidebarOpen}
+									gitFileCount={getFileCount(child.id)}
+									isInBatch={activeBatchSessionIds.includes(child.id)}
+									jumpNumber={getSessionJumpNumber(child.id)}
+									onSelect={selectHandlers.get(child.id)!}
+									onDragStart={dragStartHandlers.get(child.id)!}
+									onContextMenu={contextMenuHandlers.get(child.id)!}
+									onFinishRename={finishRenameHandlers.get(child.id)!}
+									onStartRename={() => startRenamingSession(`worktree-${session.id}-${child.id}`)}
+									onToggleBookmark={toggleBookmarkHandlers.get(child.id)!}
+								/>
+							);
+						};
+
+						return (
+							<div
+								className={`rounded-bl overflow-hidden ${needsWorktreeWrapper ? '' : 'ml-1'}`}
+								style={{
+									backgroundColor: theme.colors.accent + '10',
+									borderLeft: needsWorktreeWrapper ? 'none' : `1px solid ${theme.colors.accent}30`,
+									borderBottom: `1px solid ${theme.colors.accent}30`,
+								}}
+							>
+								{useKanban ? (
+									/* Kanban-style status sections */
+									<div>
+										{(
+											[
+												{
+													status: 'todo' as WorktreeStatus,
+													label: 'TO DO',
+													color: theme.colors.textDim,
+												},
+												{
+													status: 'in_progress' as WorktreeStatus,
+													label: 'IN PROGRESS',
+													color: theme.colors.warning,
+												},
+												{
+													status: 'in_review' as WorktreeStatus,
+													label: 'IN REVIEW',
+													color: theme.colors.accent,
+												},
+												{
+													status: 'done' as WorktreeStatus,
+													label: 'DONE',
+													color: theme.colors.success,
+												},
+											] as const
+										).map(({ status, label, color }) => {
+											const statusChildren = worktreeChildrenByStatus(session.id)[status];
+											const isDragTarget =
+												draggingSessionId && draggingWorktreeTargetStatus === status;
+											// Show section even if empty when it's a drag target
+											if (statusChildren.length === 0 && !draggingSessionId) return null;
+											const collapsed = isKanbanSectionCollapsed(session.id, status);
+											return (
+												<div
+													key={`kanban-${session.id}-${status}`}
+													onDragOver={(e) => handleKanbanDragOver(e, status)}
+													onDragLeave={handleKanbanDragLeave}
+													onDrop={(e) => handleKanbanDrop(e, status)}
+													style={{
+														borderLeft: isDragTarget
+															? `2px solid ${color}`
+															: '2px solid transparent',
+														backgroundColor: isDragTarget ? color + '10' : undefined,
+														transition: 'border-color 0.15s ease, background-color 0.15s ease',
+													}}
+												>
+													<button
+														onClick={(e) => {
+															e.stopPropagation();
+															toggleKanbanSection(session.id, status);
+														}}
+														className="w-full flex items-center gap-1.5 px-3 py-1 text-[9px] font-bold uppercase tracking-wider hover:opacity-80 transition-opacity cursor-pointer"
+														style={{ color }}
+														title={`${label} (${statusChildren.length}) - click to ${collapsed ? 'expand' : 'collapse'}`}
+													>
+														{collapsed ? (
+															<ChevronRight className="w-2.5 h-2.5" />
+														) : (
+															<ChevronDown className="w-2.5 h-2.5" />
+														)}
+														<span>{label}</span>
+														<span
+															className="px-1 py-0.5 rounded text-[8px] font-bold"
+															style={{
+																backgroundColor: color + '25',
+																color,
+															}}
+														>
+															{statusChildren.length}
+														</span>
+													</button>
+													{!collapsed && statusChildren.length > 0 && (
+														<div>{statusChildren.map(renderWorktreeChild)}</div>
+													)}
+												</div>
+											);
+										})}
+									</div>
+								) : (
+									/* Flat worktree children list (no kanban) */
+									<div>
+										{(sortedWorktreeChildrenByParentId.get(session.id) || []).map(
+											renderWorktreeChild
+										)}
+									</div>
+								)}
+								{/* Drawer handle at bottom - click to collapse */}
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										onToggleWorktreeExpanded(session.id);
+									}}
+									className="w-full flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
+									style={{
+										backgroundColor: theme.colors.accent + '20',
+										color: theme.colors.accent,
+									}}
+									title="Click to collapse worktrees"
+								>
+									<GitBranch className="w-2.5 h-2.5" />
+									<span>
+										{worktreeChildren.length} worktree{worktreeChildren.length > 1 ? 's' : ''}
+									</span>
+									<ChevronUp className="w-2.5 h-2.5" />
+								</button>
+							</div>
+						);
+					})()}
 			</>
 		);
 
@@ -698,8 +857,6 @@ function SessionListInner(props: SessionListProps) {
 									<HamburgerMenuContent
 										theme={theme}
 										onNewAgentSession={onNewAgentSession}
-										openWizard={openWizard}
-										startTour={startTour}
 										setMenuOpen={setMenuOpen}
 									/>
 								</div>
@@ -731,8 +888,6 @@ function SessionListInner(props: SessionListProps) {
 								<HamburgerMenuContent
 									theme={theme}
 									onNewAgentSession={onNewAgentSession}
-									openWizard={openWizard}
-									startTour={startTour}
 									setMenuOpen={setMenuOpen}
 								/>
 							</div>
@@ -1133,7 +1288,6 @@ function SessionListInner(props: SessionListProps) {
 				hasNoSessions={sessions.length === 0}
 				shortcuts={shortcuts}
 				addNewSession={addNewSession}
-				openWizard={openWizard}
 				setLeftSidebarOpen={setLeftSidebarOpen}
 			/>
 

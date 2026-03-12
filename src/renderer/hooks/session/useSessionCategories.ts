@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import type { Session, Project } from '../../types';
+import type { WorktreeStatus } from '../../../shared/types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { compareNamesIgnoringEmojis as compareSessionNames } from '../../../shared/emojiUtils';
 
@@ -8,6 +9,7 @@ export interface SessionCategories {
 	sortedWorktreeChildrenByParentId: Map<string, Session[]>;
 	sortedSessionIndexById: Map<string, number>;
 	getWorktreeChildren: (parentId: string) => Session[];
+	worktreeChildrenByStatus: (parentId: string) => Record<WorktreeStatus, Session[]>;
 
 	bookmarkedSessions: Session[];
 	sortedBookmarkedSessions: Session[];
@@ -31,6 +33,8 @@ export function useSessionCategories(
 		const map = new Map<string, Session[]>();
 		sessions.forEach((session) => {
 			if (!session.parentSessionId) return;
+			// Hide archived worktrees from the sidebar
+			if (session.worktreeArchived) return;
 			const siblings = map.get(session.parentSessionId);
 			if (siblings) {
 				siblings.push(session);
@@ -62,6 +66,30 @@ export function useSessionCategories(
 
 	const getWorktreeChildren = useCallback(
 		(parentId: string): Session[] => worktreeChildrenByParentId.get(parentId) || [],
+		[worktreeChildrenByParentId]
+	);
+
+	const worktreeChildrenByStatus = useCallback(
+		(parentId: string): Record<WorktreeStatus, Session[]> => {
+			const children = worktreeChildrenByParentId.get(parentId) || [];
+			const grouped: Record<WorktreeStatus, Session[]> = {
+				todo: [],
+				in_progress: [],
+				in_review: [],
+				done: [],
+			};
+			for (const child of children) {
+				const status: WorktreeStatus = child.worktreeStatus ?? 'todo';
+				grouped[status].push(child);
+			}
+			// Sort each group by name
+			const sortFn = (a: Session, b: Session) => compareSessionNames(a.name, b.name);
+			grouped.todo.sort(sortFn);
+			grouped.in_progress.sort(sortFn);
+			grouped.in_review.sort(sortFn);
+			grouped.done.sort(sortFn);
+			return grouped;
+		},
 		[worktreeChildrenByParentId]
 	);
 
@@ -162,6 +190,7 @@ export function useSessionCategories(
 		sortedWorktreeChildrenByParentId,
 		sortedSessionIndexById,
 		getWorktreeChildren,
+		worktreeChildrenByStatus,
 		bookmarkedSessions: sessionCategories.bookmarked,
 		sortedBookmarkedSessions: sessionCategories.sortedBookmarked,
 		sortedBookmarkedParentSessions: sessionCategories.sortedBookmarkedParent,

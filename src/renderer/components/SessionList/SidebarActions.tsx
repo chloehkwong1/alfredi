@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { PanelLeftClose, PanelLeftOpen, Bot, Wand2 } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Bot } from 'lucide-react';
 import type { Theme, Shortcut } from '../../types';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 
@@ -9,7 +9,6 @@ interface SidebarActionsProps {
 	hasNoSessions: boolean;
 	shortcuts: Record<string, Shortcut>;
 	addNewSession: () => void;
-	openWizard?: () => void;
 	setLeftSidebarOpen: (open: boolean) => void;
 }
 
@@ -19,7 +18,6 @@ export const SidebarActions = memo(function SidebarActions({
 	hasNoSessions,
 	shortcuts,
 	addNewSession,
-	openWizard,
 	setLeftSidebarOpen,
 }: SidebarActionsProps) {
 	return (
@@ -53,18 +51,6 @@ export const SidebarActions = memo(function SidebarActions({
 					style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
 				>
 					<Bot className="w-3 h-3" /> New Agent
-				</button>
-			)}
-
-			{leftSidebarOpen && openWizard && (
-				<button
-					type="button"
-					onClick={openWizard}
-					className="flex-1 flex items-center justify-center gap-2 py-2 rounded text-xs font-bold transition-colors hover:opacity-90"
-					style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
-					title="Get started with AI wizard"
-				>
-					<Wand2 className="w-3 h-3" /> Wizard
 				</button>
 			)}
 		</div>

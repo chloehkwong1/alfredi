@@ -64,7 +64,8 @@ export function WorktreeConfigModal({
 
 	// Resolve project from session — fall back to session-level config for sessions without a project
 	const project = useSessionStore((s) => s.projects.find((p) => p.id === session.projectId));
-	const projectConfig = project?.worktreeConfig ?? session.worktreeConfig;
+	const projectConfig: ProjectWorktreeConfig | undefined =
+		project?.worktreeConfig ?? (session.worktreeConfig as ProjectWorktreeConfig | undefined);
 
 	// Form state
 	const [basePath, setBasePath] = useState(projectConfig?.basePath || '');

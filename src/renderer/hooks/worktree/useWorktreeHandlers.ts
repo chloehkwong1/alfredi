@@ -336,7 +336,10 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			}
 			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
-			const worktreePath = `${basePath}/${branchName}`;
+			// Flatten branch slashes in directory name so e.g. "chloe/pro-5014-..."
+			// becomes "chloe-pro-5014-..." instead of creating nested subdirectories.
+			const flatBranchName = branchName.replace(/\//g, '-');
+			const worktreePath = `${basePath}/${flatBranchName}`;
 
 			// Get SSH remote ID for remote worktree operations
 			// Note: sshRemoteId is only set after AI agent spawns. For terminal-only SSH sessions,
@@ -459,7 +462,10 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			createWtSession.worktreeConfig?.basePath ||
 			createWtSession.cwd.replace(/\/[^/]+$/, '') + '/worktrees';
 
-		const worktreePath = `${basePath}/${branchName}`;
+		// Flatten branch slashes in directory name so e.g. "chloe/pro-5014-..."
+		// becomes "chloe-pro-5014-..." instead of creating nested subdirectories.
+		const flatBranchName = branchName.replace(/\//g, '-');
+		const worktreePath = `${basePath}/${flatBranchName}`;
 
 		// Get SSH remote ID for remote worktree operations
 		// Note: sshRemoteId is only set after AI agent spawns. For terminal-only SSH sessions,

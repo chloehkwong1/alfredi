@@ -1,5 +1,4 @@
 import {
-	Wand2,
 	Plus,
 	Settings,
 	ScrollText,
@@ -7,7 +6,6 @@ import {
 	ExternalLink,
 	Info,
 	Download,
-	Compass,
 	Globe,
 	BookOpen,
 	Command,
@@ -20,16 +18,12 @@ import { getModalActions } from '../../stores/modalStore';
 interface HamburgerMenuContentProps {
 	theme: Theme;
 	onNewAgentSession?: () => void;
-	openWizard?: () => void;
-	startTour?: () => void;
 	setMenuOpen: (open: boolean) => void;
 }
 
 export function HamburgerMenuContent({
 	theme,
 	onNewAgentSession,
-	openWizard,
-	startTour,
 	setMenuOpen,
 }: HamburgerMenuContentProps) {
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
@@ -70,31 +64,6 @@ export function HamburgerMenuContent({
 					</span>
 				</button>
 			)}
-			{openWizard && (
-				<button
-					onClick={() => {
-						openWizard();
-						setMenuOpen(false);
-					}}
-					className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-				>
-					<Wand2 className="w-5 h-5" style={{ color: theme.colors.accent }} />
-					<div className="flex-1">
-						<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-							New Agent Wizard
-						</div>
-						<div className="text-xs" style={{ color: theme.colors.textDim }}>
-							Get started with AI
-						</div>
-					</div>
-					<span
-						className="text-xs font-mono px-1.5 py-0.5 rounded"
-						style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-					>
-						{shortcuts.openWizard ? formatShortcutKeys(shortcuts.openWizard.keys) : '⇧⌘N'}
-					</span>
-				</button>
-			)}
 			<button
 				onClick={() => {
 					setQuickActionOpen(true);
@@ -118,25 +87,6 @@ export function HamburgerMenuContent({
 					{shortcuts.quickAction ? formatShortcutKeys(shortcuts.quickAction.keys) : '⌘K'}
 				</span>
 			</button>
-			{startTour && (
-				<button
-					onClick={() => {
-						startTour();
-						setMenuOpen(false);
-					}}
-					className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-white/10 transition-colors text-left"
-				>
-					<Compass className="w-5 h-5" style={{ color: theme.colors.accent }} />
-					<div className="flex-1">
-						<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-							Introductory Tour
-						</div>
-						<div className="text-xs" style={{ color: theme.colors.textDim }}>
-							Learn how to use Maestro
-						</div>
-					</div>
-				</button>
-			)}
 			<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 			<button
 				onClick={() => {

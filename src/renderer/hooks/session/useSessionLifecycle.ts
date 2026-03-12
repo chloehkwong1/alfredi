@@ -164,9 +164,11 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 							customEnvVars: undefined,
 							customModel: undefined,
 							customContextWindow: undefined,
-							// Reset file preview tabs and unified tab order
+							// Reset file preview tabs, diff view tabs, and unified tab order
 							filePreviewTabs: [],
 							activeFileTabId: null,
+							diffViewTabs: [],
+							activeDiffTabId: null,
 							unifiedTabOrder: [{ type: 'ai' as const, id: newTabId }],
 							unifiedClosedTabHistory: [],
 							// Reset agent runtime state
@@ -450,6 +452,19 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 			window.maestro.projects.setAll(projects);
 		}
 	}, [projects, initialLoadComplete]);
+
+	// Auto-transition worktree status from 'todo' to 'in_progress' on activation
+	// Only applies when the worktree hasn't been manually status-set via drag-and-drop
+	useEffect(() => {
+		if (!activeSession) return;
+		if (!activeSession.parentSessionId) return; // Not a worktree child
+		if (activeSession.worktreeStatus !== 'todo') return; // Only auto-transition from todo
+		if (activeSession.worktreeManualStatus) return; // Manual override — don't auto-transition
+
+		useSessionStore.getState().updateSession(activeSession.id, {
+			worktreeStatus: 'in_progress',
+		});
+	}, [activeSessionId]);  
 
 	// Track navigation history when session or AI tab changes
 	useEffect(() => {
