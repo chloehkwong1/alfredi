@@ -2,6 +2,7 @@ import type { ChildProcess } from 'child_process';
 import type { IPty } from 'node-pty';
 import type { AgentOutputParser } from '../parsers';
 import type { AgentError } from '../../shared/types';
+import type { ClaudeSDKAdapter } from './spawners/ClaudeSDKAdapter';
 
 /**
  * Configuration for spawning a new process
@@ -76,6 +77,10 @@ export interface ManagedProcess {
 	dataBufferTimeout?: NodeJS.Timeout;
 	rawDataBuffer?: string;
 	rawDataBufferTimeout?: NodeJS.Timeout;
+	/** SDK adapter instance when running in SDK mode (Claude Code) */
+	sdkAdapter?: ClaudeSDKAdapter;
+	/** Whether this process uses the SDK adapter instead of CLI */
+	isSDKMode?: boolean;
 }
 
 export interface UsageTotals {

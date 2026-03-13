@@ -202,6 +202,13 @@ export function createProcessApi() {
 		getActiveProcesses: (): Promise<ActiveProcess[]> =>
 			ipcRenderer.invoke('process:getActiveProcesses'),
 
+		/**
+		 * Answer a pending AskUserQuestion prompt (SDK mode).
+		 * Routes to ClaudeSDKAdapter.answerQuestion() via ProcessManager.
+		 */
+		answerQuestion: (sessionId: string, toolUseId: string, answer: string): Promise<boolean> =>
+			ipcRenderer.invoke('process:answerQuestion', sessionId, toolUseId, answer),
+
 		// Event listeners
 
 		/**

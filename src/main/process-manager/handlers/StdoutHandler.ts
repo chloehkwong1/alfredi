@@ -5,6 +5,7 @@ import { logger } from '../../utils/logger';
 import { appendToBuffer } from '../utils/bufferUtils';
 import { aggregateModelUsage, type ModelStats } from '../../parsers/usage-aggregator';
 import { matchSshErrorPattern } from '../../parsers/error-patterns';
+import { mergeSlashCommandsWithCustom } from '../utils/customCommands';
 import type { ManagedProcess, UsageStats, UsageTotals, AgentError } from '../types';
 import type { DataBufferManager } from './DataBufferManager';
 
@@ -468,8 +469,16 @@ export class StdoutHandler {
 			this.emitter.emit('session-id', sessionId, msgRecord.session_id as string);
 		}
 
-		if (msgRecord.type === 'system' && msgRecord.subtype === 'init' && msgRecord.slash_commands) {
-			this.emitter.emit('slash-commands', sessionId, msgRecord.slash_commands);
+		if (msgRecord.type === 'system' && msgRecord.subtype === 'init') {
+			// Merge SDK-reported commands with custom commands read from ~/.claude/commands/
+			const allCommands = mergeSlashCommandsWithCustom(
+				(msgRecord.slash_commands as string[]) || [],
+				(msgRecord.skills as string[]) || [],
+				managedProcess.cwd
+			);
+			if (allCommands.length > 0) {
+				this.emitter.emit('slash-commands', sessionId, allCommands);
+			}
 		}
 
 		if (msgRecord.modelUsage || msgRecord.usage || msgRecord.total_cost_usd !== undefined) {

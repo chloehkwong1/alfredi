@@ -1584,6 +1584,19 @@ export function registerClaudeHandlers(deps: ClaudeHandlerDependencies): void {
 		)
 	);
 
+	// ============ Get Custom Commands (for slash command descriptions) ============
+
+	ipcMain.handle(
+		'claude:getCustomCommands',
+		withIpcErrorLogging(
+			handlerOpts('getCustomCommands', '[ClaudeCommands]'),
+			async (cwd?: string) => {
+				const { readCustomCommands } = await import('../../process-manager/utils/customCommands');
+				return readCustomCommands(cwd);
+			}
+		)
+	);
+
 	// ============ Get Skills ============
 
 	const SKILLS_LOG_CONTEXT = '[ClaudeSkills]';

@@ -1,0 +1,629 @@
+// src/main/process-manager/spawners/ClaudeSDKAdapter.ts
+
+/**
+ * Claude SDK Adapter
+ *
+ * Replaces the CLI-based child_process spawning for Claude Code with the
+ * @anthropic-ai/claude-agent-sdk `query()` API. Translates SDK events into
+ * the existing ProcessManagerEvents contract so the renderer stays unchanged.
+ *
+ * Event translation:
+ *   SDKSystemMessage (init)          → 'session-id', 'slash-commands'
+ *   SDKPartialAssistantMessage       → 'thinking-chunk' (thinking deltas),
+ *                                      'tool-execution' (tool_use blocks)
+ *   SDKAssistantMessage              → 'tool-execution' (completed tool_use blocks)
+ *   SDKResultMessage                 → 'data' (result text), 'usage', 'exit'
+ *   SDKToolProgressMessage           → 'tool-execution' (progress updates)
+ *   canUseTool(AskUserQuestion)      → 'user-question' → awaits answer
+ */
+
+import { EventEmitter } from 'events';
+import { logger } from '../../utils/logger';
+import { aggregateModelUsage, type ModelStats } from '../../parsers/usage-aggregator';
+import { mergeSlashCommandsWithCustom } from '../utils/customCommands';
+import type {
+	ProcessConfig,
+	ManagedProcess,
+	SpawnResult,
+	UsageStats,
+	UserQuestionItem,
+} from '../types';
+import type { DataBufferManager } from '../handlers/DataBufferManager';
+import type {
+	SDKMessage,
+	SDKSystemMessage,
+	SDKAssistantMessage,
+	SDKPartialAssistantMessage,
+	SDKResultMessage,
+	SDKResultSuccess,
+	SDKResultError,
+	SDKToolProgressMessage,
+	SDKToolUseSummaryMessage,
+	Query,
+	Options,
+	CanUseTool,
+	PermissionResult,
+} from '@anthropic-ai/claude-agent-sdk';
+
+// Re-import query as a value — the SDK is an ESM module.
+// TypeScript's CJS output transforms `import()` into `require()`, which fails for ESM-only
+// packages. We use `Function` to create a real dynamic import that TypeScript won't transform.
+ 
+const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+	specifier: string
+) => Promise<typeof import('@anthropic-ai/claude-agent-sdk')>;
+
+let _query: (typeof import('@anthropic-ai/claude-agent-sdk'))['query'] | null = null;
+
+async function getQuery(): Promise<(typeof import('@anthropic-ai/claude-agent-sdk'))['query']> {
+	if (!_query) {
+		const sdk = await dynamicImport('@anthropic-ai/claude-agent-sdk');
+		_query = sdk.query;
+	}
+	return _query;
+}
+
+/**
+ * Pending AskUserQuestion resolution tracker.
+ * When canUseTool is called for AskUserQuestion, we store the resolve
+ * function keyed by toolUseId. The renderer calls answerQuestion() to
+ * resolve it, unblocking the SDK agent loop.
+ */
+interface PendingQuestion {
+	resolve: (result: PermissionResult) => void;
+	toolName: string;
+}
+
+/**
+ * Adapter that uses the Claude Agent SDK instead of spawning a CLI process.
+ * Implements the same event contract as ChildProcessSpawner so the rest
+ * of the system (StdoutHandler, renderer, etc.) is unaffected.
+ */
+export class ClaudeSDKAdapter {
+	private emitter: EventEmitter;
+	private processes: Map<string, ManagedProcess>;
+	private bufferManager: DataBufferManager;
+	private abortControllers = new Map<string, AbortController>();
+	private activeQueries = new Map<string, Query>();
+	private pendingQuestionResolvers = new Map<string, PendingQuestion>();
+	/** Track active tool_use blocks per session so we can emit 'completed' status */
+	private activeToolUseBlocks = new Map<string, Map<number, string>>();
+
+	constructor(
+		processes: Map<string, ManagedProcess>,
+		emitter: EventEmitter,
+		bufferManager: DataBufferManager
+	) {
+		this.processes = processes;
+		this.emitter = emitter;
+		this.bufferManager = bufferManager;
+	}
+
+	/**
+	 * Start an SDK query for the given session config.
+	 * Returns a SpawnResult matching the ChildProcessSpawner interface.
+	 */
+	async start(config: ProcessConfig): Promise<SpawnResult> {
+		const { sessionId, toolType, cwd, prompt, contextWindow, customEnvVars, shellEnvVars } = config;
+
+		if (!prompt) {
+			logger.error('[ClaudeSDKAdapter] No prompt provided', 'ClaudeSDKAdapter', { sessionId });
+			return { pid: -1, success: false };
+		}
+
+		const abortController = new AbortController();
+		this.abortControllers.set(sessionId, abortController);
+
+		// Build managed process entry (no child process — SDK runs in-process)
+		const managedProcess: ManagedProcess = {
+			sessionId,
+			toolType,
+			cwd,
+			pid: -1, // No OS process
+			isTerminal: false,
+			isBatchMode: true,
+			isStreamJsonMode: true,
+			jsonBuffer: '',
+			startTime: Date.now(),
+			stderrBuffer: '',
+			stdoutBuffer: '',
+			contextWindow,
+			querySource: config.querySource,
+			tabId: config.tabId,
+			projectPath: config.projectPath,
+			sshRemoteId: config.sshRemoteId,
+			sshRemoteHost: config.sshRemoteHost,
+		};
+		this.processes.set(sessionId, managedProcess);
+
+		// Determine resume session ID from the original args
+		// The CLI path uses --resume <sessionId>; extract it for the SDK
+		let resumeSessionId: string | undefined;
+		const resumeIdx = config.args.indexOf('--resume');
+		if (resumeIdx !== -1 && config.args[resumeIdx + 1]) {
+			resumeSessionId = config.args[resumeIdx + 1];
+		}
+
+		// Extract model from args (--model <model>)
+		let model: string | undefined;
+		const modelIdx = config.args.indexOf('--model');
+		if (modelIdx !== -1 && config.args[modelIdx + 1]) {
+			model = config.args[modelIdx + 1];
+		}
+
+		// Build environment, merging shell env vars and custom env vars
+		const env: Record<string, string | undefined> = { ...process.env };
+		if (shellEnvVars) {
+			Object.assign(env, shellEnvVars);
+		}
+		if (customEnvVars) {
+			Object.assign(env, customEnvVars);
+		}
+
+		// Build canUseTool callback
+		const canUseTool: CanUseTool = async (toolName, input, options) => {
+			return this.handleCanUseTool(sessionId, toolName, input, options);
+		};
+
+		// Build SDK options
+		const sdkOptions: Options = {
+			abortController,
+			cwd,
+			env,
+			model,
+			resume: resumeSessionId,
+			permissionMode: 'bypassPermissions',
+			allowDangerouslySkipPermissions: true,
+			canUseTool,
+			includePartialMessages: true,
+		};
+
+		logger.debug('[ClaudeSDKAdapter] Starting SDK query', 'ClaudeSDKAdapter', {
+			sessionId,
+			cwd,
+			hasResume: !!resumeSessionId,
+			model,
+		});
+
+		// Launch the query loop asynchronously
+		this.runQuery(sessionId, prompt, sdkOptions).catch((error) => {
+			logger.error('[ClaudeSDKAdapter] Query failed', 'ClaudeSDKAdapter', {
+				sessionId,
+				error: String(error),
+			});
+			this.emitter.emit('exit', sessionId, 1);
+			this.cleanup(sessionId);
+		});
+
+		return { pid: -1, success: true };
+	}
+
+	/**
+	 * Run the SDK query async generator loop.
+	 * Iterates all messages and translates them to ProcessManager events.
+	 */
+	private async runQuery(sessionId: string, prompt: string, options: Options): Promise<void> {
+		const queryFn = await getQuery();
+		const queryInstance = queryFn({ prompt, options });
+		this.activeQueries.set(sessionId, queryInstance);
+
+		try {
+			for await (const message of queryInstance) {
+				// Check if session was stopped
+				if (!this.processes.has(sessionId)) {
+					break;
+				}
+
+				this.handleSDKMessage(sessionId, message);
+			}
+		} catch (error) {
+			// AbortError is expected when stop() is called
+			if ((error as Error).name === 'AbortError') {
+				logger.debug('[ClaudeSDKAdapter] Query aborted', 'ClaudeSDKAdapter', { sessionId });
+			} else {
+				throw error;
+			}
+		} finally {
+			// If we haven't already emitted exit, do so now
+			const managedProcess = this.processes.get(sessionId);
+			if (managedProcess) {
+				this.emitter.emit('query-complete', sessionId, {
+					sessionId,
+					agentType: managedProcess.toolType,
+					source: managedProcess.querySource || 'user',
+					startTime: managedProcess.startTime,
+					duration: Date.now() - managedProcess.startTime,
+					projectPath: managedProcess.projectPath,
+					tabId: managedProcess.tabId,
+				});
+				this.emitter.emit('exit', sessionId, 0);
+			}
+			this.cleanup(sessionId);
+		}
+	}
+
+	/**
+	 * Route an SDK message to the appropriate handler.
+	 */
+	private handleSDKMessage(sessionId: string, message: SDKMessage): void {
+		switch (message.type) {
+			case 'system':
+				if (message.subtype === 'init') {
+					this.handleSystemInit(sessionId, message as SDKSystemMessage);
+				}
+				break;
+
+			case 'assistant':
+				this.handleAssistantMessage(sessionId, message as SDKAssistantMessage);
+				break;
+
+			case 'stream_event':
+				this.handleStreamEvent(sessionId, message as SDKPartialAssistantMessage);
+				break;
+
+			case 'result':
+				this.handleResultMessage(sessionId, message as SDKResultMessage);
+				break;
+
+			case 'tool_progress':
+				this.handleToolProgress(sessionId, message as SDKToolProgressMessage);
+				break;
+
+			case 'tool_use_summary':
+				this.handleToolUseSummary(sessionId, message as SDKToolUseSummaryMessage);
+				break;
+
+			// Other message types (task_*, auth_status, etc.) are not needed
+			// by the current renderer and are silently ignored.
+		}
+	}
+
+	/**
+	 * Handle system init message — emit session-id and slash-commands.
+	 */
+	private handleSystemInit(sessionId: string, message: SDKSystemMessage): void {
+		const managedProcess = this.processes.get(sessionId);
+		if (!managedProcess) return;
+
+		if (message.session_id && !managedProcess.sessionIdEmitted) {
+			managedProcess.sessionIdEmitted = true;
+			logger.debug('[ClaudeSDKAdapter] Emitting session-id', 'ClaudeSDKAdapter', {
+				sessionId,
+				sdkSessionId: message.session_id,
+			});
+			this.emitter.emit('session-id', sessionId, message.session_id);
+		}
+
+		// Merge SDK-reported commands with custom commands read from ~/.claude/commands/
+		const allCommands = mergeSlashCommandsWithCustom(
+			message.slash_commands || [],
+			message.skills || [],
+			managedProcess.cwd
+		);
+		if (allCommands.length > 0) {
+			this.emitter.emit('slash-commands', sessionId, allCommands);
+		}
+	}
+
+	/**
+	 * Handle complete assistant message — extract tool_use blocks.
+	 */
+	private handleAssistantMessage(sessionId: string, message: SDKAssistantMessage): void {
+		if (!message.message?.content) return;
+
+		const content = message.message.content;
+		if (!Array.isArray(content)) return;
+
+		for (const block of content) {
+			const blockRecord = block as Record<string, unknown>;
+			if (blockRecord.type === 'tool_use' && blockRecord.name) {
+				this.emitter.emit('tool-execution', sessionId, {
+					toolName: blockRecord.name as string,
+					state: { status: 'running', input: blockRecord.input },
+					timestamp: Date.now(),
+				});
+			}
+		}
+	}
+
+	/**
+	 * Handle streaming partial messages — emit thinking-chunk for thinking deltas,
+	 * tool-execution for tool_use starts.
+	 */
+	private handleStreamEvent(sessionId: string, message: SDKPartialAssistantMessage): void {
+		const managedProcess = this.processes.get(sessionId);
+		if (!managedProcess) return;
+
+		const event = message.event as Record<string, unknown>;
+		const eventType = event.type as string;
+
+		if (eventType === 'content_block_delta') {
+			const delta = event.delta as Record<string, unknown> | undefined;
+			if (!delta) return;
+
+			const deltaType = delta.type as string;
+
+			// Thinking text deltas
+			if (deltaType === 'thinking_delta' && delta.thinking) {
+				this.emitter.emit('thinking-chunk', sessionId, delta.thinking as string);
+			}
+
+			// Regular text deltas — accumulate for final result
+			if (deltaType === 'text_delta' && delta.text) {
+				managedProcess.streamedText = (managedProcess.streamedText || '') + (delta.text as string);
+			}
+		}
+
+		if (eventType === 'content_block_start') {
+			const contentBlock = event.content_block as Record<string, unknown> | undefined;
+			if (!contentBlock) return;
+
+			if (contentBlock.type === 'tool_use' && contentBlock.name) {
+				const toolName = contentBlock.name as string;
+				const blockIndex = event.index as number | undefined;
+
+				// Track this tool_use block so we can emit 'completed' on content_block_stop
+				if (blockIndex !== undefined) {
+					if (!this.activeToolUseBlocks.has(sessionId)) {
+						this.activeToolUseBlocks.set(sessionId, new Map());
+					}
+					this.activeToolUseBlocks.get(sessionId)!.set(blockIndex, toolName);
+				}
+
+				this.emitter.emit('tool-execution', sessionId, {
+					toolName,
+					state: { status: 'running', input: contentBlock.input },
+					timestamp: Date.now(),
+				});
+			}
+		}
+
+		if (eventType === 'content_block_stop') {
+			const blockIndex = event.index as number | undefined;
+			if (blockIndex !== undefined) {
+				const sessionBlocks = this.activeToolUseBlocks.get(sessionId);
+				const toolName = sessionBlocks?.get(blockIndex);
+				if (toolName) {
+					sessionBlocks!.delete(blockIndex);
+					this.emitter.emit('tool-execution', sessionId, {
+						toolName,
+						state: { status: 'completed' },
+						timestamp: Date.now(),
+					});
+				}
+			}
+		}
+	}
+
+	/**
+	 * Handle result message — emit result text, usage stats, and exit.
+	 */
+	private handleResultMessage(sessionId: string, message: SDKResultMessage): void {
+		const managedProcess = this.processes.get(sessionId);
+		if (!managedProcess) return;
+
+		// Extract result text
+		const successMessage = message as SDKResultSuccess;
+		const resultText = successMessage.result || managedProcess.streamedText || '';
+
+		if (resultText && !managedProcess.resultEmitted) {
+			managedProcess.resultEmitted = true;
+			this.bufferManager.emitDataBuffered(sessionId, resultText);
+		}
+
+		// Emit usage stats
+		const usage = this.buildUsageFromResult(managedProcess, message);
+		if (usage) {
+			this.emitter.emit('usage', sessionId, usage);
+		}
+
+		// Handle errors in result
+		if (message.subtype !== 'success') {
+			const errorMessage = message as SDKResultError;
+			if (errorMessage.errors?.length) {
+				logger.warn('[ClaudeSDKAdapter] Query completed with errors', 'ClaudeSDKAdapter', {
+					sessionId,
+					subtype: message.subtype,
+					errors: errorMessage.errors,
+				});
+			}
+		}
+	}
+
+	/**
+	 * Handle tool progress messages — emit as tool-execution updates.
+	 */
+	private handleToolProgress(sessionId: string, message: SDKToolProgressMessage): void {
+		this.emitter.emit('tool-execution', sessionId, {
+			toolName: message.tool_name,
+			state: {
+				status: 'running',
+				elapsed: message.elapsed_time_seconds,
+			},
+			timestamp: Date.now(),
+		});
+	}
+
+	/**
+	 * Handle tool_use_summary messages — emit completed status for referenced tools.
+	 * This acts as a fallback for tool completion when content_block_stop wasn't
+	 * enough (e.g., nested tool use or summarised batches).
+	 */
+	private handleToolUseSummary(sessionId: string, message: SDKToolUseSummaryMessage): void {
+		// The summary references tool_use IDs, but we track by block index.
+		// Emit a generic completed event using the summary text.
+		this.emitter.emit('tool-execution', sessionId, {
+			toolName: 'tool_use_summary',
+			state: { status: 'completed', summary: message.summary },
+			timestamp: Date.now(),
+		});
+	}
+
+	/**
+	 * Build UsageStats from an SDK result message.
+	 * The SDK's result includes both modelUsage (per-model breakdown) and
+	 * flat usage/total_cost_usd fields, matching the CLI output format.
+	 */
+	private buildUsageFromResult(
+		managedProcess: ManagedProcess,
+		message: SDKResultMessage
+	): UsageStats | null {
+		// Both success and error results carry usage and modelUsage
+		const modelUsage = message.modelUsage as Record<string, ModelStats> | undefined;
+		const usage = message.usage;
+		const totalCostUsd = message.total_cost_usd;
+
+		if (!modelUsage && !usage) {
+			return null;
+		}
+
+		// Use the same aggregation helper as the CLI path
+		const aggregated = aggregateModelUsage(modelUsage, usage || {}, totalCostUsd || 0);
+
+		return {
+			inputTokens: aggregated.inputTokens,
+			outputTokens: aggregated.outputTokens,
+			cacheReadInputTokens: aggregated.cacheReadInputTokens,
+			cacheCreationInputTokens: aggregated.cacheCreationInputTokens,
+			totalCostUsd: aggregated.totalCostUsd,
+			contextWindow: aggregated.contextWindow || managedProcess.contextWindow || 200000,
+		};
+	}
+
+	/**
+	 * canUseTool callback for the SDK.
+	 * - AskUserQuestion: emit user-question event, wait for user response
+	 * - All other tools: allow (matches --dangerously-skip-permissions behavior)
+	 */
+	private async handleCanUseTool(
+		sessionId: string,
+		toolName: string,
+		input: Record<string, unknown>,
+		options: { signal: AbortSignal; toolUseID: string }
+	): Promise<PermissionResult> {
+		// AskUserQuestion: surface to the user and await their response
+		if (toolName === 'AskUserQuestion') {
+			return this.handleAskUserQuestion(sessionId, input, options);
+		}
+
+		// All other tools: auto-allow (bypass permissions mode)
+		return { behavior: 'allow', updatedInput: input };
+	}
+
+	/**
+	 * Handle AskUserQuestion tool invocation.
+	 * Emits a 'user-question' event and returns a Promise that blocks the
+	 * SDK agent loop until the renderer calls answerQuestion().
+	 */
+	private handleAskUserQuestion(
+		sessionId: string,
+		input: Record<string, unknown>,
+		options: { signal: AbortSignal; toolUseID: string }
+	): Promise<PermissionResult> {
+		const { toolUseID, signal } = options;
+
+		// Extract questions from the tool input
+		const questions = (input.questions || []) as UserQuestionItem[];
+
+		logger.debug('[ClaudeSDKAdapter] AskUserQuestion received', 'ClaudeSDKAdapter', {
+			sessionId,
+			toolUseID,
+			questionCount: questions.length,
+		});
+
+		// Emit the user-question event for the renderer
+		this.emitter.emit('user-question', sessionId, {
+			toolUseId: toolUseID,
+			questions,
+		});
+
+		// Return a Promise that resolves when the user responds
+		return new Promise<PermissionResult>((resolve) => {
+			this.pendingQuestionResolvers.set(toolUseID, {
+				resolve,
+				toolName: 'AskUserQuestion',
+			});
+
+			// If the query is aborted while waiting, resolve with deny
+			const onAbort = () => {
+				if (this.pendingQuestionResolvers.has(toolUseID)) {
+					this.pendingQuestionResolvers.delete(toolUseID);
+					resolve({
+						behavior: 'deny',
+						message: 'Query was aborted',
+					});
+				}
+			};
+
+			signal.addEventListener('abort', onAbort, { once: true });
+		});
+	}
+
+	/**
+	 * Provide an answer to a pending AskUserQuestion.
+	 * Called by the renderer (via IPC) when the user responds.
+	 *
+	 * @param toolUseId - The tool use ID from the user-question event
+	 * @param answer - The user's response text
+	 */
+	answerQuestion(toolUseId: string, answer: string): boolean {
+		const pending = this.pendingQuestionResolvers.get(toolUseId);
+		if (!pending) {
+			logger.warn('[ClaudeSDKAdapter] No pending question for toolUseId', 'ClaudeSDKAdapter', {
+				toolUseId,
+			});
+			return false;
+		}
+
+		this.pendingQuestionResolvers.delete(toolUseId);
+
+		// Resolve with allow + the answer as updated input
+		// The SDK will pass this back to the tool as the response
+		pending.resolve({
+			behavior: 'allow',
+			updatedInput: { result: answer },
+			toolUseID: toolUseId,
+		});
+
+		return true;
+	}
+
+	/**
+	 * Stop a running SDK query for the given session.
+	 */
+	stop(sessionId: string): void {
+		logger.debug('[ClaudeSDKAdapter] Stopping query', 'ClaudeSDKAdapter', { sessionId });
+
+		const abortController = this.abortControllers.get(sessionId);
+		if (abortController) {
+			abortController.abort();
+		}
+
+		// Reject any pending questions
+		for (const [toolUseId, pending] of this.pendingQuestionResolvers) {
+			pending.resolve({
+				behavior: 'deny',
+				message: 'Session stopped',
+			});
+			this.pendingQuestionResolvers.delete(toolUseId);
+		}
+
+		this.cleanup(sessionId);
+	}
+
+	/**
+	 * Check if a session is using the SDK adapter.
+	 */
+	hasSession(sessionId: string): boolean {
+		return this.abortControllers.has(sessionId) || this.activeQueries.has(sessionId);
+	}
+
+	/**
+	 * Clean up resources for a session.
+	 */
+	private cleanup(sessionId: string): void {
+		this.abortControllers.delete(sessionId);
+		this.activeQueries.delete(sessionId);
+		this.activeToolUseBlocks.delete(sessionId);
+	}
+}

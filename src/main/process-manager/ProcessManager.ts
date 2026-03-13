@@ -11,6 +11,7 @@ import type {
 } from './types';
 import { PtySpawner } from './spawners/PtySpawner';
 import { ChildProcessSpawner } from './spawners/ChildProcessSpawner';
+import { ClaudeSDKAdapter } from './spawners/ClaudeSDKAdapter';
 import { DataBufferManager } from './handlers/DataBufferManager';
 import { LocalCommandRunner } from './runners/LocalCommandRunner';
 import { SshCommandRunner } from './runners/SshCommandRunner';
@@ -31,6 +32,7 @@ export class ProcessManager extends EventEmitter {
 	private bufferManager: DataBufferManager;
 	private ptySpawner: PtySpawner;
 	private childProcessSpawner: ChildProcessSpawner;
+	private sdkAdapter: ClaudeSDKAdapter;
 	private localCommandRunner: LocalCommandRunner;
 	private sshCommandRunner: SshCommandRunner;
 
@@ -39,14 +41,24 @@ export class ProcessManager extends EventEmitter {
 		this.bufferManager = new DataBufferManager(this.processes, this);
 		this.ptySpawner = new PtySpawner(this.processes, this, this.bufferManager);
 		this.childProcessSpawner = new ChildProcessSpawner(this.processes, this, this.bufferManager);
+		this.sdkAdapter = new ClaudeSDKAdapter(this.processes, this, this.bufferManager);
 		this.localCommandRunner = new LocalCommandRunner(this);
 		this.sshCommandRunner = new SshCommandRunner(this);
 	}
 
 	/**
-	 * Spawn a new process for a session
+	 * Spawn a new process for a session.
+	 *
+	 * For Claude Code (toolType === 'claude-code') with a prompt, uses the
+	 * Agent SDK adapter instead of spawning a CLI child process.
+	 * All other agents continue to use PTY or ChildProcess spawners.
 	 */
 	spawn(config: ProcessConfig): SpawnResult {
+		// Claude Code with a prompt uses the SDK adapter (not CLI --print)
+		if (config.toolType === 'claude-code' && config.prompt && !config.sshRemoteId) {
+			return this.spawnSDK(config);
+		}
+
 		const usePty = this.shouldUsePty(config);
 
 		if (usePty) {
@@ -56,13 +68,47 @@ export class ProcessManager extends EventEmitter {
 		}
 	}
 
+	/**
+	 * Spawn a Claude Code session via the Agent SDK adapter.
+	 * The adapter registers the ManagedProcess and emits events on this emitter.
+	 */
+	private spawnSDK(config: ProcessConfig): SpawnResult {
+		logger.info('[ProcessManager] Using SDK adapter for Claude Code', 'ProcessManager', {
+			sessionId: config.sessionId,
+			cwd: config.cwd,
+			hasPrompt: !!config.prompt,
+		});
+
+		// Start the SDK query asynchronously — the adapter registers in processes Map
+		this.sdkAdapter.start(config).catch((error) => {
+			logger.error('[ProcessManager] SDK adapter start failed', 'ProcessManager', {
+				sessionId: config.sessionId,
+				error: String(error),
+			});
+		});
+
+		// Mark the managed process as SDK mode once it's registered
+		// (start() registers it synchronously before the async query begins)
+		const managedProcess = this.processes.get(config.sessionId);
+		if (managedProcess) {
+			managedProcess.sdkAdapter = this.sdkAdapter;
+			managedProcess.isSDKMode = true;
+		}
+
+		return { pid: -1, success: true };
+	}
+
 	private shouldUsePty(config: ProcessConfig): boolean {
 		const { toolType, requiresPty, prompt } = config;
 		return (toolType === 'terminal' || requiresPty === true) && !prompt;
 	}
 
 	/**
-	 * Write data to a process's stdin
+	 * Write data to a process's stdin.
+	 *
+	 * For SDK-mode processes, this is used to answer AskUserQuestion prompts.
+	 * The data is expected to be a JSON string with { toolUseId, answer } when
+	 * responding to a user-question event.
 	 */
 	write(sessionId: string, data: string): boolean {
 		const process = this.processes.get(sessionId);
@@ -74,6 +120,24 @@ export class ProcessManager extends EventEmitter {
 		}
 
 		try {
+			// SDK mode: route to adapter's answerQuestion
+			if (process.isSDKMode && process.sdkAdapter) {
+				try {
+					const parsed = JSON.parse(data);
+					if (parsed.toolUseId && parsed.answer !== undefined) {
+						return process.sdkAdapter.answerQuestion(parsed.toolUseId, parsed.answer);
+					}
+				} catch {
+					// Not JSON — fall through to log a warning
+				}
+				logger.warn(
+					'[ProcessManager] SDK mode write() expects JSON { toolUseId, answer }',
+					'ProcessManager',
+					{ sessionId, dataLength: data.length }
+				);
+				return false;
+			}
+
 			if (process.isTerminal && process.ptyProcess) {
 				const command = data.replace(/\r?\n$/, '');
 				if (command.trim()) {
@@ -116,6 +180,7 @@ export class ProcessManager extends EventEmitter {
 
 	/**
 	 * Send interrupt signal (SIGINT/Ctrl+C) to a process.
+	 * For SDK-mode processes, calls sdkAdapter.stop() to abort the query.
 	 * For child processes, escalates to SIGTERM if the process doesn't exit
 	 * within a short timeout (Claude Code may not immediately exit on SIGINT).
 	 */
@@ -124,6 +189,13 @@ export class ProcessManager extends EventEmitter {
 		if (!process) return false;
 
 		try {
+			// SDK mode: abort the query via the adapter
+			if (process.isSDKMode && process.sdkAdapter) {
+				process.sdkAdapter.stop(sessionId);
+				this.processes.delete(sessionId);
+				return true;
+			}
+
 			if (process.isTerminal && process.ptyProcess) {
 				process.ptyProcess.write('\x03');
 				return true;
@@ -175,7 +247,9 @@ export class ProcessManager extends EventEmitter {
 			}
 			this.bufferManager.flushDataBuffer(sessionId);
 
-			if (process.isTerminal && process.ptyProcess) {
+			if (process.isSDKMode && process.sdkAdapter) {
+				process.sdkAdapter.stop(sessionId);
+			} else if (process.isTerminal && process.ptyProcess) {
 				process.ptyProcess.kill();
 			} else if (process.childProcess) {
 				process.childProcess.kill('SIGTERM');

@@ -154,15 +154,29 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 							}
 						: null,
 				});
-				let finalArgs = buildAgentArgs(agent, {
-					baseArgs: config.args,
-					prompt: config.prompt,
-					cwd: config.cwd,
-					readOnlyMode: config.readOnlyMode,
-					modelId: config.modelId,
-					yoloMode: config.yoloMode,
-					agentSessionId: config.agentSessionId,
-				});
+				// For Claude Code SDK mode: skip CLI arg building entirely.
+				// The SDK adapter receives config directly (prompt, model, sessionId, cwd).
+				// SSH remote sessions still use the CLI path.
+				const isClaudeSDKMode =
+					config.toolType === 'claude-code' &&
+					config.prompt &&
+					!config.sessionSshRemoteConfig?.enabled;
+
+				let finalArgs = isClaudeSDKMode
+					? [
+							...config.args,
+							// Pass resume arg so the SDK adapter can extract it
+							...(config.agentSessionId ? ['--resume', config.agentSessionId] : []),
+						]
+					: buildAgentArgs(agent, {
+							baseArgs: config.args,
+							prompt: config.prompt,
+							cwd: config.cwd,
+							readOnlyMode: config.readOnlyMode,
+							modelId: config.modelId,
+							yoloMode: config.yoloMode,
+							agentSessionId: config.agentSessionId,
+						});
 
 				// ========================================================================
 				// Apply agent config options and session overrides
@@ -582,6 +596,20 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 			});
 			return processManager.write(sessionId, data);
 		})
+	);
+
+	// Answer a pending AskUserQuestion (SDK mode)
+	// Routes directly to the ClaudeSDKAdapter via ProcessManager
+	ipcMain.handle(
+		'process:answerQuestion',
+		withIpcErrorLogging(
+			handlerOpts('answerQuestion'),
+			async (sessionId: string, toolUseId: string, answer: string) => {
+				const processManager = requireProcessManager(getProcessManager);
+				// Delegate to ProcessManager.write() with the expected JSON format
+				return processManager.write(sessionId, JSON.stringify({ toolUseId, answer }));
+			}
+		)
 	);
 
 	// Send SIGINT to a process

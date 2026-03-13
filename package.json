@@ -97,6 +97,7 @@
 		"afterSign": "scripts/notarize.js"
 	},
 	"dependencies": {
+		"@anthropic-ai/claude-agent-sdk": "^0.2.74",
 		"@fastify/cors": "^8.5.0",
 		"@fastify/rate-limit": "^9.1.0",
 		"@fastify/static": "^7.0.4",
