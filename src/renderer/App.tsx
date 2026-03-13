@@ -886,9 +886,13 @@ function MaestroConsoleInner() {
 		const filteredSlashCommands = slashCommands.filter(
 			(cmd) => !cmd.agentTypes || (currentAgentType && cmd.agentTypes.includes(currentAgentType))
 		);
-		// Deduplicate: built-in commands take precedence over agent-reported ones
-		const builtInNames = new Set(filteredSlashCommands.map((cmd) => cmd.command));
-		const uniqueAgentCommands = agentCommands.filter((cmd) => !builtInNames.has(cmd.command));
+		// Deduplicate: built-in commands take precedence, and remove duplicates within agent commands
+		const seen = new Set(filteredSlashCommands.map((cmd) => cmd.command));
+		const uniqueAgentCommands = agentCommands.filter((cmd) => {
+			if (seen.has(cmd.command)) return false;
+			seen.add(cmd.command);
+			return true;
+		});
 		return [...filteredSlashCommands, ...uniqueAgentCommands];
 	}, [activeSession?.agentCommands, activeSession?.toolType, hasActiveSessionCapability]);
 
