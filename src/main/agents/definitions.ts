@@ -142,6 +142,19 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		modelArgs: (modelId: string) => ['--model', modelId], // Model selection: claude --model opus
 		configOptions: [
 			{
+				key: 'model',
+				type: 'text',
+				label: 'Model',
+				description: 'Model override (e.g., sonnet, opus, haiku). Leave empty to use the default.',
+				default: '', // Empty = use Claude Code's default model
+				argBuilder: (value: string) => {
+					if (value && value.trim()) {
+						return ['--model', value.trim()];
+					}
+					return [];
+				},
+			},
+			{
 				key: 'outputStyle',
 				type: 'select' as const,
 				label: 'Output Style',
