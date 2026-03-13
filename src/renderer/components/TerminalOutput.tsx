@@ -591,6 +591,7 @@ const LogItemComponent = memo(
 					{log.source !== 'error' &&
 						log.source !== 'thinking' &&
 						log.source !== 'tool' &&
+						!log.interactive &&
 						(hasNoMatches ? (
 							<div
 								className="flex items-center justify-center py-8 text-sm"
