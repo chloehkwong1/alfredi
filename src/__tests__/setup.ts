@@ -319,6 +319,7 @@ const mockMaestro = {
 			supportsStreamJsonInput: true,
 			supportsContextMerge: false,
 			supportsContextExport: false,
+			supportsSDK: false,
 		}),
 	},
 	fonts: {

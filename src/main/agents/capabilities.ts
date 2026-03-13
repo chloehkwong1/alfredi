@@ -73,6 +73,9 @@ export interface AgentCapabilities {
 	/** Agent supports /clear command to reset conversation context without restarting */
 	supportsClearContext: boolean;
 
+	/** Agent uses native SDK for execution instead of CLI spawning (local only; SSH falls back to CLI) */
+	supportsSDK: boolean;
+
 	/** How images should be handled on resume when -i flag is not available.
 	 * 'prompt-embed': Save images to temp files and embed file paths in the prompt text.
 	 * undefined: Use default image handling (or no special resume handling needed). */
@@ -104,6 +107,7 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
 	supportsContextMerge: false,
 	supportsContextExport: false,
 	supportsClearContext: false,
+	supportsSDK: false,
 };
 
 /**
@@ -123,26 +127,27 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 	 * https://github.com/anthropics/claude-code
 	 */
 	'claude-code': {
-		supportsResume: true, // --resume flag
-		supportsReadOnlyMode: true, // --permission-mode plan
-		supportsJsonOutput: true, // --output-format stream-json
-		supportsSessionId: true, // session_id in JSON output
-		supportsImageInput: true, // Supports image attachments
-		supportsImageInputOnResume: true, // Can send images via --input-format stream-json on resumed sessions
+		supportsResume: true, // SDK manages session continuity; CLI --resume for SSH fallback
+		supportsReadOnlyMode: true, // SDK permissionMode config; CLI --permission-mode plan for SSH
+		supportsJsonOutput: true, // SDK emits structured events; CLI --output-format stream-json for SSH
+		supportsSessionId: true, // SDK provides session_id in events
+		supportsImageInput: true, // SDK accepts image content blocks
+		supportsImageInputOnResume: true, // SDK handles images on resumed sessions natively
 		supportsSlashCommands: true, // /help, /compact, etc.
 		supportsSessionStorage: true, // ~/.claude/projects/
-		supportsCostTracking: true, // Cost info in usage stats
-		supportsUsageStats: true, // Token counts in output
-		supportsBatchMode: true, // --print flag
-		requiresPromptToStart: false, // Claude Code can run in --print mode waiting for input
-		supportsStreaming: true, // Stream JSON events
-		supportsResultMessages: true, // "result" event type
-		supportsModelSelection: true, // --model flag (e.g., 'sonnet', 'opus', 'haiku')
-		supportsStreamJsonInput: true, // --input-format stream-json for images via stdin
-		supportsThinkingDisplay: true, // Emits streaming assistant messages
+		supportsCostTracking: true, // Cost info in SDK events
+		supportsUsageStats: true, // Token counts in SDK events
+		supportsBatchMode: true, // SDK operates in non-interactive mode; CLI --print for SSH fallback
+		requiresPromptToStart: false, // SDK query() accepts prompt directly
+		supportsStreaming: true, // SDK streams events via async iterator
+		supportsResultMessages: true, // SDK emits result events
+		supportsModelSelection: true, // SDK accepts model in config; CLI --model for SSH fallback
+		supportsStreamJsonInput: true, // CLI fallback for SSH still uses --input-format stream-json
+		supportsThinkingDisplay: true, // SDK emits streaming assistant/thinking messages
 		supportsContextMerge: true, // Can receive merged context via prompts
 		supportsContextExport: true, // Session storage supports context export
 		supportsClearContext: true, // /clear command resets conversation context
+		supportsSDK: true, // Uses @anthropic-ai/claude-agent-sdk for local execution
 	},
 
 	/**
@@ -170,6 +175,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 		supportsContextMerge: false, // Terminal is not an AI agent
 		supportsContextExport: false, // Terminal has no AI context
 		supportsClearContext: false,
+		supportsSDK: false,
 	},
 
 	/**
@@ -200,6 +206,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 		supportsContextMerge: true, // Can receive merged context via prompts
 		supportsContextExport: true, // Session storage supports context export
 		supportsClearContext: false, // Not yet investigated
+		supportsSDK: false,
 		imageResumeMode: 'prompt-embed', // codex exec resume doesn't support -i; embed file paths in prompt text
 	},
 
@@ -230,6 +237,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 		supportsContextMerge: false, // Not yet investigated - PLACEHOLDER
 		supportsContextExport: false, // Not yet investigated - PLACEHOLDER
 		supportsClearContext: false, // Not yet investigated
+		supportsSDK: false,
 	},
 
 	/**
@@ -259,6 +267,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 		supportsContextMerge: false, // Not yet investigated - PLACEHOLDER
 		supportsContextExport: false, // Not yet investigated - PLACEHOLDER
 		supportsClearContext: false, // Not yet investigated
+		supportsSDK: false,
 	},
 
 	/**
@@ -289,6 +298,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 		supportsContextMerge: true, // Can receive merged context via prompts
 		supportsContextExport: true, // Session storage supports context export
 		supportsClearContext: false, // Not yet investigated
+		supportsSDK: false,
 	},
 
 	/**
@@ -318,6 +328,7 @@ export const AGENT_CAPABILITIES: Record<string, AgentCapabilities> = {
 		supportsContextMerge: true, // Can receive merged context via prompts
 		supportsContextExport: true, // Session files are exportable
 		supportsClearContext: false, // Not yet investigated
+		supportsSDK: false,
 	},
 };
 

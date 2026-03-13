@@ -31,6 +31,7 @@ export interface AgentCapabilities {
 	supportsResultMessages: boolean;
 	supportsModelSelection: boolean;
 	supportsStreamJsonInput: boolean;
+	supportsSDK: boolean;
 }
 
 /**

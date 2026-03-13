@@ -75,6 +75,7 @@ interface AgentCapabilities {
 	supportsStreamJsonInput: boolean;
 	supportsContextMerge: boolean;
 	supportsContextExport: boolean;
+	supportsSDK: boolean;
 }
 
 interface AgentConfig {
@@ -87,6 +88,7 @@ interface AgentConfig {
 	command: string;
 	args?: string[];
 	hidden?: boolean;
+	sdkMode?: boolean;
 	configOptions?: AgentConfigOption[];
 	yoloModeArgs?: string[];
 	readOnlyCliEnforced?: boolean;
@@ -112,6 +114,7 @@ interface AgentCapabilities {
 	supportsStreamJsonInput: boolean;
 	supportsContextMerge: boolean;
 	supportsContextExport: boolean;
+	supportsSDK: boolean;
 }
 
 interface DirectoryEntry {
@@ -202,6 +205,7 @@ interface MaestroAPI {
 	process: {
 		spawn: (config: ProcessConfig) => Promise<{ pid: number; success: boolean }>;
 		write: (sessionId: string, data: string) => Promise<boolean>;
+		answerQuestion: (sessionId: string, toolUseId: string, answer: string) => Promise<boolean>;
 		interrupt: (sessionId: string) => Promise<boolean>;
 		kill: (sessionId: string) => Promise<boolean>;
 		resize: (sessionId: string, cols: number, rows: number) => Promise<boolean>;
@@ -1256,6 +1260,12 @@ interface MaestroAPI {
 				description: string;
 				tokenCount: number;
 				source: 'project' | 'user';
+			}>
+		>;
+		getCustomCommands: (cwd?: string) => Promise<
+			Array<{
+				name: string;
+				description: string;
 			}>
 		>;
 		registerSessionOrigin: (

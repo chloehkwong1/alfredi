@@ -81,6 +81,7 @@ export interface AgentConfig {
 	requiresPty?: boolean; // Whether this agent needs a pseudo-terminal
 	configOptions?: AgentConfigOption[]; // Agent-specific configuration
 	hidden?: boolean; // If true, agent is hidden from UI (internal use only)
+	sdkMode?: boolean; // If true, agent uses native SDK instead of CLI spawning
 	capabilities: AgentCapabilities; // Agent feature capabilities
 
 	// Argument builders for dynamic CLI construction
@@ -128,7 +129,8 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		name: 'Claude Code',
 		binaryName: 'claude',
 		command: 'claude',
-		// YOLO mode (--dangerously-skip-permissions) is always enabled - Maestro requires it
+		sdkMode: true, // Uses @anthropic-ai/claude-agent-sdk instead of CLI spawning
+		// CLI args kept for SSH remote fallback path (SSH agents still use CLI spawning)
 		args: [
 			'--print',
 			'--verbose',
@@ -136,10 +138,10 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 			'stream-json',
 			'--dangerously-skip-permissions',
 		],
-		resumeArgs: (sessionId: string) => ['--resume', sessionId], // Resume with session ID
-		readOnlyArgs: ['--permission-mode', 'plan'], // Read-only/plan mode
+		resumeArgs: (sessionId: string) => ['--resume', sessionId], // SDK-managed locally, CLI fallback for SSH
+		readOnlyArgs: ['--permission-mode', 'plan'], // Read-only/plan mode (SDK uses permissionMode config)
 		readOnlyCliEnforced: true, // CLI enforces read-only via --permission-mode plan
-		modelArgs: (modelId: string) => ['--model', modelId], // Model selection: claude --model opus
+		modelArgs: (modelId: string) => ['--model', modelId], // SDK extracts model from config; CLI fallback for SSH
 		configOptions: [
 			{
 				key: 'model',

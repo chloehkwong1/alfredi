@@ -273,6 +273,7 @@ describe('agent-capabilities', () => {
 				'supportsContextMerge',
 				'supportsContextExport',
 				'supportsClearContext',
+				'supportsSDK',
 			];
 
 			const defaultKeys = Object.keys(DEFAULT_CAPABILITIES);

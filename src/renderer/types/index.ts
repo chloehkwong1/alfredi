@@ -221,6 +221,8 @@ export interface LogEntry {
 		};
 		// For interactive questions - the process session ID to write the answer to
 		processSessionId?: string;
+		// For interactive questions (SDK mode) - the tool use ID to resolve the pending Promise
+		toolUseId?: string;
 	};
 }
 
@@ -476,6 +478,7 @@ export interface AITab {
 	outputStyle?: import('../../shared/types').OutputStyle; // Per-tab output style override (falls back to global outputStyle if not set)
 	wizardState?: SessionWizardState; // Per-tab inline wizard state for /wizard command
 	isGeneratingName?: boolean; // True while automatic tab naming is in progress
+	pendingQuestion?: { processSessionId: string; toolUseId: string }; // Set when a freeform AskUserQuestion arrives (no options), cleared on answer or exit
 }
 
 // A single "thinking item" — one busy tab within a session.
@@ -844,6 +847,7 @@ export interface AgentCapabilities {
 	supportsThinkingDisplay?: boolean;
 	supportsContextMerge?: boolean;
 	supportsContextExport?: boolean;
+	supportsSDK?: boolean;
 }
 
 export interface AgentConfig {

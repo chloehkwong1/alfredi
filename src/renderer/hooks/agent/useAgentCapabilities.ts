@@ -71,6 +71,9 @@ export interface AgentCapabilities {
 
 	/** Agent supports /clear command to reset conversation context */
 	supportsClearContext: boolean;
+
+	/** Agent uses native SDK for execution instead of CLI spawning */
+	supportsSDK: boolean;
 }
 
 /**
@@ -98,6 +101,7 @@ export const DEFAULT_CAPABILITIES: AgentCapabilities = {
 	supportsContextMerge: false,
 	supportsContextExport: false,
 	supportsClearContext: false,
+	supportsSDK: false,
 };
 
 /**

@@ -86,6 +86,19 @@ export class AgentDetector {
 	}
 
 	/**
+	 * Check if the Claude Agent SDK package is available (installed as npm dependency).
+	 * Returns true if the SDK can be resolved, false otherwise.
+	 */
+	private checkSDKAvailable(): boolean {
+		try {
+			require.resolve('@anthropic-ai/claude-agent-sdk');
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	/**
 	 * Internal method that performs the actual agent detection
 	 */
 	private async doDetectAgents(): Promise<AgentConfig[]> {
@@ -129,6 +142,23 @@ export class AgentDetector {
 							`Searched in PATH: ${expandedEnv.PATH}`,
 						LOG_CONTEXT
 					);
+				}
+			}
+
+			// For SDK-mode agents, also verify the SDK package is installed.
+			// The binary must exist (for auth/config) AND the SDK must be available (for execution).
+			if (agentDef.sdkMode && detection.exists) {
+				const sdkAvailable = this.checkSDKAvailable();
+				if (!sdkAvailable) {
+					logger.warn(
+						`Agent "${agentDef.name}" binary found but SDK package not available. ` +
+							`Install @anthropic-ai/claude-agent-sdk to enable SDK mode.`,
+						LOG_CONTEXT
+					);
+					// Still mark as available — CLI fallback can be used (e.g., SSH path)
+					// but log the warning so it's diagnosable
+				} else {
+					logger.info(`Agent "${agentDef.name}" SDK package verified`, LOG_CONTEXT);
 				}
 			}
 
