@@ -48,7 +48,7 @@ import type {
 // Re-import query as a value — the SDK is an ESM module.
 // TypeScript's CJS output transforms `import()` into `require()`, which fails for ESM-only
 // packages. We use `Function` to create a real dynamic import that TypeScript won't transform.
- 
+
 const dynamicImport = new Function('specifier', 'return import(specifier)') as (
 	specifier: string
 ) => Promise<typeof import('@anthropic-ai/claude-agent-sdk')>;
@@ -191,6 +191,7 @@ export class ClaudeSDKAdapter {
 				sessionId,
 				error: String(error),
 			});
+			this.processes.delete(sessionId);
 			this.emitter.emit('exit', sessionId, 1);
 			this.cleanup(sessionId);
 		});
@@ -236,6 +237,9 @@ export class ClaudeSDKAdapter {
 					projectPath: managedProcess.projectPath,
 					tabId: managedProcess.tabId,
 				});
+				// Remove from processes map BEFORE emitting exit so the renderer's
+				// getActiveProcesses() safety check sees the process as gone
+				this.processes.delete(sessionId);
 				this.emitter.emit('exit', sessionId, 0);
 			}
 			this.cleanup(sessionId);
