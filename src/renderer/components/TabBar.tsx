@@ -1568,11 +1568,28 @@ const DiffTab = memo(function DiffTab({
 	isDragging,
 	isDragOver,
 	registerRef,
+	onMoveToFirst,
+	onMoveToLast,
+	isFirstTab,
+	isLastTab,
+	onCloseOtherTabs,
+	onCloseTabsLeft,
+	onCloseTabsRight,
+	totalTabs,
+	tabIndex,
 	shortcutHint,
 	onPinTab,
 }: DiffTabProps) {
 	const [isHovered, setIsHovered] = useState(false);
+	const [overlayOpen, setOverlayOpen] = useState(false);
+	const [overlayPosition, setOverlayPosition] = useState<{
+		top: number;
+		left: number;
+		tabWidth: number;
+	} | null>(null);
 	const tabRef = useRef<HTMLDivElement>(null);
+	const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const isOverOverlayRef = useRef(false);
 
 	const setTabRef = useCallback(
 		(el: HTMLDivElement | null) => {
@@ -1582,8 +1599,41 @@ const DiffTab = memo(function DiffTab({
 		[registerRef]
 	);
 
-	const handleMouseEnter = () => setIsHovered(true);
-	const handleMouseLeave = () => setIsHovered(false);
+	const handleMouseEnter = () => {
+		setIsHovered(true);
+		// Show overlay if there are move or close actions available
+		if (isFirstTab && isLastTab && totalTabs === 1) return;
+
+		hoverTimeoutRef.current = setTimeout(() => {
+			if (tabRef.current) {
+				const rect = tabRef.current.getBoundingClientRect();
+				setOverlayPosition({ top: rect.bottom, left: rect.left, tabWidth: rect.width });
+			}
+			setOverlayOpen(true);
+		}, 400);
+	};
+
+	const handleMouseLeave = () => {
+		setIsHovered(false);
+		if (hoverTimeoutRef.current) {
+			clearTimeout(hoverTimeoutRef.current);
+			hoverTimeoutRef.current = null;
+		}
+		hoverTimeoutRef.current = setTimeout(() => {
+			if (!isOverOverlayRef.current) {
+				setOverlayOpen(false);
+			}
+		}, 100);
+	};
+
+	// Clean up timeouts on unmount
+	useEffect(() => {
+		return () => {
+			if (hoverTimeoutRef.current) {
+				clearTimeout(hoverTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
@@ -1601,6 +1651,60 @@ const DiffTab = memo(function DiffTab({
 			onClose(tab.id);
 		},
 		[onClose, tab.id]
+	);
+
+	const handleCloseTabClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onClose(tab.id);
+			setOverlayOpen(false);
+		},
+		[onClose, tab.id]
+	);
+
+	const handleCloseOtherTabsClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onCloseOtherTabs?.(tab.id);
+			setOverlayOpen(false);
+		},
+		[onCloseOtherTabs, tab.id]
+	);
+
+	const handleCloseTabsLeftClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onCloseTabsLeft?.(tab.id);
+			setOverlayOpen(false);
+		},
+		[onCloseTabsLeft, tab.id]
+	);
+
+	const handleCloseTabsRightClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onCloseTabsRight?.(tab.id);
+			setOverlayOpen(false);
+		},
+		[onCloseTabsRight, tab.id]
+	);
+
+	const handleMoveToFirstClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onMoveToFirst?.(tab.id);
+			setOverlayOpen(false);
+		},
+		[onMoveToFirst, tab.id]
+	);
+
+	const handleMoveToLastClick = useCallback(
+		(e: React.MouseEvent) => {
+			e.stopPropagation();
+			onMoveToLast?.(tab.id);
+			setOverlayOpen(false);
+		},
+		[onMoveToLast, tab.id]
 	);
 
 	const handleTabSelect = useCallback(() => {
@@ -1741,6 +1845,143 @@ const DiffTab = memo(function DiffTab({
 					<X className="w-3 h-3" />
 				</button>
 			)}
+
+			{/* Hover overlay with actions - rendered via portal to escape stacking context */}
+			{overlayOpen &&
+				overlayPosition &&
+				createPortal(
+					<div
+						className="fixed z-[100]"
+						style={{
+							top: overlayPosition.top,
+							left: overlayPosition.left,
+						}}
+						onClick={(e) => e.stopPropagation()}
+						onMouseEnter={() => {
+							isOverOverlayRef.current = true;
+							if (hoverTimeoutRef.current) {
+								clearTimeout(hoverTimeoutRef.current);
+								hoverTimeoutRef.current = null;
+							}
+						}}
+						onMouseLeave={() => {
+							isOverOverlayRef.current = false;
+							setOverlayOpen(false);
+							setIsHovered(false);
+						}}
+					>
+						<div
+							className="shadow-xl overflow-hidden"
+							style={{
+								backgroundColor: theme.colors.bgSidebar,
+								borderLeft: `1px solid ${theme.colors.border}`,
+								borderRight: `1px solid ${theme.colors.border}`,
+								borderBottom: `1px solid ${theme.colors.border}`,
+								borderBottomLeftRadius: '8px',
+								borderBottomRightRadius: '8px',
+								minWidth: '220px',
+							}}
+						>
+							<div className="p-1">
+								{/* Tab Move Actions Section */}
+								{(onMoveToFirst || onMoveToLast) && (
+									<>
+										{onMoveToFirst && !isFirstTab && (
+											<button
+												onClick={handleMoveToFirstClick}
+												className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
+												style={{ color: theme.colors.textMain }}
+											>
+												<ChevronsLeft
+													className="w-3.5 h-3.5"
+													style={{ color: theme.colors.textDim }}
+												/>
+												Move to First Position
+											</button>
+										)}
+
+										{onMoveToLast && !isLastTab && (
+											<button
+												onClick={handleMoveToLastClick}
+												className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
+												style={{ color: theme.colors.textMain }}
+											>
+												<ChevronsRight
+													className="w-3.5 h-3.5"
+													style={{ color: theme.colors.textDim }}
+												/>
+												Move to Last Position
+											</button>
+										)}
+
+										<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
+									</>
+								)}
+
+								{/* Close Tab */}
+								<button
+									onClick={handleCloseTabClick}
+									className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors hover:bg-white/10"
+									style={{ color: theme.colors.textMain }}
+								>
+									<X className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+									Close Tab
+								</button>
+
+								{/* Close Other Tabs */}
+								{onCloseOtherTabs && (
+									<button
+										onClick={handleCloseOtherTabsClick}
+										className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+											totalTabs === 1 ? 'opacity-40 cursor-default' : 'hover:bg-white/10'
+										}`}
+										style={{ color: theme.colors.textMain }}
+										disabled={totalTabs === 1}
+									>
+										<X className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+										Close Other Tabs
+									</button>
+								)}
+
+								{/* Close Tabs to Left */}
+								{onCloseTabsLeft && (
+									<button
+										onClick={handleCloseTabsLeftClick}
+										className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+											tabIndex === 0 ? 'opacity-40 cursor-default' : 'hover:bg-white/10'
+										}`}
+										style={{ color: theme.colors.textMain }}
+										disabled={tabIndex === 0}
+									>
+										<ChevronsLeft className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+										Close Tabs to Left
+									</button>
+								)}
+
+								{/* Close Tabs to Right */}
+								{onCloseTabsRight && (
+									<button
+										onClick={handleCloseTabsRightClick}
+										className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-colors ${
+											tabIndex === (totalTabs ?? 1) - 1
+												? 'opacity-40 cursor-default'
+												: 'hover:bg-white/10'
+										}`}
+										style={{ color: theme.colors.textMain }}
+										disabled={tabIndex === (totalTabs ?? 1) - 1}
+									>
+										<ChevronsRight
+											className="w-3.5 h-3.5"
+											style={{ color: theme.colors.textDim }}
+										/>
+										Close Tabs to Right
+									</button>
+								)}
+							</div>
+						</div>
+					</div>,
+					document.body
+				)}
 		</div>
 	);
 });
