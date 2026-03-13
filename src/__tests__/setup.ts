@@ -264,6 +264,7 @@ const mockMaestro = {
 		removeWorktree: vi.fn().mockResolvedValue({ success: true }),
 		listRemotes: vi.fn().mockResolvedValue({ remotes: [] }),
 		prStatus: vi.fn().mockResolvedValue({ success: false }),
+		commitFiles: vi.fn().mockResolvedValue({ files: [], error: null }),
 	},
 	fs: {
 		readDir: vi.fn().mockResolvedValue([]),
@@ -437,6 +438,25 @@ const mockMaestro = {
 		onCommandCompleted: vi.fn().mockReturnValue(() => {}),
 		onTtsCompleted: vi.fn().mockReturnValue(() => {}), // Legacy alias
 		show: vi.fn().mockResolvedValue(undefined),
+		getSystemSounds: vi
+			.fn()
+			.mockResolvedValue([
+				'Basso',
+				'Blow',
+				'Bottle',
+				'Frog',
+				'Funk',
+				'Glass',
+				'Hero',
+				'Morse',
+				'Ping',
+				'Pop',
+				'Purr',
+				'Sosumi',
+				'Submarine',
+				'Tink',
+			]),
+		playSound: vi.fn().mockResolvedValue({ success: true }),
 	},
 	dialog: {
 		selectFolder: vi.fn().mockResolvedValue(null),

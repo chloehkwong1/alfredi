@@ -11,7 +11,6 @@ import { isWindows } from '../../shared/platformDetection';
 import type {
 	MaestroSettings,
 	SessionsData,
-	ProjectsData,
 	AgentConfigsData,
 	WindowState,
 	ClaudeSessionOriginsData,
@@ -73,10 +72,6 @@ export const SETTINGS_DEFAULTS: MaestroSettings = {
 
 export const SESSIONS_DEFAULTS: SessionsData = {
 	sessions: [],
-};
-
-export const PROJECTS_DEFAULTS: ProjectsData = {
-	projects: [],
 };
 
 export const AGENT_CONFIGS_DEFAULTS: AgentConfigsData = {

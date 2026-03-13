@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import type { Session, Project, Theme } from '../../types';
+import type { Session, Theme } from '../../types';
 import { getStatusColor } from '../../utils/theme';
 import { SessionTooltipContent } from './SessionTooltipContent';
 
@@ -7,7 +7,6 @@ interface SkinnySidebarProps {
 	theme: Theme;
 	sortedSessions: Session[];
 	activeSessionId: string;
-	projects: Project[];
 	activeBatchSessionIds: string[];
 	contextWarningYellowThreshold: number;
 	contextWarningRedThreshold: number;
@@ -20,7 +19,6 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 	theme,
 	sortedSessions,
 	activeSessionId,
-	projects,
 	activeBatchSessionIds,
 	contextWarningYellowThreshold,
 	contextWarningRedThreshold,
@@ -99,7 +97,6 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 								session={session}
 								theme={theme}
 								gitFileCount={getFileCount(session.id)}
-								projectName={projects.find((p) => p.id === session.projectId)?.name}
 								isInBatch={isInBatch}
 								contextWarningYellowThreshold={contextWarningYellowThreshold}
 								contextWarningRedThreshold={contextWarningRedThreshold}

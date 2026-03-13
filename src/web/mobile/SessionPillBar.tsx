@@ -14,10 +14,10 @@
  * - Project name display above session pills with collapsible projects
  */
 
-import React, { useRef, useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { StatusDot, type SessionStatus } from '../components/Badge';
-import type { Session, ProjectInfo } from '../hooks/useSessions';
+import type { Session } from '../hooks/useSessions';
 import { triggerHaptic, HAPTIC_PATTERNS } from './constants';
 import { truncatePath } from '../../shared/formatters';
 
@@ -583,150 +583,6 @@ function SessionInfoPopover({
 }
 
 /**
- * Props for the project header component
- */
-interface ProjectHeaderProps {
-	projectId: string;
-	name: string;
-	emoji: string | null;
-	sessionCount: number;
-	isCollapsed: boolean;
-	onToggleCollapse: (projectId: string) => void;
-}
-
-/**
- * Project header component that displays project name with collapse/expand toggle
- *
- * Uses touch tracking to differentiate between scrolling and tapping,
- * similar to SessionPill.
- */
-function ProjectHeader({
-	projectId,
-	name,
-	emoji,
-	sessionCount,
-	isCollapsed,
-	onToggleCollapse,
-}: ProjectHeaderProps) {
-	const colors = useThemeColors();
-	const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-	const isScrollingRef = useRef(false);
-
-	// Handle touch start - record position
-	const handleTouchStart = useCallback((e: React.TouchEvent) => {
-		const touch = e.touches[0];
-		touchStartRef.current = { x: touch.clientX, y: touch.clientY };
-		isScrollingRef.current = false;
-	}, []);
-
-	// Handle touch move - detect scrolling
-	const handleTouchMove = useCallback((e: React.TouchEvent) => {
-		if (!touchStartRef.current) return;
-
-		const touch = e.touches[0];
-		const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-		const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-
-		// If moved more than threshold, it's a scroll
-		if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
-			isScrollingRef.current = true;
-		}
-	}, []);
-
-	// Handle touch end - only toggle if it wasn't a scroll
-	const handleTouchEnd = useCallback(() => {
-		// Only trigger tap if we weren't scrolling
-		if (!isScrollingRef.current) {
-			triggerHaptic(HAPTIC_PATTERNS.tap);
-			onToggleCollapse(projectId);
-		}
-
-		// Reset state
-		touchStartRef.current = null;
-		isScrollingRef.current = false;
-	}, [projectId, onToggleCollapse]);
-
-	// Handle touch cancel
-	const handleTouchCancel = useCallback(() => {
-		touchStartRef.current = null;
-		isScrollingRef.current = false;
-	}, []);
-
-	return (
-		<button
-			onTouchStart={handleTouchStart}
-			onTouchMove={handleTouchMove}
-			onTouchEnd={handleTouchEnd}
-			onTouchCancel={handleTouchCancel}
-			onClick={() => {
-				// For non-touch devices (mouse), use onClick
-				if (!('ontouchstart' in window)) {
-					triggerHaptic(HAPTIC_PATTERNS.tap);
-					onToggleCollapse(projectId);
-				}
-			}}
-			style={{
-				display: 'flex',
-				alignItems: 'center',
-				gap: '6px',
-				padding: '6px 12px',
-				backgroundColor: `${colors.accent}10`,
-				border: `1px solid ${colors.border}`,
-				borderRadius: '16px',
-				color: colors.textMain,
-				fontSize: '12px',
-				fontWeight: 600,
-				cursor: 'pointer',
-				whiteSpace: 'nowrap',
-				flexShrink: 0,
-				// Allow native touch scrolling
-				touchAction: 'pan-x pan-y',
-				WebkitTapHighlightColor: 'transparent',
-				outline: 'none',
-				userSelect: 'none',
-				WebkitUserSelect: 'none',
-				transition: 'all 0.15s ease',
-			}}
-			aria-expanded={!isCollapsed}
-			aria-label={`${name} project with ${sessionCount} sessions. ${isCollapsed ? 'Tap to expand' : 'Tap to collapse'}`}
-		>
-			{/* Collapse/expand indicator */}
-			<span
-				style={{
-					fontSize: '10px',
-					color: colors.textDim,
-					transition: 'transform 0.2s ease',
-					transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-				}}
-			>
-				▼
-			</span>
-
-			{/* Group emoji (if available) */}
-			{emoji && <span style={{ fontSize: '14px' }}>{emoji}</span>}
-
-			{/* Group name */}
-			<span>{name}</span>
-
-			{/* Session count badge */}
-			<span
-				style={{
-					fontSize: '10px',
-					color: colors.textDim,
-					backgroundColor: `${colors.textDim}20`,
-					padding: '2px 6px',
-					borderRadius: '8px',
-					minWidth: '18px',
-					textAlign: 'center',
-				}}
-			>
-				{sessionCount}
-			</span>
-		</button>
-	);
-}
-
-/**
  * Props for the SessionPillBar component
  */
 export interface SessionPillBarProps {
@@ -760,7 +616,6 @@ interface PopoverState {
  * SessionPillBar component
  *
  * Renders a horizontally scrollable bar of session pills for the mobile interface.
- * Sessions are organized by projects with collapsible project headers.
  * Supports long-press on pills to show session info popover.
  *
  * @example
@@ -785,90 +640,6 @@ export function SessionPillBar({
 	const colors = useThemeColors();
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const [popoverState, setPopoverState] = useState<PopoverState | null>(null);
-	const [collapsedGroups, setCollapsedGroups] = useState<Set<string> | null>(null);
-
-	// Organize sessions by project, including a special "bookmarks" group
-	const sessionsByProject = useMemo((): Record<string, ProjectInfo> => {
-		const projects: Record<string, ProjectInfo> = {};
-
-		// Add bookmarked sessions to a special "bookmarks" group
-		const bookmarkedSessions = sessions.filter((s) => s.bookmarked);
-		if (bookmarkedSessions.length > 0) {
-			projects['bookmarks'] = {
-				id: 'bookmarks',
-				name: 'Bookmarks',
-				emoji: '★',
-				sessions: bookmarkedSessions,
-			};
-		}
-
-		// Organize remaining sessions by their actual projects
-		for (const session of sessions) {
-			const projectKey = session.projectId || 'ungrouped';
-
-			if (!projects[projectKey]) {
-				projects[projectKey] = {
-					id: session.projectId || null,
-					name: session.projectName || 'Ungrouped',
-					emoji: session.projectEmoji || null,
-					sessions: [],
-				};
-			}
-			projects[projectKey].sessions.push(session);
-		}
-
-		return projects;
-	}, [sessions]);
-
-	// Get sorted group keys (bookmarks first, ungrouped last)
-	const sortedGroupKeys = useMemo(() => {
-		const keys = Object.keys(sessionsByProject);
-		return keys.sort((a, b) => {
-			// Put 'bookmarks' at the start
-			if (a === 'bookmarks') return -1;
-			if (b === 'bookmarks') return 1;
-			// Put 'ungrouped' at the end
-			if (a === 'ungrouped') return 1;
-			if (b === 'ungrouped') return -1;
-			// Sort others alphabetically by group name
-			return sessionsByProject[a].name.localeCompare(sessionsByProject[b].name);
-		});
-	}, [sessionsByProject]);
-
-	// Check if there are multiple groups (to decide whether to show group headers)
-	// Note: Consider it "multiple groups" if there's bookmarks + any other group
-	const hasMultipleGroups =
-		sortedGroupKeys.length > 1 ||
-		(sortedGroupKeys.length === 1 && sortedGroupKeys[0] !== 'ungrouped');
-
-	// Initialize collapsed groups with all groups collapsed by default, except bookmarks
-	useEffect(() => {
-		if (collapsedGroups === null && sortedGroupKeys.length > 0) {
-			// Start with all groups collapsed except bookmarks (which should be expanded by default)
-			const initialCollapsed = new Set(sortedGroupKeys.filter((key) => key !== 'bookmarks'));
-			setCollapsedGroups(initialCollapsed);
-		}
-	}, [sortedGroupKeys, collapsedGroups]);
-
-	// Auto-expand the group containing the active session
-	useEffect(() => {
-		if (!activeSessionId || collapsedGroups === null) return;
-
-		// Find which group contains the active session
-		const activeSession = sessions.find((s) => s.id === activeSessionId);
-		if (!activeSession) return;
-
-		const activeGroupKey = activeSession.projectId || 'ungrouped';
-
-		// If the active session's group is collapsed, expand it
-		if (collapsedGroups.has(activeGroupKey)) {
-			setCollapsedGroups((prev) => {
-				const next = new Set(prev || []);
-				next.delete(activeGroupKey);
-				return next;
-			});
-		}
-	}, [activeSessionId, sessions, collapsedGroups]);
 
 	// Handle long-press on a session pill
 	const handleLongPress = useCallback((session: Session, rect: DOMRect) => {
@@ -879,45 +650,6 @@ export function SessionPillBar({
 	const handleClosePopover = useCallback(() => {
 		setPopoverState(null);
 	}, []);
-
-	// Toggle project collapsed state and scroll to show the project header when expanding
-	const handleToggleCollapse = useCallback(
-		(projectId: string) => {
-			const wasCollapsed = collapsedGroups?.has(projectId) ?? true;
-
-			setCollapsedGroups((prev) => {
-				const next = new Set(prev || []);
-				if (next.has(projectId)) {
-					next.delete(projectId);
-				} else {
-					next.add(projectId);
-				}
-				return next;
-			});
-
-			// If we're expanding a project, scroll to show the project header at the start
-			if (wasCollapsed && scrollContainerRef.current) {
-				// Wait for the DOM to update with the expanded sessions
-				setTimeout(() => {
-					const container = scrollContainerRef.current;
-					if (!container) return;
-
-					// Find the project header element by its data attribute
-					const projectHeader = container.querySelector(
-						`[data-project-id="${projectId}"]`
-					) as HTMLElement | null;
-					if (projectHeader) {
-						// Scroll to put the project header at the left edge (with a small margin)
-						container.scrollTo({
-							left: projectHeader.offsetLeft - 8,
-							behavior: 'smooth',
-						});
-					}
-				}, 50);
-			}
-		},
-		[collapsedGroups]
-	);
 
 	// Scroll active session into view when it changes
 	useEffect(() => {
@@ -1096,56 +828,24 @@ export function SessionPillBar({
 					// Hide scrollbar using inline style (for webkit browsers)
 					className="hide-scrollbar"
 					role="tablist"
-					aria-label="Session selector organized by projects. Long press a session for details."
+					aria-label="Session selector. Long press a session for details."
 				>
-					{sortedGroupKeys.map((groupKey) => {
-						const group = sessionsByProject[groupKey];
-						const isCollapsed = collapsedGroups?.has(groupKey) ?? true;
-						const showGroupHeader = hasMultipleGroups;
-
-						return (
-							<React.Fragment key={groupKey}>
-								{/* Project header (only show if multiple groups exist) */}
-								{showGroupHeader && (
-									<div
-										data-project-id={groupKey}
-										style={{
-											scrollSnapAlign: 'start',
-										}}
-										role="presentation"
-									>
-										<ProjectHeader
-											projectId={groupKey}
-											name={group.name}
-											emoji={group.emoji}
-											sessionCount={group.sessions.length}
-											isCollapsed={isCollapsed}
-											onToggleCollapse={handleToggleCollapse}
-										/>
-									</div>
-								)}
-
-								{/* Session pills (hidden when collapsed) */}
-								{!isCollapsed &&
-									group.sessions.map((session) => (
-										<div
-											key={session.id}
-											style={{
-												scrollSnapAlign: 'start',
-											}}
-											role="presentation"
-										>
-											<SessionPill
-												session={session}
-												isActive={session.id === activeSessionId}
-												onSelect={onSelectSession}
-												onLongPress={handleLongPress}
-											/>
-										</div>
-									))}
-							</React.Fragment>
-						);
-					})}
+					{sessions.map((session) => (
+						<div
+							key={session.id}
+							style={{
+								scrollSnapAlign: 'start',
+							}}
+							role="presentation"
+						>
+							<SessionPill
+								session={session}
+								isActive={session.id === activeSessionId}
+								onSelect={onSelectSession}
+								onLongPress={handleLongPress}
+							/>
+						</div>
+					))}
 				</div>
 
 				{/* Inline style for hiding scrollbar */}

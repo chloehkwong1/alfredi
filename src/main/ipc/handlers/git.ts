@@ -450,6 +450,94 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// Get per-commit file list with status and stat info
+	ipcMain.handle(
+		'git:commitFiles',
+		withIpcErrorLogging(
+			handlerOpts('commitFiles'),
+			async (cwd: string, hash: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+
+				// Use --first-parent to handle merge commits (diff against first parent only)
+				// --format="" suppresses commit header, --numstat gives additions/deletions,
+				// --name-status gives the change type (A/M/D/R/C)
+				// We run both in one call using --numstat + -z for clean parsing isn't reliable,
+				// so we run two lightweight commands instead.
+
+				// 1. Get name-status (change type + path)
+				const nameStatusResult = await execGit(
+					['show', '--first-parent', '--name-status', '--format=', hash],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+
+				if (nameStatusResult.exitCode !== 0) {
+					// May be a root commit (no parent) — retry without --first-parent
+					const retryResult = await execGit(
+						['show', '--name-status', '--format=', hash],
+						cwd,
+						sshRemote,
+						effectiveRemoteCwd
+					);
+					if (retryResult.exitCode !== 0) {
+						return { files: [], error: retryResult.stderr };
+					}
+					nameStatusResult.stdout = retryResult.stdout;
+				}
+
+				// 2. Get numstat (additions/deletions per file)
+				const numstatResult = await execGit(
+					['show', '--first-parent', '--numstat', '--format=', hash],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+
+				// Parse numstat into a map: path -> { additions, deletions }
+				const statMap = new Map<string, { additions: number; deletions: number }>();
+				if (numstatResult.exitCode === 0) {
+					for (const line of numstatResult.stdout.split('\n')) {
+						const trimmed = line.trim();
+						if (!trimmed) continue;
+						// Format: additions\tdeletions\tpath (binary files show - - path)
+						const parts = trimmed.split('\t');
+						if (parts.length >= 3) {
+							const adds = parts[0] === '-' ? 0 : parseInt(parts[0], 10) || 0;
+							const dels = parts[1] === '-' ? 0 : parseInt(parts[1], 10) || 0;
+							const filePath = parts.slice(2).join('\t'); // Handle paths with tabs (unlikely but safe)
+							statMap.set(filePath, { additions: adds, deletions: dels });
+						}
+					}
+				}
+
+				// Parse name-status lines
+				const files: { path: string; status: string; additions: number; deletions: number }[] = [];
+				for (const line of nameStatusResult.stdout.split('\n')) {
+					const trimmed = line.trim();
+					if (!trimmed) continue;
+					// Format: STATUS\tpath (rename: R100\told\tnew)
+					const parts = trimmed.split('\t');
+					if (parts.length >= 2) {
+						const status = parts[0].charAt(0); // First char: A, M, D, R, C, T
+						// For renames/copies, use the new path (last part)
+						const filePath = parts.length >= 3 ? parts[parts.length - 1] : parts[1];
+						const stat = statMap.get(filePath) || { additions: 0, deletions: 0 };
+						files.push({
+							path: filePath,
+							status,
+							additions: stat.additions,
+							deletions: stat.deletions,
+						});
+					}
+				}
+
+				return { files, error: null };
+			}
+		)
+	);
+
 	// Read file content at a specific git ref (e.g., HEAD:path/to/file.png)
 	// Returns base64 data URL for images, raw content for text files
 	ipcMain.handle(
@@ -784,6 +872,11 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				} else {
 					// Branch doesn't exist anywhere, create it with -b flag
 					// If baseBranch is specified, use it as the starting point for the new branch
+					// Fetch latest from remote first so the base branch ref is up-to-date
+					if (baseBranch && baseBranch.startsWith('origin/')) {
+						const remoteBranchName = baseBranch.replace('origin/', '');
+						await execFileNoThrow('git', ['fetch', 'origin', remoteBranchName], mainRepoCwd);
+					}
 					const args = ['worktree', 'add', '-b', branchName, worktreePath];
 					if (baseBranch) {
 						args.push(baseBranch);

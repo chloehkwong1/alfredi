@@ -443,7 +443,6 @@ export function useMergeSession(activeTabId?: string): UseMergeSessionResult {
 					projectRoot: sourceSession.projectRoot,
 					toolType: sourceSession.toolType,
 					mergedLogs,
-					projectId: sourceSession.projectId,
 				});
 
 				result = {
@@ -670,7 +669,6 @@ export function useMergeSessionWithSessions(
 							projectRoot: sourceSession.projectRoot,
 							toolType: sourceSession.toolType,
 							mergedLogs,
-							projectId: sourceSession.projectId,
 						});
 
 						// Add new session to state

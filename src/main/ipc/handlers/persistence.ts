@@ -4,7 +4,6 @@
  * This module handles IPC calls for:
  * - Settings: get/set/getAll
  * - Sessions: getAll/setAll
- * - Projects: getAll/setAll
  * - CLI activity: getActivity
  *
  * Extracted from main/index.ts to improve code organization.
@@ -19,14 +18,8 @@ import { getThemeById } from '../../themes';
 import { WebServer } from '../../web-server';
 
 // Re-export types from canonical source so existing imports from './persistence' still work
-export type { MaestroSettings, SessionsData, ProjectsData } from '../../stores/types';
-import type {
-	MaestroSettings,
-	SessionsData,
-	ProjectsData,
-	StoredSession,
-} from '../../stores/types';
-import type { Project } from '../../../shared/types';
+export type { MaestroSettings, SessionsData } from '../../stores/types';
+import type { MaestroSettings, SessionsData, StoredSession } from '../../stores/types';
 
 /**
  * Dependencies required for persistence handlers
@@ -34,7 +27,6 @@ import type { Project } from '../../../shared/types';
 export interface PersistenceHandlerDependencies {
 	settingsStore: Store<MaestroSettings>;
 	sessionsStore: Store<SessionsData>;
-	projectsStore: Store<ProjectsData>;
 	getWebServer: () => WebServer | null;
 }
 
@@ -42,7 +34,7 @@ export interface PersistenceHandlerDependencies {
  * Register all persistence-related IPC handlers.
  */
 export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies): void {
-	const { settingsStore, sessionsStore, projectsStore, getWebServer } = deps;
+	const { settingsStore, sessionsStore, getWebServer } = deps;
 
 	// Settings management
 	ipcMain.handle('settings:get', async (_, key: string) => {
@@ -97,6 +89,45 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 	// Sessions persistence
 	ipcMain.handle('sessions:getAll', async () => {
 		const sessions = sessionsStore.get('sessions', []);
+
+		// Migration: if a legacy projects store file exists, merge worktreeConfig
+		// from projects onto matching sessions (by projectId), then discard.
+		try {
+			const syncPath = path.dirname(sessionsStore.path);
+			const projectsFilePath = path.join(syncPath, 'maestro-projects.json');
+			const projectsFileContent = await fs.readFile(projectsFilePath, 'utf-8').catch(() => null);
+			if (projectsFileContent) {
+				const projectsData = JSON.parse(projectsFileContent);
+				const projects: Array<{ id: string; worktreeConfig?: any }> = projectsData?.projects || [];
+				if (projects.length > 0) {
+					const projectMap = new Map(projects.map((p) => [p.id, p]));
+					let migrated = false;
+					const migratedSessions = sessions.map((s) => {
+						if (s.projectId && projectMap.has(s.projectId)) {
+							const project = projectMap.get(s.projectId)!;
+							if (project.worktreeConfig && !s.worktreeConfig) {
+								migrated = true;
+								return { ...s, worktreeConfig: project.worktreeConfig };
+							}
+						}
+						return s;
+					});
+					if (migrated) {
+						sessionsStore.set('sessions', migratedSessions);
+						logger.info(
+							`Migrated worktreeConfig from ${projects.length} projects onto sessions`,
+							'Sessions'
+						);
+					}
+				}
+				// Remove the legacy projects file after migration
+				await fs.unlink(projectsFilePath).catch(() => {});
+				logger.info('Removed legacy projects store file after migration', 'Sessions');
+			}
+		} catch (err) {
+			logger.warn(`Projects migration check failed: ${(err as Error).message}`, 'Sessions');
+		}
+
 		logger.debug(`Loaded ${sessions.length} sessions from store`, 'Sessions');
 		return sessions;
 	});
@@ -104,6 +135,17 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 	ipcMain.handle('sessions:setAll', async (_, sessions: StoredSession[]) => {
 		// Get previous sessions to detect changes
 		const previousSessions = sessionsStore.get('sessions', []);
+
+		// Guard against catastrophic data loss: never overwrite N sessions with 0
+		// This can happen when the renderer crashes before loading sessions from disk
+		if (sessions.length === 0 && previousSessions.length > 0) {
+			logger.warn(
+				`Refusing to overwrite ${previousSessions.length} sessions with empty array — likely a crash recovery artifact`,
+				'Sessions'
+			);
+			return false;
+		}
+
 		const previousSessionMap = new Map(previousSessions.map((s) => [s.id, s]));
 		const currentSessionMap = new Map(sessions.map((s) => [s.id, s]));
 
@@ -162,9 +204,6 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 						state: session.state,
 						inputMode: session.inputMode,
 						cwd: session.cwd,
-						projectId: session.projectId || null,
-						projectName: session.projectName || null,
-						projectEmoji: session.projectEmoji || null,
 						parentSessionId: session.parentSessionId || null,
 						worktreeBranch: session.worktreeBranch || null,
 					});
@@ -179,6 +218,17 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 			}
 		}
 
+		// Backup before write — only when sessions are added or removed (not on every
+		// field update) to avoid unnecessary disk I/O during streaming (~every 2s)
+		if (previousSessions.length !== sessions.length && previousSessions.length > 0) {
+			try {
+				const backupPath = sessionsStore.path.replace(/\.json$/, '.backup.json');
+				await fs.copyFile(sessionsStore.path, backupPath);
+			} catch {
+				// Best-effort — don't block persistence if backup fails
+			}
+		}
+
 		try {
 			sessionsStore.set('sessions', sessions);
 		} catch (err) {
@@ -190,22 +240,6 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 			return false;
 		}
 
-		return true;
-	});
-
-	// Projects persistence
-	ipcMain.handle('projects:getAll', async () => {
-		return projectsStore.get('projects', []);
-	});
-
-	ipcMain.handle('projects:setAll', async (_, projects: Project[]) => {
-		try {
-			projectsStore.set('projects', projects);
-		} catch (err) {
-			const code = (err as NodeJS.ErrnoException).code;
-			logger.warn(`Failed to persist projects: ${code || (err as Error).message}`, 'Projects');
-			return false;
-		}
 		return true;
 	});
 

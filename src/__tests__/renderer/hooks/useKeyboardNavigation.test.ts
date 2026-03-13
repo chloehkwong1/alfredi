@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useKeyboardNavigation, UseKeyboardNavigationDeps } from '../../../renderer/hooks';
-import type { Session, Project, FocusArea } from '../../../renderer/types';
+import type { Session, FocusArea } from '../../../renderer/types';
 
 // Create a mock session
 const createMockSession = (overrides: Partial<Session> = {}): Session => ({
@@ -51,8 +51,6 @@ const createMockDeps = (
 	setActiveSessionId: vi.fn(),
 	activeFocus: 'main',
 	setActiveFocus: vi.fn(),
-	projects: [],
-	setProjects: vi.fn(),
 	bookmarksCollapsed: false,
 	setBookmarksCollapsed: vi.fn(),
 	inputRef: { current: null },
@@ -146,35 +144,6 @@ describe('useKeyboardNavigation', () => {
 
 			expect(handled).toBe(true);
 			expect(setBookmarksCollapsed).toHaveBeenCalledWith(false);
-		});
-
-		it('should collapse project with ArrowLeft when session is in expanded project', () => {
-			const project1: Project = {
-				id: 'g1',
-				name: 'Project 1',
-				collapsed: false,
-				rootPath: '/test/project',
-				emoji: '',
-			};
-			const session1 = createMockSession({ id: 's1', projectId: 'g1' });
-			const setProjects = vi.fn();
-			const deps = createMockDeps({
-				activeFocus: 'sidebar',
-				sortedSessions: [session1],
-				selectedSidebarIndex: 0,
-				projects: [project1],
-				setProjects,
-			});
-			const { result } = renderHook(() => useKeyboardNavigation(deps));
-
-			const event = new KeyboardEvent('keydown', { key: 'ArrowLeft' });
-			result.current.handleSidebarNavigation(event);
-
-			expect(setProjects).toHaveBeenCalled();
-			// Verify the updater function collapses the project
-			const updaterFn = setProjects.mock.calls[0][0];
-			const newProjects = updaterFn([project1]);
-			expect(newProjects[0].collapsed).toBe(true);
 		});
 
 		it('should skip input events from inputs/textareas', () => {
@@ -430,41 +399,6 @@ describe('useKeyboardNavigation', () => {
 			});
 
 			expect(setSelectedSidebarIndex).toHaveBeenCalledWith(1);
-		});
-	});
-
-	describe('project navigation with space', () => {
-		it('should collapse project and jump to next visible session on Space', () => {
-			const project1: Project = {
-				id: 'g1',
-				name: 'Project 1',
-				collapsed: false,
-				rootPath: '/test/project',
-				emoji: '',
-			};
-			const session1 = createMockSession({ id: 's1', projectId: 'g1' });
-			const session2 = createMockSession({ id: 's2' }); // ungrouped
-			const setProjects = vi.fn();
-			const setSelectedSidebarIndex = vi.fn();
-			const setActiveSessionId = vi.fn();
-			const deps = createMockDeps({
-				activeFocus: 'sidebar',
-				sortedSessions: [session1, session2],
-				selectedSidebarIndex: 0,
-				projects: [project1],
-				setProjects,
-				setSelectedSidebarIndex,
-				setActiveSessionId,
-			});
-			const { result } = renderHook(() => useKeyboardNavigation(deps));
-
-			const event = new KeyboardEvent('keydown', { key: ' ' });
-			const handled = result.current.handleSidebarNavigation(event);
-
-			expect(handled).toBe(true);
-			expect(setProjects).toHaveBeenCalled();
-			expect(setSelectedSidebarIndex).toHaveBeenCalledWith(1);
-			expect(setActiveSessionId).toHaveBeenCalledWith('s2');
 		});
 	});
 });

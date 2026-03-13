@@ -7,7 +7,6 @@ import {
 	estimateContextUsage,
 	calculateContextTokens,
 	calculateContextDisplay,
-	estimateAccumulatedGrowth,
 	DEFAULT_CONTEXT_WINDOWS,
 } from '../../../renderer/utils/contextUsage';
 import type { UsageStats } from '../../../shared/types';
@@ -44,17 +43,19 @@ describe('estimateContextUsage', () => {
 			expect(result).toBe(56);
 		});
 
-		it('should return null when accumulated tokens exceed context window', () => {
+		it('should estimate from cacheCreation + input when accumulated tokens exceed context window', () => {
 			const stats = createStats({
 				inputTokens: 50000,
 				outputTokens: 50000,
 				cacheReadInputTokens: 150000,
-				cacheCreationInputTokens: 200000,
+				cacheCreationInputTokens: 80000,
 				contextWindow: 200000,
 			});
 			const result = estimateContextUsage(stats, 'claude-code');
-			// (50000 + 150000 + 200000) = 400000 > 200000 -> null (accumulated values)
-			expect(result).toBeNull();
+			// (50000 + 150000 + 80000) = 280000 > 200000 -> cumulative detected
+			// Estimated context = cacheCreation + input = 80000 + 50000 = 130000
+			// 130000 / 200000 = 65%
+			expect(result).toBe(65);
 		});
 
 		it('should round to nearest integer', () => {
@@ -116,7 +117,7 @@ describe('estimateContextUsage', () => {
 		});
 	});
 
-	describe('cacheReadInputTokens handling', () => {
+	describe('cumulative session totals handling', () => {
 		it('should handle undefined cacheReadInputTokens', () => {
 			const stats = createStats({
 				inputTokens: 10000,
@@ -130,10 +131,10 @@ describe('estimateContextUsage', () => {
 			expect(result).toBe(10);
 		});
 
-		it('should return null when accumulated cacheRead tokens cause total to exceed context window', () => {
-			// During multi-tool turns, Claude Code accumulates token values across
-			// internal API calls. When accumulated total exceeds context window,
-			// return null to signal callers should preserve previous valid percentage.
+		it('should estimate from cacheCreation + input when accumulated cacheRead causes overflow', () => {
+			// Claude Code reports cumulative session totals. cacheRead is summed
+			// across all turns (double-counted). When sum > window, estimate actual
+			// context from cacheCreation + input only.
 			const stats = createStats({
 				inputTokens: 500,
 				outputTokens: 1000,
@@ -142,8 +143,26 @@ describe('estimateContextUsage', () => {
 				contextWindow: 200000,
 			});
 			const result = estimateContextUsage(stats, 'claude-code');
-			// (500 + 758000 + 50000) = 808500 > 200000 -> null (accumulated values)
-			expect(result).toBeNull();
+			// (500 + 758000 + 50000) = 808500 > 200000 -> cumulative detected
+			// Estimated context = 50000 + 500 = 50500
+			// 50500 / 200000 = 25%
+			expect(result).toBe(25);
+		});
+
+		it('should match real-world Claude Code cumulative data', () => {
+			// Real data from an 11-turn session (git rebase)
+			const stats = createStats({
+				inputTokens: 11,
+				outputTokens: 1559,
+				cacheReadInputTokens: 275811,
+				cacheCreationInputTokens: 55551,
+				contextWindow: 200000,
+			});
+			const result = estimateContextUsage(stats, 'claude-code');
+			// Sum = 11 + 275811 + 55551 = 331373 > 200000 -> cumulative
+			// Estimated context = 55551 + 11 = 55562
+			// 55562 / 200000 = 28%
+			expect(result).toBe(28);
 		});
 	});
 
@@ -164,7 +183,7 @@ describe('estimateContextUsage', () => {
 			expect(result).toBe(5);
 		});
 
-		it('should return null for very large accumulated token counts', () => {
+		it('should estimate from cacheCreation + input for very large accumulated token counts', () => {
 			const stats = createStats({
 				inputTokens: 250000,
 				outputTokens: 500000,
@@ -173,8 +192,9 @@ describe('estimateContextUsage', () => {
 				contextWindow: 0,
 			});
 			const result = estimateContextUsage(stats, 'claude-code');
-			// (250000 + 500000 + 250000) = 1000000 > 200000 -> null (accumulated values)
-			expect(result).toBeNull();
+			// Sum = 250000 + 500000 + 250000 = 1000000 > 200000 -> cumulative
+			// Estimated = 250000 + 250000 = 500000 → capped at 100%
+			expect(result).toBe(100);
 		});
 
 		it('should handle very small percentages', () => {
@@ -187,6 +207,19 @@ describe('estimateContextUsage', () => {
 			const result = estimateContextUsage(stats, 'claude-code');
 			// (100 + 0) / 200000 = 0.05% -> 0% (output excluded for Claude)
 			expect(result).toBe(0);
+		});
+
+		it('should return null when cumulative overflow has zero cacheCreation and input', () => {
+			const stats = createStats({
+				inputTokens: 0,
+				outputTokens: 500000,
+				cacheReadInputTokens: 500000,
+				cacheCreationInputTokens: 0,
+				contextWindow: 200000,
+			});
+			const result = estimateContextUsage(stats, 'claude-code');
+			// Sum > window but estimated = 0 + 0 = 0 → null
+			expect(result).toBeNull();
 		});
 	});
 });
@@ -262,7 +295,7 @@ describe('calculateContextTokens', () => {
 		it('should include cacheRead in raw calculation (callers detect accumulated values)', () => {
 			// calculateContextTokens returns the raw total including cacheRead.
 			// Callers (estimateContextUsage) detect when total > contextWindow
-			// and return null to signal accumulated values from multi-tool turns.
+			// and estimate from cacheCreation + input instead.
 			const stats = createStats({
 				inputTokens: 50000,
 				outputTokens: 9000,
@@ -273,79 +306,6 @@ describe('calculateContextTokens', () => {
 			// 50000 + 758000 + 75000 = 883000 (raw total, callers check against window)
 			expect(result).toBe(883000);
 		});
-	});
-});
-
-describe('estimateAccumulatedGrowth', () => {
-	it('should grow by 1% for typical multi-tool turn with many internal calls', () => {
-		// 31% usage, 40 internal API calls
-		// outputTokens: 10026 (accumulated), cacheRead: 2.5M, window: 200K
-		const result = estimateAccumulatedGrowth(31, 10026, 2500000, 200000);
-		// prevTokens = 62000, estCalls = 2500000/62000 ≈ 40
-		// singleTurnGrowth = 10026/40 ≈ 251, growthPercent = 251/200000*100 ≈ 0 → min 1%
-		expect(result).toBe(32);
-	});
-
-	it('should cap per-turn growth at 3%', () => {
-		// Fewer calls, more output per call
-		const result = estimateAccumulatedGrowth(40, 100000, 400000, 200000);
-		// prevTokens = 80000, estCalls = 400000/80000 = 5
-		// singleTurnGrowth = 100000/5 = 20000, growthPercent = 20000/200000*100 = 10 → cap 3%
-		expect(result).toBe(43);
-	});
-
-	it('should guarantee minimum 1% growth', () => {
-		const result = estimateAccumulatedGrowth(50, 100, 5000000, 200000);
-		// Very small output → growthPercent ≈ 0 → min 1%
-		expect(result).toBe(51);
-	});
-
-	it('should return currentUsage unchanged when currentUsage is 0', () => {
-		const result = estimateAccumulatedGrowth(0, 10000, 500000, 200000);
-		expect(result).toBe(0);
-	});
-
-	it('should return currentUsage unchanged when contextWindow is 0', () => {
-		const result = estimateAccumulatedGrowth(30, 10000, 500000, 0);
-		expect(result).toBe(30);
-	});
-
-	it('should handle zero cacheRead tokens', () => {
-		const result = estimateAccumulatedGrowth(30, 5000, 0, 200000);
-		// estCalls = max(1, 0/60000) = 1, singleTurnGrowth = 5000
-		// growthPercent = 5000/200000*100 = 3% (at cap)
-		expect(result).toBe(33);
-	});
-
-	it('should grow monotonically across consecutive accumulated turns', () => {
-		let usage = 31;
-		for (let i = 0; i < 5; i++) {
-			const prev = usage;
-			usage = estimateAccumulatedGrowth(usage, 10000, 2500000, 200000);
-			expect(usage).toBeGreaterThan(prev);
-		}
-		expect(usage).toBeGreaterThanOrEqual(36);
-	});
-
-	it('should not be capped internally (caller handles threshold cap)', () => {
-		// At 98% with substantial output, growth of 3% still applies (bounded max).
-		// The function intentionally does not cap at 100% — the caller in App.tsx
-		// applies Math.min(estimated, yellowThreshold - 5) to prevent exceeding thresholds.
-		const result = estimateAccumulatedGrowth(98, 50000, 500000, 200000);
-		// prevTokens=196000, estCalls=3, singleTurnGrowth=16667, growthPercent=8 → cap 3%
-		expect(result).toBeGreaterThan(98);
-		expect(result).toBe(101); // 98 + 3% (max bounded growth)
-	});
-
-	it('should use minimum context floor for low usage to avoid inflated call estimates', () => {
-		// At 1% usage, prevTokens would be 2000 without the floor.
-		// With MIN_PREV_CONTEXT_FRACTION (5%), floor is 10000.
-		// This prevents dividing cacheRead by a tiny number and inflating estCalls.
-		const result = estimateAccumulatedGrowth(1, 50000, 100000, 200000);
-		// minTokens = 10000, prevTokens = max(10000, 2000) = 10000
-		// estCalls = max(1, round(100000/10000)) = 10
-		// singleTurnGrowth = 50000/10 = 5000, growthPercent = round(5000/200000*100) = 3 → cap 3%
-		expect(result).toBe(4); // 1 + 3%
 	});
 });
 
@@ -362,29 +322,29 @@ describe('calculateContextDisplay', () => {
 		expect(result.contextWindow).toBe(200000);
 	});
 
-	it('should fall back to fallbackPercentage when tokens exceed context window', () => {
+	it('should estimate from cacheCreation + input when tokens exceed context window', () => {
 		const result = calculateContextDisplay(
 			{
 				inputTokens: 50000,
 				cacheReadInputTokens: 758000,
-				cacheCreationInputTokens: 200000,
+				cacheCreationInputTokens: 80000,
 			},
-			200000,
-			'claude-code',
-			75 // preserved contextUsage from session
-		);
-		// Raw = 1008000 > 200000, so falls back: tokens = round(75/100 * 200000) = 150000
-		expect(result.tokens).toBe(150000);
-		expect(result.percentage).toBe(75);
-	});
-
-	it('should cap percentage at 100 when tokens are close to window', () => {
-		const result = calculateContextDisplay(
-			{ inputTokens: 190000, cacheReadInputTokens: 15000, cacheCreationInputTokens: 0 },
 			200000,
 			'claude-code'
 		);
-		// (190000 + 15000) / 200000 = 102.5% -> capped at 100%
+		// Raw = 888000 > 200000 -> cumulative detected
+		// Estimated tokens = cacheCreation + input = 80000 + 50000 = 130000
+		expect(result.tokens).toBe(130000);
+		expect(result.percentage).toBe(65);
+	});
+
+	it('should cap percentage at 100 when tokens fill the window', () => {
+		const result = calculateContextDisplay(
+			{ inputTokens: 5000, cacheReadInputTokens: 180000, cacheCreationInputTokens: 15000 },
+			200000,
+			'claude-code'
+		);
+		// (5000 + 180000 + 15000) / 200000 = 100% (exactly at window)
 		expect(result.percentage).toBe(100);
 	});
 
@@ -393,23 +353,6 @@ describe('calculateContextDisplay', () => {
 		expect(result.tokens).toBe(0);
 		expect(result.percentage).toBe(0);
 		expect(result.contextWindow).toBe(0);
-	});
-
-	it('should not fall back when no fallbackPercentage is provided', () => {
-		const result = calculateContextDisplay(
-			{
-				inputTokens: 50000,
-				cacheReadInputTokens: 758000,
-				cacheCreationInputTokens: 200000,
-			},
-			200000,
-			'claude-code'
-			// no fallback
-		);
-		// Raw = 1008000 > 200000, but no fallback, so tokens stay at raw value
-		// Percentage is capped at 100%
-		expect(result.tokens).toBe(1008000);
-		expect(result.percentage).toBe(100);
 	});
 
 	it('should use Codex semantics (includes output tokens)', () => {
@@ -423,23 +366,38 @@ describe('calculateContextDisplay', () => {
 		expect(result.percentage).toBe(50);
 	});
 
-	it('should handle history entries with accumulated tokens and preserved contextUsage', () => {
-		// Simulates what HistoryDetailModal sees: accumulated stats + entry.contextUsage
+	it('should handle history entries with accumulated tokens', () => {
+		// Simulates what HistoryDetailModal sees: accumulated stats
 		const result = calculateContextDisplay(
 			{
 				inputTokens: 5676,
 				outputTokens: 8522,
 				cacheReadInputTokens: 1128700,
-				cacheCreationInputTokens: 0,
+				cacheCreationInputTokens: 50000,
 			},
 			200000,
-			undefined, // history entries don't have agent type
-			100 // the screenshot showed 100% context
+			undefined
 		);
-		// Raw = 5676 + 1128700 + 0 = 1134376 > 200000
-		// Falls back to: round(100/100 * 200000) = 200000
-		expect(result.tokens).toBe(200000);
-		expect(result.percentage).toBe(100);
+		// Raw = 5676 + 1128700 + 50000 = 1184376 > 200000 -> cumulative
+		// Estimated tokens = 50000 + 5676 = 55676
+		expect(result.tokens).toBe(55676);
+		expect(result.percentage).toBe(28);
+	});
+
+	it('should handle real-world 11-turn cumulative data', () => {
+		const result = calculateContextDisplay(
+			{
+				inputTokens: 11,
+				cacheReadInputTokens: 275811,
+				cacheCreationInputTokens: 55551,
+			},
+			200000,
+			'claude-code'
+		);
+		// Raw = 331373 > 200000 -> cumulative
+		// Estimated tokens = 55551 + 11 = 55562
+		expect(result.tokens).toBe(55562);
+		expect(result.percentage).toBe(28);
 	});
 });
 

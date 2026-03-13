@@ -10,7 +10,7 @@ import {
 	Play,
 	Square,
 } from 'lucide-react';
-import type { Session, Project, Theme } from '../types';
+import type { Session, Theme } from '../types';
 import type { WorktreeStatus } from '../../shared/types';
 import { getStatusColor } from '../utils/theme';
 
@@ -39,13 +39,11 @@ const getWorktreeStatusColor = (
 
 /**
  * Variant determines the context in which the session item is rendered:
- * - 'bookmark': Session in the Bookmarks folder (shows project badge if session belongs to a project)
- * - 'project': Session inside a project folder
- * - 'flat': Session in flat list (when no projects exist)
- * - 'ungrouped': Session in the Ungrouped folder (when projects exist)
+ * - 'bookmark': Session in the Bookmarks folder
+ * - 'flat': Session in flat list
  * - 'worktree': Worktree child session nested under parent (shows branch name)
  */
-export type SessionItemVariant = 'bookmark' | 'project' | 'flat' | 'ungrouped' | 'worktree';
+export type SessionItemVariant = 'bookmark' | 'flat' | 'worktree';
 
 export interface SessionItemProps {
 	session: Session;
@@ -60,8 +58,6 @@ export interface SessionItemProps {
 	leftSidebarOpen: boolean;
 
 	// Optional data
-	project?: Project; // The project this session belongs to (for bookmark variant to show project badge)
-	projectId?: string; // The project ID context for generating editing key
 	gitFileCount?: number;
 	isInBatch?: boolean;
 	jumpNumber?: string | null; // Session jump shortcut number (1-9, 0)
@@ -84,16 +80,10 @@ export interface SessionItemProps {
 /**
  * SessionItem renders a single session in the sidebar list.
  *
- * This component unifies 4 previously separate implementations:
- * 1. Bookmark items - sessions pinned to the Bookmarks folder
- * 2. Project items - sessions inside a project folder
- * 3. Flat items - sessions in a flat list (no projects)
- * 4. Ungrouped items - sessions in the Ungrouped folder
- *
  * Key differences between variants are handled via props:
- * - Bookmark variant shows project badge and always shows filled bookmark icon
- * - Project/Flat/Ungrouped variants show bookmark icon on hover
+ * - Bookmark variant always shows filled bookmark icon
  * - Flat variant has slightly different styling (mx-3 vs ml-4)
+ * - Worktree variant shows branch info and server controls
  */
 export const SessionItem = memo(function SessionItem({
 	session,
@@ -104,8 +94,6 @@ export const SessionItem = memo(function SessionItem({
 	isDragging,
 	isEditing,
 	leftSidebarOpen,
-	project,
-	projectId,
 	gitFileCount,
 	isInBatch = false,
 	jumpNumber,
@@ -140,7 +128,7 @@ export const SessionItem = memo(function SessionItem({
 
 	return (
 		<div
-			key={`${variant}-${projectId || ''}-${session.id}`}
+			key={`${variant}-${session.id}`}
 			draggable
 			onDragStart={onDragStart}
 			onDragOver={onDragOver}
@@ -234,15 +222,6 @@ export const SessionItem = memo(function SessionItem({
 						)}
 						<Activity className="w-3 h-3" /> {session.toolType}
 						{session.sessionSshRemoteConfig?.enabled ? ' (SSH)' : ''}
-						{/* Project badge (only in bookmark variant when session belongs to a project) */}
-						{variant === 'bookmark' && project && (
-							<span
-								className="text-[9px] px-1 py-0.5 rounded"
-								style={{ backgroundColor: theme.colors.bgActivity, color: theme.colors.textDim }}
-							>
-								{project.name}
-							</span>
-						)}
 					</div>
 				)}
 			</div>

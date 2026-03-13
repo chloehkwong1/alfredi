@@ -36,7 +36,7 @@ import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import { gitService } from '../../../renderer/services/git';
 import { notifyToast } from '../../../renderer/stores/notificationStore';
 import { useUIStore } from '../../../renderer/stores/uiStore';
-import type { Session, Project } from '../../../renderer/types';
+import type { Session } from '../../../renderer/types';
 
 // ============================================================================
 // Test Helpers
@@ -55,14 +55,6 @@ const mockGit = {
 	runWorktreeScript: vi.fn().mockResolvedValue({ success: true }),
 };
 
-const mockProject: Project = {
-	id: 'project-1',
-	name: 'Test Project',
-	emoji: '',
-	collapsed: false,
-	rootPath: '/projects/myapp',
-};
-
 const mockParentSession = {
 	id: 'parent-1',
 	name: 'Parent Agent',
@@ -70,11 +62,10 @@ const mockParentSession = {
 	fullPath: '/projects/myapp',
 	projectRoot: '/projects/myapp',
 	toolType: 'claude-code' as const,
-	projectId: 'project-1',
 	inputMode: 'ai' as const,
 	state: 'idle',
-	worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true },
-	worktreesExpanded: false,
+	worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true, runScript: 'npm run dev' },
+	collapsed: true,
 	customPath: '/usr/local/bin/claude',
 	customArgs: ['--arg1'],
 	customEnvVars: { KEY: 'val' },
@@ -116,7 +107,6 @@ function createChildSession(overrides: Partial<Session> = {}): any {
 		fullPath: '/projects/worktrees/feature-1',
 		projectRoot: '/projects/worktrees/feature-1',
 		toolType: 'claude-code' as const,
-		projectId: 'project-1',
 		inputMode: 'ai' as const,
 		state: 'idle',
 		parentSessionId: 'parent-1',
@@ -157,7 +147,6 @@ beforeEach(() => {
 	useModalStore.setState({ modals: new Map() });
 	useSessionStore.setState({
 		sessions: [],
-		projects: [],
 		activeSessionId: '',
 		sessionsLoaded: false,
 		removedWorktreePaths: new Set(),
@@ -230,11 +219,11 @@ describe('Quick-access handlers', () => {
 		expect(data?.session).toBe(mockParentSession);
 	});
 
-	it('handleToggleWorktreeExpanded toggles worktreesExpanded on session (both directions)', () => {
-		// Default worktreesExpanded is undefined, which means expanded (true).
-		// The toggle uses !(s.worktreesExpanded ?? true), so first toggle collapses.
+	it('handleToggleWorktreeExpanded toggles collapsed on session (both directions)', () => {
+		// Default collapsed is undefined (expanded).
+		// The toggle uses !s.collapsed, so first toggle collapses.
 		useSessionStore.setState({
-			sessions: [{ ...mockParentSession, worktreesExpanded: undefined }],
+			sessions: [{ ...mockParentSession, collapsed: undefined }],
 			activeSessionId: 'parent-1',
 		} as any);
 		const { result } = renderHook(() => useWorktreeHandlers());
@@ -245,7 +234,7 @@ describe('Quick-access handlers', () => {
 		});
 
 		let session = useSessionStore.getState().sessions.find((s) => s.id === 'parent-1');
-		expect(session?.worktreesExpanded).toBe(false);
+		expect(session?.collapsed).toBe(true);
 
 		// Toggle from collapsed back to expanded
 		act(() => {
@@ -253,7 +242,7 @@ describe('Quick-access handlers', () => {
 		});
 
 		session = useSessionStore.getState().sessions.find((s) => s.id === 'parent-1');
-		expect(session?.worktreesExpanded).toBe(true);
+		expect(session?.collapsed).toBe(false);
 	});
 });
 
@@ -312,10 +301,9 @@ describe('Close handlers', () => {
 // ============================================================================
 
 describe('handleSaveWorktreeConfig', () => {
-	it('saves config to the project in sessionStore', async () => {
+	it('saves config to the session in sessionStore', async () => {
 		useSessionStore.setState({
 			sessions: [{ ...mockParentSession, worktreeConfig: undefined }],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -328,8 +316,8 @@ describe('handleSaveWorktreeConfig', () => {
 			});
 		});
 
-		const project = useSessionStore.getState().projects.find((p) => p.id === 'project-1');
-		expect(project?.worktreeConfig).toEqual({
+		const session = useSessionStore.getState().sessions.find((s) => s.id === 'parent-1');
+		expect(session?.worktreeConfig).toEqual({
 			basePath: '/projects/worktrees',
 			watchEnabled: true,
 		});
@@ -338,7 +326,6 @@ describe('handleSaveWorktreeConfig', () => {
 	it('scans worktrees and creates new sub-agent sessions for discovered subdirs', async () => {
 		useSessionStore.setState({
 			sessions: [{ ...mockParentSession, worktreeConfig: undefined }],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -368,7 +355,6 @@ describe('handleSaveWorktreeConfig', () => {
 	it('skips main/master/HEAD branches', async () => {
 		useSessionStore.setState({
 			sessions: [{ ...mockParentSession, worktreeConfig: undefined }],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -407,7 +393,6 @@ describe('handleSaveWorktreeConfig', () => {
 
 		useSessionStore.setState({
 			sessions: [{ ...mockParentSession, worktreeConfig: undefined }, existingChild],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -438,7 +423,6 @@ describe('handleSaveWorktreeConfig', () => {
 	it('shows success toast with discovered count', async () => {
 		useSessionStore.setState({
 			sessions: [{ ...mockParentSession, worktreeConfig: undefined }],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -498,9 +482,6 @@ describe('handleDisableWorktreeConfig', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child1, child2, unrelatedChild],
-			projects: [
-				{ ...mockProject, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true } },
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -516,7 +497,7 @@ describe('handleDisableWorktreeConfig', () => {
 		expect(sessions.some((s) => s.id === 'child-3')).toBe(true);
 	});
 
-	it('clears worktreeConfig on project and legacy fields on session', () => {
+	it('clears worktreeConfig and legacy fields on session', () => {
 		useSessionStore.setState({
 			sessions: [
 				{
@@ -524,9 +505,6 @@ describe('handleDisableWorktreeConfig', () => {
 					worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true },
 					worktreeParentPath: '/legacy/path',
 				},
-			],
-			projects: [
-				{ ...mockProject, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true } },
 			],
 			activeSessionId: 'parent-1',
 		} as any);
@@ -540,9 +518,6 @@ describe('handleDisableWorktreeConfig', () => {
 		const parent = useSessionStore.getState().sessions.find((s) => s.id === 'parent-1');
 		expect(parent?.worktreeConfig).toBeUndefined();
 		expect(parent?.worktreeParentPath).toBeUndefined();
-
-		const project = useSessionStore.getState().projects.find((p) => p.id === 'project-1');
-		expect(project?.worktreeConfig).toBeUndefined();
 	});
 
 	it('shows toast with removed count', () => {
@@ -551,9 +526,6 @@ describe('handleDisableWorktreeConfig', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child1, child2],
-			projects: [
-				{ ...mockProject, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true } },
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -605,9 +577,9 @@ describe('handleCreateWorktreeFromConfig', () => {
 		expect(newSession?.cwd).toBe('/projects/worktrees/feature-new');
 		expect(newSession?.parentSessionId).toBe('parent-1');
 
-		// Parent should be expanded
+		// Parent should be expanded (collapsed=false)
 		const parent = sessions.find((s) => s.id === 'parent-1');
-		expect(parent?.worktreesExpanded).toBe(true);
+		expect(parent?.collapsed).toBe(false);
 	});
 
 	it('shows error toast on IPC failure and re-throws error', async () => {
@@ -687,11 +659,7 @@ describe('handleCreateWorktreeFromConfig', () => {
 describe('handleCreateWorktree', () => {
 	it('reads session from modalStore data, creates worktree', async () => {
 		// Set up the project with worktreeConfig and createWorktree session in modal store
-		useSessionStore.setState({
-			projects: [
-				{ ...mockProject, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true } },
-			],
-		} as any);
+		useSessionStore.setState({} as any);
 		getModalActions().setCreateWorktreeSession(mockParentSession);
 
 		const { result } = renderHook(() => useWorktreeHandlers());
@@ -736,7 +704,7 @@ describe('handleCreateWorktree', () => {
 		);
 	});
 
-	it('saves worktreeConfig to project if not already set', async () => {
+	it('saves worktreeConfig to session if not already set', async () => {
 		const sessionNoConfig = {
 			...mockParentSession,
 			id: 'parent-no-config',
@@ -744,10 +712,9 @@ describe('handleCreateWorktree', () => {
 			cwd: '/projects/myapp',
 		};
 
-		// Put the session and project in the store
+		// Put the session in the store
 		useSessionStore.setState({
 			sessions: [sessionNoConfig],
-			projects: [mockProject],
 			activeSessionId: 'parent-no-config',
 		} as any);
 
@@ -759,8 +726,8 @@ describe('handleCreateWorktree', () => {
 			await result.current.handleCreateWorktree('new-branch');
 		});
 
-		const project = useSessionStore.getState().projects.find((p) => p.id === 'project-1');
-		expect(project?.worktreeConfig).toEqual({
+		const session = useSessionStore.getState().sessions.find((s) => s.id === 'parent-no-config');
+		expect(session?.worktreeConfig).toEqual({
 			basePath: '/projects/worktrees',
 			watchEnabled: true,
 		});
@@ -892,9 +859,9 @@ describe('handleConfirmAndDeleteWorktreeOnDisk', () => {
 // ============================================================================
 
 describe('handleToggleWorktreeExpanded', () => {
-	it('toggles from default expanded (undefined, treated as true) to collapsed', () => {
+	it('toggles from default (undefined/expanded) to collapsed', () => {
 		useSessionStore.setState({
-			sessions: [{ ...mockParentSession, worktreesExpanded: undefined }],
+			sessions: [{ ...mockParentSession, collapsed: undefined }],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -905,12 +872,12 @@ describe('handleToggleWorktreeExpanded', () => {
 		});
 
 		const session = useSessionStore.getState().sessions.find((s) => s.id === 'parent-1');
-		expect(session?.worktreesExpanded).toBe(false);
+		expect(session?.collapsed).toBe(true);
 	});
 
-	it('toggles from explicitly false to true', () => {
+	it('toggles from collapsed (true) to expanded (false)', () => {
 		useSessionStore.setState({
-			sessions: [{ ...mockParentSession, worktreesExpanded: false }],
+			sessions: [{ ...mockParentSession, collapsed: true }],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -921,7 +888,7 @@ describe('handleToggleWorktreeExpanded', () => {
 		});
 
 		const session = useSessionStore.getState().sessions.find((s) => s.id === 'parent-1');
-		expect(session?.worktreesExpanded).toBe(true);
+		expect(session?.collapsed).toBe(false);
 	});
 });
 
@@ -939,16 +906,6 @@ describe('handleToggleWorktreeServer', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child],
-			projects: [
-				{
-					...mockProject,
-					worktreeConfig: {
-						basePath: '/projects/worktrees',
-						watchEnabled: true,
-						runScript: 'npm run dev',
-					},
-				},
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -979,16 +936,6 @@ describe('handleToggleWorktreeServer', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child],
-			projects: [
-				{
-					...mockProject,
-					worktreeConfig: {
-						basePath: '/projects/worktrees',
-						watchEnabled: true,
-						runScript: 'npm run dev',
-					},
-				},
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1013,16 +960,6 @@ describe('handleToggleWorktreeServer', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child],
-			projects: [
-				{
-					...mockProject,
-					worktreeConfig: {
-						basePath: '/projects/worktrees',
-						watchEnabled: true,
-						runScript: 'npm run dev',
-					},
-				},
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1045,16 +982,6 @@ describe('handleToggleWorktreeServer', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child],
-			projects: [
-				{
-					...mockProject,
-					worktreeConfig: {
-						basePath: '/projects/worktrees',
-						watchEnabled: true,
-						runScript: 'npm run dev',
-					},
-				},
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1070,6 +997,10 @@ describe('handleToggleWorktreeServer', () => {
 	});
 
 	it('does nothing when no runScript is configured', async () => {
+		const parentNoScript = {
+			...mockParentSession,
+			worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true },
+		};
 		const child = createChildSession({
 			id: 'wt-child-1',
 			cwd: '/projects/worktrees/feature-1',
@@ -1077,10 +1008,7 @@ describe('handleToggleWorktreeServer', () => {
 		});
 
 		useSessionStore.setState({
-			sessions: [mockParentSession, child],
-			projects: [
-				{ ...mockProject, worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true } },
-			],
+			sessions: [parentNoScript, child],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1105,16 +1033,6 @@ describe('handleToggleWorktreeServer', () => {
 
 		useSessionStore.setState({
 			sessions: [mockParentSession, child],
-			projects: [
-				{
-					...mockProject,
-					worktreeConfig: {
-						basePath: '/projects/worktrees',
-						watchEnabled: true,
-						runScript: 'npm run dev',
-					},
-				},
-			],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1140,10 +1058,9 @@ describe('handleToggleWorktreeServer', () => {
 // ============================================================================
 
 describe('Session inheritance via buildWorktreeSession', () => {
-	it('created session inherits toolType, projectId, customPath, customArgs from parent', async () => {
+	it('created session inherits toolType, customPath, customArgs from parent', async () => {
 		useSessionStore.setState({
 			sessions: [mockParentSession],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1165,7 +1082,6 @@ describe('Session inheritance via buildWorktreeSession', () => {
 		const child = useSessionStore.getState().sessions.find((s) => s.worktreeBranch === 'feature-1');
 		expect(child).toBeDefined();
 		expect(child?.toolType).toBe('claude-code');
-		expect(child?.projectId).toBe('project-1');
 		expect(child?.customPath).toBe('/usr/local/bin/claude');
 		expect(child?.customArgs).toEqual(['--arg1']);
 		expect(child?.customEnvVars).toEqual({ KEY: 'val' });
@@ -1175,7 +1091,6 @@ describe('Session inheritance via buildWorktreeSession', () => {
 	it('created session gets correct worktreeBranch and parentSessionId', async () => {
 		useSessionStore.setState({
 			sessions: [mockParentSession],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1213,7 +1128,6 @@ describe('Session inheritance via buildWorktreeSession', () => {
 
 		useSessionStore.setState({
 			sessions: [sshParent],
-			projects: [mockProject],
 			activeSessionId: 'parent-1',
 		} as any);
 
@@ -1264,12 +1178,6 @@ describe('Effects', () => {
 
 			useSessionStore.setState({
 				sessions: [mockParentSession],
-				projects: [
-					{
-						...mockProject,
-						worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: false },
-					},
-				],
 				activeSessionId: 'parent-1',
 				sessionsLoaded: true,
 			} as any);
@@ -1298,12 +1206,6 @@ describe('Effects', () => {
 
 			useSessionStore.setState({
 				sessions: [mockParentSession],
-				projects: [
-					{
-						...mockProject,
-						worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: false },
-					},
-				],
 				activeSessionId: 'parent-1',
 				sessionsLoaded: true,
 			} as any);
@@ -1342,12 +1244,6 @@ describe('Effects', () => {
 
 			useSessionStore.setState({
 				sessions: [mockParentSession, existingChild],
-				projects: [
-					{
-						...mockProject,
-						worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: false },
-					},
-				],
 				activeSessionId: 'parent-1',
 				sessionsLoaded: true,
 			} as any);
@@ -1419,12 +1315,6 @@ describe('Effects', () => {
 		it('starts watchers for projects with watchEnabled', () => {
 			useSessionStore.setState({
 				sessions: [mockParentSession],
-				projects: [
-					{
-						...mockProject,
-						worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true },
-					},
-				],
 				activeSessionId: 'parent-1',
 				sessionsLoaded: false,
 			} as any);
@@ -1444,12 +1334,6 @@ describe('Effects', () => {
 
 			useSessionStore.setState({
 				sessions: [mockParentSession],
-				projects: [
-					{
-						...mockProject,
-						worktreeConfig: { basePath: '/projects/worktrees', watchEnabled: true },
-					},
-				],
 				activeSessionId: 'parent-1',
 				sessionsLoaded: false,
 			} as any);

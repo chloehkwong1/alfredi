@@ -4,7 +4,6 @@ import {
 	getDefaultShell,
 	SETTINGS_DEFAULTS,
 	SESSIONS_DEFAULTS,
-	PROJECTS_DEFAULTS,
 	AGENT_CONFIGS_DEFAULTS,
 	WINDOW_STATE_DEFAULTS,
 	CLAUDE_SESSION_ORIGINS_DEFAULTS,
@@ -158,12 +157,6 @@ describe('stores/defaults', () => {
 	describe('SESSIONS_DEFAULTS', () => {
 		it('should have empty sessions array', () => {
 			expect(SESSIONS_DEFAULTS.sessions).toEqual([]);
-		});
-	});
-
-	describe('PROJECTS_DEFAULTS', () => {
-		it('should have empty projects array', () => {
-			expect(PROJECTS_DEFAULTS.projects).toEqual([]);
 		});
 	});
 

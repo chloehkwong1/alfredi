@@ -9,7 +9,7 @@
  *   - toggleTabStar / toggleTabUnread / toggleUnreadFilter: tab state toggles
  *
  * Effects:
- *   - Projects persistence (sync projects to electron-store)
+ *   - Session persistence coordination
  *   - Navigation history tracking (push on session/tab change)
  *
  * Reads from: sessionStore, modalStore, uiStore
@@ -83,9 +83,6 @@ export interface SessionLifecycleReturn {
 
 const selectRenameTabId = (s: ReturnType<typeof useModalStore.getState>) =>
 	s.getData('renameTab')?.tabId ?? null;
-const selectProjects = (s: ReturnType<typeof useSessionStore.getState>) => s.projects;
-const selectInitialLoadComplete = (s: ReturnType<typeof useSessionStore.getState>) =>
-	s.initialLoadComplete;
 const selectActiveSessionId = (s: ReturnType<typeof useSessionStore.getState>) => s.activeSessionId;
 
 // ============================================================================
@@ -98,8 +95,6 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	// --- Store subscriptions ---
 	const activeSession = useSessionStore(selectActiveSession);
 	const renameTabId = useModalStore(selectRenameTabId);
-	const projects = useSessionStore(selectProjects);
-	const initialLoadComplete = useSessionStore(selectInitialLoadComplete);
 	const activeSessionId = useSessionStore(selectActiveSessionId);
 
 	// ====================================================================
@@ -446,13 +441,6 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	// Effects
 	// ====================================================================
 
-	// Persist projects directly (projects change infrequently, no need to debounce)
-	useEffect(() => {
-		if (initialLoadComplete) {
-			window.maestro.projects.setAll(projects);
-		}
-	}, [projects, initialLoadComplete]);
-
 	// Auto-transition worktree status from 'todo' to 'in_progress' on activation
 	// Only applies when the worktree hasn't been manually status-set via drag-and-drop
 	useEffect(() => {
@@ -464,7 +452,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 		useSessionStore.getState().updateSession(activeSession.id, {
 			worktreeStatus: 'in_progress',
 		});
-	}, [activeSessionId]);  
+	}, [activeSessionId]);
 
 	// Track navigation history when session or AI tab changes
 	useEffect(() => {

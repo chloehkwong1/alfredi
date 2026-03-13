@@ -43,7 +43,6 @@ function createMockCallbacks(): ApiRouteCallbacks {
 				state: 'idle',
 				inputMode: 'ai',
 				cwd: '/test/project',
-				projectId: null,
 			},
 			{
 				id: 'session-2',
@@ -52,7 +51,6 @@ function createMockCallbacks(): ApiRouteCallbacks {
 				state: 'busy',
 				inputMode: 'ai',
 				cwd: '/test/project2',
-				projectId: 'project-1',
 			},
 		]),
 		getSessionDetail: vi.fn().mockReturnValue({

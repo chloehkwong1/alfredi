@@ -13,7 +13,6 @@ export type {
 	AgentErrorType,
 	AgentErrorRecovery,
 	ToolType,
-	Project,
 	ProjectWorktreeConfig,
 	TerminalTab,
 	UsageStats,
@@ -578,7 +577,6 @@ export type ClosedTabEntry =
 
 export interface Session {
 	id: string;
-	projectId?: string;
 	name: string;
 	toolType: ToolType;
 	state: SessionState;
@@ -608,14 +606,8 @@ export interface Session {
 	gitBranches?: string[];
 	gitTags?: string[];
 	gitRefsCacheTime?: number; // Timestamp when branches/tags were last fetched
-	/**
-	 * @deprecated Use Project.worktreeConfig (ProjectWorktreeConfig) instead.
-	 * Kept for migration — will be removed once all sessions inherit from their project.
-	 */
-	worktreeConfig?: {
-		basePath: string; // Directory where worktrees are stored
-		watchEnabled: boolean; // Whether to watch for new worktrees via chokidar
-	};
+	// Worktree configuration (formerly on Project, now directly on Session)
+	worktreeConfig?: import('../../shared/types').ProjectWorktreeConfig;
 	// Worktree child indicator (only set on worktree child sessions)
 	parentSessionId?: string; // Links back to parent agent session
 	worktreeBranch?: string; // The git branch this worktree is checked out to
@@ -626,8 +618,9 @@ export interface Session {
 	worktreeArchivedAt?: number; // Timestamp when moved to Done (for auto-archive countdown)
 	worktreeArchived?: boolean; // True when auto-archived (hidden from sidebar, worktree dir kept on disk)
 	worktreeServerProcessId?: string; // ProcessManager key (e.g., `${sessionId}-server`) when a server is running
-	// Whether worktree children are expanded in the sidebar (only on parent sessions)
-	worktreesExpanded?: boolean;
+	// Whether worktree children are collapsed in the sidebar (only on parent sessions)
+	// When true, worktree children are hidden. Inverted semantics from old worktreesExpanded.
+	collapsed?: boolean;
 	// Legacy: Worktree parent path for auto-discovery (will be migrated to worktreeConfig)
 	// TODO: Remove after migration to new parent/child model
 	worktreeParentPath?: string;

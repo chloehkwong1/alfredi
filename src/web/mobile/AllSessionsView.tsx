@@ -8,7 +8,7 @@
  *
  * Features:
  * - Larger, touch-friendly session cards
- * - Sessions organized by project with collapsible project headers
+ * - Flat session list with worktree nesting via parentSessionId
  * - Status indicator, mode badge, and working directory visible
  * - Swipe down to dismiss / back button at top
  * - Search/filter sessions
@@ -17,7 +17,7 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { useThemeColors } from '../components/ThemeProvider';
 import { StatusDot, type SessionStatus } from '../components/Badge';
-import type { Session, ProjectInfo } from '../hooks/useSessions';
+import type { Session } from '../hooks/useSessions';
 import { triggerHaptic, HAPTIC_PATTERNS } from './constants';
 import { truncatePath } from '../../shared/formatters';
 
@@ -271,151 +271,6 @@ function getSessionDisplayName(session: Session, sessions: Session[]): string {
 }
 
 /**
- * Get the effective project for a session
- * Worktree children inherit their parent's project
- */
-function getSessionEffectiveProject(
-	session: Session,
-	sessions: Session[]
-): { projectId: string | null; projectName: string | null; projectEmoji: string | null } {
-	const parent = findParentSession(session, sessions);
-	if (parent) {
-		return {
-			projectId: parent.projectId || null,
-			projectName: parent.projectName || null,
-			projectEmoji: parent.projectEmoji || null,
-		};
-	}
-	// Use session's own project
-	return {
-		projectId: session.projectId || null,
-		projectName: session.projectName || null,
-		projectEmoji: session.projectEmoji || null,
-	};
-}
-
-/**
- * Project section component with collapsible header
- */
-interface ProjectSectionProps {
-	projectId: string;
-	name: string;
-	emoji: string | null;
-	sessions: Session[];
-	activeSessionId: string | null;
-	onSelectSession: (sessionId: string) => void;
-	isCollapsed: boolean;
-	onToggleCollapse: (projectId: string) => void;
-	/** All sessions for parent lookup */
-	allSessions: Session[];
-}
-
-function ProjectSection({
-	projectId,
-	name,
-	emoji,
-	sessions,
-	activeSessionId,
-	onSelectSession,
-	isCollapsed,
-	onToggleCollapse,
-	allSessions,
-}: ProjectSectionProps) {
-	const colors = useThemeColors();
-
-	const handleToggle = useCallback(() => {
-		triggerHaptic(HAPTIC_PATTERNS.tap);
-		onToggleCollapse(projectId);
-	}, [projectId, onToggleCollapse]);
-
-	return (
-		<div style={{ marginBottom: '16px' }}>
-			{/* Group header */}
-			<button
-				onClick={handleToggle}
-				style={{
-					display: 'flex',
-					alignItems: 'center',
-					gap: '8px',
-					padding: '10px 12px',
-					marginBottom: isCollapsed ? '0' : '10px',
-					width: '100%',
-					backgroundColor: `${colors.accent}08`,
-					border: `1px solid ${colors.border}`,
-					borderRadius: '8px',
-					color: colors.textMain,
-					fontSize: '13px',
-					fontWeight: 600,
-					cursor: 'pointer',
-					touchAction: 'manipulation',
-					WebkitTapHighlightColor: 'transparent',
-					outline: 'none',
-					userSelect: 'none',
-					WebkitUserSelect: 'none',
-					transition: 'all 0.15s ease',
-				}}
-				aria-expanded={!isCollapsed}
-				aria-label={`${name} project with ${sessions.length} sessions. ${isCollapsed ? 'Tap to expand' : 'Tap to collapse'}`}
-			>
-				{/* Collapse/expand indicator */}
-				<span
-					style={{
-						fontSize: '10px',
-						color: colors.textDim,
-						transition: 'transform 0.2s ease',
-						transform: isCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-					}}
-				>
-					▼
-				</span>
-
-				{/* Group emoji (if available) */}
-				{emoji && <span style={{ fontSize: '16px' }}>{emoji}</span>}
-
-				{/* Group name */}
-				<span style={{ flex: 1, textAlign: 'left' }}>{name}</span>
-
-				{/* Session count badge */}
-				<span
-					style={{
-						fontSize: '11px',
-						color: colors.textDim,
-						backgroundColor: `${colors.textDim}20`,
-						padding: '2px 8px',
-						borderRadius: '10px',
-						minWidth: '20px',
-						textAlign: 'center',
-					}}
-				>
-					{sessions.length}
-				</span>
-			</button>
-
-			{/* Session cards */}
-			{!isCollapsed && (
-				<div
-					style={{
-						display: 'flex',
-						flexDirection: 'column',
-						gap: '10px',
-					}}
-				>
-					{sessions.map((session) => (
-						<MobileSessionCard
-							key={session.id}
-							session={session}
-							isActive={session.id === activeSessionId}
-							onSelect={onSelectSession}
-							displayName={getSessionDisplayName(session, allSessions)}
-						/>
-					))}
-				</div>
-			)}
-		</div>
-	);
-}
-
-/**
  * Props for AllSessionsView component
  */
 export interface AllSessionsViewProps {
@@ -445,7 +300,6 @@ export function AllSessionsView({
 	searchQuery = '',
 }: AllSessionsViewProps) {
 	const colors = useThemeColors();
-	const [collapsedGroups, setCollapsedGroups] = useState<Set<string> | null>(null);
 	const [localSearchQuery, setLocalSearchQuery] = useState(searchQuery);
 	const containerRef = useRef<HTMLDivElement>(null);
 
@@ -465,99 +319,36 @@ export function AllSessionsView({
 		});
 	}, [sessions, localSearchQuery]);
 
-	// Organize sessions by project, including a special "bookmarks" group
-	// Worktree children inherit their parent's project
-	const sessionsByProject = useMemo((): Record<string, ProjectInfo> => {
-		const projects: Record<string, ProjectInfo> = {};
-
-		// Add bookmarked sessions to a special "bookmarks" group
-		const bookmarkedSessions = filteredSessions.filter((s) => s.bookmarked);
-		if (bookmarkedSessions.length > 0) {
-			projects['bookmarks'] = {
-				id: 'bookmarks',
-				name: 'Bookmarks',
-				emoji: '★',
-				sessions: bookmarkedSessions,
-			};
-		}
-
-		// Organize remaining sessions by their actual projects (or inherited project for worktree children)
-		for (const session of filteredSessions) {
-			// Get effective project (worktree children inherit from parent)
-			const effectiveProject = getSessionEffectiveProject(session, sessions);
-			const projectKey = effectiveProject.projectId || 'ungrouped';
-
-			if (!projects[projectKey]) {
-				projects[projectKey] = {
-					id: effectiveProject.projectId,
-					name: effectiveProject.projectName || 'Ungrouped',
-					emoji: effectiveProject.projectEmoji,
-					sessions: [],
-				};
-			}
-			projects[projectKey].sessions.push(session);
-		}
-
-		return projects;
-	}, [filteredSessions, sessions]);
-
-	// Get sorted group keys (bookmarks first, ungrouped last)
-	const sortedGroupKeys = useMemo(() => {
-		const keys = Object.keys(sessionsByProject);
-		return keys.sort((a, b) => {
-			// Put 'bookmarks' at the start
-			if (a === 'bookmarks') return -1;
-			if (b === 'bookmarks') return 1;
-			// Put 'ungrouped' at the end
-			if (a === 'ungrouped') return 1;
-			if (b === 'ungrouped') return -1;
-			return sessionsByProject[a].name.localeCompare(sessionsByProject[b].name);
-		});
-	}, [sessionsByProject]);
-
-	// Initialize collapsed groups with all groups collapsed by default, except bookmarks
-	useEffect(() => {
-		if (collapsedGroups === null && sortedGroupKeys.length > 0) {
-			// Start with all groups collapsed except bookmarks (which should be expanded by default)
-			const initialCollapsed = new Set(sortedGroupKeys.filter((key) => key !== 'bookmarks'));
-			setCollapsedGroups(initialCollapsed);
-		}
-	}, [sortedGroupKeys, collapsedGroups]);
-
-	// Auto-expand groups that contain search results when searching
-	useEffect(() => {
-		if (localSearchQuery.trim() && collapsedGroups) {
-			// Find projects that have matching sessions and expand them
-			const projectsWithMatches = new Set(
-				sortedGroupKeys.filter((key) => sessionsByProject[key]?.sessions.length > 0)
-			);
-
-			// If any projects have matches, expand them
-			if (projectsWithMatches.size > 0) {
-				setCollapsedGroups((prev) => {
-					const next = new Set(prev || []);
-					// Remove projects with matches from collapsed set (expand them)
-					for (const projectKey of projectsWithMatches) {
-						next.delete(projectKey);
-					}
-					return next;
-				});
+	// Separate bookmarked sessions and organize flat list with worktree nesting
+	const { bookmarkedSessions, flatSessions } = useMemo(() => {
+		const bookmarked = filteredSessions.filter((s) => s.bookmarked);
+		// Parent sessions (no parentSessionId) come first, followed by their worktree children
+		const parents = filteredSessions.filter((s) => !s.parentSessionId);
+		const childrenByParent = new Map<string, Session[]>();
+		for (const s of filteredSessions) {
+			if (s.parentSessionId) {
+				const list = childrenByParent.get(s.parentSessionId) || [];
+				list.push(s);
+				childrenByParent.set(s.parentSessionId, list);
 			}
 		}
-	}, [localSearchQuery, sortedGroupKeys, sessionsByProject]);
-
-	// Toggle project collapse
-	const handleToggleCollapse = useCallback((projectId: string) => {
-		setCollapsedGroups((prev) => {
-			const next = new Set(prev || []);
-			if (next.has(projectId)) {
-				next.delete(projectId);
-			} else {
-				next.add(projectId);
+		const flat: Session[] = [];
+		for (const parent of parents) {
+			flat.push(parent);
+			const children = childrenByParent.get(parent.id);
+			if (children) {
+				flat.push(...children);
 			}
-			return next;
-		});
-	}, []);
+		}
+		// Include orphan worktree children (parent not in filtered list)
+		const parentIds = new Set(parents.map((p) => p.id));
+		for (const s of filteredSessions) {
+			if (s.parentSessionId && !parentIds.has(s.parentSessionId)) {
+				flat.push(s);
+			}
+		}
+		return { bookmarkedSessions: bookmarked, flatSessions: flat };
+	}, [filteredSessions]);
 
 	// Handle session selection and close view
 	const handleSelectSession = useCallback(
@@ -742,8 +533,7 @@ export function AllSessionsView({
 								: 'Create a session in the desktop app to get started'}
 						</p>
 					</div>
-				) : sortedGroupKeys.length === 1 && sortedGroupKeys[0] === 'ungrouped' ? (
-					// If only ungrouped sessions, render without group header
+				) : (
 					<div
 						style={{
 							display: 'flex',
@@ -751,7 +541,35 @@ export function AllSessionsView({
 							gap: '10px',
 						}}
 					>
-						{filteredSessions.map((session) => (
+						{/* Bookmarked sessions section */}
+						{bookmarkedSessions.length > 0 && (
+							<>
+								<div
+									style={{
+										fontSize: '12px',
+										fontWeight: 600,
+										color: colors.textDim,
+										textTransform: 'uppercase',
+										letterSpacing: '0.5px',
+										padding: '4px 0',
+									}}
+								>
+									Bookmarks
+								</div>
+								{bookmarkedSessions.map((session) => (
+									<MobileSessionCard
+										key={`bookmark-${session.id}`}
+										session={session}
+										isActive={session.id === activeSessionId}
+										onSelect={handleSelectSession}
+										displayName={getSessionDisplayName(session, sessions)}
+									/>
+								))}
+								<div style={{ height: '8px' }} />
+							</>
+						)}
+						{/* Flat session list with worktree nesting */}
+						{flatSessions.map((session) => (
 							<MobileSessionCard
 								key={session.id}
 								session={session}
@@ -761,25 +579,6 @@ export function AllSessionsView({
 							/>
 						))}
 					</div>
-				) : (
-					// Render with project sections
-					sortedGroupKeys.map((groupKey) => {
-						const project = sessionsByProject[groupKey];
-						return (
-							<ProjectSection
-								key={groupKey}
-								projectId={groupKey}
-								name={project.name}
-								emoji={project.emoji}
-								sessions={project.sessions}
-								activeSessionId={activeSessionId}
-								onSelectSession={handleSelectSession}
-								isCollapsed={collapsedGroups?.has(groupKey) ?? true}
-								onToggleCollapse={handleToggleCollapse}
-								allSessions={sessions}
-							/>
-						);
-					})
 				)}
 			</div>
 

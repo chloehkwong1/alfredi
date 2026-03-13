@@ -192,7 +192,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			}
 
 			// Skip all keyboard handling when editing a session or group name in the sidebar
-			if (ctx.editingSessionId || ctx.editingProjectId) {
+			if (ctx.editingSessionId) {
 				return;
 			}
 
@@ -226,31 +226,20 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			} else if (ctx.isShortcut(e, 'toggleRightPanel')) {
 				ctx.setRightPanelOpen((p: boolean) => !p);
 				trackShortcut('toggleRightPanel');
+			} else if (ctx.isShortcut(e, 'newWorktree')) {
+				e.preventDefault();
+				if (ctx.activeSession?.worktreeConfig) {
+					useModalStore.getState().openModal('createWorktree', { session: ctx.activeSession });
+				}
+				trackShortcut('newWorktree');
 			} else if (ctx.isShortcut(e, 'newInstance')) {
 				e.preventDefault();
-				// Check if active session belongs to a worktree-enabled project
-				const activeProject = ctx.activeSession?.projectId
-					? ctx.projects?.find((p: any) => p.id === ctx.activeSession.projectId)
-					: null;
-				const hasWorktreeConfig =
-					ctx.activeSession?.worktreeConfig || activeProject?.worktreeConfig;
-				if (hasWorktreeConfig && ctx.activeSession) {
-					// Open CreateWorktreeModal for worktree-enabled projects
-					useModalStore.getState().openModal('createWorktree', { session: ctx.activeSession });
-				} else {
-					ctx.addNewSession();
-				}
+				ctx.addNewSession();
 				trackShortcut('newInstance');
 			} else if (ctx.isShortcut(e, 'killInstance')) {
 				if (ctx.activeSessionId) {
 					ctx.deleteSession(ctx.activeSessionId);
 					trackShortcut('killInstance');
-				}
-			} else if (ctx.isShortcut(e, 'moveToGroup')) {
-				if (ctx.activeSession) {
-					ctx.setQuickActionInitialMode('move-to-project');
-					ctx.setQuickActionOpen(true);
-					trackShortcut('moveToGroup');
 				}
 			} else if (ctx.isShortcut(e, 'cyclePrev')) {
 				// Cycle to previous Maestro session (global shortcut)
@@ -303,7 +292,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 				// Only open quick actions if there are agents
 				if (ctx.sessions.length > 0) {
-					ctx.setQuickActionInitialMode('main');
 					ctx.setQuickActionOpen(true);
 					trackShortcut('quickAction');
 				}

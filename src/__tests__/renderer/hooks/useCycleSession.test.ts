@@ -13,8 +13,8 @@
  *   - Collapsed sidebar uses sortedSessions from deps
  *   - Empty visual order is a no-op
  *   - Current item not visible selects first visible item
- *   - Worktree children included when parent's worktreesExpanded !== false
- *   - Worktree children skipped when parent's worktreesExpanded === false
+ *   - Worktree children included when parent is not collapsed
+ *   - Worktree children skipped when parent is collapsed
  *   - Position tracking via cyclePosition store field
  */
 
@@ -39,7 +39,6 @@ import { useCycleSession } from '../../../renderer/hooks/session/useCycleSession
 import type { UseCycleSessionDeps } from '../../../renderer/hooks/session/useCycleSession';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
 import { useUIStore } from '../../../renderer/stores/uiStore';
-import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import type { Session } from '../../../renderer/types';
 
 // ============================================================================
@@ -51,10 +50,9 @@ function makeSession(overrides: Partial<Session> & { id: string; name: string })
 	return {
 		id: overrides.id,
 		name: overrides.name,
-		projectId: overrides.projectId,
 		bookmarked: overrides.bookmarked ?? false,
 		parentSessionId: overrides.parentSessionId,
-		worktreesExpanded: overrides.worktreesExpanded,
+		collapsed: overrides.collapsed,
 		worktreeBranch: overrides.worktreeBranch,
 		// Provide stubs for the rest of the required Session fields so TypeScript is happy
 		toolType: 'claude-code' as any,
@@ -92,11 +90,6 @@ function makeSession(overrides: Partial<Session> & { id: string; name: string })
 	} as Session;
 }
 
-/** Build a minimal Project object. */
-function makeProject(id: string, name: string, collapsed = false) {
-	return { id, name, collapsed, rootPath: '/test/project', emoji: '' } as any;
-}
-
 /** Create default deps for the hook. */
 function makeDeps(overrides: Partial<UseCycleSessionDeps> = {}): UseCycleSessionDeps {
 	return {
@@ -111,7 +104,6 @@ function makeDeps(overrides: Partial<UseCycleSessionDeps> = {}): UseCycleSession
 
 const defaultSessionStoreState = {
 	sessions: [],
-	projects: [],
 	activeSessionId: '',
 	cyclePosition: -1,
 };
@@ -121,14 +113,9 @@ const defaultUIStoreState = {
 	bookmarksCollapsed: false,
 };
 
-const defaultSettingsStoreState = {
-	ungroupedCollapsed: false,
-};
-
 function resetStores() {
 	useSessionStore.setState(defaultSessionStoreState as any);
 	useUIStore.setState(defaultUIStoreState as any);
-	useSettingsStore.setState(defaultSettingsStoreState as any);
 }
 
 // ============================================================================
@@ -173,23 +160,6 @@ describe('useCycleSession', () => {
 
 			// No active session should have been set
 			expect(useSessionStore.getState().activeSessionId).toBe('');
-		});
-
-		it('does nothing when ungroupedCollapsed and no groups', () => {
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
-
-			const sessA = makeSession({ id: 'a', name: 'Alpha' });
-			useSessionStore.setState({ sessions: [sessA], activeSessionId: 'a' } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			act(() => {
-				result.current.cycleSession('next');
-			});
-
-			// activeSessionId should remain 'a' because visual order is empty — no-op
-			expect(useSessionStore.getState().activeSessionId).toBe('a');
 		});
 	});
 
@@ -465,203 +435,6 @@ describe('useCycleSession', () => {
 	});
 
 	// =========================================================================
-	// Group sessions
-	// =========================================================================
-	describe('group sessions', () => {
-		it('sessions within a group are sorted alphabetically', () => {
-			const grp = makeProject('grp-1', 'MyGroup');
-			const sessC = makeSession({ id: 'c', name: 'Charlie', projectId: 'grp-1' });
-			const sessA = makeSession({ id: 'a', name: 'Alice', projectId: 'grp-1' });
-			const sessB = makeSession({ id: 'b', name: 'Bob', projectId: 'grp-1' });
-
-			useSessionStore.setState({
-				sessions: [sessC, sessA, sessB],
-				projects: [grp],
-				activeSessionId: 'a',
-				cyclePosition: -1,
-			} as any);
-			useUIStore.setState({
-				leftSidebarOpen: true,
-				bookmarksCollapsed: true,
-			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			// next from Alice → Bob
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('b');
-
-			// next from Bob → Charlie
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('c');
-		});
-
-		it('multiple groups are sorted alphabetically between themselves', () => {
-			const grpB = makeProject('grp-b', 'Bees');
-			const grpA = makeProject('grp-a', 'Ants');
-
-			const sessA1 = makeSession({ id: 'a1', name: 'Ant-One', projectId: 'grp-a' });
-			const sessB1 = makeSession({ id: 'b1', name: 'Bee-One', projectId: 'grp-b' });
-
-			useSessionStore.setState({
-				sessions: [sessB1, sessA1],
-				projects: [grpB, grpA], // intentionally unordered
-				activeSessionId: 'a1',
-				cyclePosition: -1,
-			} as any);
-			useUIStore.setState({
-				leftSidebarOpen: true,
-				bookmarksCollapsed: true,
-			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			// Visual order: Ants-group [Ant-One], Bees-group [Bee-One]
-			// next from Ant-One → Bee-One
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('b1');
-		});
-	});
-
-	// =========================================================================
-	// Collapsed groups are skipped
-	// =========================================================================
-	describe('collapsed groups are skipped', () => {
-		it('sessions in a collapsed group are excluded from the visual order', () => {
-			const collapsedGrp = makeProject('grp-collapsed', 'Hidden', true);
-			const openGrp = makeProject('grp-open', 'Visible', false);
-
-			const sessHidden = makeSession({ id: 'h', name: 'Hidden', projectId: 'grp-collapsed' });
-			const sessA = makeSession({ id: 'a', name: 'Alpha', projectId: 'grp-open' });
-			const sessB = makeSession({ id: 'b', name: 'Beta', projectId: 'grp-open' });
-
-			useSessionStore.setState({
-				sessions: [sessHidden, sessA, sessB],
-				projects: [collapsedGrp, openGrp],
-				activeSessionId: 'a',
-				cyclePosition: -1,
-			} as any);
-			useUIStore.setState({
-				leftSidebarOpen: true,
-				bookmarksCollapsed: true,
-			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			// Visual order: [Alpha, Beta] (Hidden is in collapsed group → skipped)
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('b');
-
-			// wrap around — Beta → Alpha (not Hidden)
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('a');
-		});
-
-		it('all sessions are skipped when all groups are collapsed and ungrouped is collapsed', () => {
-			const collapsedGrp = makeProject('grp-1', 'G1', true);
-			const sessA = makeSession({ id: 'a', name: 'Alpha', projectId: 'grp-1' });
-
-			useSessionStore.setState({
-				sessions: [sessA],
-				projects: [collapsedGrp],
-				activeSessionId: 'a',
-				cyclePosition: -1,
-			} as any);
-			useUIStore.setState({
-				leftSidebarOpen: true,
-				bookmarksCollapsed: true,
-			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			act(() => {
-				result.current.cycleSession('next');
-			});
-
-			// visual order empty → no-op
-			expect(useSessionStore.getState().activeSessionId).toBe('a');
-		});
-	});
-
-	// =========================================================================
-	// Ungrouped collapsed
-	// =========================================================================
-	describe('ungroupedCollapsed', () => {
-		it('ungrouped sessions are skipped when ungroupedCollapsed is true', () => {
-			const grp = makeProject('grp-1', 'Group', false);
-			const sessInGroup = makeSession({ id: 'g', name: 'Grouped', projectId: 'grp-1' });
-			const sessUngrouped = makeSession({ id: 'u', name: 'Ungrouped' });
-
-			useSessionStore.setState({
-				sessions: [sessInGroup, sessUngrouped],
-				projects: [grp],
-				activeSessionId: 'g',
-				cyclePosition: -1,
-			} as any);
-			useUIStore.setState({
-				leftSidebarOpen: true,
-				bookmarksCollapsed: true,
-			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			// Visual order: [Grouped] only (Ungrouped is hidden)
-			// next from Grouped → wraps back to Grouped (single item)
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('g');
-		});
-
-		it('ungrouped sessions are included when ungroupedCollapsed is false', () => {
-			const grp = makeProject('grp-1', 'Group', false);
-			const sessInGroup = makeSession({ id: 'g', name: 'Grouped', projectId: 'grp-1' });
-			const sessUngrouped = makeSession({ id: 'u', name: 'Zed-Ungrouped' });
-
-			useSessionStore.setState({
-				sessions: [sessInGroup, sessUngrouped],
-				projects: [grp],
-				activeSessionId: 'g',
-				cyclePosition: -1,
-			} as any);
-			useUIStore.setState({
-				leftSidebarOpen: true,
-				bookmarksCollapsed: true,
-			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: false } as any);
-
-			const deps = makeDeps();
-			const { result } = renderHook(() => useCycleSession(deps));
-
-			// Visual order: [Grouped, Zed-Ungrouped]; next from Grouped → Zed-Ungrouped
-			act(() => {
-				result.current.cycleSession('next');
-			});
-			expect(useSessionStore.getState().activeSessionId).toBe('u');
-		});
-	});
-
-	// =========================================================================
 	// Sidebar collapsed — uses sortedSessions from deps
 	// =========================================================================
 	describe('sidebar collapsed', () => {
@@ -698,21 +471,19 @@ describe('useCycleSession', () => {
 	// =========================================================================
 	describe('current item not visible', () => {
 		it('selects first visible item when active session is not in visual order', () => {
-			// Active session is in a collapsed group → not in visual order
-			const collapsedGrp = makeProject('grp-hidden', 'Hidden', true);
-			const openGrp = makeProject('grp-open', 'Open', false);
-
+			// Active session is a worktree child under collapsed parent → not in visual order
+			const parent = makeSession({ id: 'parent', name: 'Parent', collapsed: true });
 			const sessHidden = makeSession({
 				id: 'hidden',
 				name: 'Hidden',
-				projectId: 'grp-hidden',
+				parentSessionId: 'parent',
+				worktreeBranch: 'hidden-branch',
 			});
-			const sessFirst = makeSession({ id: 'first', name: 'First', projectId: 'grp-open' });
-			const sessSecond = makeSession({ id: 'second', name: 'Second', projectId: 'grp-open' });
+			const sessFirst = makeSession({ id: 'first', name: 'First' });
+			const sessSecond = makeSession({ id: 'second', name: 'Second' });
 
 			useSessionStore.setState({
-				sessions: [sessHidden, sessFirst, sessSecond],
-				projects: [collapsedGrp, openGrp],
+				sessions: [parent, sessHidden, sessFirst, sessSecond],
 				activeSessionId: 'hidden',
 				cyclePosition: -1,
 			} as any);
@@ -720,7 +491,6 @@ describe('useCycleSession', () => {
 				leftSidebarOpen: true,
 				bookmarksCollapsed: true,
 			} as any);
-			useSettingsStore.setState({ ungroupedCollapsed: true } as any);
 
 			const deps = makeDeps();
 			const { result } = renderHook(() => useCycleSession(deps));
@@ -741,7 +511,6 @@ describe('useCycleSession', () => {
 			// Suppose 'invisible' is active but not in any expanded section
 			useSessionStore.setState({
 				sessions: [sessA, sessB],
-				projects: [],
 				activeSessionId: 'invisible',
 				cyclePosition: -1,
 			} as any);
@@ -767,9 +536,9 @@ describe('useCycleSession', () => {
 	// Worktree children
 	// =========================================================================
 	describe('worktree children', () => {
-		it('includes worktree children when parent worktreesExpanded is not false', () => {
-			// worktreesExpanded=undefined counts as expanded (truthy)
-			const parent = makeSession({ id: 'p', name: 'Parent', worktreesExpanded: undefined });
+		it('includes worktree children when parent is not collapsed', () => {
+			// collapsed=undefined counts as expanded
+			const parent = makeSession({ id: 'p', name: 'Parent', collapsed: undefined });
 			const child1 = makeSession({
 				id: 'c1',
 				name: 'Child One',
@@ -810,8 +579,8 @@ describe('useCycleSession', () => {
 			expect(useSessionStore.getState().activeSessionId).toBe('c2');
 		});
 
-		it('includes worktree children when parent worktreesExpanded is true', () => {
-			const parent = makeSession({ id: 'p', name: 'Parent', worktreesExpanded: true });
+		it('includes worktree children when parent collapsed is false', () => {
+			const parent = makeSession({ id: 'p', name: 'Parent', collapsed: false });
 			const child = makeSession({
 				id: 'c',
 				name: 'Child',
@@ -838,8 +607,8 @@ describe('useCycleSession', () => {
 			expect(useSessionStore.getState().activeSessionId).toBe('c');
 		});
 
-		it('excludes worktree children when parent worktreesExpanded is false', () => {
-			const parent = makeSession({ id: 'p', name: 'Parent', worktreesExpanded: false });
+		it('excludes worktree children when parent is collapsed', () => {
+			const parent = makeSession({ id: 'p', name: 'Parent', collapsed: true });
 			const child = makeSession({
 				id: 'c',
 				name: 'Child',
@@ -870,7 +639,7 @@ describe('useCycleSession', () => {
 		});
 
 		it('worktree children are sorted by worktreeBranch name', () => {
-			const parent = makeSession({ id: 'p', name: 'Parent', worktreesExpanded: true });
+			const parent = makeSession({ id: 'p', name: 'Parent', collapsed: false });
 			const childZ = makeSession({
 				id: 'cz',
 				name: 'Child',
@@ -913,7 +682,7 @@ describe('useCycleSession', () => {
 
 		it('worktree child sessions do not appear as top-level entries', () => {
 			// The parent-child model should not add the child at the ungrouped level separately
-			const parent = makeSession({ id: 'p', name: 'Parent', worktreesExpanded: true });
+			const parent = makeSession({ id: 'p', name: 'Parent', collapsed: false });
 			const child = makeSession({
 				id: 'c',
 				name: 'Child',

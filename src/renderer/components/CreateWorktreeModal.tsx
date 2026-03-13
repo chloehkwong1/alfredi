@@ -3,7 +3,6 @@ import { X, GitBranch, Loader2, AlertTriangle } from 'lucide-react';
 import type { Theme, Session, GhCliStatus } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
-import { useSessionStore } from '../stores/sessionStore';
 
 interface CreateWorktreeModalProps {
 	isOpen: boolean;
@@ -110,11 +109,8 @@ export function CreateWorktreeModal({
 		}
 	};
 
-	// Resolve worktree base path from project config (preferred) or deprecated session config
-	const project = useSessionStore((s) =>
-		session.projectId ? s.projects.find((p) => p.id === session.projectId) : undefined
-	);
-	const worktreeBasePath = project?.worktreeConfig?.basePath || session.worktreeConfig?.basePath;
+	// Read worktree base path directly from session config
+	const worktreeBasePath = session.worktreeConfig?.basePath;
 
 	if (!isOpen) return null;
 

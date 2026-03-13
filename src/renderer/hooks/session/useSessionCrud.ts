@@ -5,18 +5,14 @@
  *   - addNewSession (opens modal)
  *   - createNewSession (core creation logic)
  *   - deleteSession (opens confirmation modal)
- *   - deleteWorktreeProject (removes project + all agents)
  *   - startRenamingSession / finishRenamingSession
  *   - toggleBookmark
  *   - handleDragStart / handleDragOver
- *   - handleCreateProjectAndMove / handleProjectCreated
  *
  * Reads from: sessionStore, settingsStore, uiStore, modalStore
- *
- * NOTE: "group" terminology in comments/user-facing strings has been renamed to "project".
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import type { ToolType, Session, AITab } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -27,7 +23,6 @@ import { generateId } from '../../utils/ids';
 import { validateNewSession } from '../../utils/sessionValidation';
 import { gitService } from '../../services/git';
 import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
-import { getPersistentTerminalId } from '../terminal/usePersistentTerminal';
 
 // ============================================================================
 // Dependencies interface
@@ -42,8 +37,6 @@ export interface UseSessionCrudDeps {
 	showConfirmation: (message: string, onConfirm: () => void) => void;
 	/** Ref to main input element (for auto-focus after session creation) */
 	inputRef: React.RefObject<HTMLTextAreaElement | null>;
-	/** Open the create-project modal (from project modal state) */
-	setCreateProjectModalOpen: (open: boolean) => void;
 }
 
 // ============================================================================
@@ -73,8 +66,6 @@ export interface UseSessionCrudReturn {
 	) => Promise<void>;
 	/** Opens the delete agent confirmation modal */
 	deleteSession: (id: string) => void;
-	/** Deletes entire worktree project and all its agents */
-	deleteWorktreeProject: (projectId: string) => void;
 	/** Opens rename UI for a session */
 	startRenamingSession: (editKey: string) => void;
 	/** Completes session rename */
@@ -85,12 +76,6 @@ export interface UseSessionCrudReturn {
 	handleDragStart: (sessionId: string) => void;
 	/** Allows drop */
 	handleDragOver: (e: React.DragEvent) => void;
-	/** Opens create project modal with pending session to move */
-	handleCreateProjectAndMove: (sessionId: string) => void;
-	/** Callback when a project is created — moves pending session to it */
-	handleProjectCreated: (projectId: string) => void;
-	/** The session ID pending move to a newly created project */
-	pendingMoveToProjectSessionId: string | null;
 }
 
 // ============================================================================
@@ -98,23 +83,12 @@ export interface UseSessionCrudReturn {
 // ============================================================================
 
 export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
-	const {
-		flushSessionPersistence,
-		setRemovedWorktreePaths,
-		showConfirmation,
-		inputRef,
-		setCreateProjectModalOpen,
-	} = deps;
+	const { flushSessionPersistence, setRemovedWorktreePaths, showConfirmation, inputRef } = deps;
 
 	// --- Store actions (stable via getState) ---
-	const { setSessions, setActiveSessionId, setProjects } = useSessionStore.getState();
+	const { setSessions, setActiveSessionId } = useSessionStore.getState();
 	const { setEditingSessionId, setDraggingSessionId, setActiveFocus } = useUIStore.getState();
 	const { setNewInstanceModalOpen, setDeleteAgentSession } = getModalActions();
-
-	// --- Local state ---
-	const [pendingMoveToProjectSessionId, setPendingMoveToProjectSessionId] = useState<string | null>(
-		null
-	);
 
 	// ========================================================================
 	// addNewSession — opens the new instance modal
@@ -286,90 +260,6 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 	);
 
 	// ========================================================================
-	// deleteWorktreeProject — removes project + all agents
-	// ========================================================================
-	const deleteWorktreeProject = useCallback(
-		(projectId: string) => {
-			const currentProjects = useSessionStore.getState().projects;
-			const currentSessions = useSessionStore.getState().sessions;
-			const project = currentProjects.find((g) => g.id === projectId);
-			if (!project) return;
-
-			const projectSessions = currentSessions.filter((s) => s.projectId === projectId);
-			const sessionCount = projectSessions.length;
-
-			showConfirmation(
-				`Are you sure you want to remove the project "${project.name}" and all ${sessionCount} agent${
-					sessionCount !== 1 ? 's' : ''
-				} in it? This action cannot be undone.`,
-				async () => {
-					for (const session of projectSessions) {
-						try {
-							await (window as any).maestro.process.kill(`${session.id}-ai`);
-						} catch (error) {
-							console.error('Failed to kill AI process:', error);
-						}
-						try {
-							await (window as any).maestro.process.kill(`${session.id}-terminal`);
-						} catch (error) {
-							console.error('Failed to kill terminal process:', error);
-						}
-						try {
-							await (window as any).maestro.process.kill(getPersistentTerminalId(session.id));
-						} catch (error) {
-							console.error('Failed to kill persistent terminal process:', error);
-						}
-						try {
-							await (window as any).maestro.playbooks.deleteAll(session.id);
-						} catch (error) {
-							console.error('Failed to delete playbooks:', error);
-						}
-					}
-
-					const pathsToTrack = projectSessions
-						.filter((s) => s.worktreeParentPath && s.cwd)
-						.map((s) => s.cwd);
-
-					if (pathsToTrack.length > 0) {
-						setRemovedWorktreePaths((prev) => new Set([...prev, ...pathsToTrack]));
-					}
-
-					const sessionIdsToRemove = new Set(projectSessions.map((s) => s.id));
-					const latestSessions = useSessionStore.getState().sessions;
-					const newSessions = latestSessions.filter((s) => !sessionIdsToRemove.has(s.id));
-					setSessions(newSessions);
-					setProjects((prev) => prev.filter((g) => g.id !== projectId));
-
-					setTimeout(() => flushSessionPersistence(), 0);
-
-					const latestActiveId = useSessionStore.getState().activeSessionId;
-					if (sessionIdsToRemove.has(latestActiveId) && newSessions.length > 0) {
-						setActiveSessionId(newSessions[0].id);
-					} else if (newSessions.length === 0) {
-						setActiveSessionId('');
-					}
-
-					notifyToast({
-						type: 'success',
-						title: 'Project Removed',
-						message: `Removed "${project.name}" and ${sessionCount} agent${
-							sessionCount !== 1 ? 's' : ''
-						}`,
-					});
-				}
-			);
-		},
-		[
-			showConfirmation,
-			setSessions,
-			setProjects,
-			setActiveSessionId,
-			setRemovedWorktreePaths,
-			flushSessionPersistence,
-		]
-	);
-
-	// ========================================================================
 	// startRenamingSession / finishRenamingSession
 	// ========================================================================
 	const startRenamingSession = useCallback(
@@ -437,41 +327,14 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 		e.preventDefault();
 	}, []);
 
-	// ========================================================================
-	// Project + move handlers
-	// ========================================================================
-	const handleCreateProjectAndMove = useCallback(
-		(sessionId: string) => {
-			setPendingMoveToProjectSessionId(sessionId);
-			setCreateProjectModalOpen(true);
-		},
-		[setCreateProjectModalOpen]
-	);
-
-	const handleProjectCreated = useCallback(
-		(projectId: string) => {
-			if (pendingMoveToProjectSessionId) {
-				setSessions((prev) =>
-					prev.map((s) => (s.id === pendingMoveToProjectSessionId ? { ...s, projectId } : s))
-				);
-				setPendingMoveToProjectSessionId(null);
-			}
-		},
-		[pendingMoveToProjectSessionId, setSessions]
-	);
-
 	return {
 		addNewSession,
 		createNewSession,
 		deleteSession,
-		deleteWorktreeProject,
 		startRenamingSession,
 		finishRenamingSession,
 		toggleBookmark,
 		handleDragStart,
 		handleDragOver,
-		handleCreateProjectAndMove,
-		handleProjectCreated,
-		pendingMoveToProjectSessionId,
 	};
 }

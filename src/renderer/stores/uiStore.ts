@@ -55,7 +55,6 @@ export interface UIStoreState {
 	draggingWorktreeTargetStatus: WorktreeStatus | null;
 
 	// Editing (inline renaming in sidebar)
-	editingProjectId: string | null;
 	editingSessionId: string | null;
 }
 
@@ -107,7 +106,6 @@ export interface UIStoreActions {
 	) => void;
 
 	// Editing
-	setEditingProjectId: (id: string | null | ((prev: string | null) => string | null)) => void;
 	setEditingSessionId: (id: string | null | ((prev: string | null) => string | null)) => void;
 }
 
@@ -139,7 +137,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 	historySearchFilterOpen: false,
 	draggingSessionId: null,
 	draggingWorktreeTargetStatus: null,
-	editingProjectId: null,
 	editingSessionId: null,
 
 	// --- Actions ---
@@ -177,6 +174,5 @@ export const useUIStore = create<UIStore>()((set) => ({
 	setDraggingWorktreeTargetStatus: (v) =>
 		set((s) => ({ draggingWorktreeTargetStatus: resolve(v, s.draggingWorktreeTargetStatus) })),
 
-	setEditingProjectId: (v) => set((s) => ({ editingProjectId: resolve(v, s.editingProjectId) })),
 	setEditingSessionId: (v) => set((s) => ({ editingSessionId: resolve(v, s.editingSessionId) })),
 }));

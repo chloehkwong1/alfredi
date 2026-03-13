@@ -21,14 +21,6 @@ export {
 } from './useSortedSessions';
 export type { UseSortedSessionsDeps, UseSortedSessionsReturn } from './useSortedSessions';
 
-// Project management
-export { useProjectManagement } from './useProjectManagement';
-export type {
-	UseProjectManagementDeps,
-	UseProjectManagementReturn,
-	ProjectModalState,
-} from './useProjectManagement';
-
 // Batched session updates for performance
 export { useBatchedSessionUpdates, DEFAULT_BATCH_FLUSH_INTERVAL } from './useBatchedSessionUpdates';
 export type { UseBatchedSessionUpdatesReturn, BatchedUpdater } from './useBatchedSessionUpdates';
@@ -44,11 +36,11 @@ export { useHandsOnTimeTracker } from './useHandsOnTimeTracker';
 export { useSessionRestoration } from './useSessionRestoration';
 export type { SessionRestorationReturn } from './useSessionRestoration';
 
-// Session lifecycle operations (rename, delete, star, unread, projects persistence)
+// Session lifecycle operations (rename, delete, star, unread)
 export { useSessionLifecycle } from './useSessionLifecycle';
 export type { SessionLifecycleDeps, SessionLifecycleReturn } from './useSessionLifecycle';
 
-// Session CRUD (create, delete, rename, bookmark, drag-drop, project-move)
+// Session CRUD (create, delete, rename, bookmark, drag-drop)
 export { useSessionCrud } from './useSessionCrud';
 export type { UseSessionCrudDeps, UseSessionCrudReturn } from './useSessionCrud';
 

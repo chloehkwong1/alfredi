@@ -45,20 +45,9 @@ export interface ProjectWorktreeConfig {
 	autoArchiveDays?: number; // Days after a worktree reaches 'done' before auto-archiving (default: 7)
 }
 
-// Project (repo-aware grouping with a root directory)
-export interface Project {
-	id: string;
-	name: string;
-	emoji: string;
-	collapsed: boolean;
-	rootPath: string;
-	worktreeConfig?: ProjectWorktreeConfig;
-}
-
 // Simplified session interface for CLI (subset of full Session)
 export interface SessionInfo {
 	id: string;
-	projectId?: string;
 	name: string;
 	toolType: ToolType;
 	cwd: string;

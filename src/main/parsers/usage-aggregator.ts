@@ -102,11 +102,10 @@ export function calculateContextTokens(
  * - Claude models: inputTokens + cacheReadInputTokens + cacheCreationInputTokens
  * - OpenAI models (Codex): inputTokens + outputTokens (combined limit)
  *
- * Returns null when the calculated total exceeds the context window, which indicates
- * accumulated values from multi-tool turns (many internal API calls within one turn).
- * A single API call's total input can never exceed the context window, so values
- * above it are definitely accumulated. Callers should preserve the previous valid
- * percentage when this returns null.
+ * When the full sum exceeds the context window, values are cumulative session totals
+ * (a single API call's input cannot exceed the context window). In this case,
+ * cacheRead is double-counted across turns, so we estimate actual context as
+ * cacheCreation + input (cacheCreation ≈ total conversation size).
  *
  * @param stats - The usage statistics containing token counts
  * @param agentId - The agent identifier for agent-specific context window size
@@ -138,12 +137,15 @@ export function estimateContextUsage(
 		return null;
 	}
 
-	// If total exceeds context window, the values are accumulated across multiple
-	// internal API calls within a complex turn (tool use chains). A single API call's
-	// total input cannot exceed the context window. Return null to signal callers
-	// should keep the previous valid percentage.
+	// If total exceeds context window, values are cumulative session totals.
+	// cacheRead is double-counted across turns. Estimate actual context from
+	// cacheCreation + input only (cacheCreation ≈ total conversation size).
 	if (totalContextTokens > effectiveContextWindow) {
-		return null;
+		const estimatedContext = stats.cacheCreationInputTokens + stats.inputTokens;
+		if (estimatedContext <= 0) {
+			return null;
+		}
+		return Math.min(100, Math.round((estimatedContext / effectiveContextWindow) * 100));
 	}
 
 	if (totalContextTokens <= 0) {

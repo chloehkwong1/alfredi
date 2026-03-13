@@ -165,6 +165,7 @@ export class ClaudeOutputParser implements AgentOutputParser {
 			// For thinking content, prioritize thinking blocks over text blocks
 			// This ensures extended thinking (Claude 3.7+, Claude 4+) content streams properly
 			// When thinking blocks are present, emit them as partial content for thinking-chunk events
+			const hasThinking = !!thinkingText;
 			const contentToEmit = thinkingText || text;
 
 			return {
@@ -172,6 +173,7 @@ export class ClaudeOutputParser implements AgentOutputParser {
 				text: contentToEmit,
 				sessionId: msg.session_id,
 				isPartial: true,
+				isThinking: hasThinking,
 				toolUseBlocks: toolUseBlocks.length > 0 ? toolUseBlocks : undefined,
 				raw: msg,
 			};

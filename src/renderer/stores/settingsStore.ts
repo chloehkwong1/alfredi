@@ -161,6 +161,7 @@ export interface SettingsStoreState {
 	osNotificationsEnabled: boolean;
 	audioFeedbackEnabled: boolean;
 	audioFeedbackCommand: string;
+	notificationSound: string;
 	toastDuration: number;
 	checkForUpdatesOnStartup: boolean;
 	enableBetaUpdates: boolean;
@@ -233,6 +234,7 @@ export interface SettingsStoreActions {
 	setOsNotificationsEnabled: (value: boolean) => void;
 	setAudioFeedbackEnabled: (value: boolean) => void;
 	setAudioFeedbackCommand: (value: string) => void;
+	setNotificationSound: (value: string) => void;
 	setToastDuration: (value: number) => void;
 	setCheckForUpdatesOnStartup: (value: boolean) => void;
 	setEnableBetaUpdates: (value: boolean) => void;
@@ -352,6 +354,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	osNotificationsEnabled: true,
 	audioFeedbackEnabled: false,
 	audioFeedbackCommand: 'say',
+	notificationSound: 'Ping',
 	toastDuration: 20,
 	checkForUpdatesOnStartup: true,
 	enableBetaUpdates: false,
@@ -542,6 +545,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setAudioFeedbackCommand: (value) => {
 		set({ audioFeedbackCommand: value });
 		window.maestro.settings.set('audioFeedbackCommand', value);
+	},
+
+	setNotificationSound: (value) => {
+		set({ notificationSound: value });
+		window.maestro.settings.set('notificationSound', value);
 	},
 
 	setToastDuration: (value) => {
@@ -1176,6 +1184,9 @@ export async function loadAllSettings(): Promise<void> {
 
 		if (allSettings['audioFeedbackCommand'] !== undefined)
 			patch.audioFeedbackCommand = allSettings['audioFeedbackCommand'] as string;
+
+		if (allSettings['notificationSound'] !== undefined)
+			patch.notificationSound = allSettings['notificationSound'] as string;
 
 		if (allSettings['toastDuration'] !== undefined)
 			patch.toastDuration = allSettings['toastDuration'] as number;

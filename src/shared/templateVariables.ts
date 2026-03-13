@@ -9,7 +9,7 @@
  * Agent Variables:
  *   {{AGENT_NAME}}        - Agent name
  *   {{AGENT_PATH}}        - Agent home directory path (full path to project)
- *   {{AGENT_PROJECT}}     - Agent's project name (if in a project)
+ *   {{AGENT_PROJECT}}     - Agent's project/feature name (from wizard or context)
  *   {{AGENT_SESSION_ID}}  - Agent session ID (for conversation continuity)
  *   {{AGENT_HISTORY_PATH}} - Path to agent's history JSON file (for task recall)
  *   {{TAB_NAME}}          - Custom tab name (alias: SESSION_NAME)
@@ -74,7 +74,7 @@ export interface TemplateContext {
 
 // List of all available template variables for documentation (alphabetically sorted)
 export const TEMPLATE_VARIABLES = [
-	{ variable: '{{AGENT_PROJECT}}', description: 'Agent project name' },
+	{ variable: '{{AGENT_PROJECT}}', description: 'Agent project/feature name' },
 	{ variable: '{{CONDUCTOR_PROFILE}}', description: "Conductor's About Me profile" },
 	{ variable: '{{AGENT_HISTORY_PATH}}', description: 'History file path (task recall)' },
 	{ variable: '{{AGENT_NAME}}', description: 'Agent name' },

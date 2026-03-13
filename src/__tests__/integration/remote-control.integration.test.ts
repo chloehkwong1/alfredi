@@ -107,9 +107,6 @@ describe.skipIf(!runTests)('Remote Control Integration Tests', () => {
 				state: 'idle',
 				inputMode: 'ai' as const,
 				cwd: '/test/project',
-				projectId: null,
-				projectName: null,
-				projectEmoji: null,
 			},
 		]);
 		server.setGetSessionDetailCallback((sessionId) => ({

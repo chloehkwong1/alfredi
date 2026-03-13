@@ -28,6 +28,7 @@ import type { Toast } from '../../../renderer/stores/notificationStore';
 
 const mockSpeak = vi.fn().mockResolvedValue(undefined);
 const mockShow = vi.fn().mockResolvedValue(undefined);
+const mockPlaySound = vi.fn().mockResolvedValue({ success: true });
 const mockLoggerToast = vi.fn();
 
 beforeEach(() => {
@@ -39,6 +40,7 @@ beforeEach(() => {
 			audioFeedbackEnabled: false,
 			audioFeedbackCommand: '',
 			osNotificationsEnabled: true,
+			notificationSound: 'none',
 		},
 	});
 	resetToastIdCounter();
@@ -47,7 +49,7 @@ beforeEach(() => {
 	(globalThis as any).window = {
 		maestro: {
 			logger: { toast: mockLoggerToast },
-			notification: { speak: mockSpeak, show: mockShow },
+			notification: { speak: mockSpeak, show: mockShow, playSound: mockPlaySound },
 		},
 	};
 
@@ -94,6 +96,7 @@ describe('notificationStore', () => {
 			expect(config.audioFeedbackEnabled).toBe(false);
 			expect(config.audioFeedbackCommand).toBe('');
 			expect(config.osNotificationsEnabled).toBe(true);
+			expect(config.notificationSound).toBe('none');
 		});
 	});
 
@@ -197,6 +200,26 @@ describe('notificationStore', () => {
 			const { config } = useNotificationStore.getState();
 			expect(config.audioFeedbackEnabled).toBe(false);
 			expect(config.audioFeedbackCommand).toBe('');
+		});
+	});
+
+	describe('setNotificationSound', () => {
+		it('updates notification sound', () => {
+			useNotificationStore.getState().setNotificationSound('Ping');
+			expect(useNotificationStore.getState().config.notificationSound).toBe('Ping');
+		});
+
+		it('can set to none to disable', () => {
+			useNotificationStore.getState().setNotificationSound('Ping');
+			useNotificationStore.getState().setNotificationSound('none');
+			expect(useNotificationStore.getState().config.notificationSound).toBe('none');
+		});
+
+		it('does not affect other config fields', () => {
+			useNotificationStore.getState().setAudioFeedback(true, 'say');
+			useNotificationStore.getState().setNotificationSound('Glass');
+			expect(useNotificationStore.getState().config.audioFeedbackEnabled).toBe(true);
+			expect(useNotificationStore.getState().config.audioFeedbackCommand).toBe('say');
 		});
 	});
 
@@ -380,6 +403,49 @@ describe('notificationStore', () => {
 			});
 		});
 
+		describe('notification sound', () => {
+			it('calls playSound when notificationSound is set', () => {
+				useNotificationStore.getState().setNotificationSound('Ping');
+				notifyToast({ type: 'success', title: 'Done', message: 'Complete' });
+				expect(mockPlaySound).toHaveBeenCalledWith('Ping');
+			});
+
+			it('does not call playSound when notificationSound is none', () => {
+				useNotificationStore.getState().setNotificationSound('none');
+				notifyToast({ type: 'success', title: 'Done', message: 'Complete' });
+				expect(mockPlaySound).not.toHaveBeenCalled();
+			});
+
+			it('plays the correct sound name', () => {
+				useNotificationStore.getState().setNotificationSound('Glass');
+				notifyToast({ type: 'info', title: 'Alert', message: 'Something happened' });
+				expect(mockPlaySound).toHaveBeenCalledWith('Glass');
+			});
+
+			it('handles playSound rejection gracefully', async () => {
+				const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+				mockPlaySound.mockRejectedValueOnce(new Error('sound failed'));
+				useNotificationStore.getState().setNotificationSound('Ping');
+				notifyToast({ type: 'info', title: 'Test', message: 'Hello' });
+
+				await vi.advanceTimersByTimeAsync(0);
+				expect(consoleSpy).toHaveBeenCalledWith(
+					'[notificationStore] Notification sound failed:',
+					expect.any(Error)
+				);
+				consoleSpy.mockRestore();
+			});
+
+			it('is independent of TTS audio feedback', () => {
+				// Sound enabled, TTS disabled
+				useNotificationStore.getState().setNotificationSound('Ping');
+				useNotificationStore.getState().setAudioFeedback(false, '');
+				notifyToast({ type: 'success', title: 'Done', message: 'Complete' });
+				expect(mockPlaySound).toHaveBeenCalledWith('Ping');
+				expect(mockSpeak).not.toHaveBeenCalled();
+			});
+		});
+
 		describe('OS notifications', () => {
 			it('calls show when enabled', () => {
 				notifyToast({ type: 'success', title: 'Done', message: 'Task complete.' });
@@ -539,6 +605,7 @@ describe('notificationStore', () => {
 			expect(actions1.setDefaultDuration).toBe(actions2.setDefaultDuration);
 			expect(actions1.setAudioFeedback).toBe(actions2.setAudioFeedback);
 			expect(actions1.setOsNotifications).toBe(actions2.setOsNotifications);
+			expect(actions1.setNotificationSound).toBe(actions2.setNotificationSound);
 		});
 	});
 
@@ -558,6 +625,7 @@ describe('notificationStore', () => {
 					audioFeedbackEnabled: false,
 					audioFeedbackCommand: '',
 					osNotificationsEnabled: true,
+					notificationSound: 'none',
 				},
 			});
 

@@ -343,7 +343,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 					sessionCustomPath: session.customPath,
 					sessionCustomArgs: session.customArgs,
 					sessionCustomEnvVars: session.customEnvVars,
-					sessionCustomModel: session.customModel,
+					sessionCustomModel: targetTab.modelId || session.customModel,
 					sessionCustomContextWindow: session.customContextWindow,
 					sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 				});
@@ -430,7 +430,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 						sessionCustomPath: session.customPath,
 						sessionCustomArgs: session.customArgs,
 						sessionCustomEnvVars: session.customEnvVars,
-						sessionCustomModel: session.customModel,
+						sessionCustomModel: targetTab.modelId || session.customModel,
 						sessionCustomContextWindow: session.customContextWindow,
 						sessionSshRemoteConfig: session.sessionSshRemoteConfig,
 					});

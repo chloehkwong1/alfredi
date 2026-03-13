@@ -677,6 +677,7 @@ export const RightPanel = memo(
 							sshRemoteId={sshRemoteId}
 							onRefresh={changesPanel.refresh}
 							onOpenDiff={handleChangesPanelOpenDiff}
+							fetchCommitFiles={changesPanel.fetchCommitFiles}
 						/>
 					) : (
 						/* File preview tab content — placeholder for now; FilePreview will be wired in a later section */

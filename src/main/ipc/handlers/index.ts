@@ -18,7 +18,6 @@ import {
 	PersistenceHandlerDependencies,
 	MaestroSettings,
 	SessionsData,
-	ProjectsData,
 } from './persistence';
 import {
 	registerSystemHandlers,
@@ -77,7 +76,7 @@ export type { AgentSessionsHandlerDependencies };
 export type { ContextHandlerDependencies };
 export type { StatsHandlerDependencies };
 export type { GitHandlerDependencies };
-export type { MaestroSettings, SessionsData, ProjectsData };
+export type { MaestroSettings, SessionsData };
 
 /**
  * Interface for agent configuration store data
@@ -115,7 +114,6 @@ export interface HandlerDependencies {
 	settingsStore: Store<MaestroSettings>;
 	// Persistence-specific dependencies
 	sessionsStore: Store<SessionsData>;
-	projectsStore: Store<ProjectsData>;
 	getWebServer: () => WebServer | null;
 	// System-specific dependencies
 	tunnelManager: TunnelManagerType;
@@ -153,7 +151,6 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 	registerPersistenceHandlers({
 		settingsStore: deps.settingsStore,
 		sessionsStore: deps.sessionsStore,
-		projectsStore: deps.projectsStore,
 		getWebServer: deps.getWebServer,
 	});
 	registerSystemHandlers({

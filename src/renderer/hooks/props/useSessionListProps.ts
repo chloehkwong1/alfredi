@@ -31,21 +31,13 @@ export interface UseSessionListPropsDeps {
 	// Domain handlers
 	toggleGlobalLive: () => Promise<void>;
 	restartWebServer: () => Promise<string | null>;
-	toggleProject: (projectId: string) => void;
 	handleDragStart: (sessionId: string) => void;
 	handleDragOver: (e: React.DragEvent) => void;
-	handleDropOnProject: (projectId: string) => void;
-	handleDropOnUngrouped: () => void;
-	finishRenamingProject: (projectId: string, newName: string) => void;
 	finishRenamingSession: (sessId: string, newName: string) => void;
-	startRenamingProject: (projectId: string) => void;
 	startRenamingSession: (sessId: string) => void;
 	showConfirmation: (message: string, onConfirm: () => void) => void;
-	createNewProject: () => void;
-	handleCreateProjectAndMove: (sessionId: string) => void;
 	addNewSession: () => void;
 	deleteSession: (id: string) => void;
-	deleteWorktreeProject: (projectId: string) => void;
 	handleEditAgent: (session: Session) => void;
 	handleOpenCreatePRSession: (session: Session) => void;
 	handleQuickCreateWorktree: (session: Session) => void;
@@ -79,21 +71,13 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			// Domain handlers
 			toggleGlobalLive: deps.toggleGlobalLive,
 			restartWebServer: deps.restartWebServer,
-			toggleProject: deps.toggleProject,
 			handleDragStart: deps.handleDragStart,
 			handleDragOver: deps.handleDragOver,
-			handleDropOnProject: deps.handleDropOnProject,
-			handleDropOnUngrouped: deps.handleDropOnUngrouped,
-			finishRenamingProject: deps.finishRenamingProject,
 			finishRenamingSession: deps.finishRenamingSession,
-			startRenamingProject: deps.startRenamingProject,
 			startRenamingSession: deps.startRenamingSession,
 			showConfirmation: deps.showConfirmation,
-			createNewProject: deps.createNewProject,
-			onCreateProjectAndMove: deps.handleCreateProjectAndMove,
 			addNewSession: deps.addNewSession,
 			onDeleteSession: deps.deleteSession,
-			onDeleteWorktreeProject: deps.deleteWorktreeProject,
 			onEditAgent: deps.handleEditAgent,
 			onNewAgentSession: deps.addNewSession,
 			onToggleWorktreeExpanded: deps.handleToggleWorktreeExpanded,
@@ -115,21 +99,13 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			// Stable callbacks
 			deps.toggleGlobalLive,
 			deps.restartWebServer,
-			deps.toggleProject,
 			deps.handleDragStart,
 			deps.handleDragOver,
-			deps.handleDropOnProject,
-			deps.handleDropOnUngrouped,
-			deps.finishRenamingProject,
 			deps.finishRenamingSession,
-			deps.startRenamingProject,
 			deps.startRenamingSession,
 			deps.showConfirmation,
-			deps.createNewProject,
-			deps.handleCreateProjectAndMove,
 			deps.addNewSession,
 			deps.deleteSession,
-			deps.deleteWorktreeProject,
 			deps.handleEditAgent,
 			deps.handleOpenCreatePRSession,
 			deps.handleQuickCreateWorktree,

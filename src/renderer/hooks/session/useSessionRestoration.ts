@@ -9,7 +9,7 @@
  *   - fetchGitInfoInBackground: async git info fetch for SSH remote sessions
  *
  * Effects:
- *   - Session & project loading on mount (with React Strict Mode guard)
+ *   - Session loading on mount (with React Strict Mode guard)
  *   - Sets initialLoadComplete + sessionsLoaded flags for splash coordination
  */
 
@@ -46,7 +46,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 	// useCallback/useEffect without appearing in dependency arrays. Zustand
 	// store actions returned by getState() are stable singletons that never
 	// change, so the empty deps array is intentional.
-	const { setSessions, setProjects, setActiveSessionId, setSessionsLoaded } = useMemo(
+	const { setSessions, setActiveSessionId, setSessionsLoaded } = useMemo(
 		() => useSessionStore.getState(),
 		[]
 	);
@@ -327,10 +327,9 @@ export function useSessionRestoration(): SessionRestorationReturn {
 		}
 		sessionLoadStarted.current = true;
 
-		const loadSessionsAndProjects = async () => {
+		const loadSessions = async () => {
 			try {
 				const savedSessions = await window.maestro.sessions.getAll();
-				const savedProjects = await window.maestro.projects.getAll();
 
 				// Handle sessions
 				if (savedSessions && savedSessions.length > 0) {
@@ -360,26 +359,25 @@ export function useSessionRestoration(): SessionRestorationReturn {
 				} else {
 					setSessions([]);
 				}
-
-				// Handle projects
-				if (savedProjects && savedProjects.length > 0) {
-					setProjects(savedProjects);
-				} else {
-					setProjects([]);
-				}
 			} catch (e) {
-				console.error('Failed to load sessions/projects:', e);
+				console.error('Failed to load sessions:', e);
 				setSessions([]);
-				setProjects([]);
-			} finally {
-				// Mark initial load as complete to enable persistence
-				initialLoadComplete.current = true;
-
-				// Mark sessions as loaded for splash screen coordination
+				// DO NOT set initialLoadComplete here — this prevents the debounced
+				// persistence from overwriting good session data on disk with an empty
+				// array when loading fails (e.g., crash recovery, stale preload).
+				// The wizard will still show (sessionsLoaded triggers splash dismiss)
+				// but persistence won't fire until a session is intentionally created.
 				setSessionsLoaded(true);
+				return;
 			}
+
+			// Mark initial load as complete to enable persistence — only on success
+			initialLoadComplete.current = true;
+
+			// Mark sessions as loaded for splash screen coordination
+			setSessionsLoaded(true);
 		};
-		loadSessionsAndProjects();
+		loadSessions();
 	}, []);
 
 	return {

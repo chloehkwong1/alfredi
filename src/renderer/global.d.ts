@@ -199,10 +199,6 @@ interface MaestroAPI {
 		getAll: () => Promise<any[]>;
 		setAll: (sessions: any[]) => Promise<boolean>;
 	};
-	projects: {
-		getAll: () => Promise<any[]>;
-		setAll: (projects: any[]) => Promise<boolean>;
-	};
 	process: {
 		spawn: (config: ProcessConfig) => Promise<{ pid: number; success: boolean }>;
 		write: (sessionId: string, data: string) => Promise<boolean>;
@@ -453,6 +449,18 @@ interface MaestroAPI {
 			hash: string,
 			sshRemoteId?: string
 		) => Promise<{ stdout: string; stderr: string }>;
+		/**
+		 * Get per-commit file list with status and stat info
+		 */
+		commitFiles: (
+			cwd: string,
+			hash: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{
+			files: { path: string; status: string; additions: number; deletions: number }[];
+			error: string | null;
+		}>;
 		/**
 		 * Show file content at a specific ref
 		 */
@@ -1371,6 +1379,10 @@ interface MaestroAPI {
 			command?: string
 		) => Promise<{ success: boolean; notificationId?: number; error?: string }>;
 		stopSpeak: (notificationId: number) => Promise<{ success: boolean; error?: string }>;
+		getSystemSounds: () => Promise<string[]>;
+		playSound: (
+			soundName: string
+		) => Promise<{ success: boolean; notificationId?: number; error?: string }>;
 		onCommandCompleted: (handler: (notificationId: number) => void) => () => void;
 		/** @deprecated Use onCommandCompleted instead */
 		onTtsCompleted: (handler: (notificationId: number) => void) => () => void;

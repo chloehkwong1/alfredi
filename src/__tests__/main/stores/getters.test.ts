@@ -11,7 +11,6 @@ import {
 	getBootstrapStore,
 	getSettingsStore,
 	getSessionsStore,
-	getProjectsStore,
 	getAgentConfigsStore,
 	getWindowStateStore,
 	getClaudeSessionOriginsStore,
@@ -32,7 +31,6 @@ describe('stores/getters', () => {
 		bootstrapStore: { get: vi.fn(), set: vi.fn() },
 		settingsStore: { get: vi.fn(), set: vi.fn() },
 		sessionsStore: { get: vi.fn(), set: vi.fn() },
-		projectsStore: { get: vi.fn(), set: vi.fn() },
 		agentConfigsStore: { get: vi.fn(), set: vi.fn() },
 		windowStateStore: { get: vi.fn(), set: vi.fn() },
 		claudeSessionOriginsStore: { get: vi.fn(), set: vi.fn() },
@@ -62,7 +60,6 @@ describe('stores/getters', () => {
 				bootstrapStore: null,
 				settingsStore: null,
 				sessionsStore: null,
-				projectsStore: null,
 				agentConfigsStore: null,
 				windowStateStore: null,
 				claudeSessionOriginsStore: null,
@@ -88,12 +85,6 @@ describe('stores/getters', () => {
 
 		it('getSessionsStore should throw when not initialized', () => {
 			expect(() => getSessionsStore()).toThrow(
-				'Stores not initialized. Call initializeStores() first.'
-			);
-		});
-
-		it('getProjectsStore should throw when not initialized', () => {
-			expect(() => getProjectsStore()).toThrow(
 				'Stores not initialized. Call initializeStores() first.'
 			);
 		});
@@ -147,11 +138,6 @@ describe('stores/getters', () => {
 		it('getSessionsStore should return sessions store', () => {
 			const result = getSessionsStore();
 			expect(result).toBe(mockStores.sessionsStore);
-		});
-
-		it('getProjectsStore should return projects store', () => {
-			const result = getProjectsStore();
-			expect(result).toBe(mockStores.projectsStore);
 		});
 
 		it('getAgentConfigsStore should return agent configs store', () => {

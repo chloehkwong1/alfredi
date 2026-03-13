@@ -7,7 +7,6 @@
  *   - performDeleteSession: multi-step session deletion with cleanup
  *   - showConfirmation: modal coordination helper
  *   - toggleTabStar / toggleTabUnread / toggleUnreadFilter: tab state toggles
- *   - Projects persistence effect
  *   - Navigation history tracking effect
  */
 
@@ -54,7 +53,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		fullPath: '/projects/myapp',
 		projectRoot: '/projects/myapp',
 		toolType: 'claude-code' as any,
-		projectId: 'group-1',
 		inputMode: 'ai' as any,
 		state: 'idle' as any,
 		aiTabs: [createMockAITab()],
@@ -113,7 +111,6 @@ beforeEach(() => {
 		activeSessionId: '',
 		sessionsLoaded: false,
 		initialLoadComplete: false,
-		projects: [],
 	});
 
 	useModalStore.setState({ modals: new Map() });
@@ -1040,71 +1037,6 @@ describe('useSessionLifecycle', () => {
 
 			// Should still toggle the filter even without a session
 			expect(useUIStore.getState().showUnreadOnly).toBe(true);
-		});
-	});
-
-	// ======================================================================
-	// Effects: Projects persistence
-	// ======================================================================
-
-	describe('projects persistence effect', () => {
-		it('persists projects when initialLoadComplete is true', () => {
-			const projects = [
-				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
-			];
-			useSessionStore.setState({
-				sessions: [],
-				activeSessionId: '',
-				projects,
-				initialLoadComplete: true,
-			});
-
-			renderHook(() => useSessionLifecycle(createDeps()));
-
-			expect(window.maestro.projects.setAll).toHaveBeenCalledWith(projects);
-		});
-
-		it('does not persist projects before initialLoadComplete', () => {
-			const projects = [
-				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
-			];
-			useSessionStore.setState({
-				sessions: [],
-				activeSessionId: '',
-				projects,
-				initialLoadComplete: false,
-			});
-
-			renderHook(() => useSessionLifecycle(createDeps()));
-
-			expect(window.maestro.projects.setAll).not.toHaveBeenCalled();
-		});
-
-		it('re-persists when projects change', () => {
-			const projects1 = [
-				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
-			];
-			useSessionStore.setState({
-				sessions: [],
-				activeSessionId: '',
-				projects: projects1,
-				initialLoadComplete: true,
-			});
-
-			renderHook(() => useSessionLifecycle(createDeps()));
-
-			expect(window.maestro.projects.setAll).toHaveBeenCalledWith(projects1);
-
-			const projects2 = [
-				{ id: 'g1', name: 'Project 1', emoji: '', collapsed: false, rootPath: '/test/project' },
-				{ id: 'g2', name: 'Project 2', emoji: '', collapsed: false, rootPath: '/test/project' },
-			];
-
-			act(() => {
-				useSessionStore.setState({ projects: projects2 });
-			});
-
-			expect(window.maestro.projects.setAll).toHaveBeenCalledWith(projects2);
 		});
 	});
 

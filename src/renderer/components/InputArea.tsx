@@ -39,8 +39,10 @@ import { ExecutionQueueIndicator } from './ExecutionQueueIndicator';
 import { ContextWarningSash } from './ContextWarningSash';
 import { SummarizeProgressOverlay } from './SummarizeProgressOverlay';
 import { WizardInputPanel } from './InlineWizard';
+import { SmartReplyChips } from './SmartReplyChips';
 import { useAgentCapabilities, useScrollIntoView } from '../hooks';
 import { getProviderDisplayName } from '../utils/sessionValidation';
+import { parseSmartReplies } from '../utils/smartReplyParser';
 
 interface SlashCommand {
 	command: string;
@@ -80,7 +82,7 @@ interface InputAreaProps {
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 	handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 	handleDrop: (e: React.DragEvent<HTMLElement>) => void;
-	processInput: () => void;
+	processInput: (overrideInputValue?: string) => void;
 	handleInterrupt: () => void;
 	onInputFocus: () => void;
 	onInputBlur?: () => void;
@@ -340,6 +342,23 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 
 	// Get wizardState from active tab (not session level - wizard state is per-tab)
 	const wizardState = activeTab?.wizardState;
+
+	// Smart reply chips: parse the last AI log entry for actionable options
+	// Only shown when the tab is idle and the user hasn't started typing
+	const smartReplies = useMemo(() => {
+		if (!activeTab || activeTab.state !== 'idle') return [];
+		const logs = activeTab.logs;
+		if (logs.length === 0) return [];
+		// Find the last AI log entry (walk backwards)
+		for (let i = logs.length - 1; i >= 0; i--) {
+			if (logs[i].source === 'ai') {
+				return parseSmartReplies(logs[i].text);
+			}
+		}
+		return [];
+	}, [activeTab?.state, activeTab?.logs.length, activeTab?.logs]);
+
+	const smartRepliesVisible = smartReplies.length > 0 && !inputValue;
 
 	// PERF: Memoize derived state to avoid recalculation on every render
 	const isResumingSession = !!activeTab?.agentSessionId;
@@ -784,6 +803,16 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 						})}
 					</div>
 				</div>
+			)}
+
+			{/* Smart Reply Chips - show actionable options from AI output (AI mode only, when idle) */}
+			{session.inputMode === 'ai' && (
+				<SmartReplyChips
+					replies={smartReplies}
+					onSelect={(value) => processInput(value)}
+					visible={smartRepliesVisible}
+					theme={theme}
+				/>
 			)}
 
 			<div className="flex gap-3">

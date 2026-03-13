@@ -16,6 +16,7 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 	navBack: { id: 'navBack', label: 'Navigate Back', keys: ['Meta', 'Shift', ','] },
 	navForward: { id: 'navForward', label: 'Navigate Forward', keys: ['Meta', 'Shift', '.'] },
 	newInstance: { id: 'newInstance', label: 'New Agent', keys: ['Meta', 'n'] },
+	newWorktree: { id: 'newWorktree', label: 'New Worktree', keys: ['Meta', 'Shift', 'n'] },
 	killInstance: { id: 'killInstance', label: 'Remove', keys: ['Meta', 'Shift', 'Backspace'] },
 	moveToGroup: { id: 'moveToGroup', label: 'Move Session to Group', keys: ['Meta', 'Shift', 'm'] },
 	toggleMode: { id: 'toggleMode', label: 'Focus Persistent Terminal', keys: ['Meta', 'j'] },

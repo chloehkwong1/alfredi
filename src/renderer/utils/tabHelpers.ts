@@ -1809,8 +1809,6 @@ export interface CreateMergedSessionOptions {
 	mergedLogs: LogEntry[];
 	/** Aggregated usage stats from merged contexts (optional) */
 	usageStats?: UsageStats;
-	/** Project ID to assign the session to (optional) */
-	projectId?: string;
 	/** Thinking display mode: 'off' | 'on' (temporary) | 'sticky' (persistent) */
 	showThinking?: ThinkingMode;
 }
@@ -1851,15 +1849,7 @@ export interface CreateMergedSessionResult {
 export function createMergedSession(
 	options: CreateMergedSessionOptions
 ): CreateMergedSessionResult {
-	const {
-		name,
-		projectRoot,
-		toolType,
-		mergedLogs,
-		usageStats,
-		projectId,
-		showThinking = 'off',
-	} = options;
+	const { name, projectRoot, toolType, mergedLogs, usageStats, showThinking = 'off' } = options;
 
 	const sessionId = generateId();
 	const tabId = generateId();
@@ -1884,7 +1874,6 @@ export function createMergedSession(
 	const session: Session = {
 		id: sessionId,
 		name,
-		projectId,
 		toolType,
 		state: 'idle',
 		cwd: projectRoot,

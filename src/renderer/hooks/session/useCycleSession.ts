@@ -4,7 +4,7 @@
  * Provides session cycling functionality (Cmd+Shift+[/]):
  *   - Cycles through sessions in visual sidebar order
  *   - Handles bookmarks (sessions appearing in both locations)
- *   - Handles worktree children, collapsed projects, collapsed sidebar
+ *   - Handles worktree children, collapsed sidebar
  *
  * Reads from: sessionStore, uiStore, settingsStore
  */
@@ -13,7 +13,6 @@ import { useCallback } from 'react';
 import type { Session } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useUIStore } from '../../stores/uiStore';
-import { useSettingsStore } from '../../stores/settingsStore';
 import { compareNamesIgnoringEmojis } from '../session/useSortedSessions';
 
 // ============================================================================
@@ -43,7 +42,6 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 
 	// --- Reactive subscriptions ---
 	const sessions = useSessionStore((s) => s.sessions);
-	const projects = useSessionStore((s) => s.projects);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
@@ -51,21 +49,17 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 	// --- Store actions (stable via getState) ---
 	const { setActiveSessionIdInternal, setCyclePosition } = useSessionStore.getState();
 
-	// --- Settings ---
-	const ungroupedCollapsed = useSettingsStore((s) => s.ungroupedCollapsed);
-
 	const cycleSession = useCallback(
 		(dir: 'next' | 'prev') => {
 			// Build the visual order of items as they appear in the sidebar.
 			// This matches the actual rendering order in SessionList.tsx:
 			// 1. Bookmarks section (if open) - sorted alphabetically
-			// 2. Groups (sorted alphabetically) - each with sessions sorted alphabetically
-			// 3. Ungrouped sessions - sorted alphabetically
+			// 2. Parent sessions (sorted alphabetically) with worktree children
 			//
 			// A bookmarked session visually appears in BOTH the bookmarks section AND its
-			// regular location (group or ungrouped). The same session can appear twice in
-			// the visual order. We track the current position with cyclePosition to
-			// allow cycling through duplicate occurrences correctly.
+			// regular location. The same session can appear twice in the visual order.
+			// We track the current position with cyclePosition to allow cycling through
+			// duplicate occurrences correctly.
 
 			type VisualOrderItem = { type: 'session'; id: string; name: string };
 
@@ -90,8 +84,8 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 					name: session.name,
 				});
 
-				// Add worktree children if expanded
-				if (session.worktreesExpanded !== false) {
+				// Add worktree children if not collapsed
+				if (!session.collapsed) {
 					const children = getWorktreeChildren(session.id);
 					visualOrder.push(
 						...children.map((s) => ({
@@ -112,26 +106,11 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 					bookmarkedSessions.forEach(addSessionWithWorktrees);
 				}
 
-				// Projects (sorted alphabetically), with each project's sessions
-				const sortedProjects = [...projects].sort((a, b) =>
-					compareNamesIgnoringEmojis(a.name, b.name)
-				);
-				for (const project of sortedProjects) {
-					if (!project.collapsed) {
-						const projectSessions = sessions
-							.filter((s) => s.projectId === project.id && !s.parentSessionId)
-							.sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-						projectSessions.forEach(addSessionWithWorktrees);
-					}
-				}
-
-				// Unassigned sessions (sorted alphabetically) - only if not collapsed
-				if (!ungroupedCollapsed) {
-					const unassignedSessions = sessions
-						.filter((s) => !s.projectId && !s.parentSessionId)
-						.sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
-					unassignedSessions.forEach(addSessionWithWorktrees);
-				}
+				// All parent sessions sorted alphabetically with their worktree children
+				const parentSessions = sessions
+					.filter((s) => !s.parentSessionId)
+					.sort((a, b) => compareNamesIgnoringEmojis(a.name, b.name));
+				parentSessions.forEach(addSessionWithWorktrees);
 			} else {
 				// Sidebar collapsed: cycle through all sessions in their sorted order
 				visualOrder.push(
@@ -178,15 +157,7 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 			const nextItem = visualOrder[nextIndex];
 			setActiveSessionIdInternal(nextItem.id);
 		},
-		[
-			sessions,
-			projects,
-			activeSessionId,
-			leftSidebarOpen,
-			bookmarksCollapsed,
-			ungroupedCollapsed,
-			sortedSessions,
-		]
+		[sessions, activeSessionId, leftSidebarOpen, bookmarksCollapsed, sortedSessions]
 	);
 
 	return { cycleSession };

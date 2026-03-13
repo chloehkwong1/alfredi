@@ -320,12 +320,16 @@ export class StdoutHandler {
 		}
 
 		// Handle streaming text events (OpenCode, Codex reasoning)
+		// Only emit thinking-chunk for actual thinking/reasoning content (isThinking flag)
+		// Non-thinking partial text still accumulates in streamedText for result fallback
 		if (event.type === 'text' && event.isPartial && event.text) {
-			logger.debug('[ProcessManager] Emitting thinking-chunk', 'ProcessManager', {
-				sessionId,
-				textLength: event.text.length,
-			});
-			this.emitter.emit('thinking-chunk', sessionId, event.text);
+			if (event.isThinking) {
+				logger.debug('[ProcessManager] Emitting thinking-chunk', 'ProcessManager', {
+					sessionId,
+					textLength: event.text.length,
+				});
+				this.emitter.emit('thinking-chunk', sessionId, event.text);
+			}
 			managedProcess.streamedText = (managedProcess.streamedText || '') + event.text;
 		}
 

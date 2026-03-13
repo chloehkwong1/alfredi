@@ -17,7 +17,6 @@ const createMockParentSession = (overrides: Partial<Session> = {}): Session =>
 	({
 		id: 'parent-1',
 		name: 'Parent Agent',
-		projectId: 'project-1',
 		toolType: 'claude-code',
 		state: 'idle',
 		cwd: '/projects/main',
@@ -58,7 +57,6 @@ describe('buildWorktreeSession', () => {
 		expect(session.cwd).toBe('/worktrees/feature-x');
 		expect(session.fullPath).toBe('/worktrees/feature-x');
 		expect(session.projectRoot).toBe('/worktrees/feature-x');
-		expect(session.projectId).toBe('project-1');
 		expect(session.toolType).toBe('claude-code');
 		expect(session.state).toBe('idle');
 		expect(session.isGitRepo).toBe(true);

@@ -1,5 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Bell, Volume2, Clock, Square, Check, AlertCircle, Loader2 } from 'lucide-react';
+import {
+	Bell,
+	Volume2,
+	Clock,
+	Square,
+	Check,
+	AlertCircle,
+	Loader2,
+	Play,
+	Music,
+} from 'lucide-react';
 import type { Theme } from '../types';
 import { SettingCheckbox } from './SettingCheckbox';
 import { ToggleButtonGroup } from './ToggleButtonGroup';
@@ -7,6 +17,8 @@ import { ToggleButtonGroup } from './ToggleButtonGroup';
 interface NotificationsPanelProps {
 	osNotificationsEnabled: boolean;
 	setOsNotificationsEnabled: (value: boolean) => void;
+	notificationSound: string;
+	setNotificationSound: (value: string) => void;
 	audioFeedbackEnabled: boolean;
 	setAudioFeedbackEnabled: (value: boolean) => void;
 	audioFeedbackCommand: string;
@@ -21,6 +33,8 @@ type TestStatus = 'idle' | 'running' | 'success' | 'error';
 export function NotificationsPanel({
 	osNotificationsEnabled,
 	setOsNotificationsEnabled,
+	notificationSound,
+	setNotificationSound,
 	audioFeedbackEnabled,
 	setAudioFeedbackEnabled,
 	audioFeedbackCommand,
@@ -29,6 +43,19 @@ export function NotificationsPanel({
 	setToastDuration,
 	theme,
 }: NotificationsPanelProps) {
+	// System sounds list
+	const [systemSounds, setSystemSounds] = useState<string[]>([]);
+
+	useEffect(() => {
+		// Guard with optional chaining — the preload may not have this method yet if the bundle is stale
+		window.maestro.notification
+			.getSystemSounds?.()
+			?.then(setSystemSounds)
+			.catch(() => {
+				setSystemSounds([]);
+			});
+	}, []);
+
 	// Notification command test state
 	const [testNotificationId, setTestNotificationId] = useState<number | null>(null);
 	const [testStatus, setTestStatus] = useState<TestStatus>('idle');
@@ -89,6 +116,57 @@ export function NotificationsPanel({
 				>
 					Test Notification
 				</button>
+			</div>
+
+			{/* Notification Sound */}
+			<div>
+				<SettingCheckbox
+					icon={Music}
+					sectionLabel="Notification Sound"
+					title="Play Sound on Completion"
+					description="Play a system sound when AI tasks complete"
+					checked={notificationSound !== 'none'}
+					onChange={(enabled) => setNotificationSound(enabled ? 'Ping' : 'none')}
+					theme={theme}
+				/>
+				<div className="mt-3 flex items-center gap-2">
+					<select
+						value={notificationSound}
+						onChange={(e) => setNotificationSound(e.target.value)}
+						className="flex-1 p-2 rounded border bg-transparent outline-none text-sm"
+						style={{
+							borderColor: theme.colors.border,
+							color: theme.colors.textMain,
+							backgroundColor: theme.colors.bgMain,
+						}}
+					>
+						<option value="none">None</option>
+						{systemSounds.map((sound) => (
+							<option key={sound} value={sound}>
+								{sound}
+							</option>
+						))}
+					</select>
+					<button
+						onClick={() => {
+							if (notificationSound !== 'none') {
+								window.maestro.notification.playSound?.(notificationSound);
+							}
+						}}
+						disabled={notificationSound === 'none'}
+						className="px-3 py-2 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+						style={{
+							backgroundColor: theme.colors.bgActivity,
+							color: notificationSound === 'none' ? theme.colors.textDim : theme.colors.textMain,
+							border: `1px solid ${theme.colors.border}`,
+							opacity: notificationSound === 'none' ? 0.5 : 1,
+							cursor: notificationSound === 'none' ? 'not-allowed' : 'pointer',
+						}}
+					>
+						<Play className="w-3 h-3" />
+						Preview
+					</button>
+				</div>
 			</div>
 
 			{/* Custom Notification */}

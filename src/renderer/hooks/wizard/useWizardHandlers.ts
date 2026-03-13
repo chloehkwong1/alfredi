@@ -566,9 +566,7 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					return;
 				}
 
-				const currentProjects = useSessionStore.getState().projects;
-				const project = currentProjects.find((g) => g.id === currentSession.projectId);
-				const projectName = project?.name || 'Unassigned';
+				const projectName = currentSession.name || 'Unassigned';
 
 				const elapsedTimeMs = synopsisTime - activeTab.createdAt;
 
@@ -1159,6 +1157,14 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 
 			setSessions((prev) => [...prev, newSession]);
 			setActiveSessionId(newId);
+
+			// Enable persistence if it was disabled (e.g., after a failed session load
+			// during crash recovery). This ensures the new session gets saved to disk.
+			const { initialLoadComplete } = useSessionStore.getState();
+			if (!initialLoadComplete) {
+				useSessionStore.getState().setInitialLoadComplete(true);
+			}
+
 			(window as any).maestro.stats.recordSessionCreated({
 				sessionId: newId,
 				agentType: selectedAgent,

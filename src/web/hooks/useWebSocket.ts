@@ -72,9 +72,6 @@ export interface SessionData {
 	state: string;
 	inputMode: string;
 	cwd: string;
-	projectId?: string | null;
-	projectName?: string | null;
-	projectEmoji?: string | null;
 	usageStats?: UsageStats | null;
 	lastResponse?: LastResponsePreview | null;
 	agentSessionId?: string | null;

@@ -95,7 +95,6 @@ export interface ModalHandlersReturn {
 	handleCloseCreatePRModal: () => void;
 	handleCloseSendToAgent: () => void;
 	handleCloseQueueBrowser: () => void;
-	handleCloseRenameProjectModal: () => void;
 
 	// Quick actions modal openers
 	handleQuickActionsRenameTab: () => void;
@@ -462,10 +461,6 @@ export function useModalHandlers(
 		getModalActions().setQueueBrowserOpen(false);
 	}, []);
 
-	const handleCloseRenameProjectModal = useCallback(() => {
-		getModalActions().setRenameProjectModalOpen(false);
-	}, []);
-
 	// ====================================================================
 	// Group M: Quick Actions Modal Openers
 	// ====================================================================
@@ -623,7 +618,6 @@ export function useModalHandlers(
 		handleCloseCreatePRModal,
 		handleCloseSendToAgent,
 		handleCloseQueueBrowser,
-		handleCloseRenameProjectModal,
 
 		// Quick actions modal openers
 		handleQuickActionsRenameTab,

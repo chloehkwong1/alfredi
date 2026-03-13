@@ -52,7 +52,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		fullPath: '/projects/myapp',
 		projectRoot: '/projects/myapp',
 		toolType: 'claude-code' as any,
-		projectId: 'group-1',
 		inputMode: 'ai' as any,
 		state: 'idle' as any,
 		aiTabs: [
@@ -105,7 +104,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 
 // Mock IPC
 const mockGetAll = vi.fn();
-const mockProjectsGetAll = vi.fn();
 const mockAgentsGet = vi.fn();
 
 // ============================================================================
@@ -118,7 +116,6 @@ beforeEach(() => {
 
 	useSessionStore.setState({
 		sessions: [],
-		projects: [],
 		activeSessionId: '',
 		sessionsLoaded: false,
 		initialLoadComplete: false,
@@ -129,13 +126,11 @@ beforeEach(() => {
 		(window as any).maestro = {};
 	}
 	(window as any).maestro.sessions = { getAll: mockGetAll };
-	(window as any).maestro.projects = { getAll: mockProjectsGetAll };
 	(window as any).maestro.agents = {
 		get: mockAgentsGet.mockResolvedValue({ id: 'claude-code', name: 'Claude Code' }),
 	};
 
 	mockGetAll.mockResolvedValue([]);
-	mockProjectsGetAll.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -761,10 +756,10 @@ describe('initialLoadComplete proxy', () => {
 });
 
 // ============================================================================
-// Session Session & Group loading Project loading effect
+// Session loading effect
 // ============================================================================
 
-describe('Session Session & Group loading Project loading effect', () => {
+describe('Session loading effect', () => {
 	it('loads sessions from IPC on mount', async () => {
 		const session = createMockSession({ id: 'loaded-1' });
 		mockGetAll.mockResolvedValueOnce([session]);
@@ -780,23 +775,6 @@ describe('Session Session & Group loading Project loading effect', () => {
 		const sessions = useSessionStore.getState().sessions;
 		expect(sessions).toHaveLength(1);
 		expect(sessions[0].id).toBe('loaded-1');
-	});
-
-	it('loads projects from IPC on mount', async () => {
-		mockGetAll.mockResolvedValueOnce([]);
-		mockProjectsGetAll.mockResolvedValueOnce([
-			{ id: 'g1', name: 'Project 1', rootPath: '/test/project', emoji: '', collapsed: false },
-		]);
-
-		renderHook(() => useSessionRestoration());
-
-		await act(async () => {
-			await new Promise((r) => setTimeout(r, 50));
-		});
-
-		expect(mockProjectsGetAll).toHaveBeenCalled();
-		const groups = useSessionStore.getState().projects;
-		expect(groups).toHaveLength(1);
 	});
 
 	it('sets sessionsLoaded to true after loading', async () => {
@@ -851,7 +829,7 @@ describe('Session Session & Group loading Project loading effect', () => {
 		expect(useSessionStore.getState().activeSessionId).toBe('loaded-1');
 	});
 
-	it('handles IPC failure gracefully (sets empty arrays)', async () => {
+	it('handles IPC failure gracefully (sets empty sessions but does not enable persistence)', async () => {
 		mockGetAll.mockRejectedValueOnce(new Error('IPC dead'));
 
 		renderHook(() => useSessionRestoration());
@@ -861,9 +839,10 @@ describe('Session Session & Group loading Project loading effect', () => {
 		});
 
 		expect(useSessionStore.getState().sessions).toEqual([]);
-		expect(useSessionStore.getState().projects).toEqual([]);
 		expect(useSessionStore.getState().sessionsLoaded).toBe(true);
-		expect(useSessionStore.getState().initialLoadComplete).toBe(true);
+		// initialLoadComplete must stay false to prevent persistence from
+		// overwriting good session data on disk with an empty array
+		expect(useSessionStore.getState().initialLoadComplete).toBe(false);
 	});
 
 	it('fires fetchGitInfoInBackground for SSH sessions after load', async () => {

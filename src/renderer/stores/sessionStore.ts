@@ -1,7 +1,7 @@
 /**
  * sessionStore - Zustand store for centralized session and project state management
  *
- * All session, project, active session, bookmark, worktree tracking, and
+ * All session, active session, bookmark, worktree tracking, and
  * initialization states live here. Components subscribe to individual slices
  * via selectors to avoid unnecessary re-renders.
  *
@@ -14,7 +14,7 @@
  */
 
 import { create } from 'zustand';
-import type { Session, Project, LogEntry } from '../types';
+import type { Session, LogEntry } from '../types';
 import type { TerminalTab } from '../../shared/types';
 import { generateId } from '../utils/ids';
 import { getActiveTab } from '../utils/tabHelpers';
@@ -26,7 +26,6 @@ import { getActiveTab } from '../utils/tabHelpers';
 export interface SessionStoreState {
 	// Core entities
 	sessions: Session[];
-	projects: Project[];
 
 	// Active session
 	activeSessionId: string;
@@ -76,25 +75,6 @@ export interface SessionStoreActions {
 	 * Used internally by session cycling (Cmd+J/K).
 	 */
 	setActiveSessionIdInternal: (id: string | ((prev: string) => string)) => void;
-
-	// === Projects ===
-
-	/**
-	 * Set the projects array. Supports both direct value and functional updater.
-	 */
-	setProjects: (projects: Project[] | ((prev: Project[]) => Project[])) => void;
-
-	/** Add a single project. */
-	addProject: (project: Project) => void;
-
-	/** Remove a project by ID. */
-	removeProject: (id: string) => void;
-
-	/** Update a project by ID with a partial update. */
-	updateProject: (id: string, updates: Partial<Project>) => void;
-
-	/** Toggle a project's collapsed state. */
-	toggleProjectCollapsed: (id: string) => void;
 
 	// === Initialization ===
 
@@ -179,7 +159,6 @@ function resolve<T>(valOrFn: T | ((prev: T) => T), prev: T): T {
 export const useSessionStore = create<SessionStore>()((set) => ({
 	// --- State ---
 	sessions: [],
-	projects: [],
 	activeSessionId: '',
 	sessionsLoaded: false,
 	initialLoadComplete: false,
@@ -227,42 +206,6 @@ export const useSessionStore = create<SessionStore>()((set) => ({
 
 	setActiveSessionIdInternal: (v) =>
 		set((s) => ({ activeSessionId: resolve(v, s.activeSessionId) })),
-
-	// Projects
-	setProjects: (v) =>
-		set((s) => {
-			const newProjects = resolve(v, s.projects);
-			if (newProjects === s.projects) return s;
-			return { projects: newProjects };
-		}),
-
-	addProject: (project) => set((s) => ({ projects: [...s.projects, project] })),
-
-	removeProject: (id) =>
-		set((s) => {
-			const filtered = s.projects.filter((p) => p.id !== id);
-			if (filtered.length === s.projects.length) return s;
-			return { projects: filtered };
-		}),
-
-	updateProject: (id, updates) =>
-		set((s) => {
-			let found = false;
-			const newProjects = s.projects.map((p) => {
-				if (p.id === id) {
-					found = true;
-					return { ...p, ...updates };
-				}
-				return p;
-			});
-			if (!found) return s;
-			return { projects: newProjects };
-		}),
-
-	toggleProjectCollapsed: (id) =>
-		set((s) => ({
-			projects: s.projects.map((p) => (p.id === id ? { ...p, collapsed: !p.collapsed } : p)),
-		})),
 
 	// Initialization
 	setSessionsLoaded: (v) => set((s) => ({ sessionsLoaded: resolve(v, s.sessionsLoaded) })),
@@ -535,35 +478,13 @@ export const selectBookmarkedSessions = (state: SessionStore): Session[] =>
 	state.sessions.filter((s) => s.bookmarked);
 
 /**
- * Select sessions belonging to a specific project.
+ * Select parent sessions (top-level entries without a parentSessionId).
  *
  * @example
- * const projectSessions = useSessionStore(selectSessionsByProject('project-1'));
+ * const parents = useSessionStore(selectParentSessions);
  */
-export const selectSessionsByProject =
-	(projectId: string) =>
-	(state: SessionStore): Session[] =>
-		state.sessions.filter((s) => s.projectId === projectId);
-
-/**
- * Select unassigned sessions (no projectId set).
- *
- * @example
- * const unassigned = useSessionStore(selectUnprojectSessions);
- */
-export const selectUnprojectSessions = (state: SessionStore): Session[] =>
-	state.sessions.filter((s) => !s.projectId && !s.parentSessionId);
-
-/**
- * Select a project by ID.
- *
- * @example
- * const project = useSessionStore(selectProjectById('project-1'));
- */
-export const selectProjectById =
-	(id: string) =>
-	(state: SessionStore): Project | undefined =>
-		state.projects.find((p) => p.id === id);
+export const selectParentSessions = (state: SessionStore): Session[] =>
+	state.sessions.filter((s) => !s.parentSessionId);
 
 /**
  * Select session count.
@@ -597,7 +518,7 @@ export const selectIsAnySessionBusy = (state: SessionStore): boolean =>
 
 /**
  * Get current session store state outside React.
- * Replaces sessionsRef.current, projectsRef.current, activeSessionIdRef.current.
+ * Replaces sessionsRef.current, activeSessionIdRef.current.
  *
  * @example
  * const { sessions, activeSessionId } = getSessionState();
@@ -622,11 +543,6 @@ export function getSessionActions() {
 		updateSession: state.updateSession,
 		setActiveSessionId: state.setActiveSessionId,
 		setActiveSessionIdInternal: state.setActiveSessionIdInternal,
-		setProjects: state.setProjects,
-		addProject: state.addProject,
-		removeProject: state.removeProject,
-		updateProject: state.updateProject,
-		toggleProjectCollapsed: state.toggleProjectCollapsed,
 		setSessionsLoaded: state.setSessionsLoaded,
 		setInitialLoadComplete: state.setInitialLoadComplete,
 		toggleBookmark: state.toggleBookmark,

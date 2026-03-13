@@ -28,8 +28,8 @@ function getWorktreesToPoll(sessions: Session[]): Session[] {
 		if (s.parentSessionId) continue; // Skip children for this pass
 		if (!s.worktreeConfig) continue; // Not a worktree parent
 
-		// Active if expanded or has in_progress children
-		if (s.worktreesExpanded) {
+		// Active if not collapsed or has in_progress children
+		if (!s.collapsed) {
 			parentIds.add(s.id);
 		}
 	}

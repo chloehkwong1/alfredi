@@ -9,7 +9,7 @@
  * Clicking a file row calls `onOpenDiff` to open a diff viewer tab in the main panel.
  */
 
-import React, { useState, useCallback, useRef, memo } from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
 	ChevronRight,
@@ -52,6 +52,8 @@ export interface ChangesPanelProps {
 		commitHash?: string,
 		isPreview?: boolean
 	) => void;
+	/** Lazily fetch files for a specific commit */
+	fetchCommitFiles: (hash: string) => Promise<void>;
 }
 
 // --- Helpers ---
@@ -245,14 +247,18 @@ function ChangesPanelInner({
 	sshRemoteId,
 	onRefresh,
 	onOpenDiff,
+	fetchCommitFiles,
 }: ChangesPanelProps) {
 	// Section collapse state
 	const [stagedExpanded, setStagedExpanded] = useState(true);
 	const [unstagedExpanded, setUnstagedExpanded] = useState(true);
 	const [committedExpanded, setCommittedExpanded] = useState(true);
 
-	// Commit filter for the committed section
-	const [selectedCommitHash, setSelectedCommitHash] = useState<string | null>(null);
+	// Which commit timeline sections are expanded (includes 'all' for branch diff)
+	const [expandedCommits, setExpandedCommits] = useState<Set<string>>(() => new Set(['all']));
+
+	// Loading state for per-commit file fetches
+	const [loadingCommits, setLoadingCommits] = useState<Set<string>>(() => new Set());
 
 	// Keyboard navigation state
 	const [selectedIndex, setSelectedIndex] = useState(-1);
@@ -277,27 +283,71 @@ function ChangesPanelInner({
 	// Discard All confirmation modal state
 	const [showDiscardAllModal, setShowDiscardAllModal] = useState(false);
 
-	// Build flat list of all visible files for keyboard navigation
-	const flatItems = React.useMemo(() => {
-		const items: Array<{
-			filePath: string;
-			diffType: DiffOpenType;
-			commitHash?: string;
-		}> = [];
+	// Toggle a commit timeline section (expand/collapse)
+	const toggleCommitSection = useCallback(
+		async (key: string) => {
+			setExpandedCommits((prev) => {
+				const next = new Set(prev);
+				if (next.has(key)) {
+					next.delete(key);
+				} else {
+					next.add(key);
+				}
+				return next;
+			});
+
+			// Lazy-load commit files if expanding a commit (not 'all')
+			if (key !== 'all' && !expandedCommits.has(key)) {
+				const commit = commits.find((c) => c.hash === key);
+				if (commit && !commit.filesLoaded) {
+					setLoadingCommits((prev) => new Set(prev).add(key));
+					await fetchCommitFiles(key);
+					setLoadingCommits((prev) => {
+						const next = new Set(prev);
+						next.delete(key);
+						return next;
+					});
+				}
+			}
+		},
+		[expandedCommits, commits, fetchCommitFiles]
+	);
+
+	// Build flat list of all visible items for keyboard navigation
+	// Items can be file rows or commit headers (for toggling)
+	type FlatItem =
+		| { kind: 'file'; filePath: string; diffType: DiffOpenType; commitHash?: string }
+		| { kind: 'commit-header'; commitKey: string };
+
+	const flatItems: FlatItem[] = React.useMemo(() => {
+		const items: FlatItem[] = [];
 
 		if (stagedExpanded) {
 			for (const f of stagedFiles) {
-				items.push({ filePath: f.path, diffType: 'uncommitted-staged' });
+				items.push({ kind: 'file', filePath: f.path, diffType: 'uncommitted-staged' });
 			}
 		}
 		if (unstagedExpanded) {
 			for (const f of unstagedFiles) {
-				items.push({ filePath: f.path, diffType: 'uncommitted-unstaged' });
+				items.push({ kind: 'file', filePath: f.path, diffType: 'uncommitted-unstaged' });
 			}
 		}
 		if (committedExpanded) {
-			for (const f of committedFiles) {
-				items.push({ filePath: f.path, diffType: 'committed' });
+			// "All files" header
+			items.push({ kind: 'commit-header', commitKey: 'all' });
+			if (expandedCommits.has('all')) {
+				for (const f of committedFiles) {
+					items.push({ kind: 'file', filePath: f.path, diffType: 'committed' });
+				}
+			}
+			// Per-commit headers + files
+			for (const c of commits) {
+				items.push({ kind: 'commit-header', commitKey: c.hash });
+				if (expandedCommits.has(c.hash) && c.files) {
+					for (const f of c.files) {
+						items.push({ kind: 'file', filePath: f.path, diffType: 'commit', commitHash: c.hash });
+					}
+				}
 			}
 		}
 
@@ -306,10 +356,21 @@ function ChangesPanelInner({
 		stagedFiles,
 		unstagedFiles,
 		committedFiles,
+		commits,
+		expandedCommits,
 		stagedExpanded,
 		unstagedExpanded,
 		committedExpanded,
 	]);
+
+	// Clamp selectedIndex when flatItems shrinks (e.g. collapsing a section)
+	useEffect(() => {
+		setSelectedIndex((prev) => {
+			if (prev < 0) return prev;
+			if (flatItems.length === 0) return -1;
+			return Math.min(prev, flatItems.length - 1);
+		});
+	}, [flatItems.length]);
 
 	const handleKeyDown = useCallback(
 		(e: React.KeyboardEvent) => {
@@ -330,13 +391,17 @@ function ChangesPanelInner({
 					e.preventDefault();
 					const item = flatItems[selectedIndex];
 					if (item) {
-						onOpenDiff(item.filePath, item.diffType, item.commitHash);
+						if (item.kind === 'commit-header') {
+							toggleCommitSection(item.commitKey);
+						} else {
+							onOpenDiff(item.filePath, item.diffType, item.commitHash);
+						}
 					}
 					break;
 				}
 			}
 		},
-		[flatItems, selectedIndex, onOpenDiff]
+		[flatItems, selectedIndex, onOpenDiff, toggleCommitSection]
 	);
 
 	const handleFileClick = useCallback(
@@ -523,62 +588,181 @@ function ChangesPanelInner({
 						badge={baseBranch ? `vs ${baseBranch}` : undefined}
 					/>
 					{committedExpanded && (
-						<>
-							{/* Commit filter */}
-							{commits.length > 0 && (
-								<div className="px-3 py-1.5">
-									<select
-										className="w-full text-xs rounded px-2 py-1 outline-none"
-										style={{
-											backgroundColor: theme.colors.bgActivity,
-											color: theme.colors.textMain,
-											borderColor: theme.colors.border,
-											border: '1px solid',
-										}}
-										value={selectedCommitHash || ''}
-										onChange={(e) => setSelectedCommitHash(e.target.value || null)}
-									>
-										<option value="">All files (branch diff)</option>
-										{commits.map((c) => (
-											<option key={c.hash} value={c.hash}>
-												{c.shortHash} — {c.subject.slice(0, 60)}
-											</option>
-										))}
-									</select>
-								</div>
-							)}
-
-							{committedFiles.map((file) => {
-								const idx = flatIndex++;
-								const display = getCommittedStatusDisplay(file.status);
+						<div>
+							{/* "All files (branch diff)" expandable section */}
+							{(() => {
+								const allIdx = flatIndex++;
+								const allExpanded = expandedCommits.has('all');
+								const totalAdds = committedFiles.reduce((s, f) => s + f.additions, 0);
+								const totalDels = committedFiles.reduce((s, f) => s + f.deletions, 0);
 								return (
-									<FileRow
-										key={`committed-${file.path}`}
-										filePath={file.path}
-										statusLabel={display.label}
-										statusColor={display.color}
-										additions={file.additions}
-										deletions={file.deletions}
-										theme={theme}
-										selected={selectedIndex === idx}
-										onClick={() =>
-											handleFileClick(
-												file.path,
-												selectedCommitHash ? 'commit' : 'committed',
-												selectedCommitHash || undefined
-											)
-										}
-										onDoubleClick={() =>
-											handleFileDoubleClick(
-												file.path,
-												selectedCommitHash ? 'commit' : 'committed',
-												selectedCommitHash || undefined
-											)
-										}
-									/>
+									<div key="commit-all">
+										<div
+											className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs transition-colors ${
+												selectedIndex === allIdx ? '' : 'hover:bg-white/5'
+											}`}
+											style={{
+												backgroundColor:
+													selectedIndex === allIdx ? theme.colors.bgActivity : 'transparent',
+											}}
+											onClick={() => toggleCommitSection('all')}
+										>
+											{allExpanded ? (
+												<ChevronDown
+													className="w-3 h-3 shrink-0"
+													style={{ color: theme.colors.textDim }}
+												/>
+											) : (
+												<ChevronRight
+													className="w-3 h-3 shrink-0"
+													style={{ color: theme.colors.textDim }}
+												/>
+											)}
+											<span className="font-semibold" style={{ color: theme.colors.textMain }}>
+												All files (branch diff)
+											</span>
+											<span
+												className="font-mono text-[10px] px-1 py-0.5 rounded"
+												style={{
+													backgroundColor: theme.colors.bgActivity,
+													color: theme.colors.textDim,
+												}}
+											>
+												{committedFiles.length}
+											</span>
+											{(totalAdds > 0 || totalDels > 0) && (
+												<span className="font-mono text-[10px] ml-auto flex items-center gap-1">
+													{totalAdds > 0 && (
+														<span style={{ color: 'rgb(34, 197, 94)' }}>+{totalAdds}</span>
+													)}
+													{totalDels > 0 && (
+														<span style={{ color: 'rgb(239, 68, 68)' }}>-{totalDels}</span>
+													)}
+												</span>
+											)}
+										</div>
+										{allExpanded &&
+											committedFiles.map((file) => {
+												const idx = flatIndex++;
+												const display = getCommittedStatusDisplay(file.status);
+												return (
+													<FileRow
+														key={`committed-${file.path}`}
+														filePath={file.path}
+														statusLabel={display.label}
+														statusColor={display.color}
+														additions={file.additions}
+														deletions={file.deletions}
+														theme={theme}
+														selected={selectedIndex === idx}
+														onClick={() => handleFileClick(file.path, 'committed')}
+														onDoubleClick={() => handleFileDoubleClick(file.path, 'committed')}
+													/>
+												);
+											})}
+									</div>
+								);
+							})()}
+
+							{/* Per-commit expandable rows */}
+							{commits.map((commit) => {
+								const headerIdx = flatIndex++;
+								const isExpanded = expandedCommits.has(commit.hash);
+								const isLoadingCommit = loadingCommits.has(commit.hash);
+								const commitAdds = commit.files?.reduce((s, f) => s + f.additions, 0) ?? 0;
+								const commitDels = commit.files?.reduce((s, f) => s + f.deletions, 0) ?? 0;
+								const fileCount = commit.files?.length;
+
+								return (
+									<div key={`commit-${commit.hash}`}>
+										<div
+											className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs transition-colors ${
+												selectedIndex === headerIdx ? '' : 'hover:bg-white/5'
+											}`}
+											style={{
+												backgroundColor:
+													selectedIndex === headerIdx ? theme.colors.bgActivity : 'transparent',
+											}}
+											onClick={() => toggleCommitSection(commit.hash)}
+										>
+											{isExpanded ? (
+												<ChevronDown
+													className="w-3 h-3 shrink-0"
+													style={{ color: theme.colors.textDim }}
+												/>
+											) : (
+												<ChevronRight
+													className="w-3 h-3 shrink-0"
+													style={{ color: theme.colors.textDim }}
+												/>
+											)}
+											<span
+												className="shrink-0 font-mono text-[10px]"
+												style={{ color: theme.colors.textDim }}
+											>
+												{commit.shortHash}
+											</span>
+											<span
+												className="flex-1 min-w-0 truncate font-medium"
+												style={{ color: theme.colors.textMain }}
+											>
+												{commit.subject.length > 50
+													? commit.subject.slice(0, 50) + '...'
+													: commit.subject}
+											</span>
+											{isLoadingCommit && (
+												<Loader2
+													className="w-3 h-3 animate-spin shrink-0"
+													style={{ color: theme.colors.textDim }}
+												/>
+											)}
+											{fileCount !== undefined && (
+												<span
+													className="font-mono text-[10px] px-1 py-0.5 rounded shrink-0"
+													style={{
+														backgroundColor: theme.colors.bgActivity,
+														color: theme.colors.textDim,
+													}}
+												>
+													{fileCount}
+												</span>
+											)}
+											{(commitAdds > 0 || commitDels > 0) && (
+												<span className="font-mono text-[10px] shrink-0 flex items-center gap-1">
+													{commitAdds > 0 && (
+														<span style={{ color: 'rgb(34, 197, 94)' }}>+{commitAdds}</span>
+													)}
+													{commitDels > 0 && (
+														<span style={{ color: 'rgb(239, 68, 68)' }}>-{commitDels}</span>
+													)}
+												</span>
+											)}
+										</div>
+										{isExpanded &&
+											commit.files?.map((file) => {
+												const idx = flatIndex++;
+												const display = getCommittedStatusDisplay(file.status);
+												return (
+													<FileRow
+														key={`commit-${commit.hash}-${file.path}`}
+														filePath={file.path}
+														statusLabel={display.label}
+														statusColor={display.color}
+														additions={file.additions}
+														deletions={file.deletions}
+														theme={theme}
+														selected={selectedIndex === idx}
+														onClick={() => handleFileClick(file.path, 'commit', commit.hash)}
+														onDoubleClick={() =>
+															handleFileDoubleClick(file.path, 'commit', commit.hash)
+														}
+													/>
+												);
+											})}
+									</div>
 								);
 							})}
-						</>
+						</div>
 					)}
 				</div>
 			)}

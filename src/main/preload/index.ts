@@ -10,12 +10,7 @@
 import { contextBridge } from 'electron';
 
 // Import all factory functions for contextBridge exposure
-import {
-	createSettingsApi,
-	createSessionsApi,
-	createProjectsApi,
-	createAgentErrorApi,
-} from './settings';
+import { createSettingsApi, createSessionsApi, createAgentErrorApi } from './settings';
 import { createContextApi } from './context';
 import { createWebApi, createWebserverApi, createLiveApi } from './web';
 import {
@@ -50,9 +45,6 @@ contextBridge.exposeInMainWorld('maestro', {
 
 	// Sessions persistence API
 	sessions: createSessionsApi(),
-
-	// Projects persistence API
-	projects: createProjectsApi(),
 
 	// Process/Session API
 	process: createProcessApi(),
@@ -150,7 +142,6 @@ export {
 	// Settings and persistence
 	createSettingsApi,
 	createSessionsApi,
-	createProjectsApi,
 	createAgentErrorApi,
 	// Context
 	createContextApi,
@@ -201,7 +192,6 @@ export type {
 	// From settings
 	SettingsApi,
 	SessionsApi,
-	ProjectsApi,
 	AgentErrorApi,
 } from './settings';
 export type {

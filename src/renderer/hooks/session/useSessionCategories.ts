@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import type { Session, Project } from '../../types';
+import type { Session } from '../../types';
 import type { WorktreeStatus } from '../../../shared/types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { compareNamesIgnoringEmojis as compareSessionNames } from '../../../shared/emojiUtils';
@@ -14,12 +14,7 @@ export interface SessionCategories {
 	bookmarkedSessions: Session[];
 	sortedBookmarkedSessions: Session[];
 	sortedBookmarkedParentSessions: Session[];
-	sortedProjectSessionsById: Map<string, Session[]>;
-	ungroupedSessions: Session[];
-	sortedUngroupedSessions: Session[];
-	sortedUngroupedParentSessions: Session[];
 	sortedFilteredSessions: Session[];
-	sortedProjects: Project[];
 }
 
 export function useSessionCategories(
@@ -27,7 +22,6 @@ export function useSessionCategories(
 	sortedSessions: Session[]
 ): SessionCategories {
 	const sessions = useSessionStore((s) => s.sessions);
-	const projects = useSessionStore((s) => s.projects);
 
 	const worktreeChildrenByParentId = useMemo(() => {
 		const map = new Map<string, Session[]>();
@@ -132,22 +126,10 @@ export function useSessionCategories(
 
 		// Step 2: Categorize sessions in a single pass
 		const bookmarked: Session[] = [];
-		const ungrouped: Session[] = [];
-		const projectMap = new Map<string, Session[]>();
 
 		for (const s of filtered) {
 			if (s.bookmarked) {
 				bookmarked.push(s);
-			}
-			if (s.projectId) {
-				const list = projectMap.get(s.projectId);
-				if (list) {
-					list.push(s);
-				} else {
-					projectMap.set(s.projectId, [s]);
-				}
-			} else {
-				ungrouped.push(s);
 			}
 		}
 
@@ -157,33 +139,15 @@ export function useSessionCategories(
 		const sortedFiltered = [...filtered].sort(sortFn);
 		const sortedBookmarked = [...bookmarked].sort(sortFn);
 		const sortedBookmarkedParent = bookmarked.filter((s) => !s.parentSessionId).sort(sortFn);
-		const sortedUngrouped = [...ungrouped].sort(sortFn);
-		const sortedUngroupedParent = ungrouped.filter((s) => !s.parentSessionId).sort(sortFn);
-
-		// Sort sessions within each project
-		const sortedByProject = new Map<string, Session[]>();
-		projectMap.forEach((projectSessions, projectId) => {
-			sortedByProject.set(projectId, [...projectSessions].sort(sortFn));
-		});
 
 		return {
 			filtered,
 			bookmarked,
-			ungrouped,
-			projectMap,
 			sortedFiltered,
 			sortedBookmarked,
 			sortedBookmarkedParent,
-			sortedUngrouped,
-			sortedUngroupedParent,
-			sortedByProject,
 		};
 	}, [sessionFilter, sessions, worktreeChildrenByParentId]);
-
-	const sortedProjects = useMemo(
-		() => [...projects].sort((a, b) => compareSessionNames(a.name, b.name)),
-		[projects]
-	);
 
 	return {
 		worktreeChildrenByParentId,
@@ -194,11 +158,6 @@ export function useSessionCategories(
 		bookmarkedSessions: sessionCategories.bookmarked,
 		sortedBookmarkedSessions: sessionCategories.sortedBookmarked,
 		sortedBookmarkedParentSessions: sessionCategories.sortedBookmarkedParent,
-		sortedProjectSessionsById: sessionCategories.sortedByProject,
-		ungroupedSessions: sessionCategories.ungrouped,
-		sortedUngroupedSessions: sessionCategories.sortedUngrouped,
-		sortedUngroupedParentSessions: sessionCategories.sortedUngroupedParent,
 		sortedFilteredSessions: sessionCategories.sortedFiltered,
-		sortedProjects,
 	};
 }

@@ -14,7 +14,6 @@ import {
 	PersistenceHandlerDependencies,
 	MaestroSettings,
 	SessionsData,
-	ProjectsData,
 } from '../../../../main/ipc/handlers/persistence';
 import type Store from 'electron-store';
 import type { WebServer } from '../../../../main/web-server';
@@ -68,10 +67,6 @@ describe('persistence IPC handlers', () => {
 		get: ReturnType<typeof vi.fn>;
 		set: ReturnType<typeof vi.fn>;
 	};
-	let mockProjectsStore: {
-		get: ReturnType<typeof vi.fn>;
-		set: ReturnType<typeof vi.fn>;
-	};
 	let mockWebServer: {
 		getWebClientCount: ReturnType<typeof vi.fn>;
 		broadcastThemeChange: ReturnType<typeof vi.fn>;
@@ -96,11 +91,7 @@ describe('persistence IPC handlers', () => {
 		mockSessionsStore = {
 			get: vi.fn().mockReturnValue([]),
 			set: vi.fn(),
-		};
-
-		mockProjectsStore = {
-			get: vi.fn().mockReturnValue([]),
-			set: vi.fn(),
+			path: '/tmp/test-maestro-sessions.json',
 		};
 
 		mockWebServer = {
@@ -124,7 +115,6 @@ describe('persistence IPC handlers', () => {
 		const deps: PersistenceHandlerDependencies = {
 			settingsStore: mockSettingsStore as unknown as Store<MaestroSettings>,
 			sessionsStore: mockSessionsStore as unknown as Store<SessionsData>,
-			projectsStore: mockProjectsStore as unknown as Store<ProjectsData>,
 			getWebServer: getWebServerFn,
 		};
 		registerPersistenceHandlers(deps);
@@ -142,8 +132,6 @@ describe('persistence IPC handlers', () => {
 				'settings:getAll',
 				'sessions:getAll',
 				'sessions:setAll',
-				'projects:getAll',
-				'projects:setAll',
 				'cli:getActivity',
 			];
 
@@ -260,7 +248,6 @@ describe('persistence IPC handlers', () => {
 			const deps: PersistenceHandlerDependencies = {
 				settingsStore: mockSettingsStore as unknown as Store<MaestroSettings>,
 				sessionsStore: mockSessionsStore as unknown as Store<SessionsData>,
-				projectsStore: mockProjectsStore as unknown as Store<ProjectsData>,
 				getWebServer: () => null,
 			};
 			registerPersistenceHandlers(deps);
@@ -376,16 +363,12 @@ describe('persistence IPC handlers', () => {
 				state: 'idle',
 				inputMode: 'ai',
 				cwd: '/test',
-				projectId: null,
-				projectName: null,
-				projectEmoji: null,
 				parentSessionId: null,
 				worktreeBranch: null,
 			});
 		});
 
-		it('should detect removed sessions and broadcast to web clients', async () => {
-			mockWebServer.getWebClientCount.mockReturnValue(2);
+		it('should refuse to overwrite sessions with empty array', async () => {
 			const previousSessions = [
 				{
 					id: 'session-1',
@@ -399,7 +382,37 @@ describe('persistence IPC handlers', () => {
 			mockSessionsStore.get.mockReturnValue(previousSessions);
 
 			const handler = handlers.get('sessions:setAll');
-			await handler!({} as any, []);
+			const result = await handler!({} as any, []);
+
+			expect(result).toBe(false);
+			expect(mockSessionsStore.set).not.toHaveBeenCalled();
+		});
+
+		it('should detect removed sessions and broadcast to web clients', async () => {
+			mockWebServer.getWebClientCount.mockReturnValue(2);
+			const previousSessions = [
+				{
+					id: 'session-1',
+					name: 'Session 1',
+					cwd: '/test',
+					state: 'idle',
+					inputMode: 'ai',
+					toolType: 'claude-code',
+				},
+				{
+					id: 'session-2',
+					name: 'Session 2',
+					cwd: '/test2',
+					state: 'idle',
+					inputMode: 'ai',
+					toolType: 'claude-code',
+				},
+			];
+			mockSessionsStore.get.mockReturnValue(previousSessions);
+
+			const remainingSessions = [previousSessions[1]];
+			const handler = handlers.get('sessions:setAll');
+			await handler!({} as any, remainingSessions);
 
 			expect(mockWebServer.broadcastSessionRemoved).toHaveBeenCalledWith('session-1');
 		});
@@ -656,67 +669,6 @@ describe('persistence IPC handlers', () => {
 
 			const handler = handlers.get('sessions:setAll');
 			const result = await handler!({} as any, [{ id: 's1', name: 'S1', state: 'idle' }]);
-
-			expect(result).toBe(false);
-		});
-	});
-
-	describe('projects:getAll', () => {
-		it('should load projects from store', async () => {
-			const mockProjects = [
-				{ id: 'group-1', name: 'Group 1' },
-				{ id: 'group-2', name: 'Group 2' },
-			];
-			mockProjectsStore.get.mockReturnValue(mockProjects);
-
-			const handler = handlers.get('projects:getAll');
-			const result = await handler!({} as any);
-
-			expect(mockProjectsStore.get).toHaveBeenCalledWith('projects', []);
-			expect(result).toEqual(mockProjects);
-		});
-
-		it('should return empty array for missing projects', async () => {
-			mockProjectsStore.get.mockReturnValue([]);
-
-			const handler = handlers.get('projects:getAll');
-			const result = await handler!({} as any);
-
-			expect(result).toEqual([]);
-		});
-	});
-
-	describe('projects:setAll', () => {
-		it('should write projects to store', async () => {
-			const projects = [
-				{ id: 'group-1', name: 'Group 1' },
-				{ id: 'group-2', name: 'Group 2' },
-			];
-
-			const handler = handlers.get('projects:setAll');
-			const result = await handler!({} as any, projects);
-
-			expect(mockProjectsStore.set).toHaveBeenCalledWith('projects', projects);
-			expect(result).toBe(true);
-		});
-
-		it('should handle empty projects array', async () => {
-			const handler = handlers.get('projects:setAll');
-			const result = await handler!({} as any, []);
-
-			expect(mockProjectsStore.set).toHaveBeenCalledWith('projects', []);
-			expect(result).toBe(true);
-		});
-
-		it('should return false on ENOSPC write error', async () => {
-			const error = new Error('ENOSPC: no space left on device') as NodeJS.ErrnoException;
-			error.code = 'ENOSPC';
-			mockProjectsStore.set.mockImplementation(() => {
-				throw error;
-			});
-
-			const handler = handlers.get('projects:setAll');
-			const result = await handler!({} as any, [{ id: 'g1', name: 'G1' }]);
 
 			expect(result).toBe(false);
 		});

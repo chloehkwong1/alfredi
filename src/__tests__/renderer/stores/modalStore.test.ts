@@ -408,7 +408,6 @@ describe('modalStore', () => {
 				'quitConfirm',
 				'renameInstance',
 				'renameTab',
-				'renameProject',
 				'agentSessions',
 				'queueBrowser',
 				'batchRunner',
@@ -675,26 +674,24 @@ describe('modalStore', () => {
 
 			// Open two modals with data
 			openModal('settings', { tab: 'general' });
-			openModal('renameProject', { projectId: 'p1', value: 'Project 1', emoji: '🚀' });
+			openModal('renameInstance', { sessionId: 's1', value: 'Session 1' });
 
 			// Update one modal's data
 			updateModalData('settings', { tab: 'theme' });
 
 			// Other modal's data should be unchanged
-			expect(getData('renameProject')).toEqual({
-				projectId: 'p1',
-				value: 'Project 1',
-				emoji: '🚀',
+			expect(getData('renameInstance')).toEqual({
+				sessionId: 's1',
+				value: 'Session 1',
 			});
 
 			// Close one modal
 			closeModal('settings');
 
 			// Other modal should still have its data
-			expect(getData('renameProject')).toEqual({
-				projectId: 'p1',
-				value: 'Project 1',
-				emoji: '🚀',
+			expect(getData('renameInstance')).toEqual({
+				sessionId: 's1',
+				value: 'Session 1',
 			});
 		});
 	});
@@ -738,22 +735,6 @@ describe('modalStore', () => {
 				sessionId: 'sess-123',
 				value: 'Renamed Session',
 			});
-		});
-
-		it('rename project flow with emoji update', () => {
-			const { openModal, updateModalData, getData } = useModalStore.getState();
-
-			// Open rename project modal with initial data
-			openModal('renameProject', { projectId: 'project-1', value: 'Old Name', emoji: '📁' });
-
-			// User updates the name and emoji
-			updateModalData('renameProject', { value: 'Work Projects' });
-			updateModalData('renameProject', { emoji: '💼' });
-
-			const data = getData('renameProject');
-			expect(data?.projectId).toBe('project-1');
-			expect(data?.value).toBe('Work Projects');
-			expect(data?.emoji).toBe('💼');
 		});
 	});
 
@@ -965,22 +946,6 @@ describe('modalStore', () => {
 			expect(state.isOpen('renameInstance')).toBe(true);
 			expect(state.getData('renameInstance')?.sessionId).toBe('sess-456');
 			expect(state.getData('renameInstance')?.value).toBe('My Session');
-		});
-
-		it('setRenameProjectId + setRenameProjectValue + setRenameProjectEmoji + setRenameProjectModalOpen preserves data', () => {
-			const actions = getModalActions();
-
-			// Call sequence from QuickActionsModal.tsx
-			actions.setRenameProjectId('project-789');
-			actions.setRenameProjectValue('Work Projects');
-			actions.setRenameProjectEmoji('💼');
-			actions.setRenameProjectModalOpen(true);
-
-			const state = useModalStore.getState();
-			expect(state.isOpen('renameProject')).toBe(true);
-			expect(state.getData('renameProject')?.projectId).toBe('project-789');
-			expect(state.getData('renameProject')?.value).toBe('Work Projects');
-			expect(state.getData('renameProject')?.emoji).toBe('💼');
 		});
 
 		it('close then reopen rename tab with new data works correctly', () => {

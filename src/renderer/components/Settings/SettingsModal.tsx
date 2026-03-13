@@ -57,6 +57,8 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 		setAudioFeedbackEnabled,
 		audioFeedbackCommand,
 		setAudioFeedbackCommand,
+		notificationSound,
+		setNotificationSound,
 		toastDuration,
 		setToastDuration,
 	} = useSettings();
@@ -455,6 +457,8 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 						<NotificationsPanel
 							osNotificationsEnabled={osNotificationsEnabled}
 							setOsNotificationsEnabled={setOsNotificationsEnabled}
+							notificationSound={notificationSound}
+							setNotificationSound={setNotificationSound}
 							audioFeedbackEnabled={audioFeedbackEnabled}
 							setAudioFeedbackEnabled={setAudioFeedbackEnabled}
 							audioFeedbackCommand={audioFeedbackCommand}

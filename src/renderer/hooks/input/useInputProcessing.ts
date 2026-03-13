@@ -917,7 +917,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							sessionCustomPath: freshSession.customPath,
 							sessionCustomArgs: freshSession.customArgs,
 							sessionCustomEnvVars: freshSession.customEnvVars,
-							sessionCustomModel: freshSession.customModel,
+							sessionCustomModel: activeTab?.modelId || freshSession.customModel,
 							sessionCustomContextWindow: freshSession.customContextWindow,
 							// Per-session SSH remote config (takes precedence over agent-level SSH config)
 							sessionSshRemoteConfig: freshSession.sessionSshRemoteConfig,

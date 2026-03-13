@@ -41,7 +41,6 @@ export {
 	getBootstrapStore,
 	getSettingsStore,
 	getSessionsStore,
-	getProjectsStore,
 	getAgentConfigsStore,
 	getWindowStateStore,
 	getClaudeSessionOriginsStore,
@@ -64,7 +63,6 @@ export { getDefaultShell, getCustomSyncPath, getEarlySettings } from './utils';
 export {
 	SETTINGS_DEFAULTS,
 	SESSIONS_DEFAULTS,
-	PROJECTS_DEFAULTS,
 	AGENT_CONFIGS_DEFAULTS,
 	WINDOW_STATE_DEFAULTS,
 	CLAUDE_SESSION_ORIGINS_DEFAULTS,

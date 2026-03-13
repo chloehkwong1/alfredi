@@ -32,11 +32,7 @@ import { useModalStore } from '../../stores/modalStore';
 import { gitService } from '../../services/git';
 import { generateId } from '../../utils/ids';
 import { parseSessionId, isSynopsisSession, isBatchSession } from '../../utils/sessionIdParser';
-import {
-	estimateContextUsage,
-	estimateAccumulatedGrowth,
-	DEFAULT_CONTEXT_WINDOWS,
-} from '../../utils/contextUsage';
+import { estimateContextUsage } from '../../utils/contextUsage';
 import { isLikelyConcatenatedToolNames, getSlashCommandDescription } from '../../constants/app';
 import { getActiveTab, getWriteModeTab } from '../../utils/tabHelpers';
 import { parseSynopsis } from '../../../shared/synopsis';
@@ -178,7 +174,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 
 		// Shorthand for reading current state (always fresh — called per-event)
 		const getSessions = () => useSessionStore.getState().sessions;
-		const getProjects = () => useSessionStore.getState().projects;
 		const getActiveSessionId = () => useSessionStore.getState().activeSessionId;
 
 		// ================================================================
@@ -400,10 +395,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						const sessionSizeBytes = logs.reduce((sum, log) => sum + (log.text?.length || 0), 0);
 						const sessionSizeKB = (sessionSizeBytes / 1024).toFixed(1);
 
-						const sessionProject = currentSession.projectId
-							? getProjects().find((g) => g.id === currentSession.projectId)
-							: null;
-						const projectName = sessionProject?.name || 'Unassigned';
+						const projectName = currentSession.name || 'Unassigned';
 						const sessionName =
 							currentSession.name || currentSession.cwd.split('/').pop() || 'Unknown';
 
@@ -718,7 +710,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				if (toastData?.startTime && toastData?.agentType) {
 					const sessionIdForStats = toastData.sessionId || actualSessionId;
 					const isAutoRunQuery = deps.getBatchStateRef.current
-						? deps.getBatchStateRef.current(sessionIdForStats).isRunning
+						? deps.getBatchStateRef.current(sessionIdForStats)?.isRunning
 						: false;
 
 					window.maestro.stats
@@ -1036,25 +1028,6 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			deps.batchedUpdater.updateUsage(actualSessionId, null, usageStats);
 			if (contextPercentage !== null) {
 				deps.batchedUpdater.updateContextUsage(actualSessionId, contextPercentage);
-			} else {
-				const currentUsage = sessionForUsage?.contextUsage ?? 0;
-				if (currentUsage > 0) {
-					const effectiveWindow =
-						usageStats.contextWindow > 0
-							? usageStats.contextWindow
-							: agentToolType && agentToolType in DEFAULT_CONTEXT_WINDOWS
-								? DEFAULT_CONTEXT_WINDOWS[agentToolType as keyof typeof DEFAULT_CONTEXT_WINDOWS]
-								: 200000;
-					const estimated = estimateAccumulatedGrowth(
-						currentUsage,
-						usageStats.outputTokens,
-						usageStats.cacheReadInputTokens || 0,
-						effectiveWindow
-					);
-					const yellowThreshold = deps.contextWarningYellowThreshold;
-					const maxEstimate = yellowThreshold - 5;
-					deps.batchedUpdater.updateContextUsage(actualSessionId, Math.min(estimated, maxEstimate));
-				}
 			}
 			deps.batchedUpdater.updateCycleTokens(actualSessionId, usageStats.outputTokens);
 		});
@@ -1258,6 +1231,13 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									if (!targetTab) continue;
 
 									if (!targetTab.showThinking || targetTab.showThinking === 'off') continue;
+
+									// Skip adding thinking chunks if tab has gone idle (result already arrived)
+									// This prevents the RAF race where chunks fire after the result batch clears thinking entries
+									if (targetTab.state === 'idle') {
+										// Clear any remaining buffer for this tab
+										continue;
+									}
 
 									if (isLikelyConcatenatedToolNames(bufferedContent)) {
 										console.warn(

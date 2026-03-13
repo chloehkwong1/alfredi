@@ -120,6 +120,9 @@ export interface ParsedEvent {
 	 */
 	isPartial?: boolean;
 
+	/** True when content is from thinking/reasoning blocks (not regular text) */
+	isThinking?: boolean;
+
 	/**
 	 * Tool use blocks extracted from the message (for agents with mixed content)
 	 * When a message contains both text and tool_use, text goes in 'text' field

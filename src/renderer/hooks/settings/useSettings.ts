@@ -110,6 +110,8 @@ export interface UseSettingsReturn {
 	setAudioFeedbackEnabled: (value: boolean) => void;
 	audioFeedbackCommand: string;
 	setAudioFeedbackCommand: (value: string) => void;
+	notificationSound: string;
+	setNotificationSound: (value: string) => void;
 	toastDuration: number;
 	setToastDuration: (value: number) => void;
 

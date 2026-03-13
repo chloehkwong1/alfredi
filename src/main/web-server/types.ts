@@ -99,9 +99,6 @@ export interface SessionData {
 	state: string;
 	inputMode: string;
 	cwd: string;
-	projectId: string | null;
-	projectName: string | null;
-	projectEmoji: string | null;
 	usageStats?: SessionUsageStats | null;
 	lastResponse?: LastResponsePreview | null;
 	agentSessionId?: string | null;
@@ -145,9 +142,6 @@ export interface SessionBroadcastData {
 	state: string;
 	inputMode: string;
 	cwd: string;
-	projectId?: string | null;
-	projectName?: string | null;
-	projectEmoji?: string | null;
 	/** Worktree subagent support */
 	parentSessionId?: string | null;
 	worktreeBranch?: string | null;

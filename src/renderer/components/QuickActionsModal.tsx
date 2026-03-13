@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Search } from 'lucide-react';
-import type { Session, Project, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
+import type { Session, Theme, Shortcut, RightPanelTab, SettingsTab } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { notifyToast } from '../stores/notificationStore';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
@@ -28,19 +28,11 @@ interface QuickActionsModalProps {
 	sessions: Session[];
 	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	activeSessionId: string;
-	projects: Project[];
-	setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 	shortcuts: Record<string, Shortcut>;
-	initialMode?: 'main' | 'move-to-project';
 	setQuickActionOpen: (open: boolean) => void;
 	setActiveSessionId: (id: string) => void;
 	setRenameInstanceModalOpen: (open: boolean) => void;
 	setRenameInstanceValue: (value: string) => void;
-	setRenameProjectModalOpen: (open: boolean) => void;
-	setRenameProjectId: (id: string) => void;
-	setRenameProjectValue: (value: string) => void;
-	setRenameProjectEmoji: (emoji: string) => void;
-	setCreateProjectModalOpen: (open: boolean) => void;
 	setLeftSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	setRightPanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
 	setActiveRightTab: (tab: RightPanelTab) => void;
@@ -118,19 +110,11 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		sessions,
 		setSessions,
 		activeSessionId,
-		projects,
-		setProjects,
 		shortcuts,
-		initialMode = 'main',
 		setQuickActionOpen,
 		setActiveSessionId,
 		setRenameInstanceModalOpen,
 		setRenameInstanceValue,
-		setRenameProjectModalOpen,
-		setRenameProjectId,
-		setRenameProjectValue,
-		setRenameProjectEmoji,
-		setCreateProjectModalOpen,
 		setLeftSidebarOpen,
 		setRightPanelOpen,
 		setActiveRightTab,
@@ -195,7 +179,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const currentOutputStyle = useSettingsStore((s) => s.outputStyle);
 	const setOutputStyle = useSettingsStore((s) => s.setOutputStyle);
 	const [search, setSearch] = useState('');
-	const [mode, setMode] = useState<'main' | 'move-to-project'>(initialMode);
 	const [renamingSession, setRenamingSession] = useState(false);
 	const [renameValue, setRenameValue] = useState('');
 	const [firstVisibleIndex, setFirstVisibleIndex] = useState(0);
@@ -237,15 +220,9 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const handleEscapeRef = useRef<() => void>(() => setQuickActionOpen(false));
 	useEffect(() => {
 		handleEscapeRef.current = () => {
-			// Handle escape based on current mode
-			if (mode === 'move-to-project') {
-				setMode('main');
-				// Note: Selection will be reset by the search/mode change useEffect
-			} else {
-				setQuickActionOpen(false);
-			}
+			setQuickActionOpen(false);
 		};
-	}, [mode, setQuickActionOpen]);
+	}, [setQuickActionOpen]);
 
 	useEffect(() => {
 		if (layerIdRef.current) {
@@ -280,19 +257,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		}
 	};
 
-	const handleMoveToProject = (projectId: string) => {
-		const updatedSessions = sessions.map((s) =>
-			s.id === activeSessionId ? { ...s, projectId } : s
-		);
-		setSessions(updatedSessions);
-		setQuickActionOpen(false);
-	};
-
-	const handleCreateProject = () => {
-		setCreateProjectModalOpen(true);
-		setQuickActionOpen(false);
-	};
-
 	const sessionActions: QuickAction[] = sessions.map((s) => {
 		// For worktree subagents, format as "Jump to $PARENT subagent: $NAME"
 		let label: string;
@@ -309,12 +273,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			label,
 			action: () => {
 				setActiveSessionId(s.id);
-				// Auto-expand project if it's collapsed
-				if (s.projectId) {
-					setProjects((prev) =>
-						prev.map((p) => (p.id === s.projectId && p.collapsed ? { ...p, collapsed: false } : p))
-					);
-				}
 			},
 			subtext: s.state.toUpperCase(),
 		};
@@ -385,37 +343,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 					},
 				]
 			: []),
-		...(activeSession?.projectId
-			? [
-					{
-						id: 'renameProject',
-						label: 'Rename Project',
-						action: () => {
-							const project = projects.find((p) => p.id === activeSession.projectId);
-							if (project) {
-								setRenameProjectId(project.id);
-								setRenameProjectValue(project.name);
-								setRenameProjectEmoji(project.emoji);
-								setRenameProjectModalOpen(true);
-								setQuickActionOpen(false);
-							}
-						},
-					},
-				]
-			: []),
-		...(activeSession
-			? [
-					{
-						id: 'moveToProject',
-						label: 'Move to Project...',
-						action: () => {
-							setMode('move-to-project');
-							setSelectedIndex(0);
-						},
-					},
-				]
-			: []),
-		{ id: 'createProject', label: 'Create New Project', action: handleCreateProject },
 		{
 			id: 'toggleSidebar',
 			label: 'Toggle Sidebar',
@@ -1117,25 +1044,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			: []),
 	];
 
-	const projectActions: QuickAction[] = [
-		{
-			id: 'back',
-			label: '← Back to main menu',
-			action: () => {
-				setMode('main');
-				setSelectedIndex(0);
-			},
-		},
-		{ id: 'no-project', label: '📁 No Project', action: () => handleMoveToProject('') },
-		...projects.map((p) => ({
-			id: `project-${p.id}`,
-			label: `${p.emoji} ${p.name}`,
-			action: () => handleMoveToProject(p.id),
-		})),
-		{ id: 'create-new', label: '+ Create New Project', action: handleCreateProject },
-	];
-
-	const actions = mode === 'main' ? mainActions : projectActions;
+	const actions = mainActions;
 
 	// Filter actions - hide "Debug:" prefixed commands unless user explicitly types "debug"
 	const searchLower = search.toLowerCase();
@@ -1162,14 +1071,12 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			const selectedAction = filteredRef.current[index];
 			if (!selectedAction) return;
 
-			// Don't close modal if action switches modes
-			const switchesModes = selectedAction.id === 'moveToProject' || selectedAction.id === 'back';
 			selectedAction.action();
-			if (!renamingSession && mode === 'main' && !switchesModes) {
+			if (!renamingSession) {
 				setQuickActionOpen(false);
 			}
 		},
-		[renamingSession, mode, setQuickActionOpen]
+		[renamingSession, setQuickActionOpen]
 	);
 
 	// Use hook for list navigation (arrow keys, number hotkeys, Enter)
@@ -1202,14 +1109,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	useEffect(() => {
 		setSelectedIndex(0);
 		setFirstVisibleIndex(0);
-	}, [search, mode, setSelectedIndex]);
-
-	// Clear search when switching to move-to-project mode
-	useEffect(() => {
-		if (mode === 'move-to-project') {
-			setSearch('');
-		}
-	}, [mode]);
+	}, [search, setSelectedIndex]);
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		// Handle rename mode separately
@@ -1264,11 +1164,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						<input
 							ref={inputRef}
 							className="flex-1 bg-transparent outline-none text-lg placeholder-opacity-50"
-							placeholder={
-								mode === 'move-to-project'
-									? `Move ${activeSession?.name || 'agent'} to project...`
-									: 'Type a command or jump to agent...'
-							}
+							placeholder="Type a command or jump to agent..."
 							style={{ color: theme.colors.textMain }}
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
@@ -1303,9 +1199,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 									key={a.id}
 									ref={i === selectedIndex ? selectedItemRef : null}
 									onClick={() => {
-										const switchesModes = a.id === 'moveToProject' || a.id === 'back';
 										a.action();
-										if (mode === 'main' && !switchesModes) setQuickActionOpen(false);
+										setQuickActionOpen(false);
 									}}
 									className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-opacity-10 ${i === selectedIndex ? 'bg-opacity-10' : ''}`}
 									style={{

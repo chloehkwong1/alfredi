@@ -4,7 +4,6 @@ import type {
 	BootstrapSettings,
 	MaestroSettings,
 	SessionsData,
-	ProjectsData,
 	AgentConfigsData,
 	WindowState,
 	ClaudeSessionOrigin,
@@ -97,18 +96,6 @@ describe('stores/types', () => {
 			expect(session.toolType).toBe('claude-code');
 		});
 
-		it('should allow optional projectId', () => {
-			const session: StoredSession = {
-				id: '1',
-				projectId: 'project-1',
-				name: 'Test Session',
-				toolType: 'claude-code',
-				cwd: '/path/to/project',
-				projectRoot: '/path/to/project',
-			};
-			expect(session.projectId).toBe('project-1');
-		});
-
 		it('should allow additional renderer-specific fields', () => {
 			const session: StoredSession = {
 				id: '1',
@@ -141,24 +128,6 @@ describe('stores/types', () => {
 			};
 			expect(data.sessions).toHaveLength(1);
 			expect(data.sessions[0].id).toBe('1');
-		});
-	});
-
-	describe('ProjectsData', () => {
-		it('should have projects array with Project items', () => {
-			const data: ProjectsData = {
-				projects: [
-					{
-						id: '1',
-						name: 'Project 1',
-						emoji: '📁',
-						collapsed: false,
-						rootPath: '/path/to/project',
-					},
-				],
-			};
-			expect(data.projects).toHaveLength(1);
-			expect(data.projects[0].emoji).toBe('📁');
 		});
 	});
 

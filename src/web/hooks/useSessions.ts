@@ -67,21 +67,9 @@ export interface UseSessionsOptions extends Omit<UseWebSocketOptions, 'handlers'
 /**
  * Return type for the useSessions hook
  */
-/**
- * Project info containing project metadata and sessions
- */
-export interface ProjectInfo {
-	id: string | null;
-	name: string;
-	emoji: string | null;
-	sessions: Session[];
-}
-
 export interface UseSessionsReturn {
 	/** All sessions */
 	sessions: Session[];
-	/** Sessions organized by project (keyed by projectId or 'ungrouped') */
-	sessionsByProject: Record<string, ProjectInfo>;
 	/** Currently active/selected session */
 	activeSession: Session | null;
 	/** Set the active session by ID */
@@ -351,30 +339,6 @@ export function useSessions(options: UseSessionsOptions = {}): UseSessionsReturn
 	);
 
 	/**
-	 * Sessions organized by project (using actual project data from server)
-	 * Projects are keyed by projectId (or 'ungrouped' for sessions without a project)
-	 */
-	const sessionsByProject = useMemo((): Record<string, ProjectInfo> => {
-		const projects: Record<string, ProjectInfo> = {};
-
-		for (const session of sessions) {
-			const projectKey = session.projectId || 'ungrouped';
-
-			if (!projects[projectKey]) {
-				projects[projectKey] = {
-					id: session.projectId || null,
-					name: session.projectName || 'Ungrouped',
-					emoji: session.projectEmoji || null,
-					sessions: [],
-				};
-			}
-			projects[projectKey].sessions.push(session);
-		}
-
-		return projects;
-	}, [sessions]);
-
-	/**
 	 * Get the base URL for API requests
 	 */
 	const getApiBaseUrl = useCallback((): string => {
@@ -560,7 +524,6 @@ export function useSessions(options: UseSessionsOptions = {}): UseSessionsReturn
 	return {
 		// Session data
 		sessions,
-		sessionsByProject,
 		activeSession,
 		setActiveSessionId,
 		getSession,

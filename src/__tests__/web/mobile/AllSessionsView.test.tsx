@@ -72,9 +72,6 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		cwd: '/Users/test/project',
 		projectRoot: '/Users/test/project',
 		bookmarked: false,
-		projectId: null,
-		projectName: null,
-		projectEmoji: null,
 		...overrides,
 	} as Session;
 }
@@ -334,125 +331,6 @@ describe('AllSessionsView', () => {
 		});
 	});
 
-	describe('ProjectSection', () => {
-		const createGroupedSessions = () => [
-			createMockSession({
-				id: 's1',
-				name: 'Session 1',
-				projectId: 'group-1',
-				projectName: 'Dev Group',
-				projectEmoji: '🔧',
-			}),
-			createMockSession({
-				id: 's2',
-				name: 'Session 2',
-				projectId: 'group-1',
-				projectName: 'Dev Group',
-				projectEmoji: '🔧',
-			}),
-			createMockSession({
-				id: 's3',
-				name: 'Session 3',
-				projectId: 'group-2',
-				projectName: 'Test Group',
-				projectEmoji: '🧪',
-			}),
-		];
-
-		it('renders group headers with names', async () => {
-			const sessions = createGroupedSessions();
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			// Wait for initial render to complete and groups to be set up
-			await waitFor(() => {
-				expect(screen.getByText('Dev Group')).toBeInTheDocument();
-				expect(screen.getByText('Test Group')).toBeInTheDocument();
-			});
-		});
-
-		it('renders group emoji when available', async () => {
-			const sessions = createGroupedSessions();
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				expect(screen.getByText('🔧')).toBeInTheDocument();
-				expect(screen.getByText('🧪')).toBeInTheDocument();
-			});
-		});
-
-		it('renders session count badge for each group', async () => {
-			const sessions = createGroupedSessions();
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				// Dev Group has 2 sessions
-				const devGroupHeader = screen.getByRole('button', {
-					name: /Dev Group project with 2 sessions/i,
-				});
-				expect(devGroupHeader).toBeInTheDocument();
-
-				// Test Group has 1 session
-				const testGroupHeader = screen.getByRole('button', {
-					name: /Test Group project with 1 sessions/i,
-				});
-				expect(testGroupHeader).toBeInTheDocument();
-			});
-		});
-
-		it('toggles group collapse on header click', async () => {
-			const sessions = createGroupedSessions();
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				expect(screen.getByText('Dev Group')).toBeInTheDocument();
-			});
-
-			// Groups start collapsed by default (except bookmarks)
-			const devGroupHeader = screen.getByRole('button', { name: /Dev Group project/i });
-			expect(devGroupHeader).toHaveAttribute('aria-expanded', 'false');
-
-			// Click to expand
-			fireEvent.click(devGroupHeader);
-
-			expect(mockTriggerHaptic).toHaveBeenCalledWith([10]);
-			expect(devGroupHeader).toHaveAttribute('aria-expanded', 'true');
-
-			// Click again to collapse
-			fireEvent.click(devGroupHeader);
-			expect(devGroupHeader).toHaveAttribute('aria-expanded', 'false');
-		});
-
-		it('shows sessions when group is expanded', async () => {
-			const sessions = createGroupedSessions();
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				expect(screen.getByText('Dev Group')).toBeInTheDocument();
-			});
-
-			// Click to expand Dev Group
-			const devGroupHeader = screen.getByRole('button', { name: /Dev Group project/i });
-			fireEvent.click(devGroupHeader);
-
-			// Sessions should now be visible
-			expect(screen.getByText('Session 1')).toBeInTheDocument();
-			expect(screen.getByText('Session 2')).toBeInTheDocument();
-		});
-
-		it('hides sessions when group is collapsed', async () => {
-			const sessions = createGroupedSessions();
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				expect(screen.getByText('Dev Group')).toBeInTheDocument();
-			});
-
-			// Groups start collapsed, so sessions should not be visible
-			expect(screen.queryByText('Session 1')).not.toBeInTheDocument();
-			expect(screen.queryByText('Session 2')).not.toBeInTheDocument();
-		});
-	});
-
 	describe('ungrouped sessions', () => {
 		it('renders ungrouped sessions without group header when only ungrouped exist', () => {
 			const sessions = [
@@ -466,20 +344,6 @@ describe('AllSessionsView', () => {
 			expect(screen.getByText('Ungrouped 1')).toBeInTheDocument();
 			expect(screen.getByText('Ungrouped 2')).toBeInTheDocument();
 			expect(screen.queryByText('Ungrouped')).not.toBeInTheDocument(); // No group header
-		});
-
-		it('renders ungrouped section when mixed with grouped sessions', async () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Grouped', projectId: 'g1', projectName: 'My Group' }),
-				createMockSession({ id: 's2', name: 'Not Grouped' }),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				expect(screen.getByText('My Group')).toBeInTheDocument();
-				expect(screen.getByText('Ungrouped')).toBeInTheDocument();
-			});
 		});
 	});
 
@@ -509,28 +373,6 @@ describe('AllSessionsView', () => {
 			await waitFor(() => {
 				const bookmarksHeader = screen.getByRole('button', { name: /Bookmarks project/i });
 				expect(bookmarksHeader).toHaveAttribute('aria-expanded', 'true');
-			});
-		});
-
-		it('places bookmarks group first in the order', async () => {
-			const sessions = [
-				createMockSession({
-					id: 's1',
-					name: 'Regular',
-					projectId: 'a-group',
-					projectName: 'A Group',
-				}),
-				createMockSession({ id: 's2', name: 'Bookmarked', bookmarked: true }),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				const allButtons = screen.getAllByRole('button');
-				const bookmarksIndex = allButtons.findIndex((b) => b.textContent?.includes('Bookmarks'));
-				const aGroupIndex = allButtons.findIndex((b) => b.textContent?.includes('A Group'));
-
-				expect(bookmarksIndex).toBeLessThan(aGroupIndex);
 			});
 		});
 	});
@@ -722,51 +564,6 @@ describe('AllSessionsView', () => {
 		});
 	});
 
-	describe('group sorting', () => {
-		it('sorts groups alphabetically', async () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'S1', projectId: 'zebra', projectName: 'Zebra Group' }),
-				createMockSession({ id: 's2', name: 'S2', projectId: 'alpha', projectName: 'Alpha Group' }),
-				createMockSession({ id: 's3', name: 'S3', projectId: 'beta', projectName: 'Beta Group' }),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				const allButtons = screen.getAllByRole('button');
-				const alphaIndex = allButtons.findIndex((b) => b.textContent?.includes('Alpha Group'));
-				const betaIndex = allButtons.findIndex((b) => b.textContent?.includes('Beta Group'));
-				const zebraIndex = allButtons.findIndex((b) => b.textContent?.includes('Zebra Group'));
-
-				expect(alphaIndex).toBeLessThan(betaIndex);
-				expect(betaIndex).toBeLessThan(zebraIndex);
-			});
-		});
-
-		it('puts ungrouped sessions last', async () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Ungrouped', projectId: null }),
-				createMockSession({
-					id: 's2',
-					name: 'Grouped',
-					projectId: 'z-group',
-					projectName: 'Z Group',
-				}),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				const allButtons = screen.getAllByRole('button');
-				const zGroupIndex = allButtons.findIndex((b) => b.textContent?.includes('Z Group'));
-				const ungroupedIndex = allButtons.findIndex((b) => b.textContent?.includes('Ungrouped'));
-
-				// The "Ungrouped" group header should be after "Z Group"
-				expect(ungroupedIndex).toBeGreaterThan(zGroupIndex);
-			});
-		});
-	});
-
 	describe('edge cases', () => {
 		it('handles sessions with special characters in name', () => {
 			const sessions = [createMockSession({ id: 's1', name: '<script>alert("xss")</script>' })];
@@ -804,49 +601,6 @@ describe('AllSessionsView', () => {
 			expect(sessionCard).toHaveAttribute('aria-pressed', 'false');
 		});
 
-		it('handles rapid toggle of groups', async () => {
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Session', projectId: 'g1', projectName: 'Group' }),
-				createMockSession({ id: 's2', name: 'Session 2' }),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				expect(screen.getByText('Group')).toBeInTheDocument();
-			});
-
-			const groupHeader = screen.getByRole('button', { name: /Group project/i });
-
-			// Rapid toggles
-			for (let i = 0; i < 10; i++) {
-				fireEvent.click(groupHeader);
-			}
-
-			// Should still work after rapid toggles (10 clicks = even number = back to original state)
-			expect(groupHeader).toHaveAttribute('aria-expanded', 'false');
-		});
-
-		it('handles bookmarked session that is also in a group', async () => {
-			const sessions = [
-				createMockSession({
-					id: 's1',
-					name: 'Bookmarked Grouped',
-					bookmarked: true,
-					projectId: 'g1',
-					projectName: 'My Group',
-				}),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				// Should appear in both Bookmarks and the original group
-				expect(screen.getByText('Bookmarks')).toBeInTheDocument();
-				expect(screen.getByText('My Group')).toBeInTheDocument();
-			});
-		});
-
 		it('handles session with undefined toolType gracefully', () => {
 			const sessions = [createMockSession({ toolType: undefined as any })];
 
@@ -879,19 +633,6 @@ describe('AllSessionsView', () => {
 				'aria-pressed',
 				'false'
 			);
-		});
-
-		it('group headers have aria-expanded state', async () => {
-			const sessions = [
-				createMockSession({ id: 's1', projectId: 'g1', projectName: 'Test Group' }),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions })} />);
-
-			await waitFor(() => {
-				const groupHeader = screen.getByRole('button', { name: /Test Group project/i });
-				expect(groupHeader).toHaveAttribute('aria-expanded');
-			});
 		});
 
 		it('search input is accessible', () => {
@@ -940,40 +681,6 @@ describe('AllSessionsView', () => {
 	});
 
 	describe('integration scenarios', () => {
-		it('complete user flow: search, auto-expand group, select session', async () => {
-			const onSelectSession = vi.fn();
-			const onClose = vi.fn();
-			const sessions = [
-				createMockSession({ id: 's1', name: 'Frontend', projectId: 'dev', projectName: 'Dev' }),
-				createMockSession({ id: 's2', name: 'Backend', projectId: 'dev', projectName: 'Dev' }),
-				createMockSession({ id: 's3', name: 'Database' }),
-			];
-
-			render(<AllSessionsView {...createDefaultProps({ sessions, onSelectSession, onClose })} />);
-
-			// 1. Search for "end"
-			const searchInput = screen.getByPlaceholderText('Search agents...');
-			fireEvent.change(searchInput, { target: { value: 'end' } });
-
-			// 2. Wait for search results and auto-expand to complete
-			// Groups with matching sessions should auto-expand when searching
-			await waitFor(() => {
-				// Only Frontend and Backend should match
-				expect(screen.getByText('Dev')).toBeInTheDocument();
-				expect(screen.queryByText('Database')).not.toBeInTheDocument();
-				// Sessions should be visible due to auto-expand
-				expect(screen.getByText('Frontend')).toBeInTheDocument();
-				expect(screen.getByText('Backend')).toBeInTheDocument();
-			});
-
-			// 3. Select Backend
-			const backendCard = screen.getByRole('button', { name: /Backend session/i });
-			fireEvent.click(backendCard);
-
-			expect(onSelectSession).toHaveBeenCalledWith('s2');
-			expect(onClose).toHaveBeenCalled();
-		});
-
 		it('handles session state changes during view', async () => {
 			const sessions = [createMockSession({ id: 's1', state: 'idle' })];
 

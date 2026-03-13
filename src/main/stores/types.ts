@@ -5,7 +5,7 @@
  * These types are used across the main process for type-safe store access.
  */
 
-import type { SshRemoteConfig, Project, OutputStyle } from '../../shared/types';
+import type { SshRemoteConfig, ProjectWorktreeConfig, OutputStyle } from '../../shared/types';
 
 // ============================================================================
 // Stored Session Type (minimal interface for main process storage)
@@ -22,11 +22,12 @@ import type { SshRemoteConfig, Project, OutputStyle } from '../../shared/types';
  */
 export interface StoredSession {
 	id: string;
-	projectId?: string;
 	name: string;
 	toolType: string;
 	cwd: string;
 	projectRoot: string;
+	collapsed?: boolean;
+	worktreeConfig?: ProjectWorktreeConfig;
 	[key: string]: any; // Allow additional renderer-specific fields
 }
 
@@ -84,14 +85,6 @@ export interface MaestroSettings {
 
 export interface SessionsData {
 	sessions: StoredSession[];
-}
-
-// ============================================================================
-// Projects Store
-// ============================================================================
-
-export interface ProjectsData {
-	projects: Project[];
 }
 
 // ============================================================================

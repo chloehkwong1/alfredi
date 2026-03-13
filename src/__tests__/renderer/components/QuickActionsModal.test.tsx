@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuickActionsModal } from '../../../renderer/components/QuickActionsModal';
 import { formatShortcutKeys } from '../../../renderer/utils/shortcutFormatter';
-import type { Session, Project, Theme, Shortcut } from '../../../renderer/types';
+import type { Session, Theme, Shortcut } from '../../../renderer/types';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useFileExplorerStore } from '../../../renderer/stores/fileExplorerStore';
 // Add missing window.maestro.devtools and debug mocks
@@ -136,15 +136,6 @@ const createMockSession = (overrides: Partial<Session> = {}): Session => ({
 	...overrides,
 });
 
-// Create mock project
-const createMockProject = (overrides: Partial<Project> = {}): Project => ({
-	id: 'project-1',
-	name: 'Test Project',
-	emoji: '📁',
-	collapsed: false,
-	...overrides,
-});
-
 // Default props factory
 const createDefaultProps = (
 	overrides: Partial<React.ComponentProps<typeof QuickActionsModal>> = {}
@@ -153,18 +144,11 @@ const createDefaultProps = (
 	sessions: [createMockSession()],
 	setSessions: vi.fn(),
 	activeSessionId: 'session-1',
-	projects: [],
-	setProjects: vi.fn(),
 	shortcuts: mockShortcuts,
 	setQuickActionOpen: vi.fn(),
 	setActiveSessionId: vi.fn(),
 	setRenameInstanceModalOpen: vi.fn(),
 	setRenameInstanceValue: vi.fn(),
-	setRenameProjectModalOpen: vi.fn(),
-	setRenameProjectId: vi.fn(),
-	setRenameProjectValue: vi.fn(),
-	setRenameProjectEmoji: vi.fn(),
-	setCreateProjectModalOpen: vi.fn(),
 	setLeftSidebarOpen: vi.fn(),
 	setRightPanelOpen: vi.fn(),
 	setActiveRightTab: vi.fn(),
@@ -326,23 +310,6 @@ describe('QuickActionsModal', () => {
 
 			expect(props.setActiveSessionId).toHaveBeenCalledWith('session-1');
 			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
-		});
-
-		it('auto-expands collapsed project when jumping to session in project', () => {
-			const session = createMockSession({ projectId: 'project-1' });
-			const project = createMockProject({ collapsed: true });
-			const props = createDefaultProps({
-				sessions: [session],
-				projects: [project],
-			});
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Jump to: Test Session'));
-
-			expect(props.setProjects).toHaveBeenCalled();
-			const setProjectsFn = props.setProjects.mock.calls[0][0];
-			const result = setProjectsFn([project]);
-			expect(result[0].collapsed).toBe(false);
 		});
 
 		it('handles Create New Agent action', () => {
@@ -994,157 +961,12 @@ describe('QuickActionsModal', () => {
 		});
 	});
 
-	describe('Move to project mode', () => {
-		it('switches to move-to-project mode', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-
-			expect(screen.getByText('← Back to main menu')).toBeInTheDocument();
-			expect(screen.getByText('📁 No Project')).toBeInTheDocument();
-		});
-
-		it('shows projects in move-to-project mode', () => {
-			const project = createMockProject({ name: 'My Project', emoji: '🚀' });
-			const props = createDefaultProps({ projects: [project] });
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-
-			expect(screen.getByText('🚀 My Project')).toBeInTheDocument();
-		});
-
-		it('shows create new project option in move mode', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-
-			expect(screen.getByText('+ Create New Project')).toBeInTheDocument();
-		});
-
-		it('handles back to main menu', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-			fireEvent.click(screen.getByText('← Back to main menu'));
-
-			expect(screen.getByText('Move to Project...')).toBeInTheDocument();
-		});
-
-		it('handles move to project action', () => {
-			const project = createMockProject();
-			const props = createDefaultProps({ projects: [project] });
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-			fireEvent.click(screen.getByText('📁 Test Project'));
-
-			expect(props.setSessions).toHaveBeenCalled();
-			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
-		});
-
-		it('handles move to no project', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-			fireEvent.click(screen.getByText('📁 No Project'));
-
-			expect(props.setSessions).toHaveBeenCalled();
-			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
-		});
-
-		it('changes placeholder when in move-to-project mode', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Move to Project...'));
-
-			expect(screen.getByPlaceholderText('Move Test Session to...')).toBeInTheDocument();
-		});
-
-		it('clears search when entering move-to-project mode', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			// Enter some text in main mode
-			const input = screen.getByPlaceholderText('Type a command or jump to agent...');
-			fireEvent.change(input, { target: { value: 'group' } });
-
-			// Click move to project (should be visible with 'project' search)
-			fireEvent.click(screen.getByText('Move to Project...'));
-
-			// Search should be cleared when entering move-to-project mode
-			const newInput = screen.getByPlaceholderText('Move Test Session to...');
-			expect(newInput).toHaveValue('');
-		});
-	});
-
-	describe('Project actions', () => {
-		it('renders Rename Project action when session is in a project', () => {
-			const session = createMockSession({ projectId: 'project-1' });
-			const project = createMockProject();
-			const props = createDefaultProps({
-				sessions: [session],
-				projects: [project],
-			});
-			render(<QuickActionsModal {...props} />);
-
-			expect(screen.getByText('Rename Project')).toBeInTheDocument();
-		});
-
-		it('does not render Rename Project when session has no project', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			expect(screen.queryByText('Rename Project')).not.toBeInTheDocument();
-		});
-
-		it('handles Rename Project action', () => {
-			const session = createMockSession({ projectId: 'project-1' });
-			const project = createMockProject();
-			const props = createDefaultProps({
-				sessions: [session],
-				projects: [project],
-			});
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Rename Project'));
-
-			expect(props.setRenameProjectId).toHaveBeenCalledWith('project-1');
-			expect(props.setRenameProjectValue).toHaveBeenCalledWith('Test Project');
-			expect(props.setRenameProjectEmoji).toHaveBeenCalledWith('📁');
-			expect(props.setRenameProjectModalOpen).toHaveBeenCalledWith(true);
-			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
-		});
-
-		it('handles Create New Project action', () => {
-			const props = createDefaultProps();
-			render(<QuickActionsModal {...props} />);
-
-			fireEvent.click(screen.getByText('Create New Project'));
-
-			expect(props.setCreateProjectModalOpen).toHaveBeenCalledWith(true);
-			expect(props.setQuickActionOpen).toHaveBeenCalledWith(false);
-		});
-	});
-
 	describe('Initial mode', () => {
 		it('starts in main mode by default', () => {
 			const props = createDefaultProps();
 			render(<QuickActionsModal {...props} />);
 
 			expect(screen.getByPlaceholderText('Type a command or jump to agent...')).toBeInTheDocument();
-		});
-
-		it('starts in move-to-project mode when initialMode is set', () => {
-			const props = createDefaultProps({ initialMode: 'move-to-project' });
-			render(<QuickActionsModal {...props} />);
-
-			expect(screen.getByText('← Back to main menu')).toBeInTheDocument();
 		});
 	});
 

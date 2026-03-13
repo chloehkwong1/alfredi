@@ -224,6 +224,19 @@ export function createGitApi() {
 			ipcRenderer.invoke('git:show', cwd, hash, sshRemoteId),
 
 		/**
+		 * Get per-commit file list with status and stat info
+		 */
+		commitFiles: (
+			cwd: string,
+			hash: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{
+			files: { path: string; status: string; additions: number; deletions: number }[];
+			error: string | null;
+		}> => ipcRenderer.invoke('git:commitFiles', cwd, hash, sshRemoteId, remoteCwd),
+
+		/**
 		 * Show file content at a specific ref
 		 */
 		showFile: (

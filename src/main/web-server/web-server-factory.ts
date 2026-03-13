@@ -11,7 +11,6 @@ import { logger } from '../utils/logger';
 import { isWebContentsAvailable } from '../utils/safe-send';
 import type { ProcessManager } from '../process-manager';
 import type { StoredSession } from '../stores/types';
-import type { Project } from '../../shared/types';
 
 /** Store interface for settings */
 interface SettingsStore {
@@ -23,19 +22,12 @@ interface SessionsStore {
 	get<T>(key: string, defaultValue?: T): T;
 }
 
-/** Store interface for projects */
-interface ProjectsStore {
-	get<T>(key: string, defaultValue?: T): T;
-}
-
 /** Dependencies required for creating the web server */
 export interface WebServerFactoryDependencies {
 	/** Settings store for reading web interface configuration */
 	settingsStore: SettingsStore;
 	/** Sessions store for reading session data */
 	sessionsStore: SessionsStore;
-	/** Projects store for reading project data */
-	projectsStore: ProjectsStore;
 	/** Function to get the main window reference */
 	getMainWindow: () => BrowserWindow | null;
 	/** Function to get the process manager reference */
@@ -47,7 +39,7 @@ export interface WebServerFactoryDependencies {
  * This allows dependency injection and makes the code more testable.
  */
 export function createWebServerFactory(deps: WebServerFactoryDependencies) {
-	const { settingsStore, sessionsStore, projectsStore, getMainWindow, getProcessManager } = deps;
+	const { settingsStore, sessionsStore, getMainWindow, getProcessManager } = deps;
 
 	/**
 	 * Create and configure the web server with all necessary callbacks.
@@ -63,11 +55,7 @@ export function createWebServerFactory(deps: WebServerFactoryDependencies) {
 		// Set up callback for web server to fetch sessions list
 		server.setGetSessionsCallback(() => {
 			const sessions = sessionsStore.get<StoredSession[]>('sessions', []);
-			const projects = projectsStore.get<Project[]>('projects', []);
 			return sessions.map((s) => {
-				// Find the project for this session
-				const project = s.projectId ? projects.find((p) => p.id === s.projectId) : null;
-
 				// Extract last AI response for mobile preview (first 3 lines, max 500 chars)
 				// Use active tab's logs as the source of truth
 				let lastResponse = null;
@@ -119,9 +107,6 @@ export function createWebServerFactory(deps: WebServerFactoryDependencies) {
 					state: s.state,
 					inputMode: s.inputMode,
 					cwd: s.cwd,
-					projectId: s.projectId || null,
-					projectName: project?.name || null,
-					projectEmoji: project?.emoji || null,
 					usageStats: s.usageStats || null,
 					lastResponse,
 					agentSessionId: s.agentSessionId || null,

@@ -15,14 +15,13 @@ import {
 	Hash,
 	Play,
 } from 'lucide-react';
-import type { Session, Project, Theme } from '../types';
+import type { Session, Theme } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 interface ProcessMonitorProps {
 	theme: Theme;
 	sessions: Session[];
-	projects: Project[];
 	onClose: () => void;
 	onNavigateToSession?: (sessionId: string, tabId?: string) => void;
 }
@@ -98,7 +97,7 @@ interface ProcessDetailData {
 }
 
 export function ProcessMonitor(props: ProcessMonitorProps) {
-	const { theme, sessions, projects, onClose, onNavigateToSession } = props;
+	const { theme, sessions, onClose, onNavigateToSession } = props;
 	const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 	const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
 	const [activeProcesses, setActiveProcesses] = useState<ActiveProcess[]>([]);
@@ -312,19 +311,6 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 	const buildProcessTree = (): ProcessNode[] => {
 		const tree: ProcessNode[] = [];
 
-		// Group sessions by project
-		const sessionsByProject = new Map<string, Session[]>();
-		const unassignedSessions: Session[] = [];
-
-		sessions.forEach((session) => {
-			if (session.projectId) {
-				const existing = sessionsByProject.get(session.projectId) || [];
-				sessionsByProject.set(session.projectId, [...existing, session]);
-			} else {
-				unassignedSessions.push(session);
-			}
-		});
-
 		// Map active processes to their base session IDs
 		const processesMap = new Map<string, ActiveProcess[]>();
 		activeProcesses.forEach((proc) => {
@@ -411,44 +397,20 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			return sessionNode;
 		};
 
-		// Add project sessions (only include sessions with active processes)
-		projects.forEach((project) => {
-			const projectSessions = sessionsByProject.get(project.id) || [];
-			const sessionNodes = projectSessions
-				.map((session) => buildSessionNode(session))
-				.filter((node) => node.children && node.children.length > 0);
+		// Add all sessions as a flat list (only include sessions with active processes)
+		const sessionNodes = sessions
+			.map((session) => buildSessionNode(session))
+			.filter((node) => node.children && node.children.length > 0);
 
-			// Only add project if it has sessions with active processes
-			if (sessionNodes.length > 0) {
-				const projectNode: ProcessNode = {
-					id: `group-${project.id}`,
-					type: 'group',
-					label: project.name,
-					emoji: project.emoji,
-					expanded: expandedNodes.has(`group-${project.id}`),
-					children: sessionNodes,
-				};
-				tree.push(projectNode);
-			}
-		});
-
-		// Add unassigned sessions (root level, only with active processes)
-		if (unassignedSessions.length > 0) {
-			const sessionNodes = unassignedSessions
-				.map((session) => buildSessionNode(session))
-				.filter((node) => node.children && node.children.length > 0);
-
-			if (sessionNodes.length > 0) {
-				const rootNode: ProcessNode = {
-					id: 'group-root',
-					type: 'group',
-					label: 'NO PROJECT',
-					emoji: '📁',
-					expanded: expandedNodes.has('group-root'),
-					children: sessionNodes,
-				};
-				tree.push(rootNode);
-			}
+		if (sessionNodes.length > 0) {
+			const agentsNode: ProcessNode = {
+				id: 'group-agents',
+				type: 'group',
+				label: 'AGENTS',
+				expanded: expandedNodes.has('group-agents'),
+				children: sessionNodes,
+			};
+			tree.push(agentsNode);
 		}
 
 		// Add Wizard processes
@@ -1309,8 +1271,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 						>
 							<div className="flex items-center gap-4">
 								<span>
-									{sessions.length} {sessions.length === 1 ? 'session' : 'sessions'} •{' '}
-									{projects.length} {projects.length === 1 ? 'project' : 'projects'}
+									{sessions.length} {sessions.length === 1 ? 'agent' : 'agents'}
 								</span>
 								<span style={{ opacity: 0.7 }}>↑↓ navigate • Enter view details • R refresh</span>
 							</div>

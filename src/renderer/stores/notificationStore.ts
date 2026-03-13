@@ -46,6 +46,8 @@ export interface NotificationConfig {
 	audioFeedbackEnabled: boolean;
 	audioFeedbackCommand: string;
 	osNotificationsEnabled: boolean;
+	/** System sound name to play on task completion, or 'none' to disable */
+	notificationSound: string;
 }
 
 // ============================================================================
@@ -70,6 +72,8 @@ export interface NotificationStoreActions {
 	setAudioFeedback: (enabled: boolean, command: string) => void;
 	/** Configure OS desktop notifications. */
 	setOsNotifications: (enabled: boolean) => void;
+	/** Configure notification sound. */
+	setNotificationSound: (sound: string) => void;
 }
 
 export type NotificationStore = NotificationStoreState & NotificationStoreActions;
@@ -102,6 +106,7 @@ export const useNotificationStore = create<NotificationStore>()((set) => ({
 		audioFeedbackEnabled: false,
 		audioFeedbackCommand: '',
 		osNotificationsEnabled: true,
+		notificationSound: 'none',
 	},
 
 	// --- Toast CRUD ---
@@ -135,6 +140,9 @@ export const useNotificationStore = create<NotificationStore>()((set) => ({
 
 	setOsNotifications: (enabled) =>
 		set((s) => ({ config: { ...s.config, osNotificationsEnabled: enabled } })),
+
+	setNotificationSound: (sound) =>
+		set((s) => ({ config: { ...s.config, notificationSound: sound } })),
 }));
 
 // ============================================================================
@@ -240,6 +248,15 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 		}
 	}
 
+	// Notification sound (independent of TTS)
+	if (config.notificationSound !== 'none') {
+		if (typeof window !== 'undefined' && window.maestro?.notification?.playSound) {
+			window.maestro.notification.playSound(config.notificationSound).catch((err) => {
+				console.error('[notificationStore] Notification sound failed:', err);
+			});
+		}
+	}
+
 	// OS desktop notification
 	if (config.osNotificationsEnabled) {
 		if (typeof window !== 'undefined' && window.maestro?.notification?.show) {
@@ -307,5 +324,6 @@ export function getNotificationActions() {
 		setDefaultDuration: state.setDefaultDuration,
 		setAudioFeedback: state.setAudioFeedback,
 		setOsNotifications: state.setOsNotifications,
+		setNotificationSound: state.setNotificationSound,
 	};
 }

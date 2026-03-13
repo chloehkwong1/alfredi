@@ -7,7 +7,6 @@ interface SessionTooltipContentProps {
 	session: Session;
 	theme: Theme;
 	gitFileCount?: number;
-	projectName?: string;
 	isInBatch?: boolean;
 	contextWarningYellowThreshold?: number;
 	contextWarningRedThreshold?: number;
@@ -17,7 +16,6 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 	session,
 	theme,
 	gitFileCount,
-	projectName,
 	isInBatch = false,
 	contextWarningYellowThreshold = 60,
 	contextWarningRedThreshold = 80,
@@ -26,14 +24,6 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 
 	return (
 		<>
-			{projectName && (
-				<div
-					className="text-[10px] font-bold uppercase mb-1"
-					style={{ color: theme.colors.textDim }}
-				>
-					{projectName}
-				</div>
-			)}
 			<div className="flex items-center gap-2 mb-2">
 				<span className="text-xs font-bold" style={{ color: theme.colors.textMain }}>
 					{session.name}

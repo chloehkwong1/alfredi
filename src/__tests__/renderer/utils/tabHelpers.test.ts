@@ -1530,18 +1530,6 @@ describe('tabHelpers', () => {
 			expect(session.aiTabs[0].usageStats).toEqual(usageStats);
 		});
 
-		it('creates a session with project assignment', () => {
-			const { session } = createMergedSession({
-				name: 'Grouped',
-				projectRoot: '/project',
-				toolType: 'claude-code',
-				mergedLogs: [],
-				projectId: 'project-123',
-			});
-
-			expect(session.projectId).toBe('project-123');
-		});
-
 		it('creates a session with saveToHistory option', () => {
 			const { session: sessionWithHistory } = createMergedSession({
 				name: 'With History',

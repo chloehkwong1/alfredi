@@ -179,6 +179,30 @@ export const gitService = {
 	},
 
 	/**
+	 * Get per-commit file list with status and stat info (lazy, per-commit)
+	 * @param cwd Working directory path
+	 * @param hash Commit hash to fetch files for
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async getCommitFiles(
+		cwd: string,
+		hash: string,
+		sshRemoteId?: string
+	): Promise<{ path: string; status: string; additions: number; deletions: number }[]> {
+		return createIpcMethod({
+			call: async () => {
+				const result = await window.maestro.git.commitFiles(cwd, hash, sshRemoteId);
+				if (result.error) {
+					throw new Error(result.error);
+				}
+				return result.files;
+			},
+			errorContext: 'Git commitFiles',
+			defaultValue: [],
+		});
+	},
+
+	/**
 	 * Get the browser-friendly URL for the remote repository
 	 * Returns null if no remote or URL cannot be parsed
 	 * @param cwd Working directory path

@@ -3,6 +3,18 @@
  *
  * Provides fallback estimation for context window usage when agents
  * don't report their context window size directly.
+ *
+ * KEY INSIGHT: Claude Code reports CUMULATIVE session totals in modelUsage,
+ * not per-API-call values. For a session with N turns:
+ *   - cacheReadInputTokens = sum of all cache reads across N calls
+ *     (each call re-reads the conversation history, so this double-counts)
+ *   - cacheCreationInputTokens = sum of all newly-cached content across N calls
+ *     (this approximates the total conversation size)
+ *   - inputTokens = sum of all uncached input across N calls (typically small)
+ *
+ * For a single API call: context = input + cacheRead + cacheCreation (correct).
+ * For cumulative totals: the sum exceeds the context window because cacheRead
+ * is counted N times. The actual current context ≈ cacheCreation + input.
  */
 
 import type { ToolType } from '../types';
@@ -25,16 +37,6 @@ export const DEFAULT_CONTEXT_WINDOWS: Record<ToolType, number> = {
  * both input and output tokens, unlike Claude which has separate limits.
  */
 const COMBINED_CONTEXT_AGENTS: Set<ToolType> = new Set(['codex']);
-
-/** Minimum growth percentage per accumulated turn */
-const MIN_GROWTH_PERCENT = 1;
-/** Maximum growth percentage per accumulated turn */
-const MAX_GROWTH_PERCENT = 3;
-/**
- * Minimum fraction of context window to use when estimating previous token count.
- * Prevents inflated call-count estimates when currentUsage is very low (e.g., 1%).
- */
-const MIN_PREV_CONTEXT_FRACTION = 0.05;
 
 /**
  * Calculate total context tokens based on agent-specific semantics.
@@ -88,11 +90,11 @@ export function calculateContextTokens(
  * - Claude models: inputTokens + cacheReadInputTokens + cacheCreationInputTokens
  * - OpenAI models (Codex): inputTokens + outputTokens (combined limit)
  *
- * Returns null when the calculated total exceeds the context window, which indicates
- * accumulated values from multi-tool turns (many internal API calls within one turn).
- * A single API call's total input can never exceed the context window, so values
- * above it are definitely accumulated. Callers should preserve the previous valid
- * percentage when this returns null.
+ * When the full sum exceeds the context window, values are cumulative session totals
+ * (a single API call's input cannot exceed the context window). In this case,
+ * cacheRead is double-counted across turns, so we estimate actual context as
+ * cacheCreation + input (cacheCreation ≈ total conversation size, since all content
+ * gets cached and later turns read it back from cache).
  *
  * @param stats - The usage statistics containing token counts
  * @param agentId - The agent identifier for agent-specific context window size
@@ -123,12 +125,20 @@ export function estimateContextUsage(
 		return null;
 	}
 
-	// If total exceeds context window, the values are accumulated across multiple
-	// internal API calls within a complex turn (tool use chains). A single API call's
-	// total input cannot exceed the context window. Return null to signal callers
-	// should keep the previous valid percentage.
+	// If total exceeds context window, values are cumulative session totals.
+	// A single API call's total input cannot exceed the context window, so this
+	// means cacheRead has been summed across multiple turns (double-counting).
+	//
+	// Estimate actual context from cacheCreation + input only:
+	// - cacheCreation ≈ total conversation content (each turn caches new content)
+	// - On the latest turn, all previous cacheCreation is read back from cache
+	// - So actual context ≈ cumCacheCreation + latestInput
 	if (totalContextTokens > effectiveContextWindow) {
-		return null;
+		const estimatedContext = (stats.cacheCreationInputTokens || 0) + (stats.inputTokens || 0);
+		if (estimatedContext <= 0) {
+			return null;
+		}
+		return Math.min(100, Math.round((estimatedContext / effectiveContextWindow) * 100));
 	}
 
 	if (totalContextTokens <= 0) {
@@ -155,13 +165,13 @@ export interface ContextDisplayResult {
  * Calculate context tokens and percentage for display, handling accumulated-token overflow.
  *
  * This is the single source of truth for context gauge rendering. When raw token counts
- * exceed the context window (accumulated multi-tool turns), falls back to the preserved
- * contextUsage percentage to derive a sane token count.
+ * exceed the context window (cumulative session totals), estimates actual context from
+ * cacheCreation + input (excluding cacheRead which double-counts across turns).
  *
  * @param usageStats - Token counts from the agent
  * @param contextWindow - Effective context window size (0 = unknown)
  * @param agentId - Agent type for agent-specific calculation
- * @param fallbackPercentage - Preserved contextUsage % to use when tokens overflow
+ * @param fallbackPercentage - Preserved contextUsage % (unused, kept for API compat)
  * @returns Display-ready tokens, percentage, and window size
  */
 export function calculateContextDisplay(
@@ -173,7 +183,7 @@ export function calculateContextDisplay(
 	},
 	contextWindow: number,
 	agentId?: ToolType | string,
-	fallbackPercentage?: number | null
+	_fallbackPercentage?: number | null
 ): ContextDisplayResult {
 	if (!contextWindow || contextWindow <= 0) {
 		return { tokens: 0, percentage: 0, contextWindow: 0 };
@@ -182,59 +192,13 @@ export function calculateContextDisplay(
 	const raw = calculateContextTokens(usageStats, agentId);
 
 	let tokens = raw;
-	if (raw > contextWindow && fallbackPercentage != null && fallbackPercentage >= 0) {
-		// Accumulated multi-tool turn: derive tokens from preserved percentage
-		tokens = Math.round((fallbackPercentage / 100) * contextWindow);
+	if (raw > contextWindow) {
+		// Values are cumulative session totals — cacheRead is double-counted across turns.
+		// Estimate actual context from cacheCreation + input.
+		tokens = (usageStats.cacheCreationInputTokens || 0) + (usageStats.inputTokens || 0);
 	}
 
 	const percentage = tokens <= 0 ? 0 : Math.min(100, Math.round((tokens / contextWindow) * 100));
 
 	return { tokens, percentage, contextWindow };
-}
-
-/**
- * Estimate context growth during accumulated (multi-tool) turns.
- *
- * When estimateContextUsage returns null (accumulated values), the percentage
- * would freeze at the last valid value. This function provides a conservative
- * growth estimate so the gauge keeps moving during tool-heavy turns.
- *
- * Approach: de-accumulate output tokens by dividing by the estimated number
- * of internal API calls (derived from cacheRead / previousContext), then
- * compute what percentage of the window that single-turn output represents.
- * Growth is bounded to 1-3% per turn.
- *
- * IMPORTANT: The caller must cap the result below the compact warning threshold
- * so that estimates never trigger compact warnings — only real measurements can.
- *
- * @param currentUsage - Current context usage percentage (0-100)
- * @param outputTokens - Output tokens from this turn (accumulated across internal calls)
- * @param cacheReadTokens - Cache read tokens (accumulated, used to estimate call count)
- * @param contextWindow - Effective context window size
- * @returns Estimated new context usage percentage
- */
-export function estimateAccumulatedGrowth(
-	currentUsage: number,
-	outputTokens: number,
-	cacheReadTokens: number,
-	contextWindow: number
-): number {
-	if (currentUsage <= 0 || contextWindow <= 0) {
-		return currentUsage;
-	}
-
-	// Estimate how many internal API calls occurred in this turn.
-	// Use a minimum token floor to avoid inflated call-count estimates at low usage.
-	const minTokens = Math.round(contextWindow * MIN_PREV_CONTEXT_FRACTION);
-	const prevTokens = Math.max(minTokens, Math.round((currentUsage / 100) * contextWindow));
-	const estCalls = Math.max(1, Math.round((cacheReadTokens || 0) / prevTokens));
-
-	// De-accumulate: estimate single-call output growth
-	const singleTurnGrowth = Math.round(outputTokens / estCalls);
-	const growthPercent = Math.round((singleTurnGrowth / contextWindow) * 100);
-
-	// Bound growth per turn (conservative to avoid overshooting)
-	const boundedGrowth = Math.max(MIN_GROWTH_PERCENT, Math.min(growthPercent, MAX_GROWTH_PERCENT));
-
-	return currentUsage + boundedGrowth;
 }

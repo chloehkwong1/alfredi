@@ -32,7 +32,6 @@ import {
 	useNavigationHistory,
 	useSessionNavigation,
 	useSortedSessions,
-	useProjectManagement,
 	// Input processing
 	useInputHandlers,
 	// Keyboard handling
@@ -177,8 +176,6 @@ function MaestroConsoleInner() {
 		// Quick Actions Modal
 		quickActionOpen,
 		setQuickActionOpen,
-		quickActionInitialMode,
-		setQuickActionInitialMode,
 		// Lightbox Modal
 		lightboxImage,
 		lightboxImages,
@@ -220,15 +217,6 @@ function MaestroConsoleInner() {
 		setRenameTabId,
 		renameTabInitialName,
 		setRenameTabInitialName,
-		// Rename Project Modal
-		renameProjectModalOpen,
-		setRenameProjectModalOpen,
-		renameProjectId,
-		setRenameProjectId,
-		renameProjectValue,
-		setRenameProjectValue,
-		renameProjectEmoji,
-		setRenameProjectEmoji,
 		// Agent Sessions Browser
 		agentSessionsOpen,
 		setAgentSessionsOpen,
@@ -354,7 +342,6 @@ function MaestroConsoleInner() {
 	// --- SESSION STATE (migrated from useSession() to direct useSessionStore selectors) ---
 	// Reactive values — each selector triggers re-render only when its specific value changes
 	const sessions = useSessionStore((s) => s.sessions);
-	const projects = useSessionStore((s) => s.projects);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	// sessionsLoaded moved to useQueueProcessing hook
 	const activeSession = useSessionStore(selectActiveSession);
@@ -362,7 +349,6 @@ function MaestroConsoleInner() {
 	// Actions — stable references from store, never trigger re-renders
 	const {
 		setSessions,
-		setProjects,
 		setActiveSessionId: storeSetActiveSessionId,
 		setRemovedWorktreePaths,
 	} = useMemo(() => useSessionStore.getState(), []);
@@ -434,7 +420,6 @@ function MaestroConsoleInner() {
 	const showUnreadOnly = useUIStore((s) => s.showUnreadOnly);
 	const fileTreeFilter = useFileExplorerStore((s) => s.fileTreeFilter);
 	const fileTreeFilterOpen = useFileExplorerStore((s) => s.fileTreeFilterOpen);
-	const editingProjectId = useUIStore((s) => s.editingProjectId);
 	const editingSessionId = useUIStore((s) => s.editingSessionId);
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const flashNotification = useUIStore((s) => s.flashNotification);
@@ -448,7 +433,6 @@ function MaestroConsoleInner() {
 		setActiveRightTab,
 		setActiveFocus,
 		setBookmarksCollapsed,
-		setEditingProjectId,
 		setDraggingSessionId,
 		setFlashNotification,
 		setSuccessFlashNotification,
@@ -505,7 +489,7 @@ function MaestroConsoleInner() {
 
 	// Note: Git Diff State, Tour Overlay State, and Git Log Viewer State are from modalStore
 
-	// Note: Renaming state (editingProjectId/editingSessionId) and drag state (draggingSessionId)
+	// Note: Renaming state (editingSessionId) and drag state (draggingSessionId)
 	// are now destructured from useUIStore() above
 
 	// Note: All modal states are now managed by modalStore (Zustand)
@@ -721,7 +705,6 @@ function MaestroConsoleInner() {
 		handleCloseCreatePRModal,
 		handleCloseSendToAgent,
 		handleCloseQueueBrowser,
-		handleCloseRenameProjectModal,
 		handleQuickActionsRenameTab,
 		handleQuickActionsOpenTabSwitcher,
 		handleQuickActionsStartTour,
@@ -1240,7 +1223,6 @@ function MaestroConsoleInner() {
 	// Extracted hook for sorted and visible session lists (ignores leading emojis for alphabetization)
 	const { sortedSessions, visibleSessions } = useSortedSessions({
 		sessions,
-		projects,
 		bookmarksCollapsed,
 	});
 
@@ -1259,8 +1241,6 @@ function MaestroConsoleInner() {
 		setActiveSessionId,
 		activeFocus,
 		setActiveFocus,
-		projects,
-		setProjects,
 		bookmarksCollapsed,
 		setBookmarksCollapsed,
 		inputRef,
@@ -1278,7 +1258,7 @@ function MaestroConsoleInner() {
 		initialLoadComplete
 	);
 
-	// Session lifecycle operations (rename, delete, star, unread, projects persistence, nav tracking)
+	// Session lifecycle operations (rename, delete, star, unread, nav tracking)
 	// — provided by useSessionLifecycle hook (Phase 2H)
 	const {
 		handleSaveEditAgent,
@@ -1307,7 +1287,7 @@ function MaestroConsoleInner() {
 	const { cycleSession } = useCycleSession({ sortedSessions });
 
 	// showConfirmation, performDeleteSession — provided by useSessionLifecycle hook (Phase 2H)
-	// deleteSession, deleteWorktreeProject — provided by useSessionCrud hook
+	// deleteSession — provided by useSessionCrud hook
 
 	// addNewSession, createNewSession — provided by useSessionCrud hook
 
@@ -1383,54 +1363,22 @@ function MaestroConsoleInner() {
 		handleOpenFileTab,
 	});
 
-	// --- PROJECT MANAGEMENT ---
-	// Extracted hook for project CRUD operations (toggle, rename, create, drag-drop)
-	const {
-		toggleProject,
-		startRenamingProject,
-		finishRenamingProject,
-		createNewProject,
-		handleDropOnProject,
-		handleDropOnUngrouped,
-		modalState: projectModalState,
-	} = useProjectManagement({
-		projects,
-		setProjects,
-		setSessions,
-		draggingSessionId,
-		setDraggingSessionId,
-		editingProjectId,
-		setEditingProjectId,
-	});
-
-	// Destructure project modal state for use in JSX
-	const { createProjectModalOpen, setCreateProjectModalOpen } = projectModalState;
-
-	// Session CRUD operations (create, delete, rename, bookmark, drag-drop, project-move)
+	// Session CRUD operations (create, delete, rename, bookmark, drag-drop)
 	const {
 		addNewSession,
 		createNewSession,
 		deleteSession,
-		deleteWorktreeProject,
 		startRenamingSession,
 		finishRenamingSession,
 		toggleBookmark,
 		handleDragStart,
 		handleDragOver,
-		handleCreateProjectAndMove,
-		handleProjectCreated,
 	} = useSessionCrud({
 		flushSessionPersistence,
 		setRemovedWorktreePaths,
 		showConfirmation,
 		inputRef,
-		setCreateProjectModalOpen,
 	});
-
-	// Project Modal Handlers (stable callbacks for AppProjectModals)
-	const handleCloseCreateProjectModal = useCallback(() => {
-		setCreateProjectModalOpen(false);
-	}, [setCreateProjectModalOpen]);
 
 	const handlePRCreated = useCallback(
 		async (prDetails: PRDetails) => {
@@ -1595,10 +1543,8 @@ function MaestroConsoleInner() {
 		aboutModalOpen,
 		processMonitorOpen,
 		logViewerOpen,
-		createProjectModalOpen,
 		confirmModalOpen,
 		renameInstanceModalOpen,
-		renameProjectModalOpen,
 		activeSession,
 		fileTreeFilter,
 		fileTreeFilterOpen,
@@ -1609,11 +1555,9 @@ function MaestroConsoleInner() {
 		hasOpenModal,
 		visibleSessions,
 		sortedSessions,
-		projects,
 		bookmarksCollapsed,
 		leftSidebarOpen,
 		editingSessionId,
-		editingProjectId,
 		markdownEditMode,
 		chatRawTextMode,
 		defaultShowThinking,
@@ -1621,7 +1565,6 @@ function MaestroConsoleInner() {
 		setRightPanelOpen,
 		addNewSession,
 		deleteSession,
-		setQuickActionInitialMode,
 		setQuickActionOpen,
 		cycleSession,
 		toggleInputMode,
@@ -1631,7 +1574,6 @@ function MaestroConsoleInner() {
 		handleSetActiveRightTab,
 		setActiveFocus,
 		setBookmarksCollapsed,
-		setProjects,
 		setSelectedSidebarIndex,
 		setActiveSessionId,
 		handleViewGitDiff,
@@ -1985,21 +1927,13 @@ function MaestroConsoleInner() {
 		// Domain handlers
 		toggleGlobalLive,
 		restartWebServer,
-		toggleProject,
 		handleDragStart,
 		handleDragOver,
-		handleDropOnProject,
-		handleDropOnUngrouped,
-		finishRenamingProject,
 		finishRenamingSession,
-		startRenamingProject,
 		startRenamingSession,
 		showConfirmation,
-		createNewProject,
-		handleCreateProjectAndMove,
 		addNewSession,
 		deleteSession,
-		deleteWorktreeProject,
 		handleEditAgent,
 		handleOpenCreatePRSession,
 		handleQuickCreateWorktree,
@@ -2134,11 +2068,6 @@ function MaestroConsoleInner() {
 							>
 								{(() => {
 									const parts: string[] = [];
-									// Project name (if in a project)
-									const project = projects.find((p) => p.id === activeSession.projectId);
-									if (project) {
-										parts.push(`${project.emoji} ${project.name}`);
-									}
 									// Agent name (user-given name for this agent instance)
 									parts.push(activeSession.name);
 									// Active tab name or UUID octet
@@ -2164,7 +2093,7 @@ function MaestroConsoleInner() {
 
 				{/* --- UNIFIED MODALS (all modal sections consolidated into AppModals) --- */}
 				<AppModals
-					// Common props (sessions/projects + modal booleans self-sourced from stores — Tier 1B)
+					// Common props (sessions + modal booleans self-sourced from stores — Tier 1B)
 					theme={theme}
 					shortcuts={shortcuts}
 					tabShortcuts={tabShortcuts}
@@ -2203,16 +2132,6 @@ function MaestroConsoleInner() {
 					renameTabInitialName={renameTabInitialName}
 					onCloseRenameTabModal={handleCloseRenameTabModal}
 					onRenameTab={handleRenameTab}
-					// AppProjectModals props
-					createProjectModalOpen={createProjectModalOpen}
-					onCloseCreateProjectModal={handleCloseCreateProjectModal}
-					onProjectCreated={handleProjectCreated}
-					renameProjectId={renameProjectId}
-					renameProjectValue={renameProjectValue}
-					setRenameProjectValue={setRenameProjectValue}
-					renameProjectEmoji={renameProjectEmoji}
-					setRenameProjectEmoji={setRenameProjectEmoji}
-					onCloseRenameProjectModal={handleCloseRenameProjectModal}
 					// AppWorktreeModals props
 					onCloseWorktreeConfigModal={handleCloseWorktreeConfigModal}
 					onSaveWorktreeConfig={handleSaveWorktreeConfig}
@@ -2229,17 +2148,11 @@ function MaestroConsoleInner() {
 					onConfirmDeleteWorktree={handleConfirmDeleteWorktree}
 					onConfirmAndDeleteWorktreeOnDisk={handleConfirmAndDeleteWorktreeOnDisk}
 					// AppUtilityModals props
-					quickActionInitialMode={quickActionInitialMode}
 					setQuickActionOpen={setQuickActionOpen}
 					setActiveSessionId={setActiveSessionId}
 					addNewSession={addNewSession}
 					setRenameInstanceValue={setRenameInstanceValue}
 					setRenameInstanceModalOpen={setRenameInstanceModalOpen}
-					setRenameProjectId={setRenameProjectId}
-					setRenameProjectValueForQuickActions={setRenameProjectValue}
-					setRenameProjectEmojiForQuickActions={setRenameProjectEmoji}
-					setRenameProjectModalOpenForQuickActions={setRenameProjectModalOpen}
-					setCreateProjectModalOpenForQuickActions={setCreateProjectModalOpen}
 					setLeftSidebarOpen={setLeftSidebarOpen}
 					setRightPanelOpen={setRightPanelOpen}
 					toggleInputMode={toggleInputMode}

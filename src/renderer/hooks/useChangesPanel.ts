@@ -27,6 +27,15 @@ export interface CommittedFile {
 	deletions: number;
 }
 
+/** File entry within a single commit (fetched lazily on expand) */
+export interface CommitFileEntry {
+	path: string;
+	/** Single-character status: A, M, D, R, C, T */
+	status: string;
+	additions: number;
+	deletions: number;
+}
+
 /** Commit entry from git log (subset of fields needed for the panel) */
 export interface ChangesPanelCommit {
 	hash: string;
@@ -34,6 +43,10 @@ export interface ChangesPanelCommit {
 	author: string;
 	date: string;
 	subject: string;
+	/** Per-commit files, populated lazily via fetchCommitFiles */
+	files?: CommitFileEntry[];
+	/** Whether files have been fetched (avoids re-fetching on re-expand) */
+	filesLoaded?: boolean;
 }
 
 export interface UseChangesPanelResult {
@@ -46,6 +59,8 @@ export interface UseChangesPanelResult {
 	mergeBase: string | undefined;
 	isLoading: boolean;
 	refresh: () => void;
+	/** Lazily fetch files for a specific commit. Cached after first fetch. */
+	fetchCommitFiles: (hash: string) => Promise<void>;
 }
 
 /** Auto-refresh interval in milliseconds */
@@ -263,6 +278,26 @@ export function useChangesPanel(
 		return () => window.removeEventListener('focus', handleFocus);
 	}, [refresh]);
 
+	// Lazily fetch files for a specific commit (cached after first fetch)
+	const fetchCommitFiles = useCallback(
+		async (hash: string) => {
+			if (!cwd) return;
+
+			// Check if already loaded (avoid re-fetch)
+			const existing = commits.find((c) => c.hash === hash);
+			if (existing?.filesLoaded) return;
+
+			const files = await gitService.getCommitFiles(cwd, hash, sshRemoteId);
+
+			if (!mountedRef.current) return;
+
+			setCommits((prev) =>
+				prev.map((c) => (c.hash === hash ? { ...c, files, filesLoaded: true } : c))
+			);
+		},
+		[cwd, sshRemoteId, commits]
+	);
+
 	return useMemo(
 		() => ({
 			stagedFiles,
@@ -274,6 +309,7 @@ export function useChangesPanel(
 			mergeBase: mergeBaseRef,
 			isLoading,
 			refresh,
+			fetchCommitFiles,
 		}),
 		[
 			stagedFiles,
@@ -285,6 +321,7 @@ export function useChangesPanel(
 			mergeBaseRef,
 			isLoading,
 			refresh,
+			fetchCommitFiles,
 		]
 	);
 }
