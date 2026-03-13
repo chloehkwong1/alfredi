@@ -89,7 +89,7 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
  */
 export function ensureInUnifiedTabOrder(
 	unifiedTabOrder: UnifiedTabRef[],
-	type: 'ai' | 'file' | 'diff',
+	type: 'ai' | 'file' | 'diff' | 'commit-diff',
 	id: string
 ): UnifiedTabRef[] {
 	const exists = unifiedTabOrder.some((ref) => ref.type === type && ref.id === id);
@@ -1991,6 +1991,11 @@ export function findPreviewTab(session: Session): UnifiedTabRef | null {
 		return { type: 'diff', id: diffPreview.id };
 	}
 
+	const commitDiffPreview = (session.commitDiffTabs || []).find((tab) => tab.isPreview);
+	if (commitDiffPreview) {
+		return { type: 'commit-diff', id: commitDiffPreview.id };
+	}
+
 	return null;
 }
 
@@ -2021,6 +2026,15 @@ export function pinTab(session: Session, tabId: string): Session {
 			tab.id === tabId ? { ...tab, isPreview: false } : tab
 		);
 		return { ...session, diffViewTabs: updatedDiffTabs };
+	}
+
+	// Check commit diff tabs
+	const commitDiffTabIndex = (session.commitDiffTabs || []).findIndex((tab) => tab.id === tabId);
+	if (commitDiffTabIndex !== -1) {
+		const updatedCommitDiffTabs = session.commitDiffTabs.map((tab) =>
+			tab.id === tabId ? { ...tab, isPreview: false } : tab
+		);
+		return { ...session, commitDiffTabs: updatedCommitDiffTabs };
 	}
 
 	return session;
@@ -2068,7 +2082,7 @@ export function closeExistingPreviewTab(session: Session): {
 			},
 			replacedIndex: unifiedIndex,
 		};
-	} else {
+	} else if (existing.type === 'diff') {
 		// Remove from diffViewTabs and unifiedTabOrder (skip closed-tab history for preview tabs)
 		const updatedDiffViewTabs = (session.diffViewTabs || []).filter(
 			(tab) => tab.id !== existing.id
@@ -2087,6 +2101,28 @@ export function closeExistingPreviewTab(session: Session): {
 				diffViewTabs: updatedDiffViewTabs,
 				unifiedTabOrder: updatedUnifiedTabOrder,
 				activeDiffTabId: newActiveDiffTabId,
+			},
+			replacedIndex: unifiedIndex,
+		};
+	} else {
+		// Remove from commitDiffTabs and unifiedTabOrder (skip closed-tab history for preview tabs)
+		const updatedCommitDiffTabs = (session.commitDiffTabs || []).filter(
+			(tab) => tab.id !== existing.id
+		);
+		const updatedUnifiedTabOrder = (session.unifiedTabOrder || []).filter(
+			(ref) => !(ref.type === 'commit-diff' && ref.id === existing.id)
+		);
+
+		// If the closed preview was the active tab, clear the active commit diff tab
+		const newActiveCommitDiffTabId =
+			session.activeCommitDiffTabId === existing.id ? null : session.activeCommitDiffTabId;
+
+		return {
+			session: {
+				...session,
+				commitDiffTabs: updatedCommitDiffTabs,
+				unifiedTabOrder: updatedUnifiedTabOrder,
+				activeCommitDiffTabId: newActiveCommitDiffTabId,
 			},
 			replacedIndex: unifiedIndex,
 		};

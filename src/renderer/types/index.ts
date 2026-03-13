@@ -571,6 +571,7 @@ export interface CommitDiffTab {
 	rawDiff: string; // Full unified diff output from git show
 	scrollTop: number; // Saved scroll position
 	createdAt: number; // Timestamp for ordering
+	isPreview?: boolean; // Preview tab (replaced on next open, pinned on double-click)
 }
 
 /**

@@ -118,12 +118,15 @@ export interface TabHandlersReturn {
 	handleCloseDiffTab: (tabId: string) => void;
 
 	// Commit Diff Tab handlers
-	handleOpenCommitDiffTab: (commit: {
-		hash: string;
-		subject: string;
-		author: string;
-		date: string;
-	}) => Promise<void>;
+	handleOpenCommitDiffTab: (
+		commit: {
+			hash: string;
+			subject: string;
+			author: string;
+			date: string;
+		},
+		isPreview?: boolean
+	) => Promise<void>;
 	handleSelectCommitDiffTab: (tabId: string) => void;
 	handleCloseCommitDiffTab: (tabId: string) => void;
 	handleFileTabEditModeChange: (tabId: string, editMode: boolean) => void;
@@ -679,10 +682,15 @@ export function useTabHandlers(): TabHandlersReturn {
 	 * If a tab for this commit already exists, switch to it.
 	 */
 	const handleOpenCommitDiffTab = useCallback(
-		async (commit: { hash: string; subject: string; author: string; date: string }) => {
+		async (
+			commit: { hash: string; subject: string; author: string; date: string },
+			isPreview?: boolean
+		) => {
 			const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
 			const currentSession = sessions.find((s) => s.id === activeSessionId);
 			if (!currentSession) return;
+
+			const preview = isPreview ?? false;
 
 			// Check if tab for this commit already exists
 			const existing = (currentSession.commitDiffTabs || []).find(
@@ -692,11 +700,27 @@ export function useTabHandlers(): TabHandlersReturn {
 				setSessions((prev: Session[]) =>
 					prev.map((s) => {
 						if (s.id !== activeSessionId) return s;
+
+						// If opening as non-preview, pin the existing tab and close any other preview
+						const updatedTabs = s.commitDiffTabs.map((tab) =>
+							tab.id === existing.id ? { ...tab, ...(!preview ? { isPreview: false } : {}) } : tab
+						);
+						let session = { ...s, commitDiffTabs: updatedTabs };
+						if (!preview) {
+							const { session: cleaned } = closeExistingPreviewTab(session);
+							session = cleaned;
+						}
+
 						return {
-							...s,
+							...session,
 							activeCommitDiffTabId: existing.id,
 							activeFileTabId: null,
 							activeDiffTabId: null,
+							unifiedTabOrder: ensureInUnifiedTabOrder(
+								session.unifiedTabOrder,
+								'commit-diff',
+								existing.id
+							),
 						};
 					})
 				);
@@ -720,6 +744,7 @@ export function useTabHandlers(): TabHandlersReturn {
 				rawDiff: result.diff || '',
 				scrollTop: 0,
 				createdAt: Date.now(),
+				...(preview ? { isPreview: true } : {}),
 			};
 
 			const newTabRef: UnifiedTabRef = { type: 'commit-diff' as const, id: tabId };
@@ -727,13 +752,35 @@ export function useTabHandlers(): TabHandlersReturn {
 			setSessions((prev: Session[]) =>
 				prev.map((s) => {
 					if (s.id !== activeSessionId) return s;
+
+					// If opening as preview, close any existing preview tab first
+					let sessionForNewTab = s;
+					let replacedIndex = -1;
+					if (preview) {
+						const result = closeExistingPreviewTab(s);
+						sessionForNewTab = result.session;
+						replacedIndex = result.replacedIndex;
+					}
+
+					// Determine insertion position
+					let updatedUnifiedTabOrder: UnifiedTabRef[];
+					if (preview && replacedIndex !== -1) {
+						updatedUnifiedTabOrder = [
+							...sessionForNewTab.unifiedTabOrder.slice(0, replacedIndex),
+							newTabRef,
+							...sessionForNewTab.unifiedTabOrder.slice(replacedIndex),
+						];
+					} else {
+						updatedUnifiedTabOrder = [...sessionForNewTab.unifiedTabOrder, newTabRef];
+					}
+
 					return {
-						...s,
-						commitDiffTabs: [...(s.commitDiffTabs || []), newTab],
+						...sessionForNewTab,
+						commitDiffTabs: [...(sessionForNewTab.commitDiffTabs || []), newTab],
 						activeCommitDiffTabId: tabId,
 						activeFileTabId: null,
 						activeDiffTabId: null,
-						unifiedTabOrder: [...s.unifiedTabOrder, newTabRef],
+						unifiedTabOrder: updatedUnifiedTabOrder,
 					};
 				})
 			);
@@ -1071,16 +1118,48 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 				let updatedSession = s;
-				const tabIds = s.aiTabs.map((t) => t.id);
-				for (const tabId of tabIds) {
-					const tab = updatedSession.aiTabs.find((t) => t.id === tabId);
-					const result = closeTab(updatedSession, tabId, false, {
-						skipHistory: tab ? hasActiveWizard(tab) : false,
-					});
-					if (result) {
-						updatedSession = result.session;
+
+				// Close all tabs via unifiedTabOrder to handle all types
+				const tabsToClose = [...s.unifiedTabOrder];
+				for (const tabRef of tabsToClose) {
+					if (tabRef.type === 'ai') {
+						const tab = updatedSession.aiTabs.find((t) => t.id === tabRef.id);
+						const result = closeTab(updatedSession, tabRef.id, false, {
+							skipHistory: tab ? hasActiveWizard(tab) : false,
+						});
+						if (result) {
+							updatedSession = result.session;
+						}
+					} else if (tabRef.type === 'diff') {
+						const result = closeDiffTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
+						}
+					} else if (tabRef.type === 'commit-diff') {
+						updatedSession = {
+							...updatedSession,
+							commitDiffTabs: (updatedSession.commitDiffTabs || []).filter(
+								(t) => t.id !== tabRef.id
+							),
+							activeCommitDiffTabId:
+								updatedSession.activeCommitDiffTabId === tabRef.id
+									? null
+									: updatedSession.activeCommitDiffTabId,
+							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
+								(ref) => !(ref.type === 'commit-diff' && ref.id === tabRef.id)
+							),
+						};
+					} else {
+						updatedSession = {
+							...updatedSession,
+							filePreviewTabs: updatedSession.filePreviewTabs.filter((t) => t.id !== tabRef.id),
+							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
+								(ref) => !(ref.type === 'file' && ref.id === tabRef.id)
+							),
+						};
 					}
 				}
+
 				return updatedSession;
 			})
 		);
@@ -1092,8 +1171,15 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
+				const activeUnifiedId =
+					s.activeDiffTabId ?? s.activeCommitDiffTabId ?? s.activeFileTabId ?? s.activeTabId;
+				const activeUnifiedType = s.activeDiffTabId
+					? 'diff'
+					: s.activeCommitDiffTabId
+						? 'commit-diff'
+						: s.activeFileTabId
+							? 'file'
+							: 'ai';
 
 				const tabsToClose = s.unifiedTabOrder.filter(
 					(ref) => !(ref.type === activeUnifiedType && ref.id === activeUnifiedId)
@@ -1112,6 +1198,25 @@ export function useTabHandlers(): TabHandlersReturn {
 								updatedSession = result.session;
 							}
 						}
+					} else if (tabRef.type === 'diff') {
+						const result = closeDiffTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
+						}
+					} else if (tabRef.type === 'commit-diff') {
+						updatedSession = {
+							...updatedSession,
+							commitDiffTabs: (updatedSession.commitDiffTabs || []).filter(
+								(t) => t.id !== tabRef.id
+							),
+							activeCommitDiffTabId:
+								updatedSession.activeCommitDiffTabId === tabRef.id
+									? null
+									: updatedSession.activeCommitDiffTabId,
+							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
+								(ref) => !(ref.type === 'commit-diff' && ref.id === tabRef.id)
+							),
+						};
 					} else {
 						updatedSession = {
 							...updatedSession,
@@ -1134,8 +1239,15 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
+				const activeUnifiedId =
+					s.activeDiffTabId ?? s.activeCommitDiffTabId ?? s.activeFileTabId ?? s.activeTabId;
+				const activeUnifiedType = s.activeDiffTabId
+					? 'diff'
+					: s.activeCommitDiffTabId
+						? 'commit-diff'
+						: s.activeFileTabId
+							? 'file'
+							: 'ai';
 
 				const activeIndex = s.unifiedTabOrder.findIndex(
 					(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
@@ -1157,6 +1269,25 @@ export function useTabHandlers(): TabHandlersReturn {
 								updatedSession = result.session;
 							}
 						}
+					} else if (tabRef.type === 'diff') {
+						const result = closeDiffTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
+						}
+					} else if (tabRef.type === 'commit-diff') {
+						updatedSession = {
+							...updatedSession,
+							commitDiffTabs: (updatedSession.commitDiffTabs || []).filter(
+								(t) => t.id !== tabRef.id
+							),
+							activeCommitDiffTabId:
+								updatedSession.activeCommitDiffTabId === tabRef.id
+									? null
+									: updatedSession.activeCommitDiffTabId,
+							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
+								(ref) => !(ref.type === 'commit-diff' && ref.id === tabRef.id)
+							),
+						};
 					} else {
 						updatedSession = {
 							...updatedSession,
@@ -1179,8 +1310,15 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 
-				const activeUnifiedId = s.activeFileTabId ?? s.activeTabId;
-				const activeUnifiedType = s.activeFileTabId ? 'file' : 'ai';
+				const activeUnifiedId =
+					s.activeDiffTabId ?? s.activeCommitDiffTabId ?? s.activeFileTabId ?? s.activeTabId;
+				const activeUnifiedType = s.activeDiffTabId
+					? 'diff'
+					: s.activeCommitDiffTabId
+						? 'commit-diff'
+						: s.activeFileTabId
+							? 'file'
+							: 'ai';
 
 				const activeIndex = s.unifiedTabOrder.findIndex(
 					(ref) => ref.type === activeUnifiedType && ref.id === activeUnifiedId
@@ -1202,6 +1340,25 @@ export function useTabHandlers(): TabHandlersReturn {
 								updatedSession = result.session;
 							}
 						}
+					} else if (tabRef.type === 'diff') {
+						const result = closeDiffTabHelper(updatedSession, tabRef.id);
+						if (result) {
+							updatedSession = result.session;
+						}
+					} else if (tabRef.type === 'commit-diff') {
+						updatedSession = {
+							...updatedSession,
+							commitDiffTabs: (updatedSession.commitDiffTabs || []).filter(
+								(t) => t.id !== tabRef.id
+							),
+							activeCommitDiffTabId:
+								updatedSession.activeCommitDiffTabId === tabRef.id
+									? null
+									: updatedSession.activeCommitDiffTabId,
+							unifiedTabOrder: updatedSession.unifiedTabOrder.filter(
+								(ref) => !(ref.type === 'commit-diff' && ref.id === tabRef.id)
+							),
+						};
 					} else {
 						updatedSession = {
 							...updatedSession,
