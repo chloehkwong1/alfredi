@@ -123,12 +123,15 @@ interface RightPanelProps {
 	}) => void;
 
 	// Commit diff tab handler (from useTabHandlers)
-	onOpenCommitDiffTab?: (commit: {
-		hash: string;
-		subject: string;
-		author: string;
-		date: string;
-	}) => Promise<void>;
+	onOpenCommitDiffTab?: (
+		commit: {
+			hash: string;
+			subject: string;
+			author: string;
+			date: string;
+		},
+		isPreview?: boolean
+	) => Promise<void>;
 }
 
 // ============================================================================
@@ -409,13 +412,16 @@ export const RightPanel = memo(
 
 		/** Open a stacked commit diff tab for the given commit */
 		const handleOpenCommitDiff = useCallback(
-			(commit: import('../hooks/useChangesPanel').ChangesPanelCommit) => {
-				onOpenCommitDiffTab?.({
-					hash: commit.hash,
-					subject: commit.subject,
-					author: commit.author,
-					date: commit.date,
-				});
+			(commit: import('../hooks/useChangesPanel').ChangesPanelCommit, isPreview?: boolean) => {
+				onOpenCommitDiffTab?.(
+					{
+						hash: commit.hash,
+						subject: commit.subject,
+						author: commit.author,
+						date: commit.date,
+					},
+					isPreview
+				);
 			},
 			[onOpenCommitDiffTab]
 		);
@@ -563,32 +569,31 @@ export const RightPanel = memo(
 
 				{/* Top Tab Header */}
 				<div className="flex border-b h-10 shrink-0" style={{ borderColor: theme.colors.border }}>
-					{/* Explorer tab */}
-					<button
-						onClick={() => setActiveRightTopTab('explorer')}
-						className="flex items-center gap-1.5 px-3 text-xs font-bold border-b-2 transition-colors"
-						style={{
-							borderColor: activeRightTopTab === 'explorer' ? theme.colors.accent : 'transparent',
-							color:
-								activeRightTopTab === 'explorer' ? theme.colors.textMain : theme.colors.textDim,
-						}}
-						data-tour="files-tab"
-					>
-						<FolderTree className="w-3.5 h-3.5" />
-						Explorer
-					</button>
-
 					{/* Changes tab */}
 					<button
 						onClick={() => setActiveRightTopTab('changes')}
 						className="flex items-center gap-1.5 px-3 text-xs font-bold border-b-2 transition-colors"
 						style={{
 							borderColor: activeRightTopTab === 'changes' ? theme.colors.accent : 'transparent',
-							color: activeRightTopTab === 'changes' ? theme.colors.textMain : theme.colors.textDim,
+							color: activeRightTopTab === 'changes' ? theme.colors.accent : theme.colors.textMain,
 						}}
 					>
 						<GitCommitHorizontal className="w-3.5 h-3.5" />
 						Changes
+					</button>
+
+					{/* Explorer tab */}
+					<button
+						onClick={() => setActiveRightTopTab('explorer')}
+						className="flex items-center gap-1.5 px-3 text-xs font-bold border-b-2 transition-colors"
+						style={{
+							borderColor: activeRightTopTab === 'explorer' ? theme.colors.accent : 'transparent',
+							color: activeRightTopTab === 'explorer' ? theme.colors.accent : theme.colors.textMain,
+						}}
+						data-tour="files-tab"
+					>
+						<FolderTree className="w-3.5 h-3.5" />
+						Explorer
 					</button>
 
 					{/* File preview tabs from the session */}
@@ -599,7 +604,7 @@ export const RightPanel = memo(
 							className="flex items-center gap-1 px-2 text-xs border-b-2 transition-colors max-w-[120px] truncate"
 							style={{
 								borderColor: activeRightTopTab === tab.id ? theme.colors.accent : 'transparent',
-								color: activeRightTopTab === tab.id ? theme.colors.textMain : theme.colors.textDim,
+								color: activeRightTopTab === tab.id ? theme.colors.accent : theme.colors.textMain,
 							}}
 							title={tab.name + tab.extension}
 						>

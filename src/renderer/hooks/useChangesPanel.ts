@@ -120,14 +120,18 @@ export function useChangesPanel(
 	const [currentBranch, setCurrentBranch] = useState<string | undefined>();
 	const [baseBranch, setBaseBranch] = useState<string | undefined>();
 	const [mergeBaseRef, setMergeBaseRef] = useState<string | undefined>();
-	const [isLoading, setIsLoading] = useState(true);
+	const [isLoading, setIsLoading] = useState(!!cwd);
 
 	const mountedRef = useRef(true);
+	const hasLoadedOnceRef = useRef(false);
 
 	const refresh = useCallback(async () => {
 		if (!cwd) return;
 
-		setIsLoading(true);
+		// Only show loading spinner on initial load, not background refreshes
+		if (!hasLoadedOnceRef.current) {
+			setIsLoading(true);
+		}
 		try {
 			// 1. Fetch uncommitted status + numstat in parallel
 			const [statusResult, numstatResult] = await Promise.all([
@@ -269,9 +273,15 @@ export function useChangesPanel(
 		} finally {
 			if (mountedRef.current) {
 				setIsLoading(false);
+				hasLoadedOnceRef.current = true;
 			}
 		}
 	}, [cwd, sshRemoteId]);
+
+	// Reset initial-load tracking when cwd changes (e.g. switching agents)
+	useEffect(() => {
+		hasLoadedOnceRef.current = false;
+	}, [cwd]);
 
 	// Initial fetch
 	useEffect(() => {

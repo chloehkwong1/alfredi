@@ -124,7 +124,7 @@ export const useUIStore = create<UIStore>()((set) => ({
 	rightPanelOpen: true,
 	activeFocus: 'main',
 	activeRightTab: 'files',
-	activeRightTopTab: 'explorer',
+	activeRightTopTab: 'changes',
 	bookmarksCollapsed: false,
 	showUnreadOnly: false,
 	preFilterActiveTabId: null,

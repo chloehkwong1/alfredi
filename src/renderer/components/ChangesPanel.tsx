@@ -1,10 +1,9 @@
 /**
  * ChangesPanel — Right Panel content for the "Changes" tab.
  *
- * Shows three collapsible sections:
+ * Shows two collapsible sections:
  * 1. Staged Changes — files in the git index
  * 2. Unstaged Changes — modified/untracked files in the work tree
- * 3. Committed Changes — files changed vs the branch divergence point
  *
  * Clicking a file row calls `onOpenDiff` to open a diff viewer tab in the main panel.
  */
@@ -32,7 +31,7 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 
 export type DiffOpenType = 'uncommitted-staged' | 'uncommitted-unstaged' | 'committed' | 'commit';
 
-export type ChangesViewMode = 'all' | 'branch-commits' | 'all-commits';
+export type ChangesViewMode = 'all' | 'branch-commits';
 
 export interface ChangesPanelProps {
 	theme: Theme;
@@ -55,8 +54,8 @@ export interface ChangesPanelProps {
 		commitHash?: string,
 		isPreview?: boolean
 	) => void;
-	/** Called when clicking a commit row in branch/all-commits views */
-	onOpenCommitDiff: (commit: ChangesPanelCommit) => void;
+	/** Called when clicking a commit row in the By Commits view */
+	onOpenCommitDiff: (commit: ChangesPanelCommit, isPreview?: boolean) => void;
 	/** Lazily fetch files for a specific commit */
 	fetchCommitFiles: (hash: string) => Promise<void>;
 }
@@ -240,21 +239,25 @@ const SectionHeader = memo(function SectionHeader({
 /** Segmented control pill button styles */
 const VIEW_MODE_OPTIONS: { value: ChangesViewMode; label: string }[] = [
 	{ value: 'all', label: 'All Changes' },
-	{ value: 'branch-commits', label: 'Branch' },
-	{ value: 'all-commits', label: 'All Commits' },
+	{ value: 'branch-commits', label: 'By Commits' },
 ];
 
-/** Reusable commit list for both branch-commits and all-commits views */
+/** Reusable commit list for the By Commits view */
 const CommitListView = memo(function CommitListView({
 	commits,
 	theme,
 	onOpenCommitDiff,
 	fetchCommitFiles,
+	branchCommitCount,
+	isLoading,
 }: {
 	commits: ChangesPanelCommit[];
 	theme: Theme;
-	onOpenCommitDiff: (commit: ChangesPanelCommit) => void;
+	onOpenCommitDiff: (commit: ChangesPanelCommit, isPreview?: boolean) => void;
 	fetchCommitFiles: (hash: string) => Promise<void>;
+	/** Number of commits from the start that are branch-specific; rest are dimmed below a divider */
+	branchCommitCount?: number;
+	isLoading?: boolean;
 }) {
 	const [expandedCommits, setExpandedCommits] = useState<Set<string>>(() => new Set());
 	const [loadingCommits, setLoadingCommits] = useState<Set<string>>(() => new Set());
@@ -317,7 +320,7 @@ const CommitListView = memo(function CommitListView({
 					e.preventDefault();
 					const commit = commits[focusedIndex];
 					if (commit) {
-						onOpenCommitDiff(commit);
+						onOpenCommitDiff(commit, false);
 					}
 					break;
 				}
@@ -329,12 +332,18 @@ const CommitListView = memo(function CommitListView({
 	if (commits.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center py-12 px-4">
-				<span className="text-xs" style={{ color: theme.colors.textDim }}>
-					No commits
-				</span>
+				{isLoading ? (
+					<Loader2 className="w-4 h-4 animate-spin" style={{ color: theme.colors.textDim }} />
+				) : (
+					<span className="text-xs" style={{ color: theme.colors.textDim }}>
+						No commits
+					</span>
+				)}
 			</div>
 		);
 	}
+
+	const hasDivider = branchCommitCount !== undefined && branchCommitCount < commits.length;
 
 	return (
 		<div ref={listRef} tabIndex={-1} className="outline-none" onKeyDown={handleKeyDown}>
@@ -345,17 +354,36 @@ const CommitListView = memo(function CommitListView({
 				const commitDels = commit.files?.reduce((s, f) => s + f.deletions, 0) ?? 0;
 				const fileCount = commit.files?.length;
 				const isFocused = focusedIndex === commitIdx;
+				const isDimmed = hasDivider && commitIdx >= branchCommitCount;
+				const showDivider = hasDivider && commitIdx === branchCommitCount;
 
 				return (
 					<div key={`commit-${commit.hash}`}>
+						{showDivider && (
+							<div className="flex items-center gap-2 px-3 py-1.5" style={{ opacity: 0.5 }}>
+								<div
+									className="flex-1 border-t border-dashed"
+									style={{ borderColor: theme.colors.textDim }}
+								/>
+								<span className="text-[10px] shrink-0" style={{ color: theme.colors.textDim }}>
+									branch base
+								</span>
+								<div
+									className="flex-1 border-t border-dashed"
+									style={{ borderColor: theme.colors.textDim }}
+								/>
+							</div>
+						)}
 						<div
 							className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs transition-colors ${
 								isFocused ? '' : 'hover:bg-white/5'
 							}`}
 							style={{
 								backgroundColor: isFocused ? theme.colors.bgActivity : undefined,
+								opacity: isDimmed ? 0.5 : undefined,
 							}}
-							onClick={() => onOpenCommitDiff(commit)}
+							onClick={() => onOpenCommitDiff(commit, true)}
+							onDoubleClick={() => onOpenCommitDiff(commit, false)}
 						>
 							<button
 								className="shrink-0 p-0 bg-transparent border-none cursor-pointer"
@@ -380,7 +408,7 @@ const CommitListView = memo(function CommitListView({
 								className="flex-1 min-w-0 truncate font-medium"
 								style={{ color: theme.colors.textMain }}
 							>
-								{commit.subject.length > 50 ? commit.subject.slice(0, 50) + '...' : commit.subject}
+								{commit.subject}
 							</span>
 							{isLoadingCommit && (
 								<Loader2
@@ -461,12 +489,6 @@ function ChangesPanelInner({
 	const [unstagedExpanded, setUnstagedExpanded] = useState(true);
 	const [committedExpanded, setCommittedExpanded] = useState(true);
 
-	// Which commit timeline sections are expanded (includes 'all' for branch diff)
-	const [expandedCommits, setExpandedCommits] = useState<Set<string>>(() => new Set(['all']));
-
-	// Loading state for per-commit file fetches
-	const [loadingCommits, setLoadingCommits] = useState<Set<string>>(() => new Set());
-
 	// Keyboard navigation state
 	const [selectedIndex, setSelectedIndex] = useState(-1);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -490,41 +512,8 @@ function ChangesPanelInner({
 	// Discard All confirmation modal state
 	const [showDiscardAllModal, setShowDiscardAllModal] = useState(false);
 
-	// Toggle a commit timeline section (expand/collapse)
-	const toggleCommitSection = useCallback(
-		async (key: string) => {
-			setExpandedCommits((prev) => {
-				const next = new Set(prev);
-				if (next.has(key)) {
-					next.delete(key);
-				} else {
-					next.add(key);
-				}
-				return next;
-			});
-
-			// Lazy-load commit files if expanding a commit (not 'all')
-			if (key !== 'all' && !expandedCommits.has(key)) {
-				const commit = commits.find((c) => c.hash === key);
-				if (commit && !commit.filesLoaded) {
-					setLoadingCommits((prev) => new Set(prev).add(key));
-					await fetchCommitFiles(key);
-					setLoadingCommits((prev) => {
-						const next = new Set(prev);
-						next.delete(key);
-						return next;
-					});
-				}
-			}
-		},
-		[expandedCommits, commits, fetchCommitFiles]
-	);
-
 	// Build flat list of all visible items for keyboard navigation
-	// Items can be file rows or commit headers (for toggling)
-	type FlatItem =
-		| { kind: 'file'; filePath: string; diffType: DiffOpenType; commitHash?: string }
-		| { kind: 'commit-header'; commitKey: string };
+	type FlatItem = { kind: 'file'; filePath: string; diffType: DiffOpenType; commitHash?: string };
 
 	const flatItems: FlatItem[] = React.useMemo(() => {
 		const items: FlatItem[] = [];
@@ -540,21 +529,8 @@ function ChangesPanelInner({
 			}
 		}
 		if (committedExpanded) {
-			// "All files" header
-			items.push({ kind: 'commit-header', commitKey: 'all' });
-			if (expandedCommits.has('all')) {
-				for (const f of committedFiles) {
-					items.push({ kind: 'file', filePath: f.path, diffType: 'committed' });
-				}
-			}
-			// Per-commit headers + files
-			for (const c of commits) {
-				items.push({ kind: 'commit-header', commitKey: c.hash });
-				if (expandedCommits.has(c.hash) && c.files) {
-					for (const f of c.files) {
-						items.push({ kind: 'file', filePath: f.path, diffType: 'commit', commitHash: c.hash });
-					}
-				}
+			for (const f of committedFiles) {
+				items.push({ kind: 'file', filePath: f.path, diffType: 'committed' });
 			}
 		}
 
@@ -563,8 +539,6 @@ function ChangesPanelInner({
 		stagedFiles,
 		unstagedFiles,
 		committedFiles,
-		commits,
-		expandedCommits,
 		stagedExpanded,
 		unstagedExpanded,
 		committedExpanded,
@@ -597,18 +571,14 @@ function ChangesPanelInner({
 				case 'Enter': {
 					e.preventDefault();
 					const item = flatItems[selectedIndex];
-					if (item) {
-						if (item.kind === 'commit-header') {
-							toggleCommitSection(item.commitKey);
-						} else {
-							onOpenDiff(item.filePath, item.diffType, item.commitHash);
-						}
+					if (item && item.kind === 'file') {
+						onOpenDiff(item.filePath, item.diffType, item.commitHash);
 					}
 					break;
 				}
 			}
 		},
-		[flatItems, selectedIndex, onOpenDiff, toggleCommitSection]
+		[flatItems, selectedIndex, onOpenDiff]
 	);
 
 	const handleFileClick = useCallback(
@@ -690,22 +660,28 @@ function ChangesPanelInner({
 
 			{/* View mode segmented control */}
 			<div
-				className="flex items-center gap-1 px-3 py-1.5 border-b"
+				className="flex items-center gap-3 px-3 border-b"
 				style={{ borderColor: theme.colors.border }}
 			>
-				{VIEW_MODE_OPTIONS.map((option) => (
-					<button
-						key={option.value}
-						className="px-2 py-0.5 rounded-full text-[11px] font-medium transition-colors"
-						style={{
-							backgroundColor: viewMode === option.value ? theme.colors.bgActivity : 'transparent',
-							color: viewMode === option.value ? theme.colors.textMain : theme.colors.textDim,
-						}}
-						onClick={() => setViewMode(option.value)}
-					>
-						{option.label}
-					</button>
-				))}
+				{VIEW_MODE_OPTIONS.map((option) => {
+					const isActive = viewMode === option.value;
+					return (
+						<button
+							key={option.value}
+							className="px-0 py-1.5 text-[11px] font-medium transition-colors bg-transparent border-none cursor-pointer"
+							style={{
+								color: isActive ? theme.colors.accent : theme.colors.textMain,
+								borderBottom: isActive
+									? `2px solid ${theme.colors.accent}`
+									: '2px solid transparent',
+								marginBottom: '-1px',
+							}}
+							onClick={() => setViewMode(option.value)}
+						>
+							{option.label}
+						</button>
+					);
+				})}
 			</div>
 
 			{/* === All Changes view === */}
@@ -820,205 +796,39 @@ function ChangesPanelInner({
 								theme={theme}
 								badge={baseBranch ? `vs ${baseBranch}` : undefined}
 							/>
-							{committedExpanded && (
-								<div>
-									{/* "All files (branch diff)" expandable section */}
-									{(() => {
-										const allIdx = flatIndex++;
-										const allExpanded = expandedCommits.has('all');
-										const totalAdds = committedFiles.reduce((s, f) => s + f.additions, 0);
-										const totalDels = committedFiles.reduce((s, f) => s + f.deletions, 0);
-										return (
-											<div key="commit-all">
-												<div
-													className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs transition-colors ${
-														selectedIndex === allIdx ? '' : 'hover:bg-white/5'
-													}`}
-													style={{
-														backgroundColor:
-															selectedIndex === allIdx ? theme.colors.bgActivity : 'transparent',
-													}}
-													onClick={() => toggleCommitSection('all')}
-												>
-													{allExpanded ? (
-														<ChevronDown
-															className="w-3 h-3 shrink-0"
-															style={{ color: theme.colors.textDim }}
-														/>
-													) : (
-														<ChevronRight
-															className="w-3 h-3 shrink-0"
-															style={{ color: theme.colors.textDim }}
-														/>
-													)}
-													<span className="font-semibold" style={{ color: theme.colors.textMain }}>
-														All files (branch diff)
-													</span>
-													<span
-														className="font-mono text-[10px] px-1 py-0.5 rounded"
-														style={{
-															backgroundColor: theme.colors.bgActivity,
-															color: theme.colors.textDim,
-														}}
-													>
-														{committedFiles.length}
-													</span>
-													{(totalAdds > 0 || totalDels > 0) && (
-														<span className="font-mono text-[10px] ml-auto flex items-center gap-1">
-															{totalAdds > 0 && (
-																<span style={{ color: 'rgb(34, 197, 94)' }}>+{totalAdds}</span>
-															)}
-															{totalDels > 0 && (
-																<span style={{ color: 'rgb(239, 68, 68)' }}>-{totalDels}</span>
-															)}
-														</span>
-													)}
-												</div>
-												{allExpanded &&
-													committedFiles.map((file) => {
-														const idx = flatIndex++;
-														const display = getCommittedStatusDisplay(file.status);
-														return (
-															<FileRow
-																key={`committed-${file.path}`}
-																filePath={file.path}
-																statusLabel={display.label}
-																statusColor={display.color}
-																additions={file.additions}
-																deletions={file.deletions}
-																theme={theme}
-																selected={selectedIndex === idx}
-																onClick={() => handleFileClick(file.path, 'committed')}
-																onDoubleClick={() => handleFileDoubleClick(file.path, 'committed')}
-															/>
-														);
-													})}
-											</div>
-										);
-									})()}
-
-									{/* Per-commit expandable rows */}
-									{commits.map((commit) => {
-										const headerIdx = flatIndex++;
-										const isExpanded = expandedCommits.has(commit.hash);
-										const isLoadingCommit = loadingCommits.has(commit.hash);
-										const commitAdds = commit.files?.reduce((s, f) => s + f.additions, 0) ?? 0;
-										const commitDels = commit.files?.reduce((s, f) => s + f.deletions, 0) ?? 0;
-										const fileCount = commit.files?.length;
-
-										return (
-											<div key={`commit-${commit.hash}`}>
-												<div
-													className={`flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs transition-colors ${
-														selectedIndex === headerIdx ? '' : 'hover:bg-white/5'
-													}`}
-													style={{
-														backgroundColor:
-															selectedIndex === headerIdx ? theme.colors.bgActivity : 'transparent',
-													}}
-													onClick={() => toggleCommitSection(commit.hash)}
-												>
-													{isExpanded ? (
-														<ChevronDown
-															className="w-3 h-3 shrink-0"
-															style={{ color: theme.colors.textDim }}
-														/>
-													) : (
-														<ChevronRight
-															className="w-3 h-3 shrink-0"
-															style={{ color: theme.colors.textDim }}
-														/>
-													)}
-													<span
-														className="shrink-0 font-mono text-[10px]"
-														style={{ color: theme.colors.textDim }}
-													>
-														{commit.shortHash}
-													</span>
-													<span
-														className="flex-1 min-w-0 truncate font-medium"
-														style={{ color: theme.colors.textMain }}
-													>
-														{commit.subject.length > 50
-															? commit.subject.slice(0, 50) + '...'
-															: commit.subject}
-													</span>
-													{isLoadingCommit && (
-														<Loader2
-															className="w-3 h-3 animate-spin shrink-0"
-															style={{ color: theme.colors.textDim }}
-														/>
-													)}
-													{fileCount !== undefined && (
-														<span
-															className="font-mono text-[10px] px-1 py-0.5 rounded shrink-0"
-															style={{
-																backgroundColor: theme.colors.bgActivity,
-																color: theme.colors.textDim,
-															}}
-														>
-															{fileCount}
-														</span>
-													)}
-													{(commitAdds > 0 || commitDels > 0) && (
-														<span className="font-mono text-[10px] shrink-0 flex items-center gap-1">
-															{commitAdds > 0 && (
-																<span style={{ color: 'rgb(34, 197, 94)' }}>+{commitAdds}</span>
-															)}
-															{commitDels > 0 && (
-																<span style={{ color: 'rgb(239, 68, 68)' }}>-{commitDels}</span>
-															)}
-														</span>
-													)}
-												</div>
-												{isExpanded &&
-													commit.files?.map((file) => {
-														const idx = flatIndex++;
-														const display = getCommittedStatusDisplay(file.status);
-														return (
-															<FileRow
-																key={`commit-${commit.hash}-${file.path}`}
-																filePath={file.path}
-																statusLabel={display.label}
-																statusColor={display.color}
-																additions={file.additions}
-																deletions={file.deletions}
-																theme={theme}
-																selected={selectedIndex === idx}
-																onClick={() => handleFileClick(file.path, 'commit', commit.hash)}
-																onDoubleClick={() =>
-																	handleFileDoubleClick(file.path, 'commit', commit.hash)
-																}
-															/>
-														);
-													})}
-											</div>
-										);
-									})}
-								</div>
-							)}
+							{committedExpanded &&
+								committedFiles.map((file) => {
+									const idx = flatIndex++;
+									const display = getCommittedStatusDisplay(file.status);
+									return (
+										<FileRow
+											key={`committed-${file.path}`}
+											filePath={file.path}
+											statusLabel={display.label}
+											statusColor={display.color}
+											additions={file.additions}
+											deletions={file.deletions}
+											theme={theme}
+											selected={selectedIndex === idx}
+											onClick={() => handleFileClick(file.path, 'committed')}
+											onDoubleClick={() => handleFileDoubleClick(file.path, 'committed')}
+										/>
+									);
+								})}
 						</div>
 					)}
 				</>
 			)}
 
-			{/* === Branch Commits view === */}
+			{/* === By Commits view === */}
 			{viewMode === 'branch-commits' && (
-				<CommitListView
-					commits={branchCommits}
-					theme={theme}
-					onOpenCommitDiff={onOpenCommitDiff}
-					fetchCommitFiles={fetchCommitFiles}
-				/>
-			)}
-
-			{/* === All Commits view === */}
-			{viewMode === 'all-commits' && (
 				<CommitListView
 					commits={commits}
 					theme={theme}
 					onOpenCommitDiff={onOpenCommitDiff}
 					fetchCommitFiles={fetchCommitFiles}
+					branchCommitCount={branchCommits.length}
+					isLoading={isLoading}
 				/>
 			)}
 
