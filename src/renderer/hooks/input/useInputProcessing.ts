@@ -405,6 +405,47 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				return;
 			}
 
+			// Intercept for pending AskUserQuestion (freeform) — route input as answer, bypass queue
+			{
+				const activeTab = getActiveTab(activeSession);
+				const pendingQ = activeTab?.pendingQuestion;
+				if (pendingQ && effectiveInputValue.trim()) {
+					// Route to pending AskUserQuestion instead of queuing
+					window.maestro.process.answerQuestion(
+						pendingQ.processSessionId,
+						pendingQ.toolUseId,
+						effectiveInputValue
+					);
+					// Clear pending question and mark log entries as answered
+					setSessions((prev) =>
+						prev.map((s) => {
+							if (s.id !== activeSessionId) return s;
+							return {
+								...s,
+								aiTabs: s.aiTabs.map((tab) => {
+									if (tab.id !== activeTab!.id) return tab;
+									return {
+										...tab,
+										pendingQuestion: undefined,
+										logs: tab.logs.map((log) =>
+											log.metadata?.toolUseId === pendingQ.toolUseId && log.interactive
+												? { ...log, answered: effectiveInputValue }
+												: log
+										),
+									};
+								}),
+							};
+						})
+					);
+					// Clear input
+					setInputValue('');
+					setStagedImages([]);
+					syncAiInputToSession('');
+					if (inputRef.current) inputRef.current.style.height = 'auto';
+					return;
+				}
+			}
+
 			// Queue messages when AI is busy (only in AI mode)
 			// For read-only mode tabs: only queue if THIS TAB is busy (allows parallel execution)
 			// For write mode tabs: queue if ANY tab in session is busy (prevents conflicts)

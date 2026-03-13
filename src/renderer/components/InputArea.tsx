@@ -831,7 +831,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 								ref={inputRef}
 								className="flex-1 bg-transparent text-sm outline-none pl-3 pt-3 pr-3 resize-none min-h-[3.5rem] scrollbar-thin"
 								style={{ color: theme.colors.textMain, maxHeight: '11rem' }}
-								placeholder={`Talking to ${session.name} powered by ${getProviderDisplayName(session.toolType)}`}
+								placeholder={
+									activeTab?.pendingQuestion
+										? 'Type your response...'
+										: `Talking to ${session.name} powered by ${getProviderDisplayName(session.toolType)}`
+								}
 								value={inputValue}
 								onFocus={onInputFocus}
 								onBlur={onInputBlur}

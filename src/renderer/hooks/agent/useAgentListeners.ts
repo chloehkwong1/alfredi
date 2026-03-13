@@ -593,6 +593,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 															...tab,
 															state: 'idle' as const,
 															thinkingStartTime: undefined,
+															pendingQuestion: undefined,
 														}
 													: tab;
 											} else {
@@ -601,6 +602,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 															...tab,
 															state: 'idle' as const,
 															thinkingStartTime: undefined,
+															pendingQuestion: undefined,
 														}
 													: tab;
 											}
@@ -930,6 +932,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			(sessionId: string, slashCommands: string[]) => {
 				const actualSessionId = parseSessionId(sessionId).baseSessionId;
 
+				// Build commands with built-in descriptions first (sync)
 				const commands = slashCommands.map((cmd) => ({
 					command: cmd.startsWith('/') ? cmd : `/${cmd}`,
 					description: getSlashCommandDescription(cmd),
@@ -941,6 +944,32 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						return { ...s, agentCommands: commands };
 					})
 				);
+
+				// Async: fetch custom command descriptions from disk and enrich
+				const session = useSessionStore.getState().sessions.find((s) => s.id === actualSessionId);
+				if (session?.cwd) {
+					window.maestro.claude
+						.getCustomCommands(session.cwd)
+						.then((customCmds) => {
+							if (!customCmds?.length) return;
+							const descMap = new Map(customCmds.map((c) => [`/${c.name}`, c.description]));
+							setSessions((prev) =>
+								prev.map((s) => {
+									if (s.id !== actualSessionId) return s;
+									const enriched = (s.agentCommands || []).map((cmd) => {
+										const customDesc = descMap.get(cmd.command);
+										return customDesc && cmd.description === 'Claude Code command'
+											? { ...cmd, description: customDesc }
+											: cmd;
+									});
+									return { ...s, agentCommands: enriched };
+								})
+							);
+						})
+						.catch(() => {
+							// Ignore — descriptions are a nice-to-have
+						});
+				}
 			}
 		);
 
@@ -1460,8 +1489,14 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						options: q.options?.map((o) => o.label) ?? [],
 						metadata: {
 							processSessionId: sessionId,
+							toolUseId: questionData.toolUseId,
 						},
 					})
+				);
+
+				// Check if ALL questions are freeform (no options) — if so, track as pending
+				const allFreeform = questionData.questions.every(
+					(q) => !q.options || q.options.length === 0
 				);
 
 				setSessions((prev) =>
@@ -1475,6 +1510,14 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									? {
 											...tab,
 											logs: [...tab.logs, ...questionLogs],
+											...(allFreeform
+												? {
+														pendingQuestion: {
+															processSessionId: sessionId,
+															toolUseId: questionData.toolUseId,
+														},
+													}
+												: {}),
 										}
 									: tab
 							),

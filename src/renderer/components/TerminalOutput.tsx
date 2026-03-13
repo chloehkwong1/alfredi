@@ -71,19 +71,52 @@ const summarizeTodos = (v: unknown): string | null => {
 
 const InteractiveQuestion = memo(({ log, theme }: { log: LogEntry; theme: Theme }) => {
 	const [selectedOption, setSelectedOption] = useState<string | null>(log.answered ?? null);
+	const [freeformValue, setFreeformValue] = useState('');
+	const freeformInputRef = useRef<HTMLInputElement>(null);
 
-	const handleOptionClick = useCallback(
-		(label: string) => {
+	const isFreeform = !log.options || log.options.length === 0;
+
+	const handleAnswer = useCallback(
+		(answer: string) => {
 			if (selectedOption) return; // Already answered
-			setSelectedOption(label);
+			setSelectedOption(answer);
 
 			const processSessionId = log.metadata?.processSessionId;
-			if (processSessionId) {
-				window.maestro.process.write(processSessionId, label + '\n');
+			const toolUseId = log.metadata?.toolUseId;
+
+			if (processSessionId && toolUseId) {
+				// SDK mode: resolve the pending AskUserQuestion Promise
+				window.maestro.process.answerQuestion(processSessionId, toolUseId, answer);
+			} else if (processSessionId) {
+				// Legacy CLI mode: write to stdin
+				window.maestro.process.write(processSessionId, answer + '\n');
 			}
 		},
-		[selectedOption, log.metadata?.processSessionId]
+		[selectedOption, log.metadata?.processSessionId, log.metadata?.toolUseId]
 	);
+
+	const handleFreeformSubmit = useCallback(() => {
+		const trimmed = freeformValue.trim();
+		if (!trimmed) return;
+		handleAnswer(trimmed);
+	}, [freeformValue, handleAnswer]);
+
+	const handleFreeformKeyDown = useCallback(
+		(e: React.KeyboardEvent<HTMLInputElement>) => {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				handleFreeformSubmit();
+			}
+		},
+		[handleFreeformSubmit]
+	);
+
+	// Auto-focus freeform input when rendered
+	useEffect(() => {
+		if (isFreeform && !selectedOption && freeformInputRef.current) {
+			freeformInputRef.current.focus();
+		}
+	}, [isFreeform, selectedOption]);
 
 	return (
 		<div
@@ -95,39 +128,86 @@ const InteractiveQuestion = memo(({ log, theme }: { log: LogEntry; theme: Theme 
 			<div className="text-sm mb-2 whitespace-pre-wrap" style={{ color: theme.colors.textMain }}>
 				{log.text}
 			</div>
-			<div className="flex flex-wrap gap-2">
-				{log.options?.map((label) => {
-					const isSelected = selectedOption === label;
-					const isDisabled = selectedOption !== null;
-
-					return (
+			{isFreeform ? (
+				selectedOption ? (
+					<div
+						className="px-3 py-1 rounded-full text-xs font-medium inline-block"
+						style={{
+							backgroundColor: theme.colors.accent,
+							color: theme.colors.accentForeground,
+							border: `1px solid ${theme.colors.accent}`,
+						}}
+					>
+						{selectedOption} ✓
+					</div>
+				) : (
+					<div className="flex gap-2 items-center">
+						<input
+							ref={freeformInputRef}
+							type="text"
+							value={freeformValue}
+							onChange={(e) => setFreeformValue(e.target.value)}
+							onKeyDown={handleFreeformKeyDown}
+							placeholder="Type your response…"
+							className="flex-1 px-3 py-1 rounded text-xs outline-none"
+							style={{
+								backgroundColor: 'transparent',
+								border: `1px solid ${theme.colors.accent}40`,
+								color: theme.colors.textMain,
+							}}
+						/>
 						<button
-							key={label}
-							onClick={() => handleOptionClick(label)}
-							disabled={isDisabled}
+							onClick={handleFreeformSubmit}
+							disabled={!freeformValue.trim()}
 							className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
 							style={{
-								backgroundColor: isSelected
-									? theme.colors.accent
-									: isDisabled
-										? `${theme.colors.textDim}20`
-										: `${theme.colors.accent}20`,
-								color: isSelected
-									? theme.colors.accentForeground
-									: isDisabled
-										? theme.colors.textDim
-										: theme.colors.accent,
-								cursor: isDisabled ? 'default' : 'pointer',
-								opacity: isDisabled && !isSelected ? 0.5 : 1,
-								border: `1px solid ${isSelected ? theme.colors.accent : isDisabled ? 'transparent' : `${theme.colors.accent}40`}`,
+								backgroundColor: freeformValue.trim()
+									? `${theme.colors.accent}20`
+									: `${theme.colors.textDim}20`,
+								color: freeformValue.trim() ? theme.colors.accent : theme.colors.textDim,
+								cursor: freeformValue.trim() ? 'pointer' : 'default',
+								border: `1px solid ${freeformValue.trim() ? `${theme.colors.accent}40` : 'transparent'}`,
 							}}
 						>
-							{label}
-							{isSelected && ' ✓'}
+							Send
 						</button>
-					);
-				})}
-			</div>
+					</div>
+				)
+			) : (
+				<div className="flex flex-wrap gap-2">
+					{log.options?.map((label) => {
+						const isSelected = selectedOption === label;
+						const isDisabled = selectedOption !== null;
+
+						return (
+							<button
+								key={label}
+								onClick={() => handleAnswer(label)}
+								disabled={isDisabled}
+								className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
+								style={{
+									backgroundColor: isSelected
+										? theme.colors.accent
+										: isDisabled
+											? `${theme.colors.textDim}20`
+											: `${theme.colors.accent}20`,
+									color: isSelected
+										? theme.colors.accentForeground
+										: isDisabled
+											? theme.colors.textDim
+											: theme.colors.accent,
+									cursor: isDisabled ? 'default' : 'pointer',
+									opacity: isDisabled && !isSelected ? 0.5 : 1,
+									border: `1px solid ${isSelected ? theme.colors.accent : isDisabled ? 'transparent' : `${theme.colors.accent}40`}`,
+								}}
+							>
+								{label}
+								{isSelected && ' ✓'}
+							</button>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 });
