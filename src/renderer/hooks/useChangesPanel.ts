@@ -53,7 +53,10 @@ export interface UseChangesPanelResult {
 	stagedFiles: ChangesFile[];
 	unstagedFiles: ChangesFile[];
 	committedFiles: CommittedFile[];
-	commits: ChangesPanelCommit[];
+	/** All commits (full git log, up to limit) */
+	allCommits: ChangesPanelCommit[];
+	/** Commits only on the current branch (merge-base..HEAD range) */
+	branchCommits: ChangesPanelCommit[];
 	currentBranch: string | undefined;
 	baseBranch: string | undefined;
 	mergeBase: string | undefined;
@@ -112,7 +115,8 @@ export function useChangesPanel(
 	const [stagedFiles, setStagedFiles] = useState<ChangesFile[]>([]);
 	const [unstagedFiles, setUnstagedFiles] = useState<ChangesFile[]>([]);
 	const [committedFiles, setCommittedFiles] = useState<CommittedFile[]>([]);
-	const [commits, setCommits] = useState<ChangesPanelCommit[]>([]);
+	const [allCommits, setAllCommits] = useState<ChangesPanelCommit[]>([]);
+	const [branchCommits, setBranchCommits] = useState<ChangesPanelCommit[]>([]);
 	const [currentBranch, setCurrentBranch] = useState<string | undefined>();
 	const [baseBranch, setBaseBranch] = useState<string | undefined>();
 	const [mergeBaseRef, setMergeBaseRef] = useState<string | undefined>();
@@ -198,14 +202,11 @@ export function useChangesPanel(
 					setMergeBaseRef(base || undefined);
 
 					if (base) {
-						// Get the full diff to parse file names
-						const diffResult = await gitService.getDiffRefs(
-							cwd,
-							base,
-							'HEAD',
-							undefined,
-							sshRemoteId
-						);
+						// Fetch committed file diff and branch-only commits in parallel
+						const [diffResult, branchLogResult] = await Promise.all([
+							gitService.getDiffRefs(cwd, base, 'HEAD', undefined, sshRemoteId),
+							window.maestro.git.log(cwd, { limit: 100, range: `${base}..HEAD` }, sshRemoteId),
+						]);
 
 						if (!mountedRef.current) return;
 
@@ -220,13 +221,27 @@ export function useChangesPanel(
 								deletions: 0,
 							}))
 						);
+
+						// Map branch-only log entries
+						if (!branchLogResult.error) {
+							setBranchCommits(
+								branchLogResult.entries.map((e) => ({
+									hash: e.hash,
+									shortHash: e.shortHash,
+									author: e.author,
+									date: e.date,
+									subject: e.subject,
+								}))
+							);
+						}
 					} else {
 						setCommittedFiles([]);
+						setBranchCommits([]);
 					}
 
-					// Map log entries to our commit type
+					// Map all log entries to our commit type
 					if (!logResult.error) {
-						setCommits(
+						setAllCommits(
 							logResult.entries.map((e) => ({
 								hash: e.hash,
 								shortHash: e.shortHash,
@@ -239,13 +254,15 @@ export function useChangesPanel(
 				} else {
 					// On the default branch — no committed changes to show
 					setCommittedFiles([]);
-					setCommits([]);
+					setAllCommits([]);
+					setBranchCommits([]);
 					setMergeBaseRef(undefined);
 				}
 			} catch {
 				// getDefaultBranch or mergeBase may fail for repos without remotes
 				setCommittedFiles([]);
-				setCommits([]);
+				setAllCommits([]);
+				setBranchCommits([]);
 			}
 		} catch {
 			// Swallow errors — the panel gracefully shows empty state
@@ -278,24 +295,28 @@ export function useChangesPanel(
 		return () => window.removeEventListener('focus', handleFocus);
 	}, [refresh]);
 
-	// Lazily fetch files for a specific commit (cached after first fetch)
+	// Lazily fetch files for a specific commit (cached after first fetch).
+	// Updates both allCommits and branchCommits lists so the cache is shared.
 	const fetchCommitFiles = useCallback(
 		async (hash: string) => {
 			if (!cwd) return;
 
-			// Check if already loaded (avoid re-fetch)
-			const existing = commits.find((c) => c.hash === hash);
-			if (existing?.filesLoaded) return;
+			// Check if already loaded in either list (avoid re-fetch)
+			const existingAll = allCommits.find((c) => c.hash === hash);
+			const existingBranch = branchCommits.find((c) => c.hash === hash);
+			if (existingAll?.filesLoaded || existingBranch?.filesLoaded) return;
 
 			const files = await gitService.getCommitFiles(cwd, hash, sshRemoteId);
 
 			if (!mountedRef.current) return;
 
-			setCommits((prev) =>
-				prev.map((c) => (c.hash === hash ? { ...c, files, filesLoaded: true } : c))
-			);
+			const updateCommit = (c: ChangesPanelCommit) =>
+				c.hash === hash ? { ...c, files, filesLoaded: true } : c;
+
+			setAllCommits((prev) => prev.map(updateCommit));
+			setBranchCommits((prev) => prev.map(updateCommit));
 		},
-		[cwd, sshRemoteId, commits]
+		[cwd, sshRemoteId, allCommits, branchCommits]
 	);
 
 	return useMemo(
@@ -303,7 +324,8 @@ export function useChangesPanel(
 			stagedFiles,
 			unstagedFiles,
 			committedFiles,
-			commits,
+			allCommits,
+			branchCommits,
 			currentBranch,
 			baseBranch,
 			mergeBase: mergeBaseRef,
@@ -315,7 +337,8 @@ export function useChangesPanel(
 			stagedFiles,
 			unstagedFiles,
 			committedFiles,
-			commits,
+			allCommits,
+			branchCommits,
 			currentBranch,
 			baseBranch,
 			mergeBaseRef,

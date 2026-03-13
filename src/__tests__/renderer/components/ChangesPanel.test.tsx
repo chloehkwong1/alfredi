@@ -82,11 +82,13 @@ const commits: ChangesPanelCommit[] = [
 describe('ChangesPanel', () => {
 	let onRefresh: ReturnType<typeof vi.fn>;
 	let onOpenDiff: ReturnType<typeof vi.fn>;
+	let onOpenCommitDiff: ReturnType<typeof vi.fn>;
 	let fetchCommitFiles: ReturnType<typeof vi.fn>;
 
 	beforeEach(() => {
 		onRefresh = vi.fn();
 		onOpenDiff = vi.fn();
+		onOpenCommitDiff = vi.fn();
 		fetchCommitFiles = vi.fn().mockResolvedValue(undefined);
 	});
 
@@ -98,12 +100,14 @@ describe('ChangesPanel', () => {
 				unstagedFiles={unstagedFiles}
 				committedFiles={committedFiles}
 				commits={commits}
+				branchCommits={commits}
 				currentBranch="feature/test"
 				baseBranch="main"
 				isLoading={false}
 				cwd="/path/to/project"
 				onRefresh={onRefresh}
 				onOpenDiff={onOpenDiff}
+				onOpenCommitDiff={onOpenCommitDiff}
 				fetchCommitFiles={fetchCommitFiles}
 				{...overrides}
 			/>
@@ -416,6 +420,57 @@ describe('ChangesPanel', () => {
 		expect(screen.getByText('Unstaged Changes')).toBeInTheDocument();
 		expect(screen.getByText('index.ts')).toBeInTheDocument();
 		expect(screen.getByText('app.ts')).toBeInTheDocument();
+	});
+
+	// --- Segmented Control / View Mode Tests ---
+
+	it('renders segmented control with 3 view buttons', () => {
+		renderPanel();
+		expect(screen.getByText('All Changes')).toBeInTheDocument();
+		expect(screen.getByText('Branch')).toBeInTheDocument();
+		expect(screen.getByText('All Commits')).toBeInTheDocument();
+	});
+
+	it('switching to Branch view hides staged/unstaged sections and shows commits', () => {
+		renderPanel();
+		// Initially in "All Changes" view — staged/unstaged visible
+		expect(screen.getByText('Staged Changes')).toBeInTheDocument();
+
+		// Switch to "Branch" view
+		fireEvent.click(screen.getByText('Branch'));
+
+		// Staged/Unstaged sections should be hidden
+		expect(screen.queryByText('Staged Changes')).not.toBeInTheDocument();
+		expect(screen.queryByText('Unstaged Changes')).not.toBeInTheDocument();
+
+		// Commit subjects should be visible
+		expect(screen.getByText('feat: add feature')).toBeInTheDocument();
+	});
+
+	it('switching to All Commits view shows commit list', () => {
+		renderPanel();
+		fireEvent.click(screen.getByText('All Commits'));
+
+		// Should show commit rows
+		expect(screen.getByText('abc123')).toBeInTheDocument();
+		expect(screen.getByText('def456')).toBeInTheDocument();
+	});
+
+	it('All Changes view does not show inline commit timeline when no committed files', () => {
+		renderPanel({ committedFiles: [], commits: [] });
+		// "All Changes" is default view — no committed section when empty
+		expect(screen.queryByText('All files (branch diff)')).not.toBeInTheDocument();
+	});
+
+	it('clicking a commit row in Branch view calls onOpenCommitDiff', () => {
+		renderPanel();
+		fireEvent.click(screen.getByText('Branch'));
+
+		// Click on the commit subject text
+		fireEvent.click(screen.getByText('feat: add feature'));
+		expect(onOpenCommitDiff).toHaveBeenCalledWith(
+			expect.objectContaining({ hash: 'abc123', subject: 'feat: add feature' })
+		);
 	});
 
 	it('renders commit file count when files are loaded', () => {

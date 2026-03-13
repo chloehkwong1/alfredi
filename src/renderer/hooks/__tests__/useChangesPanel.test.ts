@@ -165,7 +165,8 @@ describe('useChangesPanel', () => {
 		});
 
 		expect(result.current.committedFiles).toEqual([]);
-		expect(result.current.commits).toEqual([]);
+		expect(result.current.allCommits).toEqual([]);
+		expect(result.current.branchCommits).toEqual([]);
 		// getMergeBase should not have been called for this render
 		// (only calls from this hook instance matter)
 		const calls = mockGetMergeBase.mock.calls;
@@ -209,7 +210,8 @@ describe('useChangesPanel', () => {
 		expect(result.current.committedFiles).toHaveLength(1);
 		expect(result.current.committedFiles[0].path).toBe('new.ts');
 		expect(result.current.committedFiles[0].status).toBe('A');
-		expect(result.current.commits).toHaveLength(1);
+		expect(result.current.allCommits).toHaveLength(1);
+		expect(result.current.branchCommits).toHaveLength(1);
 		expect(result.current.mergeBase).toBe('base123');
 	});
 
