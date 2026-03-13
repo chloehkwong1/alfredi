@@ -425,7 +425,7 @@ interface MaestroAPI {
 		}>;
 		log: (
 			cwd: string,
-			options?: { limit?: number; search?: string },
+			options?: { limit?: number; search?: string; range?: string },
 			sshRemoteId?: string
 		) => Promise<{
 			entries: Array<{
@@ -449,6 +449,15 @@ interface MaestroAPI {
 			hash: string,
 			sshRemoteId?: string
 		) => Promise<{ stdout: string; stderr: string }>;
+		/**
+		 * Get full unified diff for a commit (all files, no commit header)
+		 */
+		commitDiff: (
+			cwd: string,
+			hash: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ diff: string; error: string | null }>;
 		/**
 		 * Get per-commit file list with status and stat info
 		 */

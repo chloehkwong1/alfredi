@@ -197,7 +197,7 @@ export function createGitApi() {
 		 */
 		log: (
 			cwd: string,
-			options?: { limit?: number; search?: string },
+			options?: { limit?: number; search?: string; range?: string },
 			sshRemoteId?: string
 		): Promise<{
 			entries: GitLogEntry[];
@@ -222,6 +222,17 @@ export function createGitApi() {
 			sshRemoteId?: string
 		): Promise<{ stdout: string; stderr: string }> =>
 			ipcRenderer.invoke('git:show', cwd, hash, sshRemoteId),
+
+		/**
+		 * Get full unified diff for a commit (all files, no commit header)
+		 */
+		commitDiff: (
+			cwd: string,
+			hash: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ diff: string; error: string | null }> =>
+			ipcRenderer.invoke('git:commitDiff', cwd, hash, sshRemoteId, remoteCwd),
 
 		/**
 		 * Get per-commit file list with status and stat info

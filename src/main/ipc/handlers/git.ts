@@ -345,7 +345,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 			handlerOpts('log'),
 			async (
 				cwd: string,
-				options?: { limit?: number; search?: string },
+				options?: { limit?: number; search?: string; range?: string },
 				sshRemoteId?: string,
 				remoteCwd?: string
 			) => {
@@ -366,6 +366,11 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				// Add search filter if provided
 				if (options?.search) {
 					args.push('--all', `--grep=${options.search}`, '-i');
+				}
+
+				// Add range filter if provided (e.g., "mergeBase..HEAD")
+				if (options?.range) {
+					args.push(options.range);
 				}
 
 				const result = await execGit(args, cwd, sshRemote, effectiveRemoteCwd);
@@ -446,6 +451,31 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 					effectiveRemoteCwd
 				);
 				return { stdout: result.stdout, stderr: result.stderr };
+			}
+		)
+	);
+
+	// Get the full unified diff for a commit (all files, no commit message header)
+	ipcMain.handle(
+		'git:commitDiff',
+		withIpcErrorLogging(
+			handlerOpts('commitDiff'),
+			async (cwd: string, hash: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				// --format= suppresses commit message, leaving only the diff
+				// --first-parent handles merge commits cleanly
+				let result = await execGit(
+					['show', '--first-parent', '--format=', hash],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				if (result.exitCode !== 0) {
+					// May be a root commit — retry without --first-parent
+					result = await execGit(['show', '--format=', hash], cwd, sshRemote, effectiveRemoteCwd);
+				}
+				return { diff: result.stdout, error: result.exitCode !== 0 ? result.stderr : null };
 			}
 		)
 	);
