@@ -1145,6 +1145,8 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				activeFileTabId: null,
 				diffViewTabs: [],
 				activeDiffTabId: null,
+				commitDiffTabs: [],
+				activeCommitDiffTabId: null,
 				unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
 				unifiedClosedTabHistory: [],
 				autoRunFolderPath,

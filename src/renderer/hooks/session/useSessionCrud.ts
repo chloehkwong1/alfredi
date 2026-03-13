@@ -215,6 +215,8 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					activeFileTabId: null,
 					diffViewTabs: [],
 					activeDiffTabId: null,
+					commitDiffTabs: [],
+					activeCommitDiffTabId: null,
 					unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
 					unifiedClosedTabHistory: [],
 					nudgeMessage,

@@ -6,6 +6,7 @@ import {
 	AITab,
 	ClosedTab,
 	ClosedTabEntry,
+	CommitDiffTab,
 	DiffViewTab,
 	FilePreviewTab,
 	UnifiedTab,
@@ -27,11 +28,12 @@ import { getAutoRunFolderPath } from './existingDocsDetector';
  */
 export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	if (!session) return [];
-	const { aiTabs, filePreviewTabs, diffViewTabs, unifiedTabOrder } = session;
+	const { aiTabs, filePreviewTabs, diffViewTabs, commitDiffTabs, unifiedTabOrder } = session;
 
 	const aiTabMap = new Map((aiTabs || []).map((tab) => [tab.id, tab]));
 	const fileTabMap = new Map((filePreviewTabs || []).map((tab) => [tab.id, tab]));
 	const diffTabMap = new Map((diffViewTabs || []).map((tab) => [tab.id, tab]));
+	const commitDiffTabMap = new Map((commitDiffTabs || []).map((tab) => [tab.id, tab]));
 
 	const result: UnifiedTab[] = [];
 
@@ -55,6 +57,12 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 				result.push({ type: 'diff', id: ref.id, data: tab });
 				diffTabMap.delete(ref.id);
 			}
+		} else if (ref.type === 'commit-diff') {
+			const tab = commitDiffTabMap.get(ref.id);
+			if (tab) {
+				result.push({ type: 'commit-diff', id: ref.id, data: tab });
+				commitDiffTabMap.delete(ref.id);
+			}
 		}
 	}
 
@@ -67,6 +75,9 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	}
 	for (const [id, tab] of diffTabMap) {
 		result.push({ type: 'diff', id, data: tab });
+	}
+	for (const [id, tab] of commitDiffTabMap) {
+		result.push({ type: 'commit-diff', id, data: tab });
 	}
 
 	return result;
@@ -99,15 +110,18 @@ export function getRepairedUnifiedTabOrder(session: Session): UnifiedTabRef[] {
 	const aiTabs = session.aiTabs || [];
 	const fileTabs = session.filePreviewTabs || [];
 	const diffTabs = session.diffViewTabs || [];
+	const commitDiffTabs = session.commitDiffTabs || [];
 
 	// Build sets of IDs already in the order
 	const aiIdsInOrder = new Set<string>();
 	const fileIdsInOrder = new Set<string>();
 	const diffIdsInOrder = new Set<string>();
+	const commitDiffIdsInOrder = new Set<string>();
 	for (const ref of order) {
 		if (ref.type === 'ai') aiIdsInOrder.add(ref.id);
 		else if (ref.type === 'file') fileIdsInOrder.add(ref.id);
 		else if (ref.type === 'diff') diffIdsInOrder.add(ref.id);
+		else if (ref.type === 'commit-diff') commitDiffIdsInOrder.add(ref.id);
 	}
 
 	// Collect orphaned tabs
@@ -125,6 +139,11 @@ export function getRepairedUnifiedTabOrder(session: Session): UnifiedTabRef[] {
 	for (const tab of diffTabs) {
 		if (!diffIdsInOrder.has(tab.id)) {
 			orphanedRefs.push({ type: 'diff', id: tab.id });
+		}
+	}
+	for (const tab of commitDiffTabs) {
+		if (!commitDiffIdsInOrder.has(tab.id)) {
+			orphanedRefs.push({ type: 'commit-diff', id: tab.id });
 		}
 	}
 
@@ -1141,7 +1160,8 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 	if (
 		session.activeTabId === tabId &&
 		session.activeFileTabId === null &&
-		session.activeDiffTabId === null
+		session.activeDiffTabId === null &&
+		session.activeCommitDiffTabId === null
 	) {
 		return {
 			tab: targetTab,
@@ -1158,6 +1178,7 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 			activeTabId: tabId,
 			activeFileTabId: null,
 			activeDiffTabId: null,
+			activeCommitDiffTabId: null,
 		},
 	};
 }
@@ -1422,7 +1443,7 @@ export function navigateToLastTab(
  * Result of navigating to a unified tab (can be AI or file tab).
  */
 export interface NavigateToUnifiedTabResult {
-	type: 'ai' | 'file' | 'diff';
+	type: 'ai' | 'file' | 'diff' | 'commit-diff';
 	id: string;
 	session: Session;
 }
@@ -1498,6 +1519,7 @@ export function navigateToUnifiedTabByIndex(
 				activeTabId: targetTabRef.id,
 				activeFileTabId: null,
 				activeDiffTabId: null,
+				activeCommitDiffTabId: null,
 			},
 		};
 	} else if (targetTabRef.type === 'file') {
@@ -1522,9 +1544,10 @@ export function navigateToUnifiedTabByIndex(
 				...repairedSession,
 				activeFileTabId: targetTabRef.id,
 				activeDiffTabId: null,
+				activeCommitDiffTabId: null,
 			},
 		};
-	} else {
+	} else if (targetTabRef.type === 'diff') {
 		// Navigate to diff tab - verify it exists
 		const diffTab = (session.diffViewTabs || []).find((tab) => tab.id === targetTabRef.id);
 		if (!diffTab) return null;
@@ -1546,6 +1569,30 @@ export function navigateToUnifiedTabByIndex(
 				...repairedSession,
 				activeFileTabId: null,
 				activeDiffTabId: targetTabRef.id,
+				activeCommitDiffTabId: null,
+			},
+		};
+	} else {
+		// Navigate to commit-diff tab - verify it exists
+		const commitDiffTab = (session.commitDiffTabs || []).find((tab) => tab.id === targetTabRef.id);
+		if (!commitDiffTab) return null;
+
+		if (session.activeCommitDiffTabId === targetTabRef.id) {
+			return {
+				type: 'commit-diff',
+				id: targetTabRef.id,
+				session: repairedSession,
+			};
+		}
+
+		return {
+			type: 'commit-diff',
+			id: targetTabRef.id,
+			session: {
+				...repairedSession,
+				activeFileTabId: null,
+				activeDiffTabId: null,
+				activeCommitDiffTabId: targetTabRef.id,
 			},
 		};
 	}
@@ -1911,6 +1958,8 @@ export function createMergedSession(
 		activeFileTabId: null,
 		diffViewTabs: [],
 		activeDiffTabId: null,
+		commitDiffTabs: [],
+		activeCommitDiffTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: tabId }],
 		unifiedClosedTabHistory: [],
 		// Default Auto Run folder path (user can change later)

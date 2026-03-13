@@ -29,6 +29,7 @@ import { TerminalOutput } from './TerminalOutput';
 import { InputArea } from './InputArea';
 import { FilePreview, FilePreviewHandle } from './FilePreview';
 import { DiffPreview } from './DiffPreview';
+import { CommitDiffView } from './CommitDiffView';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
@@ -47,6 +48,7 @@ import type {
 	Session,
 	Theme,
 	BatchRunState,
+	CommitDiffTab,
 	DiffViewTab,
 	UnifiedTab,
 	FilePreviewTab,
@@ -202,6 +204,10 @@ interface MainPanelProps {
 	activeDiffTab?: DiffViewTab | null;
 	onDiffTabSelect?: (tabId: string) => void;
 	onDiffTabClose?: (tabId: string) => void;
+	// Commit diff tab support
+	activeCommitDiffTabId?: string | null;
+	activeCommitDiffTab?: CommitDiffTab | null;
+	onCommitDiffTabClose?: (tabId: string) => void;
 	/** Handler to pin a preview tab (remove isPreview flag) */
 	onPinTab?: (tabId: string) => void;
 	onDiffTabViewModeChange?: (tabId: string, viewMode: 'unified' | 'split') => void;
@@ -496,6 +502,10 @@ export const MainPanel = React.memo(
 			onPinTab,
 			onDiffTabViewModeChange,
 			onDiffTabScrollPositionChange,
+			// Commit diff tab props
+			activeCommitDiffTabId,
+			activeCommitDiffTab,
+			onCommitDiffTabClose,
 		} = props;
 
 		// Get the active tab for header display
@@ -1535,6 +1545,7 @@ export const MainPanel = React.memo(
 									onFileTabSelect={onFileTabSelect}
 									onFileTabClose={onFileTabClose}
 									activeDiffTabId={activeDiffTabId}
+									activeCommitDiffTabId={activeCommitDiffTabId}
 									onDiffTabSelect={onDiffTabSelect}
 									onDiffTabClose={onDiffTabClose}
 									onPinTab={onPinTab}
@@ -1609,6 +1620,19 @@ export const MainPanel = React.memo(
 										</div>
 									</div>
 								</div>
+							</div>
+						) : activeSession.inputMode === 'ai' && activeCommitDiffTabId && activeCommitDiffTab ? (
+							// Commit diff view tab - stacked multi-file diff
+							<div tabIndex={-1} className="flex-1 overflow-hidden outline-none">
+								<CommitDiffView
+									tab={activeCommitDiffTab}
+									theme={theme}
+									onClose={() => {
+										if (activeCommitDiffTabId) {
+											onCommitDiffTabClose?.(activeCommitDiffTabId);
+										}
+									}}
+								/>
 							</div>
 						) : activeSession.inputMode === 'ai' && activeDiffTabId && activeDiffTab ? (
 							// Diff view tab - DiffPreview rendered as tab content

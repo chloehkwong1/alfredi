@@ -103,6 +103,8 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		activeFileTabId: null,
 		diffViewTabs: [],
 		activeDiffTabId: null,
+		commitDiffTabs: [],
+		activeCommitDiffTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
 		unifiedClosedTabHistory: [],
 		customPath: params.parentSession.customPath,

@@ -79,6 +79,8 @@ interface TabBarProps {
 	onFileTabClose?: (tabId: string) => void;
 	/** Currently active diff tab ID (null if a non-diff tab is active) */
 	activeDiffTabId?: string | null;
+	/** Currently active commit diff tab ID (null if a non-commit-diff tab is active) */
+	activeCommitDiffTabId?: string | null;
 	/** Handler to select a diff view tab */
 	onDiffTabSelect?: (tabId: string) => void;
 	/** Handler to close a diff view tab */
@@ -1775,6 +1777,7 @@ function TabBarInner({
 	onFileTabSelect,
 	onFileTabClose,
 	activeDiffTabId,
+	activeCommitDiffTabId,
 	onDiffTabSelect,
 	onDiffTabClose,
 	onPinTab,
@@ -2145,19 +2148,29 @@ function TabBarInner({
 						// Diff tabs are active when: they match activeDiffTabId
 						const isActive =
 							unifiedTab.type === 'ai'
-								? unifiedTab.id === activeTabId && !activeFileTabId && !activeDiffTabId
+								? unifiedTab.id === activeTabId &&
+									!activeFileTabId &&
+									!activeDiffTabId &&
+									!activeCommitDiffTabId
 								: unifiedTab.type === 'file'
 									? unifiedTab.id === activeFileTabId
-									: unifiedTab.id === activeDiffTabId;
+									: unifiedTab.type === 'diff'
+										? unifiedTab.id === activeDiffTabId
+										: unifiedTab.id === activeCommitDiffTabId;
 
 						// Check previous tab's active state for separator logic
 						const prevUnifiedTab = index > 0 ? displayedUnifiedTabs[index - 1] : null;
 						const isPrevActive = prevUnifiedTab
 							? prevUnifiedTab.type === 'ai'
-								? prevUnifiedTab.id === activeTabId && !activeFileTabId && !activeDiffTabId
+								? prevUnifiedTab.id === activeTabId &&
+									!activeFileTabId &&
+									!activeDiffTabId &&
+									!activeCommitDiffTabId
 								: prevUnifiedTab.type === 'file'
 									? prevUnifiedTab.id === activeFileTabId
-									: prevUnifiedTab.id === activeDiffTabId
+									: prevUnifiedTab.type === 'diff'
+										? prevUnifiedTab.id === activeDiffTabId
+										: prevUnifiedTab.id === activeCommitDiffTabId
 							: false;
 
 						// Get original index in the FULL unified list (not filtered)
@@ -2321,6 +2334,61 @@ function TabBarInner({
 										tabIndex={originalIndex}
 										shortcutHint={shortcutHint}
 										onPinTab={onPinTab}
+									/>
+								</React.Fragment>
+							);
+						} else if (unifiedTab.type === 'commit-diff') {
+							// Commit diff tab - render as a simple diff-like tab
+							const commitDiffTab = unifiedTab.data;
+							return (
+								<React.Fragment key={unifiedTab.id}>
+									{showSeparator && (
+										<div
+											className="w-px h-4 self-center shrink-0"
+											style={{ backgroundColor: theme.colors.border }}
+										/>
+									)}
+									<DiffTab
+										tab={{
+											id: commitDiffTab.id,
+											filePath: commitDiffTab.commitHash,
+											fileName:
+												commitDiffTab.subject.length > 30
+													? commitDiffTab.subject.slice(0, 30) + '...'
+													: commitDiffTab.subject,
+											oldContent: '',
+											newContent: '',
+											oldRef: commitDiffTab.commitHash.slice(0, 8),
+											newRef: '',
+											diffType: 'commit' as const,
+											commitHash: commitDiffTab.commitHash,
+											viewMode: 'unified' as const,
+											scrollTop: 0,
+											createdAt: commitDiffTab.createdAt,
+										}}
+										isActive={isActive}
+										theme={theme}
+										onSelect={onDiffTabSelect || (() => {})}
+										onClose={onDiffTabClose || (() => {})}
+										onDragStart={handleDragStart}
+										onDragOver={handleDragOver}
+										onDragEnd={handleDragEnd}
+										onDrop={handleDrop}
+										isDragging={draggingTabId === commitDiffTab.id}
+										isDragOver={dragOverTabId === commitDiffTab.id}
+										registerRef={(el) => registerTabRef(commitDiffTab.id, el)}
+										onMoveToFirst={
+											!isFirstTab && onUnifiedTabReorder ? handleMoveToFirst : undefined
+										}
+										onMoveToLast={!isLastTab && onUnifiedTabReorder ? handleMoveToLast : undefined}
+										isFirstTab={isFirstTab}
+										isLastTab={isLastTab}
+										onCloseOtherTabs={onCloseOtherTabs ? handleTabCloseOther : undefined}
+										onCloseTabsLeft={onCloseTabsLeft ? handleTabCloseLeft : undefined}
+										onCloseTabsRight={onCloseTabsRight ? handleTabCloseRight : undefined}
+										totalTabs={allTabs.length}
+										tabIndex={originalIndex}
+										shortcutHint={shortcutHint}
 									/>
 								</React.Fragment>
 							);

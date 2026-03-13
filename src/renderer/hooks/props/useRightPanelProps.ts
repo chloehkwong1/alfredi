@@ -98,6 +98,14 @@ export interface UseRightPanelPropsDeps {
 		commitHash?: string;
 		rawDiff?: string;
 	}) => void;
+
+	// Commit diff tab handler (from useTabHandlers)
+	handleOpenCommitDiffTab: (commit: {
+		hash: string;
+		subject: string;
+		author: string;
+		date: string;
+	}) => Promise<void>;
 }
 
 /**
@@ -161,6 +169,9 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 
 			// Diff tab
 			onOpenDiffTab: deps.handleOpenDiffTab,
+
+			// Commit diff tab
+			onOpenCommitDiffTab: deps.handleOpenCommitDiffTab,
 		}),
 		[
 			deps.theme,
@@ -196,6 +207,7 @@ export function useRightPanelProps(deps: UseRightPanelPropsDeps) {
 			deps.handleFocusFileInGraph,
 			deps.handleOpenLastDocumentGraph,
 			deps.handleOpenDiffTab,
+			deps.handleOpenCommitDiffTab,
 			// Refs (stable)
 			deps.fileTreeContainerRef,
 			deps.fileTreeFilterInputRef,

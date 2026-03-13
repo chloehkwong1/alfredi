@@ -99,6 +99,10 @@ function createMockSession(overrides: Partial<Session> = {}): Session {
 		closedTabHistory: [],
 		filePreviewTabs: [],
 		activeFileTabId: null,
+		diffViewTabs: [],
+		activeDiffTabId: null,
+		commitDiffTabs: [],
+		activeCommitDiffTabId: null,
 		unifiedTabOrder: [],
 		unifiedClosedTabHistory: [],
 		...overrides,
@@ -196,7 +200,6 @@ describe('tabHelpers', () => {
 				inputValue: '',
 				stagedImages: [],
 				state: 'idle',
-				saveToHistory: true,
 			});
 			expect(result.tab.createdAt).toBeDefined();
 			expect(result.session.aiTabs).toHaveLength(1);
@@ -218,7 +221,6 @@ describe('tabHelpers', () => {
 					totalCostUsd: 0.01,
 					contextWindow: 200000,
 				},
-				saveToHistory: true,
 			};
 
 			const result = createTab(session, options);
@@ -228,7 +230,6 @@ describe('tabHelpers', () => {
 			expect(result.tab.starred).toBe(true);
 			expect(result.tab.logs).toHaveLength(1);
 			expect(result.tab.usageStats).toEqual(options.usageStats);
-			expect(result.tab.saveToHistory).toBe(true);
 		});
 
 		it('creates a tab with showThinking option', () => {
@@ -1528,28 +1529,6 @@ describe('tabHelpers', () => {
 			});
 
 			expect(session.aiTabs[0].usageStats).toEqual(usageStats);
-		});
-
-		it('creates a session with saveToHistory option', () => {
-			const { session: sessionWithHistory } = createMergedSession({
-				name: 'With History',
-				projectRoot: '/project',
-				toolType: 'claude-code',
-				mergedLogs: [],
-				saveToHistory: true,
-			});
-
-			expect(sessionWithHistory.aiTabs[0].saveToHistory).toBe(true);
-
-			const { session: sessionWithoutHistory } = createMergedSession({
-				name: 'Without History',
-				projectRoot: '/project',
-				toolType: 'claude-code',
-				mergedLogs: [],
-				saveToHistory: false,
-			});
-
-			expect(sessionWithoutHistory.aiTabs[0].saveToHistory).toBe(false);
 		});
 
 		it('creates a session with showThinking option', () => {

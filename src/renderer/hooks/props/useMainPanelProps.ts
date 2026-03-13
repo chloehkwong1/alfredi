@@ -212,6 +212,11 @@ export interface UseMainPanelPropsDeps {
 	handleDiffTabViewModeChange: (tabId: string, viewMode: 'unified' | 'split') => void;
 	handleDiffTabScrollPositionChange: (tabId: string, scrollTop: number) => void;
 
+	// Commit diff tab props
+	activeCommitDiffTabId: string | null;
+	activeCommitDiffTab: import('../../types').CommitDiffTab | null;
+	handleCloseCommitDiffTab: (tabId: string) => void;
+
 	handleScrollPositionChange: (scrollTop: number) => void;
 	handleAtBottomChange: (isAtBottom: boolean) => void;
 	handleMainPanelInputBlur: () => void;
@@ -390,6 +395,10 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onPinTab: deps.handlePinTab,
 			onDiffTabViewModeChange: deps.handleDiffTabViewModeChange,
 			onDiffTabScrollPositionChange: deps.handleDiffTabScrollPositionChange,
+			// Commit diff tab props
+			activeCommitDiffTabId: deps.activeCommitDiffTabId,
+			activeCommitDiffTab: deps.activeCommitDiffTab,
+			onCommitDiffTabClose: deps.handleCloseCommitDiffTab,
 			onToggleTabShowThinking: deps.handleToggleTabShowThinking,
 			onScrollPositionChange: deps.handleScrollPositionChange,
 			onAtBottomChange: deps.handleAtBottomChange,
@@ -594,6 +603,10 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handlePinTab,
 			deps.handleDiffTabViewModeChange,
 			deps.handleDiffTabScrollPositionChange,
+			// Commit diff tab deps
+			deps.activeCommitDiffTabId,
+			deps.activeCommitDiffTab,
+			deps.handleCloseCommitDiffTab,
 			deps.handleScrollPositionChange,
 			deps.handleAtBottomChange,
 			deps.handleMainPanelInputBlur,

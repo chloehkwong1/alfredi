@@ -56,6 +56,8 @@ function makeSession(overrides: Partial<Session> = {}): Session {
 		activeFileTabId: null,
 		diffViewTabs: [],
 		activeDiffTabId: null,
+		commitDiffTabs: [],
+		activeCommitDiffTabId: null,
 		unifiedTabOrder: [{ type: 'ai', id: 'ai-1' }],
 		unifiedClosedTabHistory: [],
 		autoRunFolderPath: '/tmp/.maestro/autorun',

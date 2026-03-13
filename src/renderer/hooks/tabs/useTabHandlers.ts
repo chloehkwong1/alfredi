@@ -2,6 +2,7 @@ import { useMemo, useCallback } from 'react';
 import type {
 	Session,
 	AITab,
+	CommitDiffTab,
 	DiffViewTab,
 	FilePreviewTab,
 	UnifiedTab,
@@ -35,7 +36,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 // ============================================================================
 
 export interface CloseCurrentTabResult {
-	type: 'file' | 'ai' | 'diff' | 'prevented' | 'none';
+	type: 'file' | 'ai' | 'diff' | 'commit-diff' | 'prevented' | 'none';
 	tabId?: string;
 	isWizardTab?: boolean;
 }
@@ -68,6 +69,7 @@ export interface TabHandlersReturn {
 	unifiedTabs: UnifiedTab[];
 	activeFileTab: FilePreviewTab | null;
 	activeDiffTab: DiffViewTab | null;
+	activeCommitDiffTab: CommitDiffTab | null;
 	isResumingSession: boolean;
 	fileTabBackHistory: FilePreviewHistoryEntry[];
 	fileTabForwardHistory: FilePreviewHistoryEntry[];
@@ -114,6 +116,15 @@ export interface TabHandlersReturn {
 	handleOpenDiffTab: (params: DiffTabOpenParams) => void;
 	handleSelectDiffTab: (tabId: string) => void;
 	handleCloseDiffTab: (tabId: string) => void;
+
+	// Commit Diff Tab handlers
+	handleOpenCommitDiffTab: (commit: {
+		hash: string;
+		subject: string;
+		author: string;
+		date: string;
+	}) => Promise<void>;
+	handleCloseCommitDiffTab: (tabId: string) => void;
 	handleFileTabEditModeChange: (tabId: string, editMode: boolean) => void;
 	handleFileTabEditContentChange: (
 		tabId: string,
@@ -181,7 +192,13 @@ export function useTabHandlers(): TabHandlersReturn {
 	const unifiedTabs = useMemo((): UnifiedTab[] => {
 		if (!activeSession) return [];
 		return buildUnifiedTabs(activeSession);
-	}, [activeSession?.aiTabs, activeSession?.filePreviewTabs, activeSession?.unifiedTabOrder]);
+	}, [
+		activeSession?.aiTabs,
+		activeSession?.filePreviewTabs,
+		activeSession?.diffViewTabs,
+		activeSession?.commitDiffTabs,
+		activeSession?.unifiedTabOrder,
+	]);
 
 	// Get the active file preview tab (if a file tab is active)
 	const activeFileTab = useMemo((): FilePreviewTab | null => {
@@ -198,6 +215,15 @@ export function useTabHandlers(): TabHandlersReturn {
 			null
 		);
 	}, [activeSession?.activeDiffTabId, activeSession?.diffViewTabs]);
+
+	const activeCommitDiffTab = useMemo((): CommitDiffTab | null => {
+		if (!activeSession?.activeCommitDiffTabId) return null;
+		return (
+			(activeSession.commitDiffTabs || []).find(
+				(tab) => tab.id === activeSession.activeCommitDiffTabId
+			) ?? null
+		);
+	}, [activeSession?.activeCommitDiffTabId, activeSession?.commitDiffTabs]);
 
 	const isResumingSession = !!activeTab?.agentSessionId;
 
@@ -557,6 +583,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						...sessionWithUpdatedTabs,
 						activeDiffTabId: existingTab.id,
 						activeFileTabId: null,
+						activeCommitDiffTabId: null,
 						unifiedTabOrder: ensureInUnifiedTabOrder(
 							sessionWithUpdatedTabs.unifiedTabOrder,
 							'diff',
@@ -611,6 +638,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					diffViewTabs: [...(sessionForNewTab.diffViewTabs || []), newTab],
 					activeDiffTabId: newTab.id,
 					activeFileTabId: null,
+					activeCommitDiffTabId: null,
 					unifiedTabOrder: updatedUnifiedTabOrder,
 				};
 			})
@@ -623,7 +651,7 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 				if (!(s.diffViewTabs || []).some((t) => t.id === tabId)) return s;
-				return { ...s, activeDiffTabId: tabId, activeFileTabId: null };
+				return { ...s, activeDiffTabId: tabId, activeFileTabId: null, activeCommitDiffTabId: null };
 			})
 		);
 	}, []);
@@ -639,6 +667,122 @@ export function useTabHandlers(): TabHandlersReturn {
 				prev.map((s) => (s.id === activeSessionId ? result.session : s))
 			);
 		}
+	}, []);
+
+	// ========================================================================
+	// Commit Diff Tabs
+	// ========================================================================
+
+	/**
+	 * Open a commit diff tab showing all file diffs stacked vertically.
+	 * If a tab for this commit already exists, switch to it.
+	 */
+	const handleOpenCommitDiffTab = useCallback(
+		async (commit: { hash: string; subject: string; author: string; date: string }) => {
+			const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+			const currentSession = sessions.find((s) => s.id === activeSessionId);
+			if (!currentSession) return;
+
+			// Check if tab for this commit already exists
+			const existing = (currentSession.commitDiffTabs || []).find(
+				(t) => t.commitHash === commit.hash
+			);
+			if (existing) {
+				setSessions((prev: Session[]) =>
+					prev.map((s) => {
+						if (s.id !== activeSessionId) return s;
+						return {
+							...s,
+							activeCommitDiffTabId: existing.id,
+							activeFileTabId: null,
+							activeDiffTabId: null,
+						};
+					})
+				);
+				return;
+			}
+
+			// Fetch the full diff from IPC
+			const cwd = currentSession.remoteCwd || currentSession.cwd;
+			const sshRemoteId = currentSession.sshRemoteId;
+			const result = await window.maestro.git.commitDiff(cwd, commit.hash, sshRemoteId);
+
+			const tabId = `commit-diff-${commit.hash}`;
+			const newTab: CommitDiffTab = {
+				id: tabId,
+				type: 'commit-diff',
+				commitHash: commit.hash,
+				subject: commit.subject,
+				author: commit.author,
+				date: commit.date,
+				rawDiff: result.diff || '',
+				scrollTop: 0,
+				createdAt: Date.now(),
+			};
+
+			const newTabRef: UnifiedTabRef = { type: 'commit-diff' as const, id: tabId };
+
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					return {
+						...s,
+						commitDiffTabs: [...(s.commitDiffTabs || []), newTab],
+						activeCommitDiffTabId: tabId,
+						activeFileTabId: null,
+						activeDiffTabId: null,
+						unifiedTabOrder: [...s.unifiedTabOrder, newTabRef],
+					};
+				})
+			);
+		},
+		[]
+	);
+
+	/**
+	 * Close a commit diff tab.
+	 */
+	const handleCloseCommitDiffTab = useCallback((tabId: string) => {
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const currentSession = sessions.find((s) => s.id === activeSessionId);
+		if (!currentSession) return;
+
+		const tabs = currentSession.commitDiffTabs || [];
+		const tabIndex = tabs.findIndex((t) => t.id === tabId);
+		if (tabIndex === -1) return;
+
+		const isActive = currentSession.activeCommitDiffTabId === tabId;
+		const updatedTabs = tabs.filter((t) => t.id !== tabId);
+		const updatedOrder = currentSession.unifiedTabOrder.filter(
+			(ref) => !(ref.type === 'commit-diff' && ref.id === tabId)
+		);
+
+		// If closing the active tab, find next tab to activate
+		let nextActiveCommitDiffTabId: string | null = null;
+		if (isActive && updatedOrder.length > 0) {
+			// Find the unified index of the closed tab and pick the nearest tab
+			const closedUnifiedIndex = currentSession.unifiedTabOrder.findIndex(
+				(ref) => ref.type === 'commit-diff' && ref.id === tabId
+			);
+			const nextIndex = Math.min(closedUnifiedIndex, updatedOrder.length - 1);
+			const nextRef = updatedOrder[nextIndex];
+			// Just switch to the first AI tab if the next tab isn't a commit-diff
+			if (nextRef?.type === 'commit-diff') {
+				nextActiveCommitDiffTabId = nextRef.id;
+			}
+		}
+
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				return {
+					...s,
+					commitDiffTabs: updatedTabs,
+					activeCommitDiffTabId: nextActiveCommitDiffTabId,
+					unifiedTabOrder: updatedOrder,
+				};
+			})
+		);
 	}, []);
 
 	// ========================================================================
@@ -789,7 +933,7 @@ export function useTabHandlers(): TabHandlersReturn {
 		setSessions((prev: Session[]) =>
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
-				return { ...s, activeFileTabId: tabId };
+				return { ...s, activeFileTabId: tabId, activeCommitDiffTabId: null };
 			})
 		);
 
@@ -1612,6 +1756,7 @@ export function useTabHandlers(): TabHandlersReturn {
 		unifiedTabs,
 		activeFileTab,
 		activeDiffTab,
+		activeCommitDiffTab,
 		isResumingSession,
 		fileTabBackHistory,
 		fileTabForwardHistory,
@@ -1652,6 +1797,10 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleOpenDiffTab,
 		handleSelectDiffTab,
 		handleCloseDiffTab,
+
+		// Commit Diff Tab handlers
+		handleOpenCommitDiffTab,
+		handleCloseCommitDiffTab,
 
 		// Preview Tab handlers
 		handlePinTab,

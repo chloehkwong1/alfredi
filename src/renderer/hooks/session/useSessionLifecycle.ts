@@ -164,6 +164,8 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 							activeFileTabId: null,
 							diffViewTabs: [],
 							activeDiffTabId: null,
+							commitDiffTabs: [],
+							activeCommitDiffTabId: null,
 							unifiedTabOrder: [{ type: 'ai' as const, id: newTabId }],
 							unifiedClosedTabHistory: [],
 							// Reset agent runtime state

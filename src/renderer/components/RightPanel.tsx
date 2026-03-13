@@ -121,6 +121,14 @@ interface RightPanelProps {
 		rawDiff?: string;
 		isPreview?: boolean;
 	}) => void;
+
+	// Commit diff tab handler (from useTabHandlers)
+	onOpenCommitDiffTab?: (commit: {
+		hash: string;
+		subject: string;
+		author: string;
+		date: string;
+	}) => Promise<void>;
 }
 
 // ============================================================================
@@ -333,6 +341,7 @@ export const RightPanel = memo(
 			onFocusFileInGraph,
 			onOpenLastDocumentGraph,
 			onOpenDiffTab,
+			onOpenCommitDiffTab,
 		} = props;
 
 		const {
@@ -396,6 +405,19 @@ export const RightPanel = memo(
 		const changesPanel = useChangesPanel(
 			activeRightTopTab === 'changes' ? session?.fullPath : undefined,
 			sshRemoteId
+		);
+
+		/** Open a stacked commit diff tab for the given commit */
+		const handleOpenCommitDiff = useCallback(
+			(commit: import('../hooks/useChangesPanel').ChangesPanelCommit) => {
+				onOpenCommitDiffTab?.({
+					hash: commit.hash,
+					subject: commit.subject,
+					author: commit.author,
+					date: commit.date,
+				});
+			},
+			[onOpenCommitDiffTab]
 		);
 
 		/** Bridge ChangesPanel's onOpenDiff to the full DiffTabOpenParams expected by handleOpenDiffTab */
@@ -669,7 +691,8 @@ export const RightPanel = memo(
 							stagedFiles={changesPanel.stagedFiles}
 							unstagedFiles={changesPanel.unstagedFiles}
 							committedFiles={changesPanel.committedFiles}
-							commits={changesPanel.commits}
+							commits={changesPanel.allCommits}
+							branchCommits={changesPanel.branchCommits}
 							currentBranch={changesPanel.currentBranch}
 							baseBranch={changesPanel.baseBranch}
 							isLoading={changesPanel.isLoading}
@@ -677,6 +700,7 @@ export const RightPanel = memo(
 							sshRemoteId={sshRemoteId}
 							onRefresh={changesPanel.refresh}
 							onOpenDiff={handleChangesPanelOpenDiff}
+							onOpenCommitDiff={handleOpenCommitDiff}
 							fetchCommitFiles={changesPanel.fetchCommitFiles}
 						/>
 					) : (

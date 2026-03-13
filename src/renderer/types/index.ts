@@ -550,10 +550,26 @@ export interface DiffViewTab {
 }
 
 /**
+ * Commit Diff Tab for viewing all file diffs in a commit stacked vertically (GitHub-style).
+ * Opens from the ChangesPanel when clicking a commit.
+ */
+export interface CommitDiffTab {
+	id: string; // Unique tab ID (UUID), based on commit hash for dedup
+	type: 'commit-diff'; // Discriminant for tab type
+	commitHash: string; // Full commit hash
+	subject: string; // Commit message subject line
+	author: string; // Commit author
+	date: string; // Commit date string
+	rawDiff: string; // Full unified diff output from git show
+	scrollTop: number; // Saved scroll position
+	createdAt: number; // Timestamp for ordering
+}
+
+/**
  * Reference to any tab in the unified tab system.
  * Used for unified tab ordering across different tab types.
  */
-export type UnifiedTabRef = { type: 'ai' | 'file' | 'diff'; id: string };
+export type UnifiedTabRef = { type: 'ai' | 'file' | 'diff' | 'commit-diff'; id: string };
 
 /**
  * Unified tab entry for rendering in TabBar.
@@ -563,7 +579,8 @@ export type UnifiedTabRef = { type: 'ai' | 'file' | 'diff'; id: string };
 export type UnifiedTab =
 	| { type: 'ai'; id: string; data: AITab }
 	| { type: 'file'; id: string; data: FilePreviewTab }
-	| { type: 'diff'; id: string; data: DiffViewTab };
+	| { type: 'diff'; id: string; data: DiffViewTab }
+	| { type: 'commit-diff'; id: string; data: CommitDiffTab };
 
 /**
  * Unified closed tab entry for undo functionality (Cmd+Shift+T).
@@ -573,7 +590,8 @@ export type UnifiedTab =
 export type ClosedTabEntry =
 	| { type: 'ai'; tab: AITab; unifiedIndex: number; closedAt: number }
 	| { type: 'file'; tab: FilePreviewTab; unifiedIndex: number; closedAt: number }
-	| { type: 'diff'; tab: DiffViewTab; unifiedIndex: number; closedAt: number };
+	| { type: 'diff'; tab: DiffViewTab; unifiedIndex: number; closedAt: number }
+	| { type: 'commit-diff'; tab: CommitDiffTab; unifiedIndex: number; closedAt: number };
 
 export interface Session {
 	id: string;
@@ -704,6 +722,11 @@ export interface Session {
 	diffViewTabs: DiffViewTab[];
 	// Currently active diff tab ID (null if an AI or file tab is active)
 	activeDiffTabId: string | null;
+
+	// Commit Diff Tabs - stacked multi-file diff view for commits
+	commitDiffTabs: CommitDiffTab[];
+	// Currently active commit diff tab ID (null if another tab type is active)
+	activeCommitDiffTabId: string | null;
 
 	// Unified tab ordering - determines visual order of all tabs (AI, file, and diff)
 	unifiedTabOrder: UnifiedTabRef[];

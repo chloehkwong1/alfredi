@@ -618,6 +618,7 @@ function MaestroConsoleInner() {
 		unifiedTabs,
 		activeFileTab,
 		activeDiffTab,
+		activeCommitDiffTab,
 		isResumingSession,
 		fileTabBackHistory,
 		fileTabForwardHistory,
@@ -663,6 +664,8 @@ function MaestroConsoleInner() {
 		handleSelectDiffTab,
 		handleCloseDiffTab,
 		handlePinTab,
+		handleOpenCommitDiffTab,
+		handleCloseCommitDiffTab,
 	} = useTabHandlers();
 
 	// --- MODAL HANDLERS (open/close, error recovery, lightbox) ---
@@ -1857,6 +1860,11 @@ function MaestroConsoleInner() {
 		handleDiffTabViewModeChange: useTabStore.getState().updateDiffTabViewMode,
 		handleDiffTabScrollPositionChange: useTabStore.getState().updateDiffTabScrollPosition,
 
+		// Commit diff tab props
+		activeCommitDiffTabId: activeSession?.activeCommitDiffTabId ?? null,
+		activeCommitDiffTab,
+		handleCloseCommitDiffTab,
+
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleMainPanelInputBlur,
@@ -1998,6 +2006,9 @@ function MaestroConsoleInner() {
 
 		// Diff tab handler
 		handleOpenDiffTab,
+
+		// Commit diff tab handler
+		handleOpenCommitDiffTab,
 	});
 
 	return (
