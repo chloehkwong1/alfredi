@@ -464,6 +464,194 @@ describe('StdoutHandler', () => {
 		});
 	});
 
+	// ── AskUserQuestion detection (toolUseBlocks path) ────────────────────
+
+	describe('AskUserQuestion detection via toolUseBlocks', () => {
+		function createParserReturning(event: Record<string, unknown>) {
+			return {
+				agentId: 'claude-code',
+				parseJsonLine: vi.fn(() => event),
+				parseJsonObject: vi.fn(() => event),
+				isResultMessage: vi.fn(() => false),
+				extractSessionId: vi.fn(() => null),
+				extractUsage: vi.fn(() => null),
+				extractSlashCommands: vi.fn(() => null),
+				detectErrorFromLine: vi.fn(() => null),
+				detectErrorFromParsed: vi.fn(() => null),
+				detectErrorFromExit: vi.fn(() => null),
+			};
+		}
+
+		it('should emit user-question event for AskUserQuestion tool_use block', () => {
+			const questions = [
+				{ question: 'Do you want to proceed?', options: [{ label: 'Yes' }, { label: 'No' }] },
+			];
+			const mockParser = createParserReturning({
+				type: 'text',
+				text: 'Let me ask you something',
+				isPartial: false,
+				toolUseBlocks: [
+					{
+						name: 'AskUserQuestion',
+						id: 'toolu_ask_123',
+						input: { questions },
+					},
+				],
+			});
+
+			const { handler, emitter, sessionId } = createTestContext({
+				isStreamJsonMode: true,
+				toolType: 'claude-code',
+				outputParser: mockParser as any,
+			});
+
+			const userQuestionSpy = vi.fn();
+			const toolExecutionSpy = vi.fn();
+			emitter.on('user-question', userQuestionSpy);
+			emitter.on('tool-execution', toolExecutionSpy);
+
+			sendJsonLine(handler, sessionId, { type: 'assistant', content: 'ask' });
+
+			expect(userQuestionSpy).toHaveBeenCalledTimes(1);
+			expect(userQuestionSpy).toHaveBeenCalledWith(sessionId, {
+				toolUseId: 'toolu_ask_123',
+				questions,
+			});
+			// AskUserQuestion should NOT also emit tool-execution
+			expect(toolExecutionSpy).not.toHaveBeenCalled();
+		});
+
+		it('should emit tool-execution for non-AskUserQuestion tool_use blocks', () => {
+			const mockParser = createParserReturning({
+				type: 'text',
+				text: 'Reading file...',
+				isPartial: false,
+				toolUseBlocks: [
+					{
+						name: 'Read',
+						id: 'toolu_read_456',
+						input: { path: '/tmp/test.ts' },
+					},
+				],
+			});
+
+			const { handler, emitter, sessionId } = createTestContext({
+				isStreamJsonMode: true,
+				toolType: 'claude-code',
+				outputParser: mockParser as any,
+			});
+
+			const userQuestionSpy = vi.fn();
+			const toolExecutionSpy = vi.fn();
+			emitter.on('user-question', userQuestionSpy);
+			emitter.on('tool-execution', toolExecutionSpy);
+
+			sendJsonLine(handler, sessionId, { type: 'assistant', content: 'read' });
+
+			expect(userQuestionSpy).not.toHaveBeenCalled();
+			expect(toolExecutionSpy).toHaveBeenCalledTimes(1);
+			expect(toolExecutionSpy).toHaveBeenCalledWith(sessionId, {
+				toolName: 'Read',
+				state: { status: 'running', input: { path: '/tmp/test.ts' } },
+				timestamp: expect.any(Number),
+			});
+		});
+
+		it('should handle mixed toolUseBlocks: AskUserQuestion + regular tools', () => {
+			const questions = [{ question: 'Continue?', options: [{ label: 'Yes' }] }];
+			const mockParser = createParserReturning({
+				type: 'text',
+				text: 'mixed content',
+				isPartial: false,
+				toolUseBlocks: [
+					{
+						name: 'Read',
+						id: 'toolu_read_1',
+						input: { path: '/a.ts' },
+					},
+					{
+						name: 'AskUserQuestion',
+						id: 'toolu_ask_2',
+						input: { questions },
+					},
+					{
+						name: 'Edit',
+						id: 'toolu_edit_3',
+						input: { file: '/b.ts' },
+					},
+				],
+			});
+
+			const { handler, emitter, sessionId } = createTestContext({
+				isStreamJsonMode: true,
+				toolType: 'claude-code',
+				outputParser: mockParser as any,
+			});
+
+			const userQuestionSpy = vi.fn();
+			const toolExecutionSpy = vi.fn();
+			emitter.on('user-question', userQuestionSpy);
+			emitter.on('tool-execution', toolExecutionSpy);
+
+			sendJsonLine(handler, sessionId, { type: 'assistant', content: 'mixed' });
+
+			// Only the AskUserQuestion block emits user-question
+			expect(userQuestionSpy).toHaveBeenCalledTimes(1);
+			expect(userQuestionSpy).toHaveBeenCalledWith(sessionId, {
+				toolUseId: 'toolu_ask_2',
+				questions,
+			});
+			// The other two emit tool-execution
+			expect(toolExecutionSpy).toHaveBeenCalledTimes(2);
+			expect(toolExecutionSpy).toHaveBeenCalledWith(
+				sessionId,
+				expect.objectContaining({ toolName: 'Read' })
+			);
+			expect(toolExecutionSpy).toHaveBeenCalledWith(
+				sessionId,
+				expect.objectContaining({ toolName: 'Edit' })
+			);
+		});
+
+		it('should fall back to tool-execution when AskUserQuestion has no questions', () => {
+			const mockParser = createParserReturning({
+				type: 'text',
+				text: 'malformed ask',
+				isPartial: false,
+				toolUseBlocks: [
+					{
+						name: 'AskUserQuestion',
+						id: 'toolu_ask_bad',
+						input: { message: 'no questions field' },
+					},
+				],
+			});
+
+			const { handler, emitter, sessionId } = createTestContext({
+				isStreamJsonMode: true,
+				toolType: 'claude-code',
+				outputParser: mockParser as any,
+			});
+
+			const userQuestionSpy = vi.fn();
+			const toolExecutionSpy = vi.fn();
+			emitter.on('user-question', userQuestionSpy);
+			emitter.on('tool-execution', toolExecutionSpy);
+
+			sendJsonLine(handler, sessionId, { type: 'assistant', content: 'bad' });
+
+			// No questions field → should NOT emit user-question, falls through to tool-execution
+			expect(userQuestionSpy).not.toHaveBeenCalled();
+			expect(toolExecutionSpy).toHaveBeenCalledTimes(1);
+			expect(toolExecutionSpy).toHaveBeenCalledWith(
+				sessionId,
+				expect.objectContaining({
+					toolName: 'AskUserQuestion',
+				})
+			);
+		});
+	});
+
 	// ── normalizeUsageToDelta (tested via outputParser path) ───────────────
 
 	describe('normalizeUsageToDelta (via outputParser stream-JSON path)', () => {

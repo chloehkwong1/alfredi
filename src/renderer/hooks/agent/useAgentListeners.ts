@@ -1428,6 +1428,63 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		);
 
 		// ================================================================
+		// onUserQuestion — Handle AskUserQuestion tool events (Claude Code)
+		// ================================================================
+		const unsubscribeUserQuestion = window.maestro.process.onUserQuestion?.(
+			(
+				sessionId: string,
+				questionData: {
+					toolUseId: string;
+					questions: Array<{
+						question: string;
+						header?: string;
+						options?: Array<{ label: string; description?: string }>;
+						multiSelect?: boolean;
+					}>;
+				}
+			) => {
+				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
+				if (!aiTabMatch) return;
+
+				const actualSessionId = aiTabMatch[1];
+				const tabId = aiTabMatch[2];
+
+				// Create one log entry per question in the event
+				const questionLogs: import('../../types').LogEntry[] = questionData.questions.map(
+					(q, idx) => ({
+						id: `question-${Date.now()}-${questionData.toolUseId}-${idx}`,
+						timestamp: Date.now(),
+						source: 'system' as const,
+						text: q.header ? `${q.header}\n${q.question}` : q.question,
+						interactive: true,
+						options: q.options?.map((o) => o.label) ?? [],
+						metadata: {
+							processSessionId: sessionId,
+						},
+					})
+				);
+
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== actualSessionId) return s;
+
+						return {
+							...s,
+							aiTabs: s.aiTabs.map((tab) =>
+								tab.id === tabId
+									? {
+											...tab,
+											logs: [...tab.logs, ...questionLogs],
+										}
+									: tab
+							),
+						};
+					})
+				);
+			}
+		);
+
+		// ================================================================
 		// Cleanup — unsubscribe all listeners on unmount
 		// ================================================================
 		return () => {
@@ -1442,6 +1499,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			unsubscribeThinkingChunk?.();
 			unsubscribeSshRemote?.();
 			unsubscribeToolExecution?.();
+			unsubscribeUserQuestion?.();
 			// Cancel any pending thinking chunk RAF and clear buffer
 			if (thinkingChunkRafIdRef.current !== null) {
 				cancelAnimationFrame(thinkingChunkRafIdRef.current);

@@ -238,6 +238,20 @@ interface MaestroAPI {
 				toolEvent: { toolName: string; state?: unknown; timestamp: number }
 			) => void
 		) => () => void;
+		onUserQuestion: (
+			callback: (
+				sessionId: string,
+				questionData: {
+					toolUseId: string;
+					questions: Array<{
+						question: string;
+						header?: string;
+						options?: Array<{ label: string; description?: string }>;
+						multiSelect?: boolean;
+					}>;
+				}
+			) => void
+		) => () => void;
 		onSshRemote: (
 			callback: (
 				sessionId: string,

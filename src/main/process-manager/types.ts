@@ -119,8 +119,26 @@ export interface ProcessManagerEvents {
 	'agent-error': (sessionId: string, error: AgentError) => void;
 	'thinking-chunk': (sessionId: string, text: string) => void;
 	'tool-execution': (sessionId: string, tool: ToolExecution) => void;
+	'user-question': (sessionId: string, question: UserQuestion) => void;
 	'slash-commands': (sessionId: string, commands: unknown[]) => void;
 	'query-complete': (sessionId: string, data: QueryCompleteData) => void;
+}
+
+export interface UserQuestionOption {
+	label: string;
+	description?: string;
+}
+
+export interface UserQuestionItem {
+	question: string;
+	header?: string;
+	options?: UserQuestionOption[];
+	multiSelect?: boolean;
+}
+
+export interface UserQuestion {
+	toolUseId: string;
+	questions: UserQuestionItem[];
 }
 
 export interface ToolExecution {

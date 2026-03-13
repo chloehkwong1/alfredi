@@ -386,7 +386,8 @@ describe('ChildProcessSpawner', () => {
 
 			// The message should be written to stdin
 			expect(mockChildProcess.stdin.write).toHaveBeenCalled();
-			expect(mockChildProcess.stdin.end).toHaveBeenCalled();
+			// stdin stays open for claude-code to support AskUserQuestion interactive tool
+			expect(mockChildProcess.stdin.end).not.toHaveBeenCalled();
 		});
 
 		it('should send stream-json message via stdin with multiple images', () => {

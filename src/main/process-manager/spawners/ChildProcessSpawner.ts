@@ -502,7 +502,17 @@ export class ChildProcessSpawner {
 					hasImages: !!(images && images.length > 0),
 				});
 				childProcess.stdin?.write(streamJsonMessage + '\n');
-				childProcess.stdin?.end();
+				if (toolType === 'claude-code') {
+					logger.debug(
+						'[ProcessManager] Keeping stdin open for interactive tool support',
+						'ProcessManager',
+						{
+							sessionId,
+						}
+					);
+				} else {
+					childProcess.stdin?.end();
+				}
 			} else if (isBatchMode) {
 				// Regular batch mode: close stdin immediately
 				logger.debug('[ProcessManager] Closing stdin for batch mode', 'ProcessManager', {

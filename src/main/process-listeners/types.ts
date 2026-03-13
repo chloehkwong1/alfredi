@@ -10,7 +10,12 @@ import type { SafeSendFn } from '../utils/safe-send';
 import type { StatsDB } from '../stats';
 
 // Re-export types from their canonical locations
-export type { UsageStats, QueryCompleteData, ToolExecution } from '../process-manager/types';
+export type {
+	UsageStats,
+	QueryCompleteData,
+	ToolExecution,
+	UserQuestion,
+} from '../process-manager/types';
 export type { AgentError } from '../../shared/types';
 export type { SafeSendFn } from '../utils/safe-send';
 

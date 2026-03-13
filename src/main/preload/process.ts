@@ -121,6 +121,32 @@ export interface ToolExecutionEvent {
 }
 
 /**
+ * User question option from AskUserQuestion tool
+ */
+export interface UserQuestionOptionEvent {
+	label: string;
+	description?: string;
+}
+
+/**
+ * Individual question from AskUserQuestion tool
+ */
+export interface UserQuestionItemEvent {
+	question: string;
+	header?: string;
+	options?: UserQuestionOptionEvent[];
+	multiSelect?: boolean;
+}
+
+/**
+ * User question event from AskUserQuestion tool
+ */
+export interface UserQuestionEvent {
+	toolUseId: string;
+	questions: UserQuestionItemEvent[];
+}
+
+/**
  * SSH remote info
  */
 export interface SshRemoteInfo {
@@ -250,6 +276,18 @@ export function createProcessApi() {
 				callback(sessionId, toolEvent);
 			ipcRenderer.on('process:tool-execution', handler);
 			return () => ipcRenderer.removeListener('process:tool-execution', handler);
+		},
+
+		/**
+		 * Subscribe to AskUserQuestion events from Claude Code
+		 */
+		onUserQuestion: (
+			callback: (sessionId: string, questionData: UserQuestionEvent) => void
+		): (() => void) => {
+			const handler = (_: unknown, sessionId: string, questionData: UserQuestionEvent) =>
+				callback(sessionId, questionData);
+			ipcRenderer.on('process:user-question', handler);
+			return () => ipcRenderer.removeListener('process:user-question', handler);
 		},
 
 		/**

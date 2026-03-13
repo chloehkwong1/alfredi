@@ -66,6 +66,74 @@ const summarizeTodos = (v: unknown): string | null => {
 };
 
 // ============================================================================
+// InteractiveQuestion - Renders AskUserQuestion inline with clickable options
+// ============================================================================
+
+const InteractiveQuestion = memo(({ log, theme }: { log: LogEntry; theme: Theme }) => {
+	const [selectedOption, setSelectedOption] = useState<string | null>(log.answered ?? null);
+
+	const handleOptionClick = useCallback(
+		(label: string) => {
+			if (selectedOption) return; // Already answered
+			setSelectedOption(label);
+
+			const processSessionId = log.metadata?.processSessionId;
+			if (processSessionId) {
+				window.maestro.process.write(processSessionId, label + '\n');
+			}
+		},
+		[selectedOption, log.metadata?.processSessionId]
+	);
+
+	return (
+		<div
+			className="px-4 py-3 border-l-2"
+			style={{
+				borderColor: theme.colors.accent,
+			}}
+		>
+			<div className="text-sm mb-2 whitespace-pre-wrap" style={{ color: theme.colors.textMain }}>
+				{log.text}
+			</div>
+			<div className="flex flex-wrap gap-2">
+				{log.options?.map((label) => {
+					const isSelected = selectedOption === label;
+					const isDisabled = selectedOption !== null;
+
+					return (
+						<button
+							key={label}
+							onClick={() => handleOptionClick(label)}
+							disabled={isDisabled}
+							className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
+							style={{
+								backgroundColor: isSelected
+									? theme.colors.accent
+									: isDisabled
+										? `${theme.colors.textDim}20`
+										: `${theme.colors.accent}20`,
+								color: isSelected
+									? theme.colors.accentForeground
+									: isDisabled
+										? theme.colors.textDim
+										: theme.colors.accent,
+								cursor: isDisabled ? 'default' : 'pointer',
+								opacity: isDisabled && !isSelected ? 0.5 : 1,
+								border: `1px solid ${isSelected ? theme.colors.accent : isDisabled ? 'transparent' : `${theme.colors.accent}40`}`,
+							}}
+						>
+							{label}
+							{isSelected && ' ✓'}
+						</button>
+					);
+				})}
+			</div>
+		</div>
+	);
+});
+InteractiveQuestion.displayName = 'InteractiveQuestion';
+
+// ============================================================================
 // LogItem - Memoized component for individual log entries
 // ============================================================================
 
@@ -447,6 +515,10 @@ const LogItemComponent = memo(
 								)}
 							</div>
 						</div>
+					)}
+					{/* Special rendering for interactive AskUserQuestion events */}
+					{log.interactive === true && log.options && log.options.length > 0 && (
+						<InteractiveQuestion log={log} theme={theme} />
 					)}
 					{/* Special rendering for tool execution events (shown alongside thinking) */}
 					{log.source === 'tool' &&

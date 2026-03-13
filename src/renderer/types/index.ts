@@ -198,6 +198,8 @@ export interface LogEntry {
 	text: string;
 	interactive?: boolean;
 	options?: string[];
+	// For interactive questions - tracks the selected answer label (disables buttons once set)
+	answered?: string;
 	images?: string[];
 	// For custom AI commands - stores the command metadata for display
 	aiCommand?: {
@@ -217,6 +219,8 @@ export interface LogEntry {
 			input?: unknown;
 			output?: unknown;
 		};
+		// For interactive questions - the process session ID to write the answer to
+		processSessionId?: string;
 	};
 }
 

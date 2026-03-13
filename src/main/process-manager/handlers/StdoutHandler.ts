@@ -345,6 +345,19 @@ export class StdoutHandler {
 		// Handle tool_use blocks embedded in text events (Claude Code mixed content)
 		if (event.toolUseBlocks?.length) {
 			for (const tool of event.toolUseBlocks) {
+				// Detect AskUserQuestion and emit a dedicated user-question event
+				if (tool.name === 'AskUserQuestion' && tool.input) {
+					const input = tool.input as { questions?: unknown[] };
+					if (input.questions) {
+						this.emitter.emit('user-question', sessionId, {
+							toolUseId: tool.id ?? '',
+							questions:
+								input.questions as import('../../process-manager/types').UserQuestionItem[],
+						});
+						continue;
+					}
+				}
+
 				this.emitter.emit('tool-execution', sessionId, {
 					toolName: tool.name,
 					state: { status: 'running', input: tool.input },

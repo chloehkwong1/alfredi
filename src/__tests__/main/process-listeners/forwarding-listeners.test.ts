@@ -32,6 +32,7 @@ describe('Forwarding Listeners', () => {
 		expect(mockProcessManager.on).toHaveBeenCalledWith('slash-commands', expect.any(Function));
 		expect(mockProcessManager.on).toHaveBeenCalledWith('thinking-chunk', expect.any(Function));
 		expect(mockProcessManager.on).toHaveBeenCalledWith('tool-execution', expect.any(Function));
+		expect(mockProcessManager.on).toHaveBeenCalledWith('user-question', expect.any(Function));
 		expect(mockProcessManager.on).toHaveBeenCalledWith('stderr', expect.any(Function));
 		expect(mockProcessManager.on).toHaveBeenCalledWith('command-exit', expect.any(Function));
 	});
@@ -90,6 +91,21 @@ describe('Forwarding Listeners', () => {
 		handler?.(testSessionId, testStderr);
 
 		expect(mockSafeSend).toHaveBeenCalledWith('process:stderr', testSessionId, testStderr);
+	});
+
+	it('should forward user-question events to renderer', () => {
+		setupForwardingListeners(mockProcessManager, { safeSend: mockSafeSend });
+
+		const handler = eventHandlers.get('user-question');
+		const testSessionId = 'test-session-123';
+		const testQuestion = {
+			toolUseId: 'toolu_ask_123',
+			questions: [{ question: 'Continue?', options: [{ label: 'Yes' }, { label: 'No' }] }],
+		};
+
+		handler?.(testSessionId, testQuestion);
+
+		expect(mockSafeSend).toHaveBeenCalledWith('process:user-question', testSessionId, testQuestion);
 	});
 
 	it('should forward command-exit events to renderer', () => {
