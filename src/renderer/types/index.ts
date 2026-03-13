@@ -562,6 +562,7 @@ export interface CommitDiffTab {
 	type: 'commit-diff'; // Discriminant for tab type
 	commitHash: string; // Full commit hash
 	subject: string; // Commit message subject line
+	body: string; // Extended commit message (after subject line)
 	author: string; // Commit author
 	date: string; // Commit date string
 	rawDiff: string; // Full unified diff output from git show

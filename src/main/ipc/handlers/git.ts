@@ -475,7 +475,17 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 					// May be a root commit — retry without --first-parent
 					result = await execGit(['show', '--format=', hash], cwd, sshRemote, effectiveRemoteCwd);
 				}
-				return { diff: result.stdout, error: result.exitCode !== 0 ? result.stderr : null };
+
+				// Fetch the commit body (extended message after the subject line)
+				const bodyResult = await execGit(
+					['log', '-1', '--format=%b', hash],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				const body = bodyResult.exitCode === 0 ? bodyResult.stdout.trim() : '';
+
+				return { diff: result.stdout, body, error: result.exitCode !== 0 ? result.stderr : null };
 			}
 		)
 	);

@@ -183,45 +183,55 @@ export const CommitDiffView = memo(function CommitDiffView({
 		>
 			{/* Header bar */}
 			<div
-				className="flex items-center justify-between px-4 py-2 border-b shrink-0"
+				className="border-b shrink-0"
 				style={{ borderColor: c.border, backgroundColor: c.bgSidebar }}
 			>
-				<div className="flex items-center gap-3 min-w-0">
-					<GitCommit className="w-4 h-4 shrink-0" style={{ color: c.accent }} />
-					<span
-						className="text-sm font-mono truncate"
-						style={{ color: c.textMain }}
-						title={tab.commitHash}
+				<div className="flex items-center justify-between px-4 py-2">
+					<div className="flex items-center gap-3 min-w-0">
+						<GitCommit className="w-4 h-4 shrink-0" style={{ color: c.accent }} />
+						<span
+							className="text-sm font-mono truncate"
+							style={{ color: c.textMain }}
+							title={tab.commitHash}
+						>
+							{tab.commitHash.slice(0, 8)}
+						</span>
+						<span className="text-sm truncate" style={{ color: c.textDim }}>
+							{tab.subject}
+						</span>
+						<span className="flex items-center gap-2 text-xs shrink-0">
+							{totalStats.additions > 0 && (
+								<span className="text-green-500 flex items-center gap-0.5">
+									<Plus className="w-3 h-3" />
+									{totalStats.additions}
+								</span>
+							)}
+							{totalStats.deletions > 0 && (
+								<span className="text-red-500 flex items-center gap-0.5">
+									<Minus className="w-3 h-3" />
+									{totalStats.deletions}
+								</span>
+							)}
+						</span>
+					</div>
+					<div className="flex items-center gap-2 shrink-0 text-xs" style={{ color: c.textDim }}>
+						<span>
+							{parsedFiles.length} {parsedFiles.length === 1 ? 'file' : 'files'}
+						</span>
+						<span>|</span>
+						<span>{tab.author}</span>
+						<span>|</span>
+						<span>{tab.date}</span>
+					</div>
+				</div>
+				{tab.body && (
+					<div
+						className="px-4 pb-2 text-xs whitespace-pre-wrap"
+						style={{ color: c.textDim, paddingLeft: 'calc(1rem + 16px + 0.75rem)' }}
 					>
-						{tab.commitHash.slice(0, 8)}
-					</span>
-					<span className="text-sm truncate" style={{ color: c.textDim }}>
-						{tab.subject}
-					</span>
-					<span className="flex items-center gap-2 text-xs shrink-0">
-						{totalStats.additions > 0 && (
-							<span className="text-green-500 flex items-center gap-0.5">
-								<Plus className="w-3 h-3" />
-								{totalStats.additions}
-							</span>
-						)}
-						{totalStats.deletions > 0 && (
-							<span className="text-red-500 flex items-center gap-0.5">
-								<Minus className="w-3 h-3" />
-								{totalStats.deletions}
-							</span>
-						)}
-					</span>
-				</div>
-				<div className="flex items-center gap-2 shrink-0 text-xs" style={{ color: c.textDim }}>
-					<span>
-						{parsedFiles.length} {parsedFiles.length === 1 ? 'file' : 'files'}
-					</span>
-					<span>|</span>
-					<span>{tab.author}</span>
-					<span>|</span>
-					<span>{tab.date}</span>
-				</div>
+						{tab.body}
+					</div>
+				)}
 			</div>
 
 			{/* Main content: sidebar + stacked diffs */}

@@ -665,6 +665,7 @@ function MaestroConsoleInner() {
 		handleCloseDiffTab,
 		handlePinTab,
 		handleOpenCommitDiffTab,
+		handleSelectCommitDiffTab,
 		handleCloseCommitDiffTab,
 	} = useTabHandlers();
 
@@ -1863,6 +1864,7 @@ function MaestroConsoleInner() {
 		// Commit diff tab props
 		activeCommitDiffTabId: activeSession?.activeCommitDiffTabId ?? null,
 		activeCommitDiffTab,
+		handleSelectCommitDiffTab,
 		handleCloseCommitDiffTab,
 
 		handleScrollPositionChange,

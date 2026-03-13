@@ -85,6 +85,10 @@ interface TabBarProps {
 	onDiffTabSelect?: (tabId: string) => void;
 	/** Handler to close a diff view tab */
 	onDiffTabClose?: (tabId: string) => void;
+	/** Handler to select a commit diff tab */
+	onCommitDiffTabSelect?: (tabId: string) => void;
+	/** Handler to close a commit diff tab */
+	onCommitDiffTabClose?: (tabId: string) => void;
 	/** Handler to pin a preview tab (remove isPreview flag) */
 	onPinTab?: (tabId: string) => void;
 
@@ -1780,6 +1784,8 @@ function TabBarInner({
 	activeCommitDiffTabId,
 	onDiffTabSelect,
 	onDiffTabClose,
+	onCommitDiffTabSelect,
+	onCommitDiffTabClose,
 	onPinTab,
 	onUnifiedTabReorder,
 	// Accessibility
@@ -2368,8 +2374,8 @@ function TabBarInner({
 										}}
 										isActive={isActive}
 										theme={theme}
-										onSelect={onDiffTabSelect || (() => {})}
-										onClose={onDiffTabClose || (() => {})}
+										onSelect={onCommitDiffTabSelect || (() => {})}
+										onClose={onCommitDiffTabClose || (() => {})}
 										onDragStart={handleDragStart}
 										onDragOver={handleDragOver}
 										onDragEnd={handleDragEnd}

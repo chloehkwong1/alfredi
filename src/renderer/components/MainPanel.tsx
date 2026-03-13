@@ -207,6 +207,7 @@ interface MainPanelProps {
 	// Commit diff tab support
 	activeCommitDiffTabId?: string | null;
 	activeCommitDiffTab?: CommitDiffTab | null;
+	onCommitDiffTabSelect?: (tabId: string) => void;
 	onCommitDiffTabClose?: (tabId: string) => void;
 	/** Handler to pin a preview tab (remove isPreview flag) */
 	onPinTab?: (tabId: string) => void;
@@ -505,6 +506,7 @@ export const MainPanel = React.memo(
 			// Commit diff tab props
 			activeCommitDiffTabId,
 			activeCommitDiffTab,
+			onCommitDiffTabSelect,
 			onCommitDiffTabClose,
 		} = props;
 
@@ -1548,6 +1550,8 @@ export const MainPanel = React.memo(
 									activeCommitDiffTabId={activeCommitDiffTabId}
 									onDiffTabSelect={onDiffTabSelect}
 									onDiffTabClose={onDiffTabClose}
+									onCommitDiffTabSelect={onCommitDiffTabSelect}
+									onCommitDiffTabClose={onCommitDiffTabClose}
 									onPinTab={onPinTab}
 									// Accessibility
 									colorBlindMode={colorBlindMode}

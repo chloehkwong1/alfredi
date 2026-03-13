@@ -231,7 +231,7 @@ export function createGitApi() {
 			hash: string,
 			sshRemoteId?: string,
 			remoteCwd?: string
-		): Promise<{ diff: string; error: string | null }> =>
+		): Promise<{ diff: string; body: string; error: string | null }> =>
 			ipcRenderer.invoke('git:commitDiff', cwd, hash, sshRemoteId, remoteCwd),
 
 		/**

@@ -471,7 +471,7 @@ interface MaestroAPI {
 			hash: string,
 			sshRemoteId?: string,
 			remoteCwd?: string
-		) => Promise<{ diff: string; error: string | null }>;
+		) => Promise<{ diff: string; body: string; error: string | null }>;
 		/**
 		 * Get per-commit file list with status and stat info
 		 */

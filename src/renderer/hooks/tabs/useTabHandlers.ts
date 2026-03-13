@@ -124,6 +124,7 @@ export interface TabHandlersReturn {
 		author: string;
 		date: string;
 	}) => Promise<void>;
+	handleSelectCommitDiffTab: (tabId: string) => void;
 	handleCloseCommitDiffTab: (tabId: string) => void;
 	handleFileTabEditModeChange: (tabId: string, editMode: boolean) => void;
 	handleFileTabEditContentChange: (
@@ -713,6 +714,7 @@ export function useTabHandlers(): TabHandlersReturn {
 				type: 'commit-diff',
 				commitHash: commit.hash,
 				subject: commit.subject,
+				body: result.body || '',
 				author: commit.author,
 				date: commit.date,
 				rawDiff: result.diff || '',
@@ -738,6 +740,20 @@ export function useTabHandlers(): TabHandlersReturn {
 		},
 		[]
 	);
+
+	/**
+	 * Select a commit diff tab.
+	 */
+	const handleSelectCommitDiffTab = useCallback((tabId: string) => {
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				if (!(s.commitDiffTabs || []).some((t) => t.id === tabId)) return s;
+				return { ...s, activeCommitDiffTabId: tabId, activeFileTabId: null, activeDiffTabId: null };
+			})
+		);
+	}, []);
 
 	/**
 	 * Close a commit diff tab.
@@ -1800,6 +1816,7 @@ export function useTabHandlers(): TabHandlersReturn {
 
 		// Commit Diff Tab handlers
 		handleOpenCommitDiffTab,
+		handleSelectCommitDiffTab,
 		handleCloseCommitDiffTab,
 
 		// Preview Tab handlers
