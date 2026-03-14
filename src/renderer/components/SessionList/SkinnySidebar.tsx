@@ -10,7 +10,6 @@ interface SkinnySidebarProps {
 	activeBatchSessionIds: string[];
 	contextWarningYellowThreshold: number;
 	contextWarningRedThreshold: number;
-	getFileCount: (sessionId: string) => number;
 	setActiveSessionId: (id: string) => void;
 	handleContextMenu: (e: React.MouseEvent, sessionId: string) => void;
 }
@@ -22,7 +21,6 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 	activeBatchSessionIds,
 	contextWarningYellowThreshold,
 	contextWarningRedThreshold,
-	getFileCount,
 	setActiveSessionId,
 	handleContextMenu,
 }: SkinnySidebarProps) {
@@ -96,7 +94,6 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 							<SessionTooltipContent
 								session={session}
 								theme={theme}
-								gitFileCount={getFileCount(session.id)}
 								isInBatch={isInBatch}
 								contextWarningYellowThreshold={contextWarningYellowThreshold}
 								contextWarningRedThreshold={contextWarningRedThreshold}

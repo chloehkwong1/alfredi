@@ -11,7 +11,6 @@ interface CollapsedSessionPillProps {
 	leftSidebarWidth: number;
 	contextWarningYellowThreshold: number;
 	contextWarningRedThreshold: number;
-	getFileCount: (sessionId: string) => number;
 	getWorktreeChildren: (parentId: string) => Session[];
 	setActiveSessionId: (id: string) => void;
 }
@@ -24,7 +23,6 @@ export const CollapsedSessionPill = memo(function CollapsedSessionPill({
 	leftSidebarWidth,
 	contextWarningYellowThreshold,
 	contextWarningRedThreshold,
-	getFileCount,
 	getWorktreeChildren,
 	setActiveSessionId,
 }: CollapsedSessionPillProps) {
@@ -105,7 +103,6 @@ export const CollapsedSessionPill = memo(function CollapsedSessionPill({
 							<SessionTooltipContent
 								session={s}
 								theme={theme}
-								gitFileCount={getFileCount(s.id)}
 								isInBatch={isInBatch}
 								contextWarningYellowThreshold={contextWarningYellowThreshold}
 								contextWarningRedThreshold={contextWarningRedThreshold}

@@ -155,6 +155,34 @@ textarea::placeholder {
 	}
 }
 
+@keyframes server-alive {
+	0%,
+	100% {
+		opacity: 1;
+		transform: scale(1);
+		filter: drop-shadow(0 0 0px currentColor);
+	}
+	25% {
+		opacity: 0.6;
+		transform: scale(0.85);
+		filter: drop-shadow(0 0 2px currentColor);
+	}
+	50% {
+		opacity: 1;
+		transform: scale(1.15);
+		filter: drop-shadow(0 0 4px currentColor);
+	}
+	75% {
+		opacity: 0.8;
+		transform: scale(0.95);
+		filter: drop-shadow(0 0 1px currentColor);
+	}
+}
+
+.animate-server-alive {
+	animation: server-alive 2s ease-in-out infinite;
+}
+
 @keyframes progress-stripe {
 	0% {
 		background-position: 0 0;
@@ -625,7 +653,8 @@ svg.wand-sparkle-active path:nth-child(8) {
 @media (prefers-reduced-motion: reduce) {
 	.animate-pulse,
 	.animate-spin,
-	.animate-bounce {
+	.animate-bounce,
+	.animate-server-alive {
 		animation: none !important;
 	}
 

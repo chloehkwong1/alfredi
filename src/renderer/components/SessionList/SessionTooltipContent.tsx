@@ -1,12 +1,11 @@
 import { memo } from 'react';
-import { Folder, GitBranch, Bot, Clock, Server } from 'lucide-react';
+import { Folder, Bot, Clock, Server } from 'lucide-react';
 import type { Session, Theme } from '../../types';
 import { getContextColor, formatActiveTime } from '../../utils/theme';
 
 interface SessionTooltipContentProps {
 	session: Session;
 	theme: Theme;
-	gitFileCount?: number;
 	isInBatch?: boolean;
 	contextWarningYellowThreshold?: number;
 	contextWarningRedThreshold?: number;
@@ -15,7 +14,6 @@ interface SessionTooltipContentProps {
 export const SessionTooltipContent = memo(function SessionTooltipContent({
 	session,
 	theme,
-	gitFileCount,
 	isInBatch = false,
 	contextWarningYellowThreshold = 60,
 	contextWarningRedThreshold = 80,
@@ -28,71 +26,24 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 				<span className="text-xs font-bold" style={{ color: theme.colors.textMain }}>
 					{session.name}
 				</span>
-				{session.toolType !== 'terminal' && (
-					<>
-						{session.sessionSshRemoteConfig?.enabled && session.sshConnectionFailed && (
-							<span
-								className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold"
-								style={{
-									backgroundColor: theme.colors.error + '30',
-									color: theme.colors.error,
-								}}
-								title="SSH connection failed"
-							>
-								<Server className="w-3 h-3" />
-								{!(session.isGitRepo || session.worktreeBranch) && (
-									<span className="uppercase">REMOTE</span>
-								)}
-							</span>
-						)}
-						{session.isGitRepo || session.worktreeBranch ? (
-							<>
-								{session.sessionSshRemoteConfig?.enabled && !session.sshConnectionFailed && (
-									<span
-										className="flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold"
-										style={{
-											backgroundColor: theme.colors.success + '30',
-											color: theme.colors.success,
-										}}
-										title="Remote SSH"
-									>
-										<Server className="w-3 h-3" />
-									</span>
-								)}
-								<span
-									className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-									style={{
-										backgroundColor: theme.colors.accent + '30',
-										color: theme.colors.accent,
-									}}
-								>
-									GIT
-								</span>
-							</>
-						) : session.sessionSshRemoteConfig?.enabled ? (
-							!session.sshConnectionFailed && (
-								<span
-									className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-									style={{
-										backgroundColor: theme.colors.warning + '30',
-										color: theme.colors.warning,
-									}}
-								>
-									REMOTE
-								</span>
-							)
-						) : (
-							<span
-								className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
-								style={{
-									backgroundColor: theme.colors.textDim + '20',
-									color: theme.colors.textDim,
-								}}
-							>
-								LOCAL
-							</span>
-						)}
-					</>
+				{session.toolType !== 'terminal' && session.sessionSshRemoteConfig?.enabled && (
+					<span
+						className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold"
+						style={{
+							backgroundColor: session.sshConnectionFailed
+								? theme.colors.error + '30'
+								: theme.colors.warning + '30',
+							color: session.sshConnectionFailed ? theme.colors.error : theme.colors.warning,
+						}}
+						title={
+							session.sshConnectionFailed
+								? 'SSH connection failed'
+								: 'Running on remote host via SSH'
+						}
+					>
+						<Server className="w-3 h-3" />
+						SSH
+					</span>
 				)}
 				{isInBatch && (
 					<span
@@ -137,16 +88,6 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 						}}
 					/>
 				</div>
-
-				{session.isGitRepo && gitFileCount !== undefined && gitFileCount > 0 && (
-					<div className="flex items-center justify-between text-[10px] pt-1">
-						<span className="flex items-center gap-1" style={{ color: theme.colors.textDim }}>
-							<GitBranch className="w-3 h-3" />
-							Git Changes
-						</span>
-						<span style={{ color: theme.colors.warning }}>{gitFileCount} files</span>
-					</div>
-				)}
 
 				{session.usageStats && session.usageStats.totalCostUsd > 0 && (
 					<div className="flex items-center justify-between text-[10px] pt-1">
