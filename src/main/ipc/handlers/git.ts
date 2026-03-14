@@ -1927,5 +1927,110 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// Compare two refs (e.g., local branch vs origin/branch) for ahead/behind count
+	ipcMain.handle(
+		'git:compareBranches',
+		withIpcErrorLogging(
+			handlerOpts('compareBranches'),
+			async (
+				cwd: string,
+				localRef: string,
+				remoteRef: string,
+				sshRemoteId?: string,
+				remoteCwd?: string
+			) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const result = await execGit(
+					['rev-list', '--count', '--left-right', `${localRef}...${remoteRef}`],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				const parts = result.stdout.trim().split(/\s+/);
+				const ahead = parseInt(parts[0] || '0', 10);
+				const behind = parseInt(parts[1] || '0', 10);
+
+				let commits: { hash: string; message: string; relativeTime: string }[] = [];
+				if (behind > 0) {
+					const logResult = await execGit(
+						['log', '--oneline', '--format=%H|%s|%ar', `${localRef}..${remoteRef}`],
+						cwd,
+						sshRemote,
+						effectiveRemoteCwd
+					);
+					commits = logResult.stdout
+						.trim()
+						.split('\n')
+						.filter((line: string) => line.length > 0)
+						.map((line: string) => {
+							const [hash, message, relativeTime] = line.split('|');
+							return { hash, message, relativeTime };
+						});
+				}
+
+				return { ahead, behind, commits };
+			}
+		)
+	);
+
+	// Fetch a specific branch from remote
+	ipcMain.handle(
+		'git:fetchBranch',
+		withIpcErrorLogging(
+			handlerOpts('fetchBranch'),
+			async (cwd: string, branchName: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				try {
+					await execGit(['fetch', 'origin', branchName], cwd, sshRemote, effectiveRemoteCwd);
+					return { success: true };
+				} catch (err: unknown) {
+					const message = err instanceof Error ? err.message : String(err);
+					return { success: false, error: message };
+				}
+			}
+		)
+	);
+
+	// Pull current branch from remote
+	ipcMain.handle(
+		'git:pull',
+		withIpcErrorLogging(
+			handlerOpts('pull'),
+			async (cwd: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				try {
+					await execGit(['pull'], cwd, sshRemote, effectiveRemoteCwd);
+					return { success: true };
+				} catch (err: unknown) {
+					const message = err instanceof Error ? err.message : String(err);
+					return { success: false, error: message };
+				}
+			}
+		)
+	);
+
+	// Get last commit info for a given cwd
+	ipcMain.handle(
+		'git:lastCommitInfo',
+		withIpcErrorLogging(
+			handlerOpts('lastCommitInfo'),
+			async (cwd: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				const result = await execGit(
+					['log', '-1', '--format=%H|%s|%aI', 'HEAD'],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				const [hash, message, timestamp] = result.stdout.trim().split('|');
+				return { hash, message, timestamp };
+			}
+		)
+	);
+
 	logger.debug(`${LOG_CONTEXT} Git IPC handlers registered`);
 }

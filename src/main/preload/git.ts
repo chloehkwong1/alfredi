@@ -470,6 +470,53 @@ export function createGitApi() {
 			ipcRenderer.invoke('git:restoreAll', cwd, sshRemoteId, remoteCwd),
 
 		/**
+		 * Compare two refs for ahead/behind count with commit list
+		 */
+		compareBranches: (
+			cwd: string,
+			localRef: string,
+			remoteRef: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{
+			ahead: number;
+			behind: number;
+			commits: { hash: string; message: string; relativeTime: string }[];
+		}> =>
+			ipcRenderer.invoke('git:compareBranches', cwd, localRef, remoteRef, sshRemoteId, remoteCwd),
+
+		/**
+		 * Fetch a specific branch from remote
+		 */
+		fetchBranch: (
+			cwd: string,
+			branchName: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ success: boolean; error?: string }> =>
+			ipcRenderer.invoke('git:fetchBranch', cwd, branchName, sshRemoteId, remoteCwd),
+
+		/**
+		 * Pull current branch from remote
+		 */
+		pull: (
+			cwd: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ success: boolean; error?: string }> =>
+			ipcRenderer.invoke('git:pull', cwd, sshRemoteId, remoteCwd),
+
+		/**
+		 * Get last commit info for a given cwd
+		 */
+		lastCommitInfo: (
+			cwd: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ hash: string; message: string; timestamp: string }> =>
+			ipcRenderer.invoke('git:lastCommitInfo', cwd, sshRemoteId, remoteCwd),
+
+		/**
 		 * Subscribe to discovered worktrees
 		 */
 		onWorktreeDiscovered: (callback: (data: WorktreeDiscoveredData) => void): (() => void) => {

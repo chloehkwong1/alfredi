@@ -132,7 +132,7 @@ describe('Git IPC handlers', () => {
 	});
 
 	describe('registration', () => {
-		it('should register all 36 git handlers', () => {
+		it('should register all 42 git handlers', () => {
 			const expectedChannels = [
 				'git:status',
 				'git:diff',
@@ -149,6 +149,8 @@ describe('Git IPC handlers', () => {
 				'git:log',
 				'git:commitCount',
 				'git:show',
+				'git:commitDiff',
+				'git:commitFiles',
 				'git:showFile',
 				'git:worktreeInfo',
 				'git:getRepoRoot',
@@ -168,11 +170,15 @@ describe('Git IPC handlers', () => {
 				'git:prStatus',
 				'git:restore',
 				'git:restoreAll',
+				'git:compareBranches',
+				'git:fetchBranch',
+				'git:pull',
+				'git:lastCommitInfo',
 				'worktree:startServer',
 				'worktree:stopServer',
 			];
 
-			expect(handlers.size).toBe(36);
+			expect(handlers.size).toBe(42);
 			for (const channel of expectedChannels) {
 				expect(handlers.has(channel)).toBe(true);
 			}
