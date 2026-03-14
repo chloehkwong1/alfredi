@@ -37,6 +37,7 @@ import { createGitApi } from './git';
 import { createFsApi } from './fs';
 import { createAgentsApi } from './agents';
 import { createTabNamingApi } from './tabNaming';
+import { createLinearApi } from './linear';
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('maestro', {
@@ -135,6 +136,9 @@ contextBridge.exposeInMainWorld('maestro', {
 
 	// Tab Naming API (automatic tab name generation)
 	tabNaming: createTabNamingApi(),
+
+	// Linear integration API (issue tracking)
+	linear: createLinearApi(),
 });
 
 // Re-export factory functions for external consumers (e.g., tests)
@@ -185,6 +189,8 @@ export {
 	createAgentsApi,
 	// Tab Naming
 	createTabNamingApi,
+	// Linear
+	createLinearApi,
 };
 
 // Re-export types for TypeScript consumers
@@ -304,3 +310,10 @@ export type {
 	TabNamingApi,
 	TabNamingConfig,
 } from './tabNaming';
+export type {
+	// From linear
+	LinearApi,
+	LinearValidateResponse,
+	LinearTicket,
+	LinearListResponse,
+} from './linear';

@@ -439,6 +439,27 @@ export function createGitApi() {
 			ipcRenderer.invoke('git:listRemotes', cwd, sshRemoteId),
 
 		/**
+		 * List open PRs for a repository using GitHub CLI
+		 */
+		listPRs: (
+			cwd: string,
+			sshRemoteId?: string,
+			ghPath?: string
+		): Promise<{
+			success: boolean;
+			prs?: Array<{
+				number: number;
+				title: string;
+				headRefName: string;
+				author: { login: string };
+				state: string;
+				url: string;
+				isDraft: boolean;
+			}>;
+			error?: string;
+		}> => ipcRenderer.invoke('git:listPRs', cwd, sshRemoteId, ghPath),
+
+		/**
 		 * Get PR status for a branch using GitHub CLI
 		 * Returns PR state, URL, and number, or null if no PR exists
 		 */

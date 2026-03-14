@@ -1847,6 +1847,79 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// List open PRs for a repository using gh CLI
+	// Returns an array of PR objects with number, title, branch, author, etc.
+	// Supports SSH remote execution via optional sshRemoteId parameter
+	ipcMain.handle(
+		'git:listPRs',
+		withIpcErrorLogging(
+			{ context: LOG_CONTEXT, operation: 'listPRs' },
+			async (cwd: string, sshRemoteId?: string, ghPath?: string) => {
+				// For SSH remote, execute gh pr list on the remote host
+				if (sshRemoteId) {
+					const sshConfig = getSshRemoteById(sshRemoteId);
+					if (!sshConfig) {
+						return { success: false, error: `SSH remote not found: ${sshRemoteId}` };
+					}
+					const sshResult = await buildSshCommand(sshConfig, {
+						command: ghPath || 'gh',
+						args: [
+							'pr',
+							'list',
+							'--json',
+							'number,title,headRefName,author,state,url,isDraft',
+							'--limit',
+							'50',
+						],
+						cwd,
+					});
+					const result = await execFileNoThrow(sshResult.command, sshResult.args);
+					if (result.exitCode !== 0) {
+						return { success: false, error: result.stderr || 'Failed to list PRs via SSH' };
+					}
+					try {
+						const prs = JSON.parse(result.stdout.trim());
+						return { success: true, prs };
+					} catch {
+						return { success: false, error: 'Failed to parse PR list output' };
+					}
+				}
+
+				// Local execution
+				let ghCommand: string;
+				try {
+					ghCommand = await resolveGhPath(ghPath);
+				} catch {
+					return { success: false, error: 'GitHub CLI (gh) is not installed' };
+				}
+
+				const result = await execFileNoThrow(
+					ghCommand,
+					[
+						'pr',
+						'list',
+						'--json',
+						'number,title,headRefName,author,state,url,isDraft',
+						'--limit',
+						'50',
+					],
+					cwd
+				);
+
+				if (result.exitCode !== 0) {
+					return { success: false, error: result.stderr || 'Failed to list PRs' };
+				}
+
+				try {
+					const prs = JSON.parse(result.stdout.trim());
+					return { success: true, prs };
+				} catch {
+					return { success: false, error: 'Failed to parse PR list output' };
+				}
+			}
+		)
+	);
+
 	// Start a long-running server process for a worktree
 	// Uses ProcessManager's ChildProcess strategy (not PTY) so output can be streamed to the renderer
 	ipcMain.handle(

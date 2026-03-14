@@ -191,13 +191,32 @@ export interface FileArtifact {
 	linesRemoved?: number;
 }
 
+/**
+ * A group of consecutive thinking + tool log entries.
+ * Rendered as a collapsible block between user/AI messages.
+ */
+export interface WorkGroup {
+	type: 'workGroup';
+	id: string; // First entry's ID (stable key)
+	entries: LogEntry[]; // The thinking+tool entries in this group
+	toolSummary: { name: string; status?: 'running' | 'completed' | 'error' }[];
+}
+
+/**
+ * Union of items that can appear in the rendered log list.
+ * Standalone LogEntry (no `type` field) or a WorkGroup.
+ */
+export type RenderUnit = (LogEntry & { type?: undefined }) | WorkGroup;
+
 export interface LogEntry {
 	id: string;
 	timestamp: number;
 	source: 'stdout' | 'stderr' | 'system' | 'user' | 'ai' | 'error' | 'thinking' | 'tool';
 	text: string;
 	interactive?: boolean;
-	options?: string[];
+	options?: Array<{ label: string; description?: string }>;
+	// For interactive questions - optional header/category label (e.g., "Ticket")
+	questionHeader?: string;
 	// For interactive questions - tracks the selected answer label (disables buttons once set)
 	answered?: string;
 	images?: string[];
@@ -287,6 +306,28 @@ export interface WorktreeValidationState {
 export interface GhCliStatus {
 	installed: boolean; // gh CLI is installed
 	authenticated: boolean; // gh CLI is authenticated
+}
+
+// Linear ticket/issue (used in worktree source selector)
+export interface LinearTicket {
+	id: string;
+	identifier: string;
+	title: string;
+	state: { name: string; color: string };
+	team: { key: string };
+	url: string;
+	branchName: string;
+}
+
+// GitHub PR from gh pr list (used in worktree source selector)
+export interface GitHubPR {
+	number: number;
+	title: string;
+	headRefName: string;
+	author: { login: string };
+	state: string;
+	url: string;
+	isDraft: boolean;
 }
 
 // Configuration for starting a batch run

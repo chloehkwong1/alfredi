@@ -16,6 +16,16 @@ type AutoRunTreeNode = {
 	children?: AutoRunTreeNode[];
 };
 
+interface LinearTicket {
+	id: string;
+	identifier: string;
+	title: string;
+	state: { name: string; color: string };
+	team: { key: string };
+	url: string;
+	branchName: string;
+}
+
 interface ProcessConfig {
 	sessionId: string;
 	toolType: string;
@@ -644,6 +654,26 @@ interface MaestroAPI {
 			sshRemoteId?: string
 		) => Promise<{
 			remotes: Array<{ name: string; url: string }>;
+		}>;
+		/**
+		 * List open PRs for a repository using GitHub CLI
+		 */
+		listPRs: (
+			cwd: string,
+			sshRemoteId?: string,
+			ghPath?: string
+		) => Promise<{
+			success: boolean;
+			prs?: Array<{
+				number: number;
+				title: string;
+				headRefName: string;
+				author: { login: string };
+				state: string;
+				url: string;
+				isDraft: boolean;
+			}>;
+			error?: string;
 		}>;
 		/**
 		 * Get PR status for a branch using GitHub CLI
@@ -1465,6 +1495,16 @@ interface MaestroAPI {
 		onCommandCompleted: (handler: (notificationId: number) => void) => () => void;
 		/** @deprecated Use onCommandCompleted instead */
 		onTtsCompleted: (handler: (notificationId: number) => void) => () => void;
+	};
+	linear: {
+		validateKey: (
+			apiKey: string
+		) => Promise<{ valid: boolean; user?: { name: string }; error?: string }>;
+		listMyIssues: (apiKey: string) => Promise<{ tickets: LinearTicket[]; error?: string }>;
+		searchIssues: (
+			apiKey: string,
+			query: string
+		) => Promise<{ tickets: LinearTicket[]; error?: string }>;
 	};
 	attachments: {
 		save: (

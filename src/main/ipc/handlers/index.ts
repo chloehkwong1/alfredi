@@ -39,6 +39,7 @@ import { registerWebHandlers, WebHandlerDependencies } from './web';
 import { registerNotificationsHandlers } from './notifications';
 import { registerAgentErrorHandlers } from './agent-error';
 import { registerTabNamingHandlers, TabNamingHandlerDependencies } from './tabNaming';
+import { registerLinearHandlers } from './linear';
 import { AgentDetector } from '../../agents';
 import { ProcessManager } from '../../process-manager';
 import { WebServer } from '../../web-server';
@@ -66,6 +67,7 @@ export type { WebHandlerDependencies };
 export { registerNotificationsHandlers };
 export { registerAgentErrorHandlers };
 export { registerTabNamingHandlers };
+export { registerLinearHandlers };
 export type { TabNamingHandlerDependencies };
 export type { AgentsHandlerDependencies };
 export type { ProcessHandlerDependencies };
@@ -192,6 +194,8 @@ export function registerAllHandlers(deps: HandlerDependencies): void {
 		agentConfigsStore: deps.agentConfigsStore,
 		settingsStore: deps.settingsStore,
 	});
+	// Register Linear integration handlers (API key validation, issue listing/search)
+	registerLinearHandlers();
 	// Setup logger event forwarding to renderer
 	setupLoggerEventForwarding(deps.getMainWindow);
 }

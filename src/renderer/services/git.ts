@@ -270,6 +270,30 @@ export const gitService = {
 	},
 
 	/**
+	 * List open PRs for a repository using GitHub CLI
+	 * @param cwd Working directory path (must be a git repo)
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 * @param ghPath Optional custom path to gh CLI binary
+	 */
+	async listPRs(
+		cwd: string,
+		sshRemoteId?: string,
+		ghPath?: string
+	): Promise<import('../types').GitHubPR[]> {
+		return createIpcMethod({
+			call: async () => {
+				const result = await window.maestro.git.listPRs(cwd, sshRemoteId, ghPath);
+				if (!result.success) {
+					throw new Error(result.error || 'Failed to list PRs');
+				}
+				return result.prs || [];
+			},
+			errorContext: 'Git listPRs',
+			defaultValue: [],
+		});
+	},
+
+	/**
 	 * Get PR status for a branch using GitHub CLI
 	 * Returns PR state, URL, and number, or null if no PR exists
 	 * @param repoPath Path to the git repository

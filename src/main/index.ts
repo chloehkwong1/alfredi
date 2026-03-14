@@ -38,6 +38,7 @@ import {
 	registerNotificationsHandlers,
 	registerTabNamingHandlers,
 	registerAgentErrorHandlers,
+	registerLinearHandlers,
 	setupLoggerEventForwarding,
 	cleanupAllGroomingSessions,
 	getActiveGroomingSessionCount,
@@ -494,6 +495,9 @@ function setupIpcHandlers() {
 		agentConfigsStore,
 		settingsStore: store,
 	});
+
+	// Register Linear integration handlers (API key validation, issue listing/search)
+	registerLinearHandlers();
 }
 
 // Handle process output streaming (set up after initialization)
