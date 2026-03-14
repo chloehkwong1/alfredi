@@ -309,7 +309,12 @@ export class AgentDetector {
 				case 'claude-code': {
 					// Claude Code accepts model aliases via --model flag
 					// Hardcoded list — update when new models release
-					const claudeModels = ['claude-sonnet-4-6', 'claude-opus-4-6', 'claude-haiku-4-5'];
+					const claudeModels = [
+						'claude-sonnet-4-6',
+						'claude-opus-4-6',
+						'claude-opus-4-6[1m]',
+						'claude-haiku-4-5',
+					];
 					logger.info(
 						`Returning ${claudeModels.length} hardcoded models for ${agentId}`,
 						LOG_CONTEXT,
