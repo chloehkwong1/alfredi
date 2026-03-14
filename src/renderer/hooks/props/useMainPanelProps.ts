@@ -23,7 +23,9 @@ import type {
 	ThinkingItem,
 	AgentError,
 	StagedFile,
+	ThinkingMode,
 } from '../../types';
+import type { OutputStyle } from '../../../shared/types';
 import type { FileTreeChanges } from '../../utils/fileExplorer';
 import type { TabCompletionSuggestion, TabCompletionFilter } from '../input/useTabCompletion';
 import type {
@@ -176,10 +178,10 @@ export interface UseMainPanelPropsDeps {
 	) => void;
 	handleTabStar: (tabId: string, starred: boolean) => void;
 	handleTabMarkUnread: (tabId: string) => void;
-	handleToggleTabReadOnlyMode: () => void;
-	handleToggleTabShowThinking: () => void;
+	handleToggleTabReadOnlyMode: (value?: boolean) => void;
+	handleToggleTabShowThinking: (mode?: ThinkingMode) => void;
 	handleTabModelChange: (modelId: string) => void;
-	handleToggleTabOutputStyle: () => void;
+	handleToggleTabOutputStyle: (style?: OutputStyle) => void;
 	toggleUnreadFilter: () => void;
 	handleOpenTabSearch: () => void;
 	handleCloseAllTabs: () => void;

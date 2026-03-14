@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, startTransition } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, startTransition } from 'react';
 import {
 	Cpu,
 	Paperclip,
@@ -13,6 +13,7 @@ import {
 	Brain,
 	Pin,
 	BookOpen,
+	Check,
 } from 'lucide-react';
 import type {
 	Session,
@@ -123,14 +124,14 @@ interface InputAreaProps {
 	onOpenQueueBrowser?: () => void;
 	// Read-only mode toggle (per-tab)
 	tabReadOnlyMode?: boolean;
-	onToggleTabReadOnlyMode?: () => void;
+	onToggleTabReadOnlyMode?: (value?: boolean) => void;
 	// Shortcuts for displaying keyboard hints
 	shortcuts?: Record<string, Shortcut>;
 	// Flash notification callback
 	showFlashNotification?: (message: string) => void;
 	// Show Thinking toggle (per-tab) - three states: 'off' | 'on' | 'sticky'
 	tabShowThinking?: ThinkingMode;
-	onToggleTabShowThinking?: () => void;
+	onToggleTabShowThinking?: (mode?: ThinkingMode) => void;
 	supportsThinking?: boolean; // From agent capabilities
 	// Context warning sash props (Phase 6)
 	contextUsage?: number; // 0-100 percentage
@@ -163,7 +164,7 @@ interface InputAreaProps {
 	onModelChange?: (modelId: string) => void;
 	// Output style selector (per-tab, Claude Code only)
 	tabOutputStyle?: OutputStyle;
-	onToggleOutputStyle?: () => void;
+	onToggleOutputStyle?: (style?: OutputStyle) => void;
 }
 
 export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
@@ -285,12 +286,15 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		if (id === 'haiku') return 'Haiku';
 		// Try common patterns with version numbers
 		// Handles both dot and hyphen separators: "opus-4-6" -> "Opus 4.6", "opus-4" -> "Opus 4"
-		const opusMatch = id.match(/opus[- ]?(\d+)(?:[.-](\d+))?/);
-		if (opusMatch) return `Opus ${opusMatch[1]}${opusMatch[2] ? `.${opusMatch[2]}` : ''}`;
-		const sonnetMatch = id.match(/sonnet[- ]?(\d+)(?:[.-](\d+))?/);
-		if (sonnetMatch) return `Sonnet ${sonnetMatch[1]}${sonnetMatch[2] ? `.${sonnetMatch[2]}` : ''}`;
-		const haikuMatch = id.match(/haiku[- ]?(\d+)(?:[.-](\d+))?/);
-		if (haikuMatch) return `Haiku ${haikuMatch[1]}${haikuMatch[2] ? `.${haikuMatch[2]}` : ''}`;
+		const opusMatch = id.match(/opus[- ]?(\d+)(?:[.-](\d+))?(?:\[(\w+)\])?/);
+		if (opusMatch)
+			return `Opus ${opusMatch[1]}${opusMatch[2] ? `.${opusMatch[2]}` : ''}${opusMatch[3] ? ` (${opusMatch[3]})` : ''}`;
+		const sonnetMatch = id.match(/sonnet[- ]?(\d+)(?:[.-](\d+))?(?:\[(\w+)\])?/);
+		if (sonnetMatch)
+			return `Sonnet ${sonnetMatch[1]}${sonnetMatch[2] ? `.${sonnetMatch[2]}` : ''}${sonnetMatch[3] ? ` (${sonnetMatch[3]})` : ''}`;
+		const haikuMatch = id.match(/haiku[- ]?(\d+)(?:[.-](\d+))?(?:\[(\w+)\])?/);
+		if (haikuMatch)
+			return `Haiku ${haikuMatch[1]}${haikuMatch[2] ? `.${haikuMatch[2]}` : ''}${haikuMatch[3] ? ` (${haikuMatch[3]})` : ''}`;
 
 		// For "claude-3.5-sonnet" style
 		const versionModelMatch = id.match(/(\d+(?:\.\d+)?)[- ](sonnet|opus|haiku)/);
@@ -306,15 +310,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		);
 		return meaningful.slice(-2).join(' ').slice(0, 16) || currentModelId.slice(0, 16);
 	}, [currentModelId]);
-
-	const handleModelCycle = useMemo(() => {
-		if (!onModelChange || availableModels.length <= 1) return undefined;
-		return () => {
-			const currentIndex = currentModelId ? availableModels.indexOf(currentModelId) : -1;
-			const nextIndex = (currentIndex + 1) % availableModels.length;
-			onModelChange(availableModels[nextIndex]);
-		};
-	}, [onModelChange, availableModels, currentModelId]);
 
 	// Whether the current model is non-default (not the first in the list)
 	const isNonDefaultModel = useMemo(() => {
@@ -333,6 +328,50 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 	}, [tabOutputStyle]);
 
 	const isNonDefaultOutputStyle = tabOutputStyle !== 'default';
+
+	// Pill popup menu state
+	type PillPopup = 'readOnly' | 'thinking' | 'model' | 'outputStyle';
+	const [openPillPopup, setOpenPillPopup] = useState<PillPopup | null>(null);
+	const pillPopupRef = useRef<HTMLDivElement>(null);
+
+	// Close popup on click outside
+	useEffect(() => {
+		if (!openPillPopup) return;
+		const handler = (e: MouseEvent) => {
+			if (pillPopupRef.current && !pillPopupRef.current.contains(e.target as Node)) {
+				setOpenPillPopup(null);
+			}
+		};
+		document.addEventListener('mousedown', handler);
+		return () => document.removeEventListener('mousedown', handler);
+	}, [openPillPopup]);
+
+	// Model display name helper for popup items
+	const getModelDisplayName = useCallback((modelId: string): string => {
+		const id = modelId.toLowerCase();
+		if (id === 'sonnet') return 'Sonnet';
+		if (id === 'opus') return 'Opus';
+		if (id === 'haiku') return 'Haiku';
+		const opusMatch = id.match(/opus[- ]?(\d+)(?:[.-](\d+))?(?:\[(\w+)\])?/);
+		if (opusMatch)
+			return `Opus ${opusMatch[1]}${opusMatch[2] ? `.${opusMatch[2]}` : ''}${opusMatch[3] ? ` (${opusMatch[3]})` : ''}`;
+		const sonnetMatch = id.match(/sonnet[- ]?(\d+)(?:[.-](\d+))?(?:\[(\w+)\])?/);
+		if (sonnetMatch)
+			return `Sonnet ${sonnetMatch[1]}${sonnetMatch[2] ? `.${sonnetMatch[2]}` : ''}${sonnetMatch[3] ? ` (${sonnetMatch[3]})` : ''}`;
+		const haikuMatch = id.match(/haiku[- ]?(\d+)(?:[.-](\d+))?(?:\[(\w+)\])?/);
+		if (haikuMatch)
+			return `Haiku ${haikuMatch[1]}${haikuMatch[2] ? `.${haikuMatch[2]}` : ''}${haikuMatch[3] ? ` (${haikuMatch[3]})` : ''}`;
+		const versionModelMatch = id.match(/(\d+(?:\.\d+)?)[- ](sonnet|opus|haiku)/);
+		if (versionModelMatch) {
+			const name = versionModelMatch[2].charAt(0).toUpperCase() + versionModelMatch[2].slice(1);
+			return `${name} ${versionModelMatch[1]}`;
+		}
+		const parts = modelId.split(/[/\-_]/);
+		const meaningful = parts.filter(
+			(p) => !/^\d{8}$/.test(p) && p !== 'claude' && p !== 'anthropic'
+		);
+		return meaningful.slice(-2).join(' ').slice(0, 16) || modelId.slice(0, 16);
+	}, []);
 
 	// PERF: Memoize activeTab lookup to avoid O(n) search on every render
 	const activeTab = useMemo(
@@ -1007,119 +1046,319 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 
 							<div className="flex items-center gap-2">
 								{/* Read-only mode toggle - AI mode only, if agent supports it */}
-								{/* User can freely toggle read-only during Auto Run */}
 								{session.inputMode === 'ai' &&
 									onToggleTabReadOnlyMode &&
 									hasCapability('supportsReadOnlyMode') && (
+										<div
+											className="relative"
+											ref={openPillPopup === 'readOnly' ? pillPopupRef : undefined}
+										>
+											<button
+												onClick={() =>
+													setOpenPillPopup(openPillPopup === 'readOnly' ? null : 'readOnly')
+												}
+												className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
+													isReadOnlyMode ? '' : 'opacity-40 hover:opacity-70'
+												}`}
+												style={{
+													backgroundColor: isReadOnlyMode
+														? `${theme.colors.warning}25`
+														: 'transparent',
+													color: isReadOnlyMode ? theme.colors.warning : theme.colors.textDim,
+													border: isReadOnlyMode
+														? `1px solid ${theme.colors.warning}50`
+														: '1px solid transparent',
+												}}
+												title="Read-only mode (agent won't modify files)"
+											>
+												<Eye className="w-3 h-3" />
+												<span>Read-only</span>
+											</button>
+											{openPillPopup === 'readOnly' && (
+												<div
+													className="absolute bottom-full left-0 mb-1 py-1 rounded-md shadow-lg z-50 min-w-[120px]"
+													style={{
+														backgroundColor: theme.colors.bgActivity,
+														border: `1px solid ${theme.colors.border}`,
+													}}
+												>
+													{[
+														{ value: false, label: 'Off' },
+														{ value: true, label: 'Read-only' },
+													].map((opt) => (
+														<button
+															key={String(opt.value)}
+															className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:brightness-125 cursor-pointer"
+															style={{
+																color:
+																	opt.value === isReadOnlyMode
+																		? theme.colors.accentText
+																		: theme.colors.textMain,
+																backgroundColor:
+																	opt.value === isReadOnlyMode
+																		? `${theme.colors.accent}15`
+																		: 'transparent',
+															}}
+															onClick={() => {
+																onToggleTabReadOnlyMode(opt.value);
+																setOpenPillPopup(null);
+															}}
+														>
+															<Check
+																className="w-3 h-3 flex-shrink-0"
+																style={{
+																	opacity: opt.value === isReadOnlyMode ? 1 : 0,
+																}}
+															/>
+															<span>{opt.label}</span>
+														</button>
+													))}
+												</div>
+											)}
+										</div>
+									)}
+								{/* Show Thinking selector - AI mode only, for agents that support it */}
+								{session.inputMode === 'ai' && supportsThinking && onToggleTabShowThinking && (
+									<div
+										className="relative"
+										ref={openPillPopup === 'thinking' ? pillPopupRef : undefined}
+									>
 										<button
-											onClick={onToggleTabReadOnlyMode}
+											onClick={() =>
+												setOpenPillPopup(openPillPopup === 'thinking' ? null : 'thinking')
+											}
 											className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-												isReadOnlyMode ? '' : 'opacity-40 hover:opacity-70'
+												tabShowThinking !== 'off' ? '' : 'opacity-40 hover:opacity-70'
 											}`}
 											style={{
-												backgroundColor: isReadOnlyMode
-													? `${theme.colors.warning}25`
-													: 'transparent',
-												color: isReadOnlyMode ? theme.colors.warning : theme.colors.textDim,
-												border: isReadOnlyMode
-													? `1px solid ${theme.colors.warning}50`
-													: '1px solid transparent',
+												backgroundColor:
+													tabShowThinking === 'sticky'
+														? `${theme.colors.warning}30`
+														: tabShowThinking === 'on'
+															? `${theme.colors.accentText}25`
+															: 'transparent',
+												color:
+													tabShowThinking === 'sticky'
+														? theme.colors.warning
+														: tabShowThinking === 'on'
+															? theme.colors.accentText
+															: theme.colors.textDim,
+												border:
+													tabShowThinking === 'sticky'
+														? `1px solid ${theme.colors.warning}50`
+														: tabShowThinking === 'on'
+															? `1px solid ${theme.colors.accentText}50`
+															: '1px solid transparent',
 											}}
-											title="Toggle read-only mode (agent won't modify files)"
+											title="Show Thinking"
 										>
-											<Eye className="w-3 h-3" />
-											<span>Read-only</span>
+											<Brain className="w-3 h-3" />
+											<span>Thinking</span>
+											{tabShowThinking === 'sticky' && <Pin className="w-2.5 h-2.5" />}
 										</button>
-									)}
-								{/* Show Thinking toggle - AI mode only, for agents that support it
-								    Three states: 'off' (hidden), 'on' (temporary), 'sticky' (persistent) */}
-								{session.inputMode === 'ai' && supportsThinking && onToggleTabShowThinking && (
-									<button
-										onClick={onToggleTabShowThinking}
-										className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-											tabShowThinking !== 'off' ? '' : 'opacity-40 hover:opacity-70'
-										}`}
-										style={{
-											backgroundColor:
-												tabShowThinking === 'sticky'
-													? `${theme.colors.warning}30`
-													: tabShowThinking === 'on'
-														? `${theme.colors.accentText}25`
-														: 'transparent',
-											color:
-												tabShowThinking === 'sticky'
-													? theme.colors.warning
-													: tabShowThinking === 'on'
-														? theme.colors.accentText
-														: theme.colors.textDim,
-											border:
-												tabShowThinking === 'sticky'
-													? `1px solid ${theme.colors.warning}50`
-													: tabShowThinking === 'on'
-														? `1px solid ${theme.colors.accentText}50`
-														: '1px solid transparent',
-										}}
-										title={
-											tabShowThinking === 'off'
-												? 'Show Thinking - Click to stream AI reasoning'
-												: tabShowThinking === 'on'
-													? 'Thinking (temporary) - Click for sticky mode'
-													: 'Thinking (sticky) - Click to turn off'
-										}
-									>
-										<Brain className="w-3 h-3" />
-										<span>Thinking</span>
-										{tabShowThinking === 'sticky' && <Pin className="w-2.5 h-2.5" />}
-									</button>
+										{openPillPopup === 'thinking' && (
+											<div
+												className="absolute bottom-full left-0 mb-1 py-1 rounded-md shadow-lg z-50 min-w-[150px]"
+												style={{
+													backgroundColor: theme.colors.bgActivity,
+													border: `1px solid ${theme.colors.border}`,
+												}}
+											>
+												{[
+													{ value: 'off' as const, label: 'Off', desc: 'Hide thinking' },
+													{
+														value: 'on' as const,
+														label: 'Temporary',
+														desc: 'Show for this message',
+													},
+													{
+														value: 'sticky' as const,
+														label: 'Sticky',
+														desc: 'Always show thinking',
+													},
+												].map((opt) => (
+													<button
+														key={opt.value}
+														className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:brightness-125 cursor-pointer"
+														style={{
+															color:
+																opt.value === tabShowThinking
+																	? theme.colors.accentText
+																	: theme.colors.textMain,
+															backgroundColor:
+																opt.value === tabShowThinking
+																	? `${theme.colors.accent}15`
+																	: 'transparent',
+														}}
+														onClick={() => {
+															onToggleTabShowThinking(opt.value);
+															setOpenPillPopup(null);
+														}}
+													>
+														<Check
+															className="w-3 h-3 flex-shrink-0"
+															style={{
+																opacity: opt.value === tabShowThinking ? 1 : 0,
+															}}
+														/>
+														<div className="flex flex-col">
+															<span>{opt.label}</span>
+															<span className="text-[9px]" style={{ color: theme.colors.textDim }}>
+																{opt.desc}
+															</span>
+														</div>
+													</button>
+												))}
+											</div>
+										)}
+									</div>
 								)}
 								{/* Model selector pill - AI mode only, when multiple models available */}
 								{session.inputMode === 'ai' &&
-									handleModelCycle &&
+									onModelChange &&
 									modelDisplayName &&
 									availableModels.length > 1 && (
-										<button
-											onClick={handleModelCycle}
-											className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-												isNonDefaultModel ? '' : 'opacity-40 hover:opacity-70'
-											}`}
-											style={{
-												backgroundColor: isNonDefaultModel
-													? `${theme.colors.accent}25`
-													: 'transparent',
-												color: isNonDefaultModel ? theme.colors.accent : theme.colors.textDim,
-												border: isNonDefaultModel
-													? `1px solid ${theme.colors.accent}50`
-													: '1px solid transparent',
-											}}
-											title={`${currentModelId} — Click to switch model`}
+										<div
+											className="relative"
+											ref={openPillPopup === 'model' ? pillPopupRef : undefined}
 										>
-											<Cpu className="w-3 h-3" />
-											<span>{modelDisplayName}</span>
-										</button>
+											<button
+												onClick={() => setOpenPillPopup(openPillPopup === 'model' ? null : 'model')}
+												className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
+													isNonDefaultModel ? '' : 'opacity-40 hover:opacity-70'
+												}`}
+												style={{
+													backgroundColor: isNonDefaultModel
+														? `${theme.colors.accent}25`
+														: 'transparent',
+													color: isNonDefaultModel ? theme.colors.accent : theme.colors.textDim,
+													border: isNonDefaultModel
+														? `1px solid ${theme.colors.accent}50`
+														: '1px solid transparent',
+												}}
+												title={`Model: ${currentModelId}`}
+											>
+												<Cpu className="w-3 h-3" />
+												<span>{modelDisplayName}</span>
+											</button>
+											{openPillPopup === 'model' && (
+												<div
+													className="absolute bottom-full left-0 mb-1 py-1 rounded-md shadow-lg z-50 min-w-[160px]"
+													style={{
+														backgroundColor: theme.colors.bgActivity,
+														border: `1px solid ${theme.colors.border}`,
+													}}
+												>
+													{availableModels.map((modelId) => (
+														<button
+															key={modelId}
+															className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:brightness-125 cursor-pointer"
+															style={{
+																color:
+																	modelId === currentModelId
+																		? theme.colors.accentText
+																		: theme.colors.textMain,
+																backgroundColor:
+																	modelId === currentModelId
+																		? `${theme.colors.accent}15`
+																		: 'transparent',
+															}}
+															onClick={() => {
+																onModelChange(modelId);
+																setOpenPillPopup(null);
+															}}
+														>
+															<Check
+																className="w-3 h-3 flex-shrink-0"
+																style={{
+																	opacity: modelId === currentModelId ? 1 : 0,
+																}}
+															/>
+															<span>{getModelDisplayName(modelId)}</span>
+														</button>
+													))}
+												</div>
+											)}
+										</div>
 									)}
 								{/* Output style selector pill - AI mode only, Claude Code agents only */}
 								{session.inputMode === 'ai' &&
 									session.toolType === 'claude-code' &&
 									onToggleOutputStyle && (
-										<button
-											onClick={onToggleOutputStyle}
-											className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-												isNonDefaultOutputStyle ? '' : 'opacity-40 hover:opacity-70'
-											}`}
-											style={{
-												backgroundColor: isNonDefaultOutputStyle
-													? `${theme.colors.accent}25`
-													: 'transparent',
-												color: isNonDefaultOutputStyle ? theme.colors.accent : theme.colors.textDim,
-												border: isNonDefaultOutputStyle
-													? `1px solid ${theme.colors.accent}50`
-													: '1px solid transparent',
-											}}
-											title={`Output Style: ${OUTPUT_STYLE_OPTIONS.find((o) => o.id === tabOutputStyle)?.description ?? 'Default'} — Click to cycle`}
+										<div
+											className="relative"
+											ref={openPillPopup === 'outputStyle' ? pillPopupRef : undefined}
 										>
-											<BookOpen className="w-3 h-3" />
-											<span>{outputStyleLabel}</span>
-										</button>
+											<button
+												onClick={() =>
+													setOpenPillPopup(openPillPopup === 'outputStyle' ? null : 'outputStyle')
+												}
+												className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
+													isNonDefaultOutputStyle ? '' : 'opacity-40 hover:opacity-70'
+												}`}
+												style={{
+													backgroundColor: isNonDefaultOutputStyle
+														? `${theme.colors.accent}25`
+														: 'transparent',
+													color: isNonDefaultOutputStyle
+														? theme.colors.accent
+														: theme.colors.textDim,
+													border: isNonDefaultOutputStyle
+														? `1px solid ${theme.colors.accent}50`
+														: '1px solid transparent',
+												}}
+												title="Output Style"
+											>
+												<BookOpen className="w-3 h-3" />
+												<span>{outputStyleLabel}</span>
+											</button>
+											{openPillPopup === 'outputStyle' && (
+												<div
+													className="absolute bottom-full left-0 mb-1 py-1 rounded-md shadow-lg z-50 min-w-[160px]"
+													style={{
+														backgroundColor: theme.colors.bgActivity,
+														border: `1px solid ${theme.colors.border}`,
+													}}
+												>
+													{OUTPUT_STYLE_OPTIONS.map((opt) => (
+														<button
+															key={opt.id}
+															className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:brightness-125 cursor-pointer"
+															style={{
+																color:
+																	opt.id === tabOutputStyle
+																		? theme.colors.accentText
+																		: theme.colors.textMain,
+																backgroundColor:
+																	opt.id === tabOutputStyle
+																		? `${theme.colors.accent}15`
+																		: 'transparent',
+															}}
+															onClick={() => {
+																onToggleOutputStyle(opt.id);
+																setOpenPillPopup(null);
+															}}
+														>
+															<Check
+																className="w-3 h-3 flex-shrink-0"
+																style={{
+																	opacity: opt.id === tabOutputStyle ? 1 : 0,
+																}}
+															/>
+															<div className="flex flex-col">
+																<span>{opt.label}</span>
+																<span
+																	className="text-[9px]"
+																	style={{ color: theme.colors.textDim }}
+																>
+																	{opt.description}
+																</span>
+															</div>
+														</button>
+													))}
+												</div>
+											)}
+										</div>
 									)}
 							</div>
 						</div>

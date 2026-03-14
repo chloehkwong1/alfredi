@@ -181,10 +181,10 @@ interface MainPanelProps {
 		agentSessionId: string,
 		updates: { name?: string | null; starred?: boolean }
 	) => void;
-	onToggleTabReadOnlyMode?: () => void;
-	onToggleTabShowThinking?: () => void;
+	onToggleTabReadOnlyMode?: (value?: boolean) => void;
+	onToggleTabShowThinking?: (mode?: ThinkingMode) => void;
 	onTabModelChange?: (modelId: string) => void;
-	onToggleTabOutputStyle?: () => void;
+	onToggleTabOutputStyle?: (style?: OutputStyle) => void;
 	onToggleUnreadFilter?: () => void;
 	onOpenTabSearch?: () => void;
 	// Bulk tab close operations

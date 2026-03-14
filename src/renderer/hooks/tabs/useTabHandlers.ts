@@ -99,10 +99,10 @@ export interface TabHandlersReturn {
 	) => void;
 	handleTabStar: (tabId: string, starred: boolean) => void;
 	handleTabMarkUnread: (tabId: string) => void;
-	handleToggleTabReadOnlyMode: () => void;
-	handleToggleTabShowThinking: () => void;
+	handleToggleTabReadOnlyMode: (value?: boolean) => void;
+	handleToggleTabShowThinking: (mode?: ThinkingMode) => void;
 	handleTabModelChange: (modelId: string) => void;
-	handleToggleTabOutputStyle: () => void;
+	handleToggleTabOutputStyle: (style?: OutputStyle) => void;
 
 	// File Tab handlers
 	handleOpenFileTab: (file: FileTabOpenParams, options?: { openInNewTab?: boolean }) => void;
@@ -1325,7 +1325,10 @@ export function useTabHandlers(): TabHandlersReturn {
 				);
 				if (activeIndex < 0 || activeIndex >= s.unifiedTabOrder.length - 1) return s;
 
-				const tabsToClose = s.unifiedTabOrder.slice(activeIndex + 1);
+				// Skip pinned dashboard tabs
+				const tabsToClose = s.unifiedTabOrder
+					.slice(activeIndex + 1)
+					.filter((ref) => ref.type !== 'dashboard');
 
 				let updatedSession = s;
 
@@ -1616,7 +1619,7 @@ export function useTabHandlers(): TabHandlersReturn {
 		);
 	}, []);
 
-	const handleToggleTabReadOnlyMode = useCallback(() => {
+	const handleToggleTabReadOnlyMode = useCallback((value?: boolean) => {
 		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
@@ -1628,14 +1631,16 @@ export function useTabHandlers(): TabHandlersReturn {
 				return {
 					...s,
 					aiTabs: s.aiTabs.map((tab) =>
-						tab.id === currentActiveTab.id ? { ...tab, readOnlyMode: !tab.readOnlyMode } : tab
+						tab.id === currentActiveTab.id
+							? { ...tab, readOnlyMode: value !== undefined ? value : !tab.readOnlyMode }
+							: tab
 					),
 				};
 			})
 		);
 	}, []);
 
-	const handleToggleTabShowThinking = useCallback(() => {
+	const handleToggleTabShowThinking = useCallback((mode?: ThinkingMode) => {
 		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
@@ -1655,7 +1660,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					...s,
 					aiTabs: s.aiTabs.map((tab) => {
 						if (tab.id !== currentActiveTab.id) return tab;
-						const newMode = cycleThinkingMode(tab.showThinking);
+						const newMode = mode !== undefined ? mode : cycleThinkingMode(tab.showThinking);
 						if (newMode === 'off') {
 							return {
 								...tab,
