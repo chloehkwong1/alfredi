@@ -23,6 +23,8 @@ import {
 	GitPullRequest,
 	Settings2,
 	Server,
+	Play,
+	Square,
 } from 'lucide-react';
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
@@ -30,6 +32,7 @@ import { InputArea } from './InputArea';
 import { FilePreview, FilePreviewHandle } from './FilePreview';
 import { DiffPreview } from './DiffPreview';
 import { CommitDiffView } from './CommitDiffView';
+import { ProjectDashboard } from './ProjectDashboard';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
@@ -41,8 +44,10 @@ import { useGitBranch, useGitDetail, useGitFileStatus } from '../contexts/GitSta
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { calculateContextDisplay } from '../utils/contextUsage';
 import { useAgentCapabilities, useHoverTooltip } from '../hooks';
+import { useProjectDashboard } from '../hooks/worktree/useProjectDashboard';
 import { safeClipboardWrite } from '../utils/clipboard';
 import { useUIStore } from '../stores/uiStore';
+import { useSessionStore } from '../stores/sessionStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import type {
 	Session,
@@ -55,7 +60,9 @@ import type {
 	ThinkingItem,
 	AgentError,
 	StagedFile,
+	ThinkingMode,
 } from '../types';
+import type { OutputStyle } from '../../shared/types';
 
 interface SlashCommand {
 	command: string;
@@ -211,6 +218,13 @@ interface MainPanelProps {
 	onCommitDiffTabClose?: (tabId: string) => void;
 	/** Handler to pin a preview tab (remove isPreview flag) */
 	onPinTab?: (tabId: string) => void;
+	// Dashboard tab support
+	activeDashboardTabId?: string | null;
+	onDashboardTabSelect?: (tabId: string) => void;
+	/** Handler to open the CreateWorktree modal */
+	onNewWorktree?: () => void;
+	/** Handler to open the WorktreeConfig modal */
+	onOpenConfig?: () => void;
 	onDiffTabViewModeChange?: (tabId: string, viewMode: 'unified' | 'split') => void;
 	onDiffTabScrollPositionChange?: (tabId: string, scrollTop: number) => void;
 	onOpenFileTab?: (filePath: string) => void;
@@ -508,6 +522,11 @@ export const MainPanel = React.memo(
 			activeCommitDiffTab,
 			onCommitDiffTabSelect,
 			onCommitDiffTabClose,
+			// Dashboard tab props
+			activeDashboardTabId,
+			onDashboardTabSelect,
+			onNewWorktree,
+			onOpenConfig,
 		} = props;
 
 		// Get the active tab for header display
@@ -522,6 +541,21 @@ export const MainPanel = React.memo(
 			[activeSession?.aiTabs, activeSession?.activeTabId]
 		);
 		const activeTabError = activeTab?.agentError;
+
+		// Project dashboard hook — only does work for project head sessions
+		// Requires a stable Session reference; uses a placeholder when no session is active
+		const dashboardPlaceholder = useMemo(
+			() =>
+				({
+					id: '',
+					cwd: '',
+					worktreeConfig: undefined,
+					parentSessionId: undefined,
+				}) as unknown as Session,
+			[]
+		);
+		const dashboard = useProjectDashboard(activeSession ?? dashboardPlaceholder);
+		const isProjectHead = !!(activeSession?.worktreeConfig && !activeSession?.parentSessionId);
 
 		// Resolve the configured context window from session override or agent settings.
 		useEffect(() => {
@@ -615,6 +649,104 @@ export const MainPanel = React.memo(
 			activeSession?.toolType,
 			activeTabContextWindow,
 			activeSession?.contextUsage,
+		]);
+
+		// Server Run/Stop: determine if active session is a worktree with runScript configured
+		const activeSessionRunScript = useMemo(() => {
+			if (!activeSession) return undefined;
+			// If this is a worktree child, look up the parent's config
+			if (activeSession.parentSessionId) {
+				const parent = useSessionStore
+					.getState()
+					.sessions.find((s) => s.id === activeSession.parentSessionId);
+				return parent?.worktreeConfig?.runScript;
+			}
+			return activeSession.worktreeConfig?.runScript;
+		}, [
+			activeSession?.id,
+			activeSession?.parentSessionId,
+			activeSession?.worktreeConfig?.runScript,
+		]);
+
+		const isServerRunning = !!activeSession?.worktreeServerProcessId;
+
+		const handleToggleServer = useCallback(() => {
+			if (!activeSession) return;
+			if (isServerRunning && activeSession.worktreeServerProcessId) {
+				// Stop the running server
+				window.maestro.git
+					.stopServer(activeSession.worktreeServerProcessId)
+					.then((result) => {
+						if (!result.success) {
+							showFlashNotification?.('Stop Server Failed');
+						}
+						useSessionStore
+							.getState()
+							.setSessions((prev) =>
+								prev.map((s) =>
+									s.id === activeSession.id ? { ...s, worktreeServerProcessId: undefined } : s
+								)
+							);
+					})
+					.catch(() => {
+						showFlashNotification?.('Stop Server Failed');
+						// Still clear the processId — the process is likely gone even if IPC failed
+						useSessionStore
+							.getState()
+							.setSessions((prev) =>
+								prev.map((s) =>
+									s.id === activeSession.id ? { ...s, worktreeServerProcessId: undefined } : s
+								)
+							);
+					});
+			} else {
+				// Start the server
+				if (!activeSessionRunScript) return;
+				const sshRemoteId = activeSession.sessionSshRemoteConfig?.enabled
+					? (activeSession.sessionSshRemoteConfig.remoteId ?? undefined)
+					: undefined;
+				const terminalWidth = useSettingsStore.getState().terminalWidth || 100;
+				window.maestro.git
+					.startServer(
+						activeSession.id,
+						activeSession.cwd,
+						activeSessionRunScript,
+						sshRemoteId,
+						terminalWidth
+					)
+					.then((result) => {
+						if (result.success && result.processId) {
+							useSessionStore
+								.getState()
+								.setSessions((prev) =>
+									prev.map((s) =>
+										s.id === activeSession.id
+											? { ...s, worktreeServerProcessId: result.processId }
+											: s
+									)
+								);
+							// Open a "Server" terminal tab to stream output
+							useSessionStore
+								.getState()
+								.addServerTerminalTab(activeSession.id, result.processId, 'Server');
+							// Ensure the Right Panel is open so the user sees the output
+							useUIStore.getState().setRightPanelOpen(true);
+						} else {
+							showFlashNotification?.('Start Server Failed');
+						}
+					})
+					.catch(() => {
+						showFlashNotification?.('Start Server Failed');
+					});
+			}
+		}, [
+			activeSession?.id,
+			activeSession?.cwd,
+			activeSession?.worktreeServerProcessId,
+			activeSession?.sessionSshRemoteConfig,
+			activeSessionRunScript,
+			isServerRunning,
+			showFlashNotification,
 		]);
 
 		// Git status from focused contexts (reduces cascade re-renders)
@@ -886,7 +1018,7 @@ export const MainPanel = React.memo(
 				>
 					<Wand2 className="w-16 h-16 mb-4" style={{ color: theme.colors.textDim }} />
 					<p className="text-sm" style={{ color: theme.colors.textDim }}>
-						No agents. Create one to get started.
+						No projects. Create one to get started.
 					</p>
 				</div>
 			);
@@ -1225,6 +1357,41 @@ export const MainPanel = React.memo(
 								)}
 
 								<div className="flex items-center gap-3 justify-end shrink-0">
+									{/* Server Run/Stop Pill - only shown for worktrees with runScript configured */}
+									{activeSessionRunScript && (
+										<button
+											className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1"
+											style={{
+												backgroundColor: isServerRunning
+													? theme.colors.success + '20'
+													: theme.colors.textDim + '20',
+												color: isServerRunning ? theme.colors.success : theme.colors.textDim,
+												borderColor: isServerRunning
+													? theme.colors.success + '30'
+													: theme.colors.textDim + '30',
+											}}
+											title={
+												isServerRunning ? 'Stop server' : `Run server: ${activeSessionRunScript}`
+											}
+											onClick={(e) => {
+												e.stopPropagation();
+												handleToggleServer();
+											}}
+										>
+											{isServerRunning ? (
+												<>
+													<Square className="w-2.5 h-2.5" fill="currentColor" />
+													SERVER
+												</>
+											) : (
+												<>
+													<Play className="w-2.5 h-2.5" fill="currentColor" />
+													SERVER
+												</>
+											)}
+										</button>
+									)}
+
 									{/* Session UUID Pill - click to copy full UUID, hidden at narrow widths via CSS container query */}
 									{/* Hide when file preview tab is focused - session stats are only relevant for AI tabs */}
 									{activeSession.inputMode === 'ai' &&
@@ -1553,6 +1720,9 @@ export const MainPanel = React.memo(
 									onCommitDiffTabSelect={onCommitDiffTabSelect}
 									onCommitDiffTabClose={onCommitDiffTabClose}
 									onPinTab={onPinTab}
+									// Dashboard tab
+									activeDashboardTabId={activeDashboardTabId}
+									onDashboardTabSelect={onDashboardTabSelect}
 									// Accessibility
 									colorBlindMode={colorBlindMode}
 								/>
@@ -1599,10 +1769,131 @@ export const MainPanel = React.memo(
 							</div>
 						)}
 
-						{/* Content area: Show FilePreview when file tab is active, otherwise show terminal output */}
-						{/* Skip rendering when loading remote file - loading state takes over entire main area */}
-						{activeSession.inputMode === 'ai' &&
-						((filePreviewLoading && !activeFileTabId) || activeFileTab?.isLoading) ? (
+						{/* Content area: Show Dashboard, FilePreview, Diff, or terminal output based on active tab */}
+						{/* Dashboard view for project head sessions */}
+						{activeSession.inputMode === 'ai' && activeDashboardTabId && isProjectHead ? (
+							<>
+								<div
+									tabIndex={-1}
+									className="flex-1 overflow-auto outline-none"
+									style={{ backgroundColor: theme.colors.bgMain }}
+								>
+									<ProjectDashboard
+										session={activeSession}
+										syncStatus={dashboard.syncStatus}
+										worktreeCards={dashboard.worktreeCards}
+										groupedWorktrees={dashboard.groupedWorktrees}
+										onNavigateToSession={(sessionId) => {
+											useSessionStore.getState().setActiveSessionId(sessionId);
+										}}
+										onNewWorktree={() => onNewWorktree?.()}
+										onOpenConfig={() => onOpenConfig?.()}
+										onPull={dashboard.handlePull}
+										onRefresh={dashboard.refreshSyncStatus}
+										isPulling={dashboard.isPulling}
+										theme={theme}
+									/>
+								</div>
+								{/* AI input at bottom of dashboard — sending a message switches to AI terminal view */}
+								{!isMobileLandscape && (
+									<div data-tour="input-area">
+										<InputArea
+											session={activeSession}
+											theme={theme}
+											inputValue={inputValue}
+											setInputValue={setInputValue}
+											enterToSend={enterToSendAI}
+											setEnterToSend={useSettingsStore.getState().setEnterToSendAI}
+											stagedImages={stagedImages}
+											setStagedImages={setStagedImages}
+											stagedFiles={stagedFiles}
+											setStagedFiles={setStagedFiles}
+											setLightboxImage={setLightboxImage}
+											commandHistoryOpen={commandHistoryOpen}
+											setCommandHistoryOpen={setCommandHistoryOpen}
+											commandHistoryFilter={commandHistoryFilter}
+											setCommandHistoryFilter={setCommandHistoryFilter}
+											commandHistorySelectedIndex={commandHistorySelectedIndex}
+											setCommandHistorySelectedIndex={setCommandHistorySelectedIndex}
+											slashCommandOpen={slashCommandOpen}
+											setSlashCommandOpen={setSlashCommandOpen}
+											slashCommands={slashCommands}
+											selectedSlashCommandIndex={selectedSlashCommandIndex}
+											setSelectedSlashCommandIndex={setSelectedSlashCommandIndex}
+											tabCompletionOpen={tabCompletionOpen}
+											setTabCompletionOpen={setTabCompletionOpen}
+											tabCompletionSuggestions={tabCompletionSuggestions}
+											selectedTabCompletionIndex={selectedTabCompletionIndex}
+											setSelectedTabCompletionIndex={setSelectedTabCompletionIndex}
+											tabCompletionFilter={tabCompletionFilter}
+											setTabCompletionFilter={setTabCompletionFilter}
+											atMentionOpen={atMentionOpen}
+											setAtMentionOpen={setAtMentionOpen}
+											atMentionFilter={atMentionFilter}
+											setAtMentionFilter={setAtMentionFilter}
+											atMentionStartIndex={atMentionStartIndex}
+											setAtMentionStartIndex={setAtMentionStartIndex}
+											atMentionSuggestions={atMentionSuggestions}
+											selectedAtMentionIndex={selectedAtMentionIndex}
+											setSelectedAtMentionIndex={setSelectedAtMentionIndex}
+											inputRef={inputRef}
+											handleInputKeyDown={handleInputKeyDown}
+											handlePaste={handlePaste}
+											handleDrop={handleDrop}
+											processInput={processInput}
+											handleInterrupt={handleInterrupt}
+											onInputFocus={handleInputFocus}
+											onInputBlur={props.onInputBlur}
+											isAutoModeActive={isCurrentSessionAutoMode}
+											thinkingItems={thinkingItems}
+											onSessionClick={handleSessionClick}
+											autoRunState={currentSessionBatchState || undefined}
+											onStopAutoRun={() => onStopBatchRun?.(activeSession.id)}
+											onOpenQueueBrowser={onOpenQueueBrowser}
+											tabReadOnlyMode={activeTab?.readOnlyMode ?? false}
+											onToggleTabReadOnlyMode={props.onToggleTabReadOnlyMode}
+											tabShowThinking={activeTab?.showThinking ?? 'off'}
+											onToggleTabShowThinking={props.onToggleTabShowThinking}
+											supportsThinking={hasCapability('supportsThinkingDisplay')}
+											currentModelId={activeTab?.modelId || availableModels[0] || undefined}
+											availableModels={availableModels}
+											onModelChange={props.onTabModelChange}
+											tabOutputStyle={activeTab?.outputStyle ?? 'default'}
+											onToggleOutputStyle={props.onToggleTabOutputStyle}
+											shortcuts={shortcuts}
+											showFlashNotification={showFlashNotification}
+											contextUsage={activeTabContextUsage}
+											contextWarningsEnabled={contextWarningsEnabled}
+											contextWarningYellowThreshold={contextWarningYellowThreshold}
+											contextWarningRedThreshold={contextWarningRedThreshold}
+											onSummarizeAndContinue={
+												onSummarizeAndContinue
+													? () => onSummarizeAndContinue(activeSession.activeTabId)
+													: undefined
+											}
+											summarizeProgress={summarizeProgress}
+											summarizeResult={summarizeResult}
+											summarizeStartTime={summarizeStartTime}
+											isSummarizing={isSummarizing}
+											onCancelSummarize={onCancelSummarize}
+											// Merge progress props
+											mergeProgress={mergeProgress}
+											mergeResult={mergeResult}
+											mergeStartTime={mergeStartTime}
+											isMerging={isMerging}
+											mergeSourceName={mergeSourceName}
+											mergeTargetName={mergeTargetName}
+											onCancelMerge={onCancelMerge}
+											// Inline wizard mode
+											onExitWizard={onExitWizard}
+											wizardShowThinking={activeTab?.wizardState?.showWizardThinking ?? false}
+											onToggleWizardShowThinking={props.onToggleWizardShowThinking}
+										/>
+									</div>
+								)}
+							</>
+						) : activeSession.inputMode === 'ai' &&
+						  ((filePreviewLoading && !activeFileTabId) || activeFileTab?.isLoading) ? (
 							<div
 								className="flex-1 flex items-center justify-center"
 								style={{ backgroundColor: theme.colors.bgMain }}

@@ -166,6 +166,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 							activeDiffTabId: null,
 							commitDiffTabs: [],
 							activeCommitDiffTabId: null,
+							activeDashboardTabId: null,
 							unifiedTabOrder: [{ type: 'ai' as const, id: newTabId }],
 							unifiedClosedTabHistory: [],
 							// Reset agent runtime state
@@ -442,6 +443,33 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 	// ====================================================================
 	// Effects
 	// ====================================================================
+
+	// Auto-create dashboard tab for project head sessions (worktreeConfig + no parentSessionId)
+	// Ensures the dashboard tab exists as the first tab and is active on first switch
+	useEffect(() => {
+		if (!activeSession) return;
+		// Only for project heads (has worktreeConfig, no parent)
+		if (!activeSession.worktreeConfig || activeSession.parentSessionId) return;
+		// Already has a dashboard tab
+		if (activeSession.activeDashboardTabId) return;
+
+		const dashboardTabId = `dashboard-${activeSession.id}`;
+
+		useSessionStore.getState().updateSession(activeSession.id, {
+			activeDashboardTabId: dashboardTabId,
+			// Clear other active tab types so dashboard shows by default
+			activeFileTabId: null,
+			activeDiffTabId: null,
+			activeCommitDiffTabId: null,
+			// Insert dashboard tab at the front of unified tab order
+			unifiedTabOrder: [
+				{ type: 'dashboard' as const, id: dashboardTabId },
+				...activeSession.unifiedTabOrder.filter(
+					(ref) => !(ref.type === 'dashboard' && ref.id === dashboardTabId)
+				),
+			],
+		});
+	}, [activeSessionId]);
 
 	// Auto-transition worktree status from 'todo' to 'in_progress' on activation
 	// Only applies when the worktree hasn't been manually status-set via drag-and-drop

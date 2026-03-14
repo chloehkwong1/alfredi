@@ -575,10 +575,21 @@ export interface CommitDiffTab {
 }
 
 /**
+ * Dashboard Tab for project head sessions.
+ * Minimal — no persistent state needed; the dashboard is always live.
+ */
+export interface DashboardTab {
+	id: string;
+}
+
+/**
  * Reference to any tab in the unified tab system.
  * Used for unified tab ordering across different tab types.
  */
-export type UnifiedTabRef = { type: 'ai' | 'file' | 'diff' | 'commit-diff'; id: string };
+export type UnifiedTabRef = {
+	type: 'ai' | 'file' | 'diff' | 'commit-diff' | 'dashboard';
+	id: string;
+};
 
 /**
  * Unified tab entry for rendering in TabBar.
@@ -589,7 +600,8 @@ export type UnifiedTab =
 	| { type: 'ai'; id: string; data: AITab }
 	| { type: 'file'; id: string; data: FilePreviewTab }
 	| { type: 'diff'; id: string; data: DiffViewTab }
-	| { type: 'commit-diff'; id: string; data: CommitDiffTab };
+	| { type: 'commit-diff'; id: string; data: CommitDiffTab }
+	| { type: 'dashboard'; id: string; data: DashboardTab };
 
 /**
  * Unified closed tab entry for undo functionality (Cmd+Shift+T).
@@ -744,6 +756,9 @@ export interface Session {
 	commitDiffTabs: CommitDiffTab[];
 	// Currently active commit diff tab ID (null if another tab type is active)
 	activeCommitDiffTabId: string | null;
+
+	// Dashboard Tab - project head dashboard (only one per project head, not closable)
+	activeDashboardTabId?: string | null;
 
 	// Unified tab ordering - determines visual order of all tabs (AI, file, and diff)
 	unifiedTabOrder: UnifiedTabRef[];

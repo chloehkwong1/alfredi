@@ -287,6 +287,7 @@ export function useTabHandlers(): TabHandlersReturn {
 							...sessionWithPreviewClosed,
 							activeFileTabId: existingTab.id,
 							activeTabId: s.activeTabId,
+							activeDashboardTabId: null,
 							unifiedTabOrder: ensureInUnifiedTabOrder(
 								sessionWithPreviewClosed.unifiedTabOrder,
 								'file',
@@ -440,6 +441,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						filePreviewTabs: [...sessionForNewTab.filePreviewTabs, newFileTab],
 						unifiedTabOrder: updatedUnifiedTabOrder,
 						activeFileTabId: newTabId,
+						activeDashboardTabId: null,
 					};
 				})
 			);
@@ -588,6 +590,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						activeDiffTabId: existingTab.id,
 						activeFileTabId: null,
 						activeCommitDiffTabId: null,
+						activeDashboardTabId: null,
 						unifiedTabOrder: ensureInUnifiedTabOrder(
 							sessionWithUpdatedTabs.unifiedTabOrder,
 							'diff',
@@ -643,6 +646,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					activeDiffTabId: newTab.id,
 					activeFileTabId: null,
 					activeCommitDiffTabId: null,
+					activeDashboardTabId: null,
 					unifiedTabOrder: updatedUnifiedTabOrder,
 				};
 			})
@@ -655,7 +659,13 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 				if (!(s.diffViewTabs || []).some((t) => t.id === tabId)) return s;
-				return { ...s, activeDiffTabId: tabId, activeFileTabId: null, activeCommitDiffTabId: null };
+				return {
+					...s,
+					activeDiffTabId: tabId,
+					activeFileTabId: null,
+					activeCommitDiffTabId: null,
+					activeDashboardTabId: null,
+				};
 			})
 		);
 	}, []);
@@ -716,6 +726,7 @@ export function useTabHandlers(): TabHandlersReturn {
 							activeCommitDiffTabId: existing.id,
 							activeFileTabId: null,
 							activeDiffTabId: null,
+							activeDashboardTabId: null,
 							unifiedTabOrder: ensureInUnifiedTabOrder(
 								session.unifiedTabOrder,
 								'commit-diff',
@@ -780,6 +791,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						activeCommitDiffTabId: tabId,
 						activeFileTabId: null,
 						activeDiffTabId: null,
+						activeDashboardTabId: null,
 						unifiedTabOrder: updatedUnifiedTabOrder,
 					};
 				})
@@ -797,7 +809,13 @@ export function useTabHandlers(): TabHandlersReturn {
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
 				if (!(s.commitDiffTabs || []).some((t) => t.id === tabId)) return s;
-				return { ...s, activeCommitDiffTabId: tabId, activeFileTabId: null, activeDiffTabId: null };
+				return {
+					...s,
+					activeCommitDiffTabId: tabId,
+					activeFileTabId: null,
+					activeDiffTabId: null,
+					activeDashboardTabId: null,
+				};
 			})
 		);
 	}, []);
@@ -996,7 +1014,12 @@ export function useTabHandlers(): TabHandlersReturn {
 		setSessions((prev: Session[]) =>
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
-				return { ...s, activeFileTabId: tabId, activeCommitDiffTabId: null };
+				return {
+					...s,
+					activeFileTabId: tabId,
+					activeCommitDiffTabId: null,
+					activeDashboardTabId: null,
+				};
 			})
 		);
 
@@ -1044,6 +1067,14 @@ export function useTabHandlers(): TabHandlersReturn {
 				) {
 					return s;
 				}
+				// Don't allow moving the pinned dashboard tab or moving tabs before it
+				const movingRef = s.unifiedTabOrder[fromIndex];
+				if (movingRef.type === 'dashboard') return s;
+				// Count pinned dashboard tabs at the front
+				const pinnedCount = s.unifiedTabOrder.findIndex((ref) => ref.type !== 'dashboard');
+				const effectivePinnedCount = pinnedCount === -1 ? s.unifiedTabOrder.length : pinnedCount;
+				if (toIndex < effectivePinnedCount) return s;
+
 				const newOrder = [...s.unifiedTabOrder];
 				const [movedRef] = newOrder.splice(fromIndex, 1);
 				newOrder.splice(toIndex, 0, movedRef);
@@ -1119,8 +1150,8 @@ export function useTabHandlers(): TabHandlersReturn {
 				if (s.id !== activeSessionId) return s;
 				let updatedSession = s;
 
-				// Close all tabs via unifiedTabOrder to handle all types
-				const tabsToClose = [...s.unifiedTabOrder];
+				// Close all tabs via unifiedTabOrder to handle all types (skip pinned dashboard tabs)
+				const tabsToClose = s.unifiedTabOrder.filter((ref) => ref.type !== 'dashboard');
 				for (const tabRef of tabsToClose) {
 					if (tabRef.type === 'ai') {
 						const tab = updatedSession.aiTabs.find((t) => t.id === tabRef.id);
@@ -1181,8 +1212,11 @@ export function useTabHandlers(): TabHandlersReturn {
 							? 'file'
 							: 'ai';
 
+				// Skip pinned dashboard tabs and the active tab
 				const tabsToClose = s.unifiedTabOrder.filter(
-					(ref) => !(ref.type === activeUnifiedType && ref.id === activeUnifiedId)
+					(ref) =>
+						ref.type !== 'dashboard' &&
+						!(ref.type === activeUnifiedType && ref.id === activeUnifiedId)
 				);
 
 				let updatedSession = s;
@@ -1254,7 +1288,10 @@ export function useTabHandlers(): TabHandlersReturn {
 				);
 				if (activeIndex <= 0) return s;
 
-				const tabsToClose = s.unifiedTabOrder.slice(0, activeIndex);
+				// Skip pinned dashboard tabs
+				const tabsToClose = s.unifiedTabOrder
+					.slice(0, activeIndex)
+					.filter((ref) => ref.type !== 'dashboard');
 
 				let updatedSession = s;
 
@@ -1694,16 +1731,21 @@ export function useTabHandlers(): TabHandlersReturn {
 		);
 	}, []);
 
-	const handleToggleTabOutputStyle = useCallback(() => {
+	const handleToggleTabOutputStyle = useCallback((style?: OutputStyle) => {
 		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return;
 		const currentActiveTab = getActiveTab(session);
 		if (!currentActiveTab) return;
-		const styles: OutputStyle[] = OUTPUT_STYLE_OPTIONS.map((o) => o.id);
-		const currentStyle = currentActiveTab.outputStyle ?? 'default';
-		const currentIndex = styles.indexOf(currentStyle);
-		const nextStyle = styles[(currentIndex + 1) % styles.length];
+		let nextStyle: OutputStyle;
+		if (style !== undefined) {
+			nextStyle = style;
+		} else {
+			const styles: OutputStyle[] = OUTPUT_STYLE_OPTIONS.map((o) => o.id);
+			const currentStyle = currentActiveTab.outputStyle ?? 'default';
+			const currentIndex = styles.indexOf(currentStyle);
+			nextStyle = styles[(currentIndex + 1) % styles.length];
+		}
 		setSessions((prev: Session[]) =>
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;

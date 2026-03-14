@@ -7,6 +7,7 @@ import {
 	ClosedTab,
 	ClosedTabEntry,
 	CommitDiffTab,
+	DashboardTab,
 	DiffViewTab,
 	FilePreviewTab,
 	UnifiedTab,
@@ -34,6 +35,12 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	const fileTabMap = new Map((filePreviewTabs || []).map((tab) => [tab.id, tab]));
 	const diffTabMap = new Map((diffViewTabs || []).map((tab) => [tab.id, tab]));
 	const commitDiffTabMap = new Map((commitDiffTabs || []).map((tab) => [tab.id, tab]));
+
+	// Build a map of dashboard tabs from the session's activeDashboardTabId
+	const dashboardTabMap = new Map<string, DashboardTab>();
+	if (session.activeDashboardTabId) {
+		dashboardTabMap.set(session.activeDashboardTabId, { id: session.activeDashboardTabId });
+	}
 
 	const result: UnifiedTab[] = [];
 
@@ -63,6 +70,12 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 				result.push({ type: 'commit-diff', id: ref.id, data: tab });
 				commitDiffTabMap.delete(ref.id);
 			}
+		} else if (ref.type === 'dashboard') {
+			const tab = dashboardTabMap.get(ref.id);
+			if (tab) {
+				result.push({ type: 'dashboard', id: ref.id, data: tab });
+				dashboardTabMap.delete(ref.id);
+			}
 		}
 	}
 
@@ -79,6 +92,9 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	for (const [id, tab] of commitDiffTabMap) {
 		result.push({ type: 'commit-diff', id, data: tab });
 	}
+	for (const [id, tab] of dashboardTabMap) {
+		result.push({ type: 'dashboard', id, data: tab });
+	}
 
 	return result;
 }
@@ -89,7 +105,7 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
  */
 export function ensureInUnifiedTabOrder(
 	unifiedTabOrder: UnifiedTabRef[],
-	type: 'ai' | 'file' | 'diff' | 'commit-diff',
+	type: 'ai' | 'file' | 'diff' | 'commit-diff' | 'dashboard',
 	id: string
 ): UnifiedTabRef[] {
 	const exists = unifiedTabOrder.some((ref) => ref.type === type && ref.id === id);
@@ -1156,12 +1172,13 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 		return null;
 	}
 
-	// If already active and no file/diff tab is selected, return current state (no mutation needed)
+	// If already active and no file/diff/dashboard tab is selected, return current state (no mutation needed)
 	if (
 		session.activeTabId === tabId &&
 		session.activeFileTabId === null &&
 		session.activeDiffTabId === null &&
-		session.activeCommitDiffTabId === null
+		session.activeCommitDiffTabId === null &&
+		!session.activeDashboardTabId
 	) {
 		return {
 			tab: targetTab,
@@ -1169,8 +1186,8 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 		};
 	}
 
-	// When selecting an AI tab, deselect any active file preview or diff tab
-	// This ensures only one tab type (AI, file, or diff) is active at a time
+	// When selecting an AI tab, deselect any active file preview, diff, or dashboard tab
+	// This ensures only one tab type (AI, file, diff, or dashboard) is active at a time
 	return {
 		tab: targetTab,
 		session: {
@@ -1179,6 +1196,7 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 			activeFileTabId: null,
 			activeDiffTabId: null,
 			activeCommitDiffTabId: null,
+			activeDashboardTabId: null,
 		},
 	};
 }
@@ -1520,6 +1538,7 @@ export function navigateToUnifiedTabByIndex(
 				activeFileTabId: null,
 				activeDiffTabId: null,
 				activeCommitDiffTabId: null,
+				activeDashboardTabId: null,
 			},
 		};
 	} else if (targetTabRef.type === 'file') {
@@ -1545,6 +1564,7 @@ export function navigateToUnifiedTabByIndex(
 				activeFileTabId: targetTabRef.id,
 				activeDiffTabId: null,
 				activeCommitDiffTabId: null,
+				activeDashboardTabId: null,
 			},
 		};
 	} else if (targetTabRef.type === 'diff') {
@@ -1570,6 +1590,7 @@ export function navigateToUnifiedTabByIndex(
 				activeFileTabId: null,
 				activeDiffTabId: targetTabRef.id,
 				activeCommitDiffTabId: null,
+				activeDashboardTabId: null,
 			},
 		};
 	} else {
@@ -1960,6 +1981,7 @@ export function createMergedSession(
 		activeDiffTabId: null,
 		commitDiffTabs: [],
 		activeCommitDiffTabId: null,
+		activeDashboardTabId: null,
 		unifiedTabOrder: [{ type: 'ai' as const, id: tabId }],
 		unifiedClosedTabHistory: [],
 		// Default Auto Run folder path (user can change later)

@@ -527,6 +527,8 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							return {
 								...s,
 								executionQueue: [...s.executionQueue, queuedItem],
+								// Switch away from dashboard tab so AI terminal is visible
+								activeDashboardTabId: null,
 							};
 						})
 					);
@@ -606,6 +608,8 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 						currentCycleTokens: 0,
 						aiCommandHistory: newHistory,
 						aiTabs: updatedAiTabs,
+						// Switch away from dashboard tab so AI terminal is visible
+						activeDashboardTabId: null,
 					};
 				})
 			);

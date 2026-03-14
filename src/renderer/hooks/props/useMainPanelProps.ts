@@ -220,6 +220,12 @@ export interface UseMainPanelPropsDeps {
 	handleSelectCommitDiffTab: (tabId: string) => void;
 	handleCloseCommitDiffTab: (tabId: string) => void;
 
+	// Dashboard tab props
+	activeDashboardTabId: string | null;
+	handleSelectDashboardTab: (tabId: string) => void;
+	handleNewWorktree: () => void;
+	handleOpenWorktreeConfigFromDashboard: () => void;
+
 	handleScrollPositionChange: (scrollTop: number) => void;
 	handleAtBottomChange: (isAtBottom: boolean) => void;
 	handleMainPanelInputBlur: () => void;
@@ -403,6 +409,11 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			activeCommitDiffTab: deps.activeCommitDiffTab,
 			onCommitDiffTabSelect: deps.handleSelectCommitDiffTab,
 			onCommitDiffTabClose: deps.handleCloseCommitDiffTab,
+			// Dashboard tab props
+			activeDashboardTabId: deps.activeDashboardTabId,
+			onDashboardTabSelect: deps.handleSelectDashboardTab,
+			onNewWorktree: deps.handleNewWorktree,
+			onOpenConfig: deps.handleOpenWorktreeConfigFromDashboard,
 			onToggleTabShowThinking: deps.handleToggleTabShowThinking,
 			onScrollPositionChange: deps.handleScrollPositionChange,
 			onAtBottomChange: deps.handleAtBottomChange,
@@ -612,6 +623,11 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.activeCommitDiffTab,
 			deps.handleSelectCommitDiffTab,
 			deps.handleCloseCommitDiffTab,
+			// Dashboard tab deps
+			deps.activeDashboardTabId,
+			deps.handleSelectDashboardTab,
+			deps.handleNewWorktree,
+			deps.handleOpenWorktreeConfigFromDashboard,
 			deps.handleScrollPositionChange,
 			deps.handleAtBottomChange,
 			deps.handleMainPanelInputBlur,

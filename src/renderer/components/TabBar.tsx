@@ -21,6 +21,7 @@ import {
 	ExternalLink,
 	FolderOpen,
 	GitCompare,
+	LayoutDashboard,
 } from 'lucide-react';
 import type { AITab, Theme, DiffViewTab, FilePreviewTab, UnifiedTab } from '../types';
 import { hasDraft } from '../utils/tabHelpers';
@@ -91,6 +92,12 @@ interface TabBarProps {
 	onCommitDiffTabClose?: (tabId: string) => void;
 	/** Handler to pin a preview tab (remove isPreview flag) */
 	onPinTab?: (tabId: string) => void;
+
+	// Dashboard tab support
+	/** Currently active dashboard tab ID (null if a non-dashboard tab is active) */
+	activeDashboardTabId?: string | null;
+	/** Handler to select a dashboard tab */
+	onDashboardTabSelect?: (tabId: string) => void;
 
 	// === Accessibility ===
 	/** Whether colorblind-friendly colors should be used for extension badges */
@@ -2029,6 +2036,9 @@ function TabBarInner({
 	onCommitDiffTabClose,
 	onPinTab,
 	onUnifiedTabReorder,
+	// Dashboard tab
+	activeDashboardTabId,
+	onDashboardTabSelect,
 	// Accessibility
 	colorBlindMode,
 }: TabBarProps) {
@@ -2100,6 +2110,7 @@ function TabBarInner({
 
 	// When unifiedTabs is provided, filter it similarly for display
 	// File tabs don't have "unread" state, so they only show in filtered mode if active
+	// Dashboard tabs always show (not closable, always visible)
 	const displayedUnifiedTabs = useMemo(() => {
 		if (!unifiedTabs) return null;
 		if (!showUnreadOnly) return unifiedTabs;
@@ -2108,6 +2119,8 @@ function TabBarInner({
 			if (ut.type === 'ai') {
 				return ut.data.hasUnread || ut.id === activeTabId || hasDraft(ut.data);
 			}
+			// Dashboard tabs: always show
+			if (ut.type === 'dashboard') return true;
 			// File tabs: only show if active
 			return ut.id === activeFileTabId;
 		});
@@ -2390,20 +2403,24 @@ function TabBarInner({
 			{displayedUnifiedTabs
 				? displayedUnifiedTabs.map((unifiedTab, index) => {
 						// Determine if this tab is active (based on type)
-						// AI tabs are active when: they match activeTabId AND no file/diff tab is selected
+						// AI tabs are active when: they match activeTabId AND no file/diff/dashboard tab is selected
 						// File tabs are active when: they match activeFileTabId
 						// Diff tabs are active when: they match activeDiffTabId
+						// Dashboard tabs are active when: they match activeDashboardTabId
 						const isActive =
 							unifiedTab.type === 'ai'
 								? unifiedTab.id === activeTabId &&
 									!activeFileTabId &&
 									!activeDiffTabId &&
-									!activeCommitDiffTabId
+									!activeCommitDiffTabId &&
+									!activeDashboardTabId
 								: unifiedTab.type === 'file'
 									? unifiedTab.id === activeFileTabId
 									: unifiedTab.type === 'diff'
 										? unifiedTab.id === activeDiffTabId
-										: unifiedTab.id === activeCommitDiffTabId;
+										: unifiedTab.type === 'dashboard'
+											? unifiedTab.id === activeDashboardTabId
+											: unifiedTab.id === activeCommitDiffTabId;
 
 						// Check previous tab's active state for separator logic
 						const prevUnifiedTab = index > 0 ? displayedUnifiedTabs[index - 1] : null;
@@ -2412,12 +2429,15 @@ function TabBarInner({
 								? prevUnifiedTab.id === activeTabId &&
 									!activeFileTabId &&
 									!activeDiffTabId &&
-									!activeCommitDiffTabId
+									!activeCommitDiffTabId &&
+									!activeDashboardTabId
 								: prevUnifiedTab.type === 'file'
 									? prevUnifiedTab.id === activeFileTabId
 									: prevUnifiedTab.type === 'diff'
 										? prevUnifiedTab.id === activeDiffTabId
-										: prevUnifiedTab.id === activeCommitDiffTabId
+										: prevUnifiedTab.type === 'dashboard'
+											? prevUnifiedTab.id === activeDashboardTabId
+											: prevUnifiedTab.id === activeCommitDiffTabId
 							: false;
 
 						// Get original index in the FULL unified list (not filtered)
@@ -2637,6 +2657,35 @@ function TabBarInner({
 										tabIndex={originalIndex}
 										shortcutHint={shortcutHint}
 									/>
+								</React.Fragment>
+							);
+						} else if (unifiedTab.type === 'dashboard') {
+							// Dashboard tab - project head overview
+							return (
+								<React.Fragment key={unifiedTab.id}>
+									{showSeparator && (
+										<div
+											className="w-px h-4 self-center shrink-0"
+											style={{ backgroundColor: theme.colors.border }}
+										/>
+									)}
+									<div
+										className={`group relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer shrink-0 text-xs font-medium transition-colors duration-100 select-none ${
+											isActive ? 'rounded-t-md' : 'rounded-t-md opacity-70 hover:opacity-100'
+										}`}
+										style={{
+											backgroundColor: isActive ? theme.colors.bgMain : 'transparent',
+											color: isActive ? theme.colors.accent : theme.colors.textDim,
+											borderBottom: isActive
+												? `2px solid ${theme.colors.accent}`
+												: '2px solid transparent',
+										}}
+										onClick={() => onDashboardTabSelect?.(unifiedTab.id)}
+										ref={(el) => registerTabRef(unifiedTab.id, el)}
+									>
+										<LayoutDashboard className="w-3.5 h-3.5" />
+										<span>Dashboard</span>
+									</div>
 								</React.Fragment>
 							);
 						} else {

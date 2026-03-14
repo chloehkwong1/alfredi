@@ -64,6 +64,7 @@ import {
 	useWorktreeHandlers,
 	useWorktreeAutoArchive,
 	useWorktreeStatusPoller,
+	useBranchPoller,
 	// Session restoration
 	useSessionRestoration,
 	// Input keyboard handling
@@ -739,9 +740,31 @@ function MaestroConsoleInner() {
 		handleToggleWorktreeServer,
 	} = useWorktreeHandlers();
 
+	// Dashboard tab selection — sets activeDashboardTabId on the session
+	const handleSelectDashboardTab = useCallback((tabId: string) => {
+		const { activeSessionId, updateSession } = useSessionStore.getState();
+		if (!activeSessionId) return;
+		updateSession(activeSessionId, {
+			activeDashboardTabId: tabId,
+			activeFileTabId: null,
+			activeDiffTabId: null,
+			activeCommitDiffTabId: null,
+		});
+	}, []);
+
+	// Dashboard "New Worktree" — opens CreateWorktreeModal for the active session
+	const handleNewWorktreeFromDashboard = useCallback(() => {
+		if (activeSession?.worktreeConfig) {
+			handleQuickCreateWorktree(activeSession);
+		}
+	}, [activeSession, handleQuickCreateWorktree]);
+
 	// --- WORKTREE AUTO-STATUS & AUTO-ARCHIVE ---
 	useWorktreeStatusPoller();
 	useWorktreeAutoArchive();
+
+	// --- BRANCH + PR POLLING FOR REGULAR AGENTS ---
+	useBranchPoller();
 
 	// --- APP HANDLERS (drag, file, folder operations) ---
 	const {
@@ -1871,6 +1894,12 @@ function MaestroConsoleInner() {
 		handleSelectCommitDiffTab,
 		handleCloseCommitDiffTab,
 
+		// Dashboard tab props
+		activeDashboardTabId: activeSession?.activeDashboardTabId ?? null,
+		handleSelectDashboardTab,
+		handleNewWorktree: handleNewWorktreeFromDashboard,
+		handleOpenWorktreeConfigFromDashboard: handleOpenWorktreeConfig,
+
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleMainPanelInputBlur,
@@ -1955,7 +1984,6 @@ function MaestroConsoleInner() {
 		handleDeleteWorktreeSession,
 		handleRunWorktreeScript,
 		handleToggleWorktreeExpanded,
-		handleToggleWorktreeServer,
 	});
 
 	const rightPanelProps = useRightPanelProps({
