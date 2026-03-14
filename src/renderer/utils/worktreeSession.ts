@@ -5,7 +5,7 @@
  * when spawning a worktree agent for Auto Run dispatch.
  */
 
-import type { Session, AITab, ThinkingMode } from '../types';
+import type { Session, AITab } from '../types';
 import { generateId } from './ids';
 
 /**
@@ -27,7 +27,6 @@ export interface BuildWorktreeSessionParams {
 	gitBranches?: string[];
 	gitTags?: string[];
 	gitRefsCacheTime?: number;
-	defaultShowThinking: ThinkingMode;
 	/** Legacy worktreeParentPath to inherit — presence triggers legacy mode. */
 	worktreeParentPath?: string;
 }
@@ -47,7 +46,6 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		stagedImages: [],
 		createdAt: Date.now(),
 		state: 'idle',
-		showThinking: params.defaultShowThinking,
 	};
 
 	return {

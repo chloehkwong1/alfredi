@@ -25,7 +25,7 @@ import type {
 	StagedFile,
 	ThinkingMode,
 } from '../../types';
-import type { OutputStyle } from '../../../shared/types';
+import type { OutputStyle, EffortLevel } from '../../../shared/types';
 import type { FileTreeChanges } from '../../utils/fileExplorer';
 import type { TabCompletionSuggestion, TabCompletionFilter } from '../input/useTabCompletion';
 import type {
@@ -182,6 +182,7 @@ export interface UseMainPanelPropsDeps {
 	handleToggleTabShowThinking: (mode?: ThinkingMode) => void;
 	handleTabModelChange: (modelId: string) => void;
 	handleToggleTabOutputStyle: (style?: OutputStyle) => void;
+	handleTabEffortChange: (level: EffortLevel) => void;
 	toggleUnreadFilter: () => void;
 	handleOpenTabSearch: () => void;
 	handleCloseAllTabs: () => void;
@@ -379,6 +380,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onToggleTabReadOnlyMode: deps.handleToggleTabReadOnlyMode,
 			onTabModelChange: deps.handleTabModelChange,
 			onToggleTabOutputStyle: deps.handleToggleTabOutputStyle,
+			onTabEffortChange: deps.handleTabEffortChange,
 			onToggleUnreadFilter: deps.toggleUnreadFilter,
 			onOpenTabSearch: deps.handleOpenTabSearch,
 			onCloseAllTabs: deps.handleCloseAllTabs,
@@ -533,6 +535,10 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.forwardHistory,
 			deps.filePreviewHistoryIndex,
 			deps.activeTab?.agentError,
+			deps.activeTab?.readOnlyMode,
+			deps.activeTab?.modelId,
+			deps.activeTab?.outputStyle,
+			deps.activeTab?.effortLevel,
 			deps.isWorktreeChild,
 			deps.summarizeProgress,
 			deps.summarizeResult,
@@ -593,6 +599,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleToggleTabShowThinking,
 			deps.handleTabModelChange,
 			deps.handleToggleTabOutputStyle,
+			deps.handleTabEffortChange,
 			deps.toggleUnreadFilter,
 			deps.handleOpenTabSearch,
 			deps.handleCloseAllTabs,

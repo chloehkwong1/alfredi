@@ -144,13 +144,13 @@ describe('buildWorktreeSession', () => {
 			path: '/worktrees/tabs',
 			name: 'tabs',
 			defaultSaveToHistory: false,
-			defaultShowThinking: 'sticky',
 		});
 
 		expect(session.aiTabs).toHaveLength(1);
 		const tab = session.aiTabs[0];
 		expect(tab.saveToHistory).toBe(false);
-		expect(tab.showThinking).toBe('sticky');
+		// showThinking removed from AITab — uses global defaultShowThinking
+		expect((tab as any).showThinking).toBeUndefined();
 		expect(tab.state).toBe('idle');
 		expect(tab.logs).toEqual([]);
 	});

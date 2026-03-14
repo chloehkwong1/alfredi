@@ -502,16 +502,12 @@ describe('agentStore', () => {
 
 			useSessionStore.getState().setSessions([session]);
 
-			useAgentStore.getState().startNewSessionAfterError('session-1', {
-				saveToHistory: true,
-				showThinking: 'on',
-			});
+			useAgentStore.getState().startNewSessionAfterError('session-1');
 
 			const updated = useSessionStore.getState().sessions[0];
-			// The new tab should have the options applied
+			// A new tab should be created
 			const newTab = updated.aiTabs[updated.aiTabs.length - 1];
-			expect(newTab.saveToHistory).toBe(true);
-			expect(newTab.showThinking).toBe('on');
+			expect(newTab).toBeDefined();
 		});
 
 		it('does nothing if session not found', () => {

@@ -9,6 +9,7 @@ type BuildAgentArgsOptions = {
 	cwd?: string;
 	readOnlyMode?: boolean;
 	modelId?: string;
+	effortLevel?: string;
 	yoloMode?: boolean;
 	agentSessionId?: string;
 };
@@ -88,6 +89,11 @@ export function buildAgentArgs(
 
 	if (options.modelId && agent.modelArgs) {
 		finalArgs = [...finalArgs, ...agent.modelArgs(options.modelId)];
+	}
+
+	// Add effort level args (skip 'medium' as it's the default - no flag needed)
+	if (options.effortLevel && options.effortLevel !== 'medium' && agent.effortArgs) {
+		finalArgs = [...finalArgs, ...agent.effortArgs(options.effortLevel)];
 	}
 
 	if (options.yoloMode && agent.yoloModeArgs) {

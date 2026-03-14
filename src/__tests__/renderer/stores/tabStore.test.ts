@@ -14,6 +14,7 @@ import {
 	getTabActions,
 } from '../../../renderer/stores/tabStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
+import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import type { Session, AITab, FilePreviewTab } from '../../../renderer/types';
 
 // ============================================================================
@@ -481,22 +482,19 @@ describe('tabStore', () => {
 			expect(session.aiTabs[0].saveToHistory).toBe(false);
 		});
 
-		it('should cycle thinking mode: off → on → sticky → off', () => {
+		it('should cycle global thinking mode: off → on → sticky → off', () => {
 			const tab1 = createMockAITab({ id: 'tab-1' });
 			setupSessionWithTabs([tab1]);
 
 			// Default is off (undefined → treated as 'off')
 			useTabStore.getState().cycleThinkingMode('tab-1');
-			let session = useSessionStore.getState().sessions[0];
-			expect(session.aiTabs[0].showThinking).toBe('on');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('on');
 
 			useTabStore.getState().cycleThinkingMode('tab-1');
-			session = useSessionStore.getState().sessions[0];
-			expect(session.aiTabs[0].showThinking).toBe('sticky');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('sticky');
 
 			useTabStore.getState().cycleThinkingMode('tab-1');
-			session = useSessionStore.getState().sessions[0];
-			expect(session.aiTabs[0].showThinking).toBe('off');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('off');
 		});
 
 		it('should be no-op for non-existent tab', () => {

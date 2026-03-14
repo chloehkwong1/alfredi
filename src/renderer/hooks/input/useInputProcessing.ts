@@ -405,16 +405,29 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				return;
 			}
 
-			// Intercept for pending AskUserQuestion (freeform) — route input as answer, bypass queue
+			// Intercept for pending AskUserQuestion — route input as answer, bypass queue
 			{
 				const activeTab = getActiveTab(activeSession);
 				const pendingQ = activeTab?.pendingQuestion;
 				if (pendingQ && effectiveInputValue.trim()) {
+					// Resolve numbered option input (e.g. "1" → actual option label)
+					let answer = effectiveInputValue.trim();
+					const questionLog = activeTab?.logs.find(
+						(l) =>
+							l.metadata?.toolUseId === pendingQ.toolUseId && l.interactive && l.options?.length
+					);
+					if (questionLog?.options) {
+						const num = parseInt(answer, 10);
+						if (!isNaN(num) && num >= 1 && num <= questionLog.options.length) {
+							answer = questionLog.options[num - 1].label;
+						}
+					}
+
 					// Route to pending AskUserQuestion instead of queuing
 					window.maestro.process.answerQuestion(
 						pendingQ.processSessionId,
 						pendingQ.toolUseId,
-						effectiveInputValue
+						answer
 					);
 					// Clear pending question and mark log entries as answered
 					setSessions((prev) =>
@@ -429,7 +442,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 										pendingQuestion: undefined,
 										logs: tab.logs.map((log) =>
 											log.metadata?.toolUseId === pendingQ.toolUseId && log.interactive
-												? { ...log, answered: effectiveInputValue }
+												? { ...log, answered: answer }
 												: log
 										),
 									};
@@ -958,6 +971,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							// Generic spawn options - main process builds agent-specific args
 							agentSessionId: tabAgentSessionId ?? undefined,
 							readOnlyMode: isReadOnly,
+							effortLevel: freshActiveTab?.effortLevel || undefined,
 							// Per-session config overrides (if set)
 							sessionCustomPath: freshSession.customPath,
 							sessionCustomArgs: freshSession.customArgs,

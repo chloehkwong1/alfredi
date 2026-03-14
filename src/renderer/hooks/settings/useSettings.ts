@@ -24,7 +24,7 @@ import type {
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../../types';
-import type { OutputStyle } from '../../../shared/types';
+import type { OutputStyle, EffortLevel } from '../../../shared/types';
 import { useSettingsStore, loadAllSettings } from '../../stores/settingsStore';
 import type { DocumentGraphLayoutType } from '../../stores/settingsStore';
 
@@ -255,6 +255,10 @@ export interface UseSettingsReturn {
 	outputStyle: OutputStyle;
 	setOutputStyle: (value: OutputStyle) => void;
 
+	// Default Effort Level - controls how much effort Claude Code puts into responses
+	defaultEffortLevel: EffortLevel;
+	setDefaultEffortLevel: (value: EffortLevel) => void;
+
 	// Encore Features - optional features disabled by default
 	encoreFeatures: EncoreFeatureFlags;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
@@ -264,6 +268,10 @@ export interface UseSettingsReturn {
 	setUseNativeTitleBar: (value: boolean) => void;
 	autoHideMenuBar: boolean;
 	setAutoHideMenuBar: (value: boolean) => void;
+
+	// Linear integration
+	linearApiKey: string;
+	setLinearApiKey: (value: string) => void;
 }
 
 export function useSettings(): UseSettingsReturn {

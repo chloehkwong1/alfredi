@@ -342,7 +342,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 					})),
 					previousUIState: tabWizardState.previousUIState ?? {
 						readOnlyMode: false,
-						showThinking: 'off',
 					},
 					error: tabWizardState.error,
 					isGeneratingDocs: tabWizardState.isGeneratingDocs,
@@ -783,7 +782,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 
 			const currentUIState: PreviousUIState = {
 				readOnlyMode: activeTab.readOnlyMode ?? false,
-				showThinking: activeTab.showThinking ?? 'off',
 			};
 
 			const currentConductorProfile = useSettingsStore.getState().conductorProfile;
@@ -844,10 +842,8 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 			return;
 		}
 
-		const currentDefaults = useSettingsStore.getState();
 		const result = createTab(currentSession, {
 			name: 'Wizard',
-			showThinking: currentDefaults.defaultShowThinking,
 		});
 		if (!result) {
 			console.warn('[handleLaunchWizardTab] Failed to create new tab');
@@ -869,7 +865,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 
 		const currentUIState: PreviousUIState = {
 			readOnlyMode: false,
-			showThinking: currentDefaults.defaultShowThinking,
 		};
 
 		const currentConductorProfile = useSettingsStore.getState().conductorProfile;
@@ -1102,7 +1097,6 @@ export function useWizardHandlers(deps: UseWizardHandlersDeps): UseWizardHandler
 				stagedImages: [],
 				createdAt: Date.now(),
 				state: 'idle',
-				showThinking: currentDefaults.defaultShowThinking,
 			};
 
 			const autoRunFolderPath = `${directoryPath}/${AUTO_RUN_FOLDER_NAME}`;

@@ -103,33 +103,34 @@ export function useQuickActionsHandlers(
 
 	const handleQuickActionsToggleTabShowThinking = useCallback(() => {
 		if (activeSession?.inputMode === 'ai' && activeSession.activeTabId) {
-			// Cycle through: off -> on -> sticky -> off
+			// Cycle through global thinking mode: off -> on -> sticky -> off
 			const cycleThinkingMode = (current: ThinkingMode | undefined): ThinkingMode => {
 				if (!current || current === 'off') return 'on';
 				if (current === 'on') return 'sticky';
 				return 'off';
 			};
-			setSessions((prev) =>
-				prev.map((s) => {
-					if (s.id !== activeSession.id) return s;
-					return {
-						...s,
-						aiTabs: s.aiTabs.map((tab) => {
-							if (tab.id !== s.activeTabId) return tab;
-							const newMode = cycleThinkingMode(tab.showThinking);
-							// When turning OFF, clear any thinking/tool logs
-							if (newMode === 'off') {
+			const currentGlobal = useSettingsStore.getState().defaultShowThinking;
+			const newMode = cycleThinkingMode(currentGlobal);
+			useSettingsStore.getState().setDefaultShowThinking(newMode);
+
+			// When turning off, clear thinking/tool logs from the active tab
+			if (newMode === 'off') {
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== activeSession.id) return s;
+						return {
+							...s,
+							aiTabs: s.aiTabs.map((tab) => {
+								if (tab.id !== s.activeTabId) return tab;
 								return {
 									...tab,
-									showThinking: 'off',
 									logs: tab.logs.filter((l) => l.source !== 'thinking' && l.source !== 'tool'),
 								};
-							}
-							return { ...tab, showThinking: newMode };
-						}),
-					};
-				})
-			);
+							}),
+						};
+					})
+				);
+			}
 		}
 	}, [activeSession]);
 

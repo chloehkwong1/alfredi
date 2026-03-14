@@ -29,6 +29,7 @@ import { notifyToast } from '../../stores/notificationStore';
 import type { HistoryEntryInput } from './useAgentSessionManagement';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { gitService } from '../../services/git';
 import { generateId } from '../../utils/ids';
 import { parseSessionId, isSynopsisSession, isBatchSession } from '../../utils/sessionIdParser';
@@ -1259,7 +1260,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									const targetTab = updatedTabs.find((t) => t.id === chunkTabId);
 									if (!targetTab) continue;
 
-									if (!targetTab.showThinking || targetTab.showThinking === 'off') continue;
+									const globalShowThinking = useSettingsStore.getState().defaultShowThinking;
+									if (!globalShowThinking || globalShowThinking === 'off') continue;
 
 									// Skip adding thinking chunks if tab has gone idle (result already arrived)
 									// This prevents the RAF race where chunks fire after the result batch clears thinking entries
@@ -1417,6 +1419,9 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					timestamp: number;
 				}
 			) => {
+				// Skip AskUserQuestion tool entries — rendered inline by InteractiveQuestion
+				if (toolEvent.toolName === 'AskUserQuestion') return;
+
 				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
 				if (!aiTabMatch) return;
 
@@ -1428,7 +1433,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						if (s.id !== actualSessionId) return s;
 
 						const targetTab = s.aiTabs.find((t) => t.id === tabId);
-						if (!targetTab?.showThinking || targetTab.showThinking === 'off') return s;
+						const globalShowThinking = useSettingsStore.getState().defaultShowThinking;
+						if (!globalShowThinking || globalShowThinking === 'off') return s;
 
 						const toolLog: LogEntry = {
 							id: `tool-${Date.now()}-${toolEvent.toolName}`,
@@ -1484,19 +1490,15 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						id: `question-${Date.now()}-${questionData.toolUseId}-${idx}`,
 						timestamp: Date.now(),
 						source: 'system' as const,
-						text: q.header ? `${q.header}\n${q.question}` : q.question,
+						text: q.question,
+						questionHeader: q.header,
 						interactive: true,
-						options: q.options?.map((o) => o.label) ?? [],
+						options: q.options?.map((o) => ({ label: o.label, description: o.description })) ?? [],
 						metadata: {
 							processSessionId: sessionId,
 							toolUseId: questionData.toolUseId,
 						},
 					})
-				);
-
-				// Check if ALL questions are freeform (no options) — if so, track as pending
-				const allFreeform = questionData.questions.every(
-					(q) => !q.options || q.options.length === 0
 				);
 
 				setSessions((prev) =>
@@ -1505,19 +1507,17 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 
 						return {
 							...s,
+							state: 'waiting_input' as import('../../types').SessionState,
 							aiTabs: s.aiTabs.map((tab) =>
 								tab.id === tabId
 									? {
 											...tab,
+											state: 'busy' as const,
 											logs: [...tab.logs, ...questionLogs],
-											...(allFreeform
-												? {
-														pendingQuestion: {
-															processSessionId: sessionId,
-															toolUseId: questionData.toolUseId,
-														},
-													}
-												: {}),
+											pendingQuestion: {
+												processSessionId: sessionId,
+												toolUseId: questionData.toolUseId,
+											},
 										}
 									: tab
 							),

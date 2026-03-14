@@ -66,10 +66,7 @@ export interface AgentStoreActions {
 	 * Start a new tab in the session after an error (recovery action).
 	 * Clears error and creates a fresh AI tab.
 	 */
-	startNewSessionAfterError: (
-		sessionId: string,
-		options?: { showThinking?: 'off' | 'on' | 'sticky' }
-	) => void;
+	startNewSessionAfterError: (sessionId: string) => void;
 
 	/**
 	 * Clear error and let user retry manually (recovery action).
@@ -182,7 +179,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 		});
 	},
 
-	startNewSessionAfterError: (sessionId, options?) => {
+	startNewSessionAfterError: (sessionId) => {
 		const session = getSession(sessionId);
 		if (!session) return;
 
@@ -191,9 +188,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
 		// Create a new tab in the session
 		updateSession(sessionId, (s) => {
-			const result = createTab(s, {
-				showThinking: options?.showThinking,
-			});
+			const result = createTab(s);
 			if (!result) return s;
 			return result.session;
 		});

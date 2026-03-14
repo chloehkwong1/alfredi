@@ -151,6 +151,13 @@ export class ClaudeSDKAdapter {
 			model = config.args[modelIdx + 1];
 		}
 
+		// Extract effort level from args (--effort <level>)
+		let effortLevel: string | undefined;
+		const effortIdx = config.args.indexOf('--effort');
+		if (effortIdx !== -1 && config.args[effortIdx + 1]) {
+			effortLevel = config.args[effortIdx + 1];
+		}
+
 		// Build environment, merging shell env vars and custom env vars
 		const env: Record<string, string | undefined> = { ...process.env };
 		if (shellEnvVars) {
@@ -171,6 +178,7 @@ export class ClaudeSDKAdapter {
 			cwd,
 			env,
 			model,
+			effort: effortLevel as Options['effort'],
 			resume: resumeSessionId,
 			permissionMode: 'bypassPermissions',
 			allowDangerouslySkipPermissions: true,
@@ -183,6 +191,7 @@ export class ClaudeSDKAdapter {
 			cwd,
 			hasResume: !!resumeSessionId,
 			model,
+			effort: effortLevel,
 		});
 
 		// Launch the query loop asynchronously

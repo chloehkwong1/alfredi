@@ -169,7 +169,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		const { sessions: currentSessions, activeSessionId } = useSessionStore.getState();
 		const activeSession = currentSessions.find((s) => s.id === activeSessionId);
 		if (!activeSession) return;
-		const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 		// Save config directly on the session
 		useSessionStore
@@ -216,7 +215,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 							path: subdir.path,
 							branch: subdir.branch,
 							name: subdir.branch || subdir.name,
-							defaultShowThinking: showThink,
 							...gitInfo,
 						})
 					);
@@ -291,7 +289,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				});
 				return;
 			}
-			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 			// Flatten branch slashes in directory name so e.g. "chloe/pro-5014-..."
 			// becomes "chloe-pro-5014-..." instead of creating nested subdirectories.
@@ -341,7 +338,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 					path: worktreePath,
 					branch: branchName,
 					name: branchName,
-					defaultShowThinking: showThink,
 					...gitInfo,
 				});
 
@@ -410,7 +406,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 	const handleCreateWorktree = useCallback(async (branchName: string) => {
 		const createWtSession = useModalStore.getState().getData('createWorktree')?.session ?? null;
 		if (!createWtSession) return;
-		const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 		// Determine base path from session's worktreeConfig, fall back to default
 		const worktreeConfig = createWtSession.worktreeConfig;
@@ -457,7 +452,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				path: worktreePath,
 				branch: branchName,
 				name: branchName,
-				defaultShowThinking: showThink,
 				...gitInfo,
 			});
 
@@ -751,7 +745,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 
 		const scanWorktreeConfigsOnStartup = async () => {
 			const currentSessions = useSessionStore.getState().sessions;
-			const { defaultShowThinking: showThink } = useSettingsStore.getState();
 
 			// --- Scan sessions with worktreeConfig ---
 			const sessionsWithConfig = currentSessions.filter(
@@ -797,7 +790,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 								path: subdir.path,
 								branch: subdir.branch,
 								name: subdir.branch || subdir.name,
-								defaultShowThinking: showThink,
 								...gitInfo,
 							})
 						);
@@ -896,7 +888,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			if (existingSession) return;
 
 			// Create new worktree session
-			const { defaultShowThinking: showThink } = useSettingsStore.getState();
+
 			const sshRemoteId = getSshRemoteId(parentSession);
 			const gitInfo = await fetchGitInfo(worktree.path, sshRemoteId);
 
@@ -905,7 +897,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				path: worktree.path,
 				branch: worktree.branch,
 				name: worktree.branch || worktree.name,
-				defaultShowThinking: showThink,
 				...gitInfo,
 			});
 
@@ -958,7 +949,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			try {
 				// Find sessions that have worktreeParentPath set (legacy model)
 				const latestSessions = useSessionStore.getState().sessions;
-				const { defaultShowThinking: showThink } = useSettingsStore.getState();
+
 				const worktreeParentSessions = latestSessions.filter((s) => s.worktreeParentPath);
 				if (worktreeParentSessions.length === 0) return;
 
@@ -1015,7 +1006,6 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 									path: subdir.path,
 									branch: subdir.branch,
 									name: sessionName,
-									defaultShowThinking: showThink,
 									worktreeParentPath: session.worktreeParentPath,
 									...gitInfo,
 								})

@@ -15,7 +15,6 @@ import {
 	LogEntry,
 	UsageStats,
 	ToolType,
-	ThinkingMode,
 } from '../types';
 import { generateId } from './ids';
 import { getAutoRunFolderPath } from './existingDocsDetector';
@@ -319,7 +318,6 @@ export interface CreateTabOptions {
 	name?: string | null; // User-defined name (null = show UUID octet)
 	starred?: boolean; // Whether session is starred
 	usageStats?: UsageStats; // Token usage stats
-	showThinking?: ThinkingMode; // Thinking display mode: 'off' | 'on' (temporary) | 'sticky' (persistent)
 }
 
 /**
@@ -359,14 +357,7 @@ export function createTab(
 		return null;
 	}
 
-	const {
-		agentSessionId = null,
-		logs = [],
-		name = null,
-		starred = false,
-		usageStats,
-		showThinking = 'off',
-	} = options;
+	const { agentSessionId = null, logs = [], name = null, starred = false, usageStats } = options;
 
 	// Create the new tab with default values
 	const newTab: AITab = {
@@ -380,7 +371,6 @@ export function createTab(
 		usageStats,
 		createdAt: Date.now(),
 		state: 'idle',
-		showThinking,
 	};
 
 	// Update the session with the new tab added and set as active
@@ -1877,8 +1867,6 @@ export interface CreateMergedSessionOptions {
 	mergedLogs: LogEntry[];
 	/** Aggregated usage stats from merged contexts (optional) */
 	usageStats?: UsageStats;
-	/** Thinking display mode: 'off' | 'on' (temporary) | 'sticky' (persistent) */
-	showThinking?: ThinkingMode;
 }
 
 /**
@@ -1917,7 +1905,7 @@ export interface CreateMergedSessionResult {
 export function createMergedSession(
 	options: CreateMergedSessionOptions
 ): CreateMergedSessionResult {
-	const { name, projectRoot, toolType, mergedLogs, usageStats, showThinking = 'off' } = options;
+	const { name, projectRoot, toolType, mergedLogs, usageStats } = options;
 
 	const sessionId = generateId();
 	const tabId = generateId();
@@ -1934,7 +1922,6 @@ export function createMergedSession(
 		usageStats,
 		createdAt: Date.now(),
 		state: 'idle',
-		showThinking,
 	};
 
 	// Create the merged session with standard structure

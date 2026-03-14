@@ -101,7 +101,6 @@ export interface WizardMessage {
  */
 export interface WizardPreviousUIState {
 	readOnlyMode: boolean;
-	showThinking: ThinkingMode;
 }
 
 /**
@@ -507,7 +506,7 @@ export interface AITab {
 	createdAt: number; // Timestamp for ordering
 	state: 'idle' | 'busy'; // Tab-level state for write-mode tracking
 	readOnlyMode?: boolean; // When true, agent operates in plan/read-only mode
-	showThinking?: ThinkingMode; // Controls thinking display: 'off' | 'on' (temporary) | 'sticky' (persistent)
+	// showThinking removed — uses global defaultShowThinking from settings store
 	awaitingSessionId?: boolean; // True when this tab sent a message and is awaiting its session ID
 	thinkingStartTime?: number; // Timestamp when tab started thinking (for elapsed time display)
 	scrollTop?: number; // Saved scroll position for this tab's output view
@@ -517,6 +516,7 @@ export interface AITab {
 	autoSendOnActivate?: boolean; // When true, automatically send inputValue when tab becomes active
 	modelId?: string; // Per-tab model override (falls back to global modelSlug if not set)
 	outputStyle?: import('../../shared/types').OutputStyle; // Per-tab output style override (falls back to global outputStyle if not set)
+	effortLevel?: import('../../shared/types').EffortLevel; // Per-tab effort level override (Claude Code only, defaults to 'medium')
 	wizardState?: SessionWizardState; // Per-tab inline wizard state for /wizard command
 	isGeneratingName?: boolean; // True while automatic tab naming is in progress
 	pendingQuestion?: { processSessionId: string; toolUseId: string }; // Set when a freeform AskUserQuestion arrives (no options), cleared on answer or exit
@@ -945,6 +945,7 @@ export interface ProcessConfig {
 	agentSessionId?: string; // For session resume (uses agent's resumeArgs builder)
 	readOnlyMode?: boolean; // For read-only/plan mode (uses agent's readOnlyArgs)
 	modelId?: string; // For model selection (uses agent's modelArgs builder)
+	effortLevel?: string; // For effort level (uses agent's effortArgs builder, e.g., 'low', 'high', 'max')
 	yoloMode?: boolean; // For YOLO/full-access mode (uses agent's yoloModeArgs)
 	// Per-session overrides (take precedence over agent-level config)
 	sessionCustomPath?: string;

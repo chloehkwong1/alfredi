@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { Session, SessionState, ThinkingMode } from '../../types';
+import type { Session, SessionState } from '../../types';
 import { createTab, closeTab } from '../../utils/tabHelpers';
 
 /**
@@ -19,8 +19,6 @@ export interface UseRemoteIntegrationDeps {
 	setSessions: React.Dispatch<React.SetStateAction<Session[]>>;
 	/** Active session ID setter */
 	setActiveSessionId: (id: string) => void;
-	/** Default value for showThinking on new tabs */
-	defaultShowThinking: ThinkingMode;
 }
 
 /**
@@ -56,7 +54,6 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 		activeSessionIdRef,
 		setSessions,
 		setActiveSessionId,
-		defaultShowThinking,
 	} = deps;
 
 	// Broadcast active session change to web clients
@@ -247,9 +244,7 @@ export function useRemoteIntegration(deps: UseRemoteIntegrationDeps): UseRemoteI
 						if (s.id !== sessionId) return s;
 
 						// Use createTab helper
-						const result = createTab(s, {
-							showThinking: defaultShowThinking,
-						});
+						const result = createTab(s);
 						if (!result) return s;
 						newTabId = result.tab.id;
 						return result.session;

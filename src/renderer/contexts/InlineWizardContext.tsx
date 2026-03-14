@@ -7,7 +7,6 @@
  */
 
 import { createContext, useContext, ReactNode } from 'react';
-import type { ThinkingMode } from '../types';
 
 // Inline types (previously from batch/useInlineWizard)
 export type InlineWizardMode = 'new' | 'iterate' | null;
@@ -25,7 +24,6 @@ export interface InlineGeneratedDocument {
 }
 export interface PreviousUIState {
 	readOnlyMode: boolean;
-	showThinking: ThinkingMode;
 }
 export interface InlineWizardState {
 	isActive: boolean;

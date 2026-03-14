@@ -92,6 +92,7 @@ export interface AgentConfig {
 	resumeArgs?: (sessionId: string) => string[]; // Function to build resume args
 	readOnlyArgs?: string[]; // Args for read-only/plan mode (e.g., ['--agent', 'plan'])
 	modelArgs?: (modelId: string) => string[]; // Function to build model selection args (e.g., ['--model', modelId])
+	effortArgs?: (level: string) => string[]; // Function to build effort level args (e.g., ['--effort', level])
 	yoloModeArgs?: string[]; // Args for YOLO/full-access mode (e.g., ['--dangerously-bypass-approvals-and-sandbox'])
 	workingDirArgs?: (dir: string) => string[]; // Function to build working directory args (e.g., ['-C', dir])
 	imageArgs?: (imagePath: string) => string[]; // Function to build image attachment args (e.g., ['-i', imagePath] for Codex)
@@ -142,6 +143,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 		readOnlyArgs: ['--permission-mode', 'plan'], // Read-only/plan mode (SDK uses permissionMode config)
 		readOnlyCliEnforced: true, // CLI enforces read-only via --permission-mode plan
 		modelArgs: (modelId: string) => ['--model', modelId], // SDK extracts model from config; CLI fallback for SSH
+		effortArgs: (level: string) => ['--effort', level], // Effort level (low/medium/high/max); SDK extracts from args
 		configOptions: [
 			{
 				key: 'model',

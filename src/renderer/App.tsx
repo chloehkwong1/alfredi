@@ -283,6 +283,7 @@ function MaestroConsoleInner() {
 		enterToSendAI,
 		setEnterToSendAI,
 		defaultShowThinking,
+		setDefaultShowThinking,
 		rightPanelWidth,
 		setRightPanelWidth,
 		markdownEditMode,
@@ -646,6 +647,7 @@ function MaestroConsoleInner() {
 		handleToggleTabShowThinking,
 		handleTabModelChange,
 		handleToggleTabOutputStyle,
+		handleTabEffortChange,
 		handleOpenFileTab,
 		handleSelectFileTab,
 		handleCloseFileTab,
@@ -827,7 +829,6 @@ function MaestroConsoleInner() {
 		activeSessionIdRef,
 		setSessions,
 		setActiveSessionId,
-		defaultShowThinking,
 	});
 
 	// Web broadcasting hook - handles external history change notifications
@@ -942,7 +943,11 @@ function MaestroConsoleInner() {
 	const thinkingItems: ThinkingItem[] = useMemo(() => {
 		const items: ThinkingItem[] = [];
 		for (const session of sessions) {
-			if (session.state !== 'busy' || session.busySource !== 'ai') continue;
+			if (
+				(session.state !== 'busy' && session.state !== 'waiting_input') ||
+				session.busySource !== 'ai'
+			)
+				continue;
 			const busyTabs = session.aiTabs?.filter((t) => t.state === 'busy');
 			if (busyTabs && busyTabs.length > 0) {
 				for (const tab of busyTabs) {
@@ -987,7 +992,6 @@ function MaestroConsoleInner() {
 			setActiveAgentSessionId,
 			setAgentSessionsOpen,
 			rightPanelRef,
-			defaultShowThinking,
 		});
 
 	// Bridge: keep handleResumeSessionRef in sync for useModalHandlers
@@ -1592,6 +1596,7 @@ function MaestroConsoleInner() {
 		markdownEditMode,
 		chatRawTextMode,
 		defaultShowThinking,
+		setDefaultShowThinking,
 		setLeftSidebarOpen,
 		setRightPanelOpen,
 		addNewSession,
@@ -1860,6 +1865,7 @@ function MaestroConsoleInner() {
 		handleToggleTabShowThinking,
 		handleTabModelChange,
 		handleToggleTabOutputStyle,
+		handleTabEffortChange,
 		toggleUnreadFilter,
 		handleOpenTabSearch,
 		handleCloseAllTabs,

@@ -60,7 +60,6 @@ import type {
 	ThinkingItem,
 	AgentError,
 	StagedFile,
-	ThinkingMode,
 } from '../types';
 import type { OutputStyle } from '../../shared/types';
 
@@ -189,7 +188,7 @@ interface MainPanelProps {
 		updates: { name?: string | null; starred?: boolean }
 	) => void;
 	onToggleTabReadOnlyMode?: (value?: boolean) => void;
-	onToggleTabShowThinking?: (mode?: ThinkingMode) => void;
+	onTabEffortChange?: (level: import('../../shared/types').EffortLevel) => void;
 	onTabModelChange?: (modelId: string) => void;
 	onToggleTabOutputStyle?: (style?: OutputStyle) => void;
 	onToggleUnreadFilter?: () => void;
@@ -1852,9 +1851,8 @@ export const MainPanel = React.memo(
 											onOpenQueueBrowser={onOpenQueueBrowser}
 											tabReadOnlyMode={activeTab?.readOnlyMode ?? false}
 											onToggleTabReadOnlyMode={props.onToggleTabReadOnlyMode}
-											tabShowThinking={activeTab?.showThinking ?? 'off'}
-											onToggleTabShowThinking={props.onToggleTabShowThinking}
-											supportsThinking={hasCapability('supportsThinkingDisplay')}
+											tabEffortLevel={activeTab?.effortLevel ?? 'medium'}
+											onTabEffortChange={props.onTabEffortChange}
 											currentModelId={activeTab?.modelId || availableModels[0] || undefined}
 											availableModels={availableModels}
 											onModelChange={props.onTabModelChange}
@@ -2174,9 +2172,8 @@ export const MainPanel = React.memo(
 											onOpenQueueBrowser={onOpenQueueBrowser}
 											tabReadOnlyMode={activeTab?.readOnlyMode ?? false}
 											onToggleTabReadOnlyMode={props.onToggleTabReadOnlyMode}
-											tabShowThinking={activeTab?.showThinking ?? 'off'}
-											onToggleTabShowThinking={props.onToggleTabShowThinking}
-											supportsThinking={hasCapability('supportsThinkingDisplay')}
+											tabEffortLevel={activeTab?.effortLevel ?? 'medium'}
+											onTabEffortChange={props.onTabEffortChange}
 											// Model selector (per-tab)
 											currentModelId={activeTab?.modelId || availableModels[0] || undefined}
 											availableModels={availableModels}

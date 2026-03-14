@@ -470,9 +470,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 				if (ctx.isTabShortcut(e, 'newTab')) {
 					e.preventDefault();
-					const result = ctx.createTab(ctx.activeSession, {
-						showThinking: ctx.defaultShowThinking,
-					});
+					const result = ctx.createTab(ctx.activeSession);
 					if (result) {
 						ctx.setSessions((prev: Session[]) =>
 							prev.map((s: Session) => (s.id === ctx.activeSession!.id ? result.session : s))
@@ -585,48 +583,43 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 				if (ctx.isTabShortcut(e, 'toggleShowThinking')) {
 					e.preventDefault();
-					// Helper to cycle through thinking modes: off -> on -> sticky -> off
-					const cycleThinkingMode = (current: ThinkingMode | undefined): ThinkingMode => {
-						if (!current || current === 'off') return 'on';
-						if (current === 'on') return 'sticky';
-						return 'off'; // sticky -> off
-					};
-					ctx.setSessions((prev: Session[]) =>
-						prev.map((s: Session) => {
-							if (s.id !== ctx.activeSession!.id) return s;
-							return {
-								...s,
-								aiTabs: s.aiTabs.map((tab: AITab) => {
-									if (tab.id !== s.activeTabId) return tab;
-									// Check if wizard is active on this tab - toggle wizard thinking instead
-									if (tab.wizardState?.isActive) {
+					// Check if wizard is active on the current tab - toggle wizard thinking
+					const activeTab = ctx.activeSession?.aiTabs.find(
+						(t: AITab) => t.id === ctx.activeSession!.activeTabId
+					);
+					if (activeTab?.wizardState?.isActive) {
+						ctx.setSessions((prev: Session[]) =>
+							prev.map((s: Session) => {
+								if (s.id !== ctx.activeSession!.id) return s;
+								return {
+									...s,
+									aiTabs: s.aiTabs.map((tab: AITab) => {
+										if (tab.id !== s.activeTabId) return tab;
 										return {
 											...tab,
 											wizardState: {
-												...tab.wizardState,
-												showWizardThinking: !tab.wizardState.showWizardThinking,
-												// Clear thinking content when turning off
-												thinkingContent: !tab.wizardState.showWizardThinking
+												...tab.wizardState!,
+												showWizardThinking: !tab.wizardState!.showWizardThinking,
+												thinkingContent: !tab.wizardState!.showWizardThinking
 													? ''
-													: tab.wizardState.thinkingContent,
+													: tab.wizardState!.thinkingContent,
 											},
 										};
-									}
-									// Regular tab: cycle showThinking through three states
-									const newMode = cycleThinkingMode(tab.showThinking);
-									// When turning OFF, also clear any existing thinking/tool logs
-									if (newMode === 'off') {
-										return {
-											...tab,
-											showThinking: 'off',
-											logs: tab.logs.filter((l) => l.source !== 'thinking' && l.source !== 'tool'),
-										};
-									}
-									return { ...tab, showThinking: newMode };
-								}),
-							};
-						})
-					);
+									}),
+								};
+							})
+						);
+					} else {
+						// Cycle global thinking mode: off -> on -> sticky -> off
+						const cycleThinkingMode = (current: ThinkingMode | undefined): ThinkingMode => {
+							if (!current || current === 'off') return 'on';
+							if (current === 'on') return 'sticky';
+							return 'off'; // sticky -> off
+						};
+						const currentGlobal = ctx.defaultShowThinking;
+						const newMode = cycleThinkingMode(currentGlobal);
+						ctx.setDefaultShowThinking(newMode);
+					}
 					trackShortcut('toggleShowThinking');
 				}
 				if (ctx.isTabShortcut(e, 'filterUnreadTabs')) {

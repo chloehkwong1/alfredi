@@ -98,6 +98,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 				agentSessionId?: string; // For session resume
 				readOnlyMode?: boolean; // For read-only/plan mode
 				modelId?: string; // For model selection
+				effortLevel?: string; // For effort level (e.g., 'low', 'high', 'max')
 				yoloMode?: boolean; // For YOLO/full-access mode (bypasses confirmations)
 				// Per-session overrides (take precedence over agent-level config)
 				sessionCustomPath?: string; // Session-specific custom path
@@ -170,6 +171,10 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 							...config.args,
 							// Pass resume arg so the SDK adapter can extract it
 							...(config.agentSessionId ? ['--resume', config.agentSessionId] : []),
+							// Pass effort level so the SDK adapter can extract it
+							...(config.effortLevel && config.effortLevel !== 'medium'
+								? ['--effort', config.effortLevel]
+								: []),
 						]
 					: buildAgentArgs(agent, {
 							baseArgs: config.args,
@@ -177,6 +182,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 							cwd: config.cwd,
 							readOnlyMode: config.readOnlyMode,
 							modelId: config.modelId,
+							effortLevel: config.effortLevel,
 							yoloMode: config.yoloMode,
 							agentSessionId: config.agentSessionId,
 						});

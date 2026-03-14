@@ -245,8 +245,9 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 			}
 
 			// ArrowUp/ArrowDown: inline history browsing (AI mode)
-			// Only activates when cursor is on the first line (ArrowUp) or last line (ArrowDown),
-			// so multi-line editing still works normally.
+			// ArrowUp triggers history only when cursor is at position 0 (before all text),
+			// so pressing Up on the first line first moves the cursor to the start naturally,
+			// and only a subsequent Up press navigates history.
 			if (activeSession?.inputMode === 'ai' && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
 				const history = activeSession.aiCommandHistory || [];
 				if (history.length === 0) return;
@@ -255,17 +256,16 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 				const cursorPos = textarea?.selectionStart ?? 0;
 				const value = textarea?.value ?? '';
 
-				// ArrowUp: only trigger when cursor is on the first line (or already browsing)
+				// ArrowUp: only trigger when cursor is at the very start (or already browsing history)
 				// ArrowDown: only trigger when cursor is on the last line (or already browsing)
-				const isOnFirstLine =
-					historyBrowseIndex !== -1 || !value.substring(0, cursorPos).includes('\n');
+				const isAtStart = historyBrowseIndex !== -1 || cursorPos === 0;
 				const isOnLastLine =
 					historyBrowseIndex !== -1 || !value.substring(cursorPos).includes('\n');
 
 				// Reverse so index 0 = most recent
 				const reversed = [...history].reverse();
 
-				if (e.key === 'ArrowUp' && isOnFirstLine) {
+				if (e.key === 'ArrowUp' && isAtStart) {
 					e.preventDefault();
 					if (historyBrowseIndex === -1) {
 						// Start browsing: save current input as draft, show most recent

@@ -29,7 +29,7 @@ import type {
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../types';
-import type { OutputStyle } from '../../shared/types';
+import type { OutputStyle, EffortLevel } from '../../shared/types';
 import { DEFAULT_CUSTOM_THEME_COLORS } from '../constants/themes';
 import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS } from '../constants/shortcuts';
 // keyboardMastery constants removed (gamification stripped)
@@ -199,8 +199,10 @@ export interface SettingsStoreState {
 	userMessageAlignment: 'left' | 'right';
 	encoreFeatures: EncoreFeatureFlags;
 	outputStyle: OutputStyle;
+	defaultEffortLevel: EffortLevel;
 	useNativeTitleBar: boolean;
 	autoHideMenuBar: boolean;
+	linearApiKey: string;
 }
 
 export interface SettingsStoreActions {
@@ -265,8 +267,10 @@ export interface SettingsStoreActions {
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
 	setOutputStyle: (value: OutputStyle) => void;
+	setDefaultEffortLevel: (value: EffortLevel) => void;
 	setUseNativeTitleBar: (value: boolean) => void;
 	setAutoHideMenuBar: (value: boolean) => void;
+	setLinearApiKey: (value: string) => void;
 
 	// Async setters
 	setLogLevel: (value: string) => Promise<void>;
@@ -392,8 +396,10 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	userMessageAlignment: 'right',
 	encoreFeatures: DEFAULT_ENCORE_FEATURES,
 	outputStyle: 'default',
+	defaultEffortLevel: 'medium',
 	useNativeTitleBar: false,
 	autoHideMenuBar: false,
+	linearApiKey: '',
 
 	// ============================================================================
 	// Simple Setters
@@ -709,6 +715,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		window.maestro.settings.set('outputStyle', value);
 	},
 
+	setDefaultEffortLevel: (value) => {
+		set({ defaultEffortLevel: value });
+		window.maestro.settings.set('defaultEffortLevel', value);
+	},
+
 	setUseNativeTitleBar: (value) => {
 		set({ useNativeTitleBar: value });
 		window.maestro.settings.set('useNativeTitleBar', value);
@@ -717,6 +728,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setAutoHideMenuBar: (value) => {
 		set({ autoHideMenuBar: value });
 		window.maestro.settings.set('autoHideMenuBar', value);
+	},
+
+	setLinearApiKey: (value) => {
+		set({ linearApiKey: value });
+		window.maestro.settings.set('linearApiKey', value);
 	},
 
 	// ============================================================================
@@ -1453,10 +1469,20 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['autoHideMenuBar'] !== undefined)
 			patch.autoHideMenuBar = allSettings['autoHideMenuBar'] as boolean;
 
+		if (allSettings['linearApiKey'] !== undefined)
+			patch.linearApiKey = allSettings['linearApiKey'] as string;
+
 		if (allSettings['outputStyle'] !== undefined) {
 			const validStyles = ['default', 'explanatory', 'learning'];
 			if (validStyles.includes(allSettings['outputStyle'] as string)) {
 				patch.outputStyle = allSettings['outputStyle'] as OutputStyle;
+			}
+		}
+
+		if (allSettings['defaultEffortLevel'] !== undefined) {
+			const validLevels = ['low', 'medium', 'high', 'max'];
+			if (validLevels.includes(allSettings['defaultEffortLevel'] as string)) {
+				patch.defaultEffortLevel = allSettings['defaultEffortLevel'] as EffortLevel;
 			}
 		}
 
@@ -1559,7 +1585,9 @@ export function getSettingsActions() {
 		setAutoScrollAiMode: state.setAutoScrollAiMode,
 		setEncoreFeatures: state.setEncoreFeatures,
 		setOutputStyle: state.setOutputStyle,
+		setDefaultEffortLevel: state.setDefaultEffortLevel,
 		setUseNativeTitleBar: state.setUseNativeTitleBar,
 		setAutoHideMenuBar: state.setAutoHideMenuBar,
+		setLinearApiKey: state.setLinearApiKey,
 	};
 }

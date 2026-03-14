@@ -37,7 +37,6 @@ function createTab(overrides: Partial<AITab> = {}): AITab {
 		createdAt: Date.now(),
 		state: 'idle',
 		saveToHistory: false,
-		showThinking: 'off',
 		readOnlyMode: false,
 		...overrides,
 	} as AITab;
@@ -295,7 +294,7 @@ describe('useQuickActionsHandlers', () => {
 	// ========================================================================
 	describe('handleQuickActionsToggleTabShowThinking', () => {
 		it('cycles thinking mode from off to on', () => {
-			const tab = createTab({ id: 'tab-1', showThinking: 'off' });
+			const tab = createTab({ id: 'tab-1' });
 			const session = createSession({
 				id: 'sess-1',
 				inputMode: 'ai',
@@ -303,6 +302,7 @@ describe('useQuickActionsHandlers', () => {
 				aiTabs: [tab],
 			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
+			useSettingsStore.setState({ defaultShowThinking: 'off' } as any);
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useQuickActionsHandlers(deps));
@@ -311,12 +311,11 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-			expect(updatedTab.showThinking).toBe('on');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('on');
 		});
 
 		it('cycles thinking mode from on to sticky', () => {
-			const tab = createTab({ id: 'tab-1', showThinking: 'on' });
+			const tab = createTab({ id: 'tab-1' });
 			const session = createSession({
 				id: 'sess-1',
 				inputMode: 'ai',
@@ -324,6 +323,7 @@ describe('useQuickActionsHandlers', () => {
 				aiTabs: [tab],
 			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
+			useSettingsStore.setState({ defaultShowThinking: 'on' } as any);
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useQuickActionsHandlers(deps));
@@ -332,12 +332,11 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-			expect(updatedTab.showThinking).toBe('sticky');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('sticky');
 		});
 
 		it('cycles thinking mode from sticky to off', () => {
-			const tab = createTab({ id: 'tab-1', showThinking: 'sticky' });
+			const tab = createTab({ id: 'tab-1' });
 			const session = createSession({
 				id: 'sess-1',
 				inputMode: 'ai',
@@ -345,6 +344,7 @@ describe('useQuickActionsHandlers', () => {
 				aiTabs: [tab],
 			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
+			useSettingsStore.setState({ defaultShowThinking: 'sticky' } as any);
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useQuickActionsHandlers(deps));
@@ -353,13 +353,11 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-			expect(updatedTab.showThinking).toBe('off');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('off');
 		});
 
-		it('treats undefined showThinking the same as off (undefined → on)', () => {
+		it('treats undefined defaultShowThinking the same as off (undefined → on)', () => {
 			const tab = createTab({ id: 'tab-1' });
-			(tab as any).showThinking = undefined;
 			const session = createSession({
 				id: 'sess-1',
 				inputMode: 'ai',
@@ -367,6 +365,7 @@ describe('useQuickActionsHandlers', () => {
 				aiTabs: [tab],
 			});
 			useSessionStore.setState({ sessions: [session], activeSessionId: 'sess-1' });
+			useSettingsStore.setState({ defaultShowThinking: undefined } as any);
 
 			const deps = createDeps();
 			const { result } = renderHook(() => useQuickActionsHandlers(deps));
@@ -375,14 +374,13 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-			expect(updatedTab.showThinking).toBe('on');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('on');
 		});
 
 		it('clears thinking and tool logs when cycling to off', () => {
+			useSettingsStore.setState({ defaultShowThinking: 'sticky' } as any);
 			const tab = createTab({
 				id: 'tab-1',
-				showThinking: 'sticky',
 				logs: [
 					{ id: 'log-1', timestamp: 1, source: 'user', text: 'Hello' } as any,
 					{ id: 'log-2', timestamp: 2, source: 'thinking', text: 'Hmm...' } as any,
@@ -414,9 +412,9 @@ describe('useQuickActionsHandlers', () => {
 		});
 
 		it('does not clear logs when cycling to on', () => {
+			useSettingsStore.setState({ defaultShowThinking: 'off' } as any);
 			const tab = createTab({
 				id: 'tab-1',
-				showThinking: 'off',
 				logs: [
 					{ id: 'log-1', timestamp: 1, source: 'user', text: 'Hello' } as any,
 					{ id: 'log-2', timestamp: 2, source: 'ai', text: 'Response' } as any,
@@ -442,9 +440,9 @@ describe('useQuickActionsHandlers', () => {
 		});
 
 		it('does not clear logs when cycling to sticky', () => {
+			useSettingsStore.setState({ defaultShowThinking: 'on' } as any);
 			const tab = createTab({
 				id: 'tab-1',
-				showThinking: 'on',
 				logs: [
 					{ id: 'log-1', timestamp: 1, source: 'thinking', text: 'Thinking...' } as any,
 					{ id: 'log-2', timestamp: 2, source: 'ai', text: 'Response' } as any,
@@ -467,14 +465,15 @@ describe('useQuickActionsHandlers', () => {
 
 			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
 			expect(updatedTab.logs).toHaveLength(2);
-			expect(updatedTab.showThinking).toBe('sticky');
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('sticky');
 		});
 
 		it('is a no-op when inputMode is terminal', () => {
-			const tab = createTab({ id: 'tab-1', showThinking: 'off' });
+			useSettingsStore.setState({ defaultShowThinking: 'off' } as any);
+			const tab = createTab({ id: 'tab-1' });
 			const session = createSession({
 				id: 'sess-1',
-				inputMode: 'ai',
+				inputMode: 'terminal',
 				activeTabId: 'tab-1',
 				aiTabs: [tab],
 			});
@@ -487,12 +486,13 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-			expect(updatedTab.showThinking).toBe('off');
+			// Global setting should remain unchanged since inputMode is terminal
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('off');
 		});
 
 		it('is a no-op when there is no active tab (activeTabId is null)', () => {
-			const tab = createTab({ id: 'tab-1', showThinking: 'off' });
+			useSettingsStore.setState({ defaultShowThinking: 'off' } as any);
+			const tab = createTab({ id: 'tab-1' });
 			const session = createSession({
 				id: 'sess-1',
 				inputMode: 'ai',
@@ -508,8 +508,8 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const updatedTab = useSessionStore.getState().sessions[0].aiTabs[0];
-			expect(updatedTab.showThinking).toBe('off');
+			// Global setting should remain unchanged since no activeTabId
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('off');
 		});
 
 		it('is a no-op when no active session exists', () => {
@@ -525,9 +525,10 @@ describe('useQuickActionsHandlers', () => {
 			}).not.toThrow();
 		});
 
-		it('only affects the active tab when multiple tabs exist', () => {
-			const activeTab = createTab({ id: 'tab-active', showThinking: 'off' });
-			const otherTab = createTab({ id: 'tab-other', showThinking: 'off' });
+		it('cycles global thinking mode when multiple tabs exist', () => {
+			useSettingsStore.setState({ defaultShowThinking: 'off' } as any);
+			const activeTab = createTab({ id: 'tab-active' });
+			const otherTab = createTab({ id: 'tab-other' });
 			const session = createSession({
 				id: 'sess-1',
 				inputMode: 'ai',
@@ -543,11 +544,8 @@ describe('useQuickActionsHandlers', () => {
 				result.current.handleQuickActionsToggleTabShowThinking();
 			});
 
-			const sessions = useSessionStore.getState().sessions;
-			const updatedActive = sessions[0].aiTabs.find((t: AITab) => t.id === 'tab-active');
-			const updatedOther = sessions[0].aiTabs.find((t: AITab) => t.id === 'tab-other');
-			expect(updatedActive?.showThinking).toBe('on');
-			expect(updatedOther?.showThinking).toBe('off');
+			// Global setting should be cycled
+			expect(useSettingsStore.getState().defaultShowThinking).toBe('on');
 		});
 	});
 

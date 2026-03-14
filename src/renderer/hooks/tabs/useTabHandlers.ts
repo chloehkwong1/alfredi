@@ -9,7 +9,7 @@ import type {
 	UnifiedTabRef,
 	FilePreviewHistoryEntry,
 } from '../../types';
-import type { ThinkingMode, OutputStyle } from '../../../shared/types';
+import type { ThinkingMode, OutputStyle, EffortLevel } from '../../../shared/types';
 import { OUTPUT_STYLE_OPTIONS } from '../../../shared/types';
 import {
 	setActiveTab,
@@ -103,6 +103,7 @@ export interface TabHandlersReturn {
 	handleToggleTabShowThinking: (mode?: ThinkingMode) => void;
 	handleTabModelChange: (modelId: string) => void;
 	handleToggleTabOutputStyle: (style?: OutputStyle) => void;
+	handleTabEffortChange: (level: EffortLevel) => void;
 
 	// File Tab handlers
 	handleOpenFileTab: (file: FileTabOpenParams, options?: { openInNewTab?: boolean }) => void;
@@ -456,16 +457,12 @@ export function useTabHandlers(): TabHandlersReturn {
 	const handleNewAgentSession = useCallback(() => {
 		const { setSessions } = useSessionStore.getState();
 		const activeSessionId = useSessionStore.getState().activeSessionId;
-		const { defaultShowThinking } = useSettingsStore.getState();
-
 		setSessions((prev: Session[]) => {
 			const currentSession = prev.find((s) => s.id === activeSessionId);
 			if (!currentSession) return prev;
 			return prev.map((s) => {
 				if (s.id !== currentSession.id) return s;
-				const result = createTab(s, {
-					showThinking: defaultShowThinking,
-				});
+				const result = createTab(s);
 				if (!result) return s;
 				return result.session;
 			});
@@ -1130,13 +1127,10 @@ export function useTabHandlers(): TabHandlersReturn {
 
 	const handleNewTab = useCallback(() => {
 		const { setSessions, activeSessionId } = useSessionStore.getState();
-		const { defaultShowThinking } = useSettingsStore.getState();
 		setSessions((prev: Session[]) =>
 			prev.map((s) => {
 				if (s.id !== activeSessionId) return s;
-				const result = createTab(s, {
-					showThinking: defaultShowThinking,
-				});
+				const result = createTab(s);
 				if (!result) return s;
 				return result.session;
 			})
@@ -1678,11 +1672,8 @@ export function useTabHandlers(): TabHandlersReturn {
 	}, []);
 
 	const handleToggleTabShowThinking = useCallback((mode?: ThinkingMode) => {
-		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
-		const session = sessions.find((s) => s.id === activeSessionId);
-		if (!session) return;
-		const currentActiveTab = getActiveTab(session);
-		if (!currentActiveTab) return;
+		// Thinking mode is now a global setting, not per-tab
+		const currentGlobal = useSettingsStore.getState().defaultShowThinking;
 
 		const cycleThinkingMode = (current: ThinkingMode | undefined): ThinkingMode => {
 			if (!current || current === 'off') return 'on';
@@ -1690,26 +1681,33 @@ export function useTabHandlers(): TabHandlersReturn {
 			return 'off';
 		};
 
-		setSessions((prev: Session[]) =>
-			prev.map((s) => {
-				if (s.id !== activeSessionId) return s;
-				return {
-					...s,
-					aiTabs: s.aiTabs.map((tab) => {
-						if (tab.id !== currentActiveTab.id) return tab;
-						const newMode = mode !== undefined ? mode : cycleThinkingMode(tab.showThinking);
-						if (newMode === 'off') {
+		const newMode = mode !== undefined ? mode : cycleThinkingMode(currentGlobal);
+		useSettingsStore.getState().setDefaultShowThinking(newMode);
+
+		// When turning off, clear thinking/tool logs from the active tab
+		if (newMode === 'off') {
+			const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+			const session = sessions.find((s) => s.id === activeSessionId);
+			if (!session) return;
+			const currentActiveTab = getActiveTab(session);
+			if (!currentActiveTab) return;
+
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					return {
+						...s,
+						aiTabs: s.aiTabs.map((tab) => {
+							if (tab.id !== currentActiveTab.id) return tab;
 							return {
 								...tab,
-								showThinking: 'off',
 								logs: tab.logs.filter((l) => l.source !== 'thinking' && l.source !== 'tool'),
 							};
-						}
-						return { ...tab, showThinking: newMode };
-					}),
-				};
-			})
-		);
+						}),
+					};
+				})
+			);
+		}
 	}, []);
 
 	const handleTabModelChange = useCallback((modelId: string) => {
@@ -1725,6 +1723,25 @@ export function useTabHandlers(): TabHandlersReturn {
 					...s,
 					aiTabs: s.aiTabs.map((tab) =>
 						tab.id === currentActiveTab.id ? { ...tab, modelId } : tab
+					),
+				};
+			})
+		);
+	}, []);
+
+	const handleTabEffortChange = useCallback((level: EffortLevel) => {
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const session = sessions.find((s) => s.id === activeSessionId);
+		if (!session) return;
+		const currentActiveTab = getActiveTab(session);
+		if (!currentActiveTab) return;
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+				return {
+					...s,
+					aiTabs: s.aiTabs.map((tab) =>
+						tab.id === currentActiveTab.id ? { ...tab, effortLevel: level } : tab
 					),
 				};
 			})
@@ -2007,6 +2024,7 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleToggleTabShowThinking,
 		handleTabModelChange,
 		handleToggleTabOutputStyle,
+		handleTabEffortChange,
 
 		// File Tab handlers
 		handleOpenFileTab,

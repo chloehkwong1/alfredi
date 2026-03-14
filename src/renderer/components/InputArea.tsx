@@ -10,22 +10,13 @@ import {
 	Folder,
 	GitBranch,
 	Tag,
-	Brain,
-	Pin,
 	BookOpen,
 	Check,
+	Gauge,
 } from 'lucide-react';
-import type {
-	Session,
-	Theme,
-	BatchRunState,
-	Shortcut,
-	ThinkingMode,
-	ThinkingItem,
-	StagedFile,
-} from '../types';
-import type { OutputStyle } from '../../shared/types';
-import { OUTPUT_STYLE_OPTIONS } from '../../shared/types';
+import type { Session, Theme, BatchRunState, Shortcut, ThinkingItem, StagedFile } from '../types';
+import type { OutputStyle, EffortLevel } from '../../shared/types';
+import { OUTPUT_STYLE_OPTIONS, EFFORT_LEVEL_OPTIONS } from '../../shared/types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import type { TabCompletionSuggestion, TabCompletionFilter } from '../hooks';
 import type {
@@ -129,10 +120,9 @@ interface InputAreaProps {
 	shortcuts?: Record<string, Shortcut>;
 	// Flash notification callback
 	showFlashNotification?: (message: string) => void;
-	// Show Thinking toggle (per-tab) - three states: 'off' | 'on' | 'sticky'
-	tabShowThinking?: ThinkingMode;
-	onToggleTabShowThinking?: (mode?: ThinkingMode) => void;
-	supportsThinking?: boolean; // From agent capabilities
+	// Effort level (per-tab, Claude Code only)
+	tabEffortLevel?: EffortLevel;
+	onTabEffortChange?: (level: EffortLevel) => void;
 	// Context warning sash props (Phase 6)
 	contextUsage?: number; // 0-100 percentage
 	contextWarningsEnabled?: boolean;
@@ -226,9 +216,9 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		onToggleTabReadOnlyMode,
 		shortcuts,
 		showFlashNotification,
-		tabShowThinking = 'off',
-		onToggleTabShowThinking,
-		supportsThinking = false,
+		// Effort level (per-tab, Claude Code only)
+		tabEffortLevel = 'medium',
+		onTabEffortChange,
 		// Context warning sash props (Phase 6)
 		contextUsage = 0,
 		contextWarningsEnabled = false,
@@ -330,7 +320,7 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 	const isNonDefaultOutputStyle = tabOutputStyle !== 'default';
 
 	// Pill popup menu state
-	type PillPopup = 'readOnly' | 'thinking' | 'model' | 'outputStyle';
+	type PillPopup = 'readOnly' | 'effort' | 'model' | 'outputStyle';
 	const [openPillPopup, setOpenPillPopup] = useState<PillPopup | null>(null);
 	const pillPopupRef = useRef<HTMLDivElement>(null);
 
@@ -1057,22 +1047,20 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 												onClick={() =>
 													setOpenPillPopup(openPillPopup === 'readOnly' ? null : 'readOnly')
 												}
-												className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-													isReadOnlyMode ? '' : 'opacity-40 hover:opacity-70'
-												}`}
+												className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all"
 												style={{
 													backgroundColor: isReadOnlyMode
 														? `${theme.colors.warning}25`
-														: 'transparent',
-													color: isReadOnlyMode ? theme.colors.warning : theme.colors.textDim,
+														: `${theme.colors.accent}25`,
+													color: isReadOnlyMode ? theme.colors.warning : theme.colors.accent,
 													border: isReadOnlyMode
 														? `1px solid ${theme.colors.warning}50`
-														: '1px solid transparent',
+														: `1px solid ${theme.colors.accent}50`,
 												}}
-												title="Read-only mode (agent won't modify files)"
+												title="Plan mode (agent won't modify files)"
 											>
 												<Eye className="w-3 h-3" />
-												<span>Read-only</span>
+												<span>{isReadOnlyMode ? 'Plan' : 'Write'}</span>
 											</button>
 											{openPillPopup === 'readOnly' && (
 												<div
@@ -1083,8 +1071,8 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 													}}
 												>
 													{[
-														{ value: false, label: 'Off' },
-														{ value: true, label: 'Read-only' },
+														{ value: false, label: 'Write' },
+														{ value: true, label: 'Plan' },
 													].map((opt) => (
 														<button
 															key={String(opt.value)}
@@ -1117,102 +1105,80 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 											)}
 										</div>
 									)}
-								{/* Show Thinking selector - AI mode only, for agents that support it */}
-								{session.inputMode === 'ai' && supportsThinking && onToggleTabShowThinking && (
-									<div
-										className="relative"
-										ref={openPillPopup === 'thinking' ? pillPopupRef : undefined}
-									>
-										<button
-											onClick={() =>
-												setOpenPillPopup(openPillPopup === 'thinking' ? null : 'thinking')
-											}
-											className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-												tabShowThinking !== 'off' ? '' : 'opacity-40 hover:opacity-70'
-											}`}
-											style={{
-												backgroundColor:
-													tabShowThinking === 'sticky'
-														? `${theme.colors.warning}30`
-														: tabShowThinking === 'on'
-															? `${theme.colors.accentText}25`
-															: 'transparent',
-												color:
-													tabShowThinking === 'sticky'
-														? theme.colors.warning
-														: tabShowThinking === 'on'
-															? theme.colors.accentText
-															: theme.colors.textDim,
-												border:
-													tabShowThinking === 'sticky'
-														? `1px solid ${theme.colors.warning}50`
-														: tabShowThinking === 'on'
-															? `1px solid ${theme.colors.accentText}50`
-															: '1px solid transparent',
-											}}
-											title="Show Thinking"
+								{/* Effort level selector pill - AI mode only, Claude Code only */}
+								{session.inputMode === 'ai' &&
+									session.toolType === 'claude-code' &&
+									onTabEffortChange && (
+										<div
+											className="relative"
+											ref={openPillPopup === 'effort' ? pillPopupRef : undefined}
 										>
-											<Brain className="w-3 h-3" />
-											<span>Thinking</span>
-											{tabShowThinking === 'sticky' && <Pin className="w-2.5 h-2.5" />}
-										</button>
-										{openPillPopup === 'thinking' && (
-											<div
-												className="absolute bottom-full left-0 mb-1 py-1 rounded-md shadow-lg z-50 min-w-[150px]"
+											<button
+												onClick={() =>
+													setOpenPillPopup(openPillPopup === 'effort' ? null : 'effort')
+												}
+												className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all"
 												style={{
-													backgroundColor: theme.colors.bgActivity,
-													border: `1px solid ${theme.colors.border}`,
+													backgroundColor: `${theme.colors.accent}25`,
+													color: theme.colors.accent,
+													border: `1px solid ${theme.colors.accent}50`,
 												}}
+												title="Effort level"
 											>
-												{[
-													{ value: 'off' as const, label: 'Off', desc: 'Hide thinking' },
-													{
-														value: 'on' as const,
-														label: 'Temporary',
-														desc: 'Show for this message',
-													},
-													{
-														value: 'sticky' as const,
-														label: 'Sticky',
-														desc: 'Always show thinking',
-													},
-												].map((opt) => (
-													<button
-														key={opt.value}
-														className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:brightness-125 cursor-pointer"
-														style={{
-															color:
-																opt.value === tabShowThinking
-																	? theme.colors.accentText
-																	: theme.colors.textMain,
-															backgroundColor:
-																opt.value === tabShowThinking
-																	? `${theme.colors.accent}15`
-																	: 'transparent',
-														}}
-														onClick={() => {
-															onToggleTabShowThinking(opt.value);
-															setOpenPillPopup(null);
-														}}
-													>
-														<Check
-															className="w-3 h-3 flex-shrink-0"
+												<Gauge className="w-3 h-3" />
+												<span>
+													{EFFORT_LEVEL_OPTIONS.find((o) => o.id === tabEffortLevel)?.label ??
+														'Medium'}
+												</span>
+											</button>
+											{openPillPopup === 'effort' && (
+												<div
+													className="absolute bottom-full left-0 mb-1 py-1 rounded-md shadow-lg z-50 min-w-[160px]"
+													style={{
+														backgroundColor: theme.colors.bgActivity,
+														border: `1px solid ${theme.colors.border}`,
+													}}
+												>
+													{EFFORT_LEVEL_OPTIONS.map((opt) => (
+														<button
+															key={opt.id}
+															className="w-full text-left px-3 py-1.5 text-[11px] flex items-center gap-2 hover:brightness-125 cursor-pointer"
 															style={{
-																opacity: opt.value === tabShowThinking ? 1 : 0,
+																color:
+																	opt.id === tabEffortLevel
+																		? theme.colors.accentText
+																		: theme.colors.textMain,
+																backgroundColor:
+																	opt.id === tabEffortLevel
+																		? `${theme.colors.accent}15`
+																		: 'transparent',
 															}}
-														/>
-														<div className="flex flex-col">
-															<span>{opt.label}</span>
-															<span className="text-[9px]" style={{ color: theme.colors.textDim }}>
-																{opt.desc}
-															</span>
-														</div>
-													</button>
-												))}
-											</div>
-										)}
-									</div>
-								)}
+															onClick={() => {
+																onTabEffortChange(opt.id);
+																setOpenPillPopup(null);
+															}}
+														>
+															<Check
+																className="w-3 h-3 flex-shrink-0"
+																style={{
+																	opacity: opt.id === tabEffortLevel ? 1 : 0,
+																}}
+															/>
+															<div className="flex flex-col">
+																<span>{opt.label}</span>
+																<span
+																	className="text-[9px]"
+																	style={{ color: theme.colors.textDim }}
+																>
+																	{opt.description}
+																</span>
+															</div>
+														</button>
+													))}
+												</div>
+											)}
+										</div>
+									)}
 								{/* Model selector pill - AI mode only, when multiple models available */}
 								{session.inputMode === 'ai' &&
 									onModelChange &&
@@ -1224,17 +1190,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 										>
 											<button
 												onClick={() => setOpenPillPopup(openPillPopup === 'model' ? null : 'model')}
-												className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-													isNonDefaultModel ? '' : 'opacity-40 hover:opacity-70'
-												}`}
+												className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all"
 												style={{
-													backgroundColor: isNonDefaultModel
-														? `${theme.colors.accent}25`
-														: 'transparent',
-													color: isNonDefaultModel ? theme.colors.accent : theme.colors.textDim,
-													border: isNonDefaultModel
-														? `1px solid ${theme.colors.accent}50`
-														: '1px solid transparent',
+													backgroundColor: `${theme.colors.accent}25`,
+													color: theme.colors.accent,
+													border: `1px solid ${theme.colors.accent}50`,
 												}}
 												title={`Model: ${currentModelId}`}
 											>
@@ -1293,19 +1253,11 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 												onClick={() =>
 													setOpenPillPopup(openPillPopup === 'outputStyle' ? null : 'outputStyle')
 												}
-												className={`flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all ${
-													isNonDefaultOutputStyle ? '' : 'opacity-40 hover:opacity-70'
-												}`}
+												className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded-full cursor-pointer transition-all"
 												style={{
-													backgroundColor: isNonDefaultOutputStyle
-														? `${theme.colors.accent}25`
-														: 'transparent',
-													color: isNonDefaultOutputStyle
-														? theme.colors.accent
-														: theme.colors.textDim,
-													border: isNonDefaultOutputStyle
-														? `1px solid ${theme.colors.accent}50`
-														: '1px solid transparent',
+													backgroundColor: `${theme.colors.accent}25`,
+													color: theme.colors.accent,
+													border: `1px solid ${theme.colors.accent}50`,
 												}}
 												title="Output Style"
 											>

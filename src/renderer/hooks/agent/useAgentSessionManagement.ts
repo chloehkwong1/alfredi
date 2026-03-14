@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { Session, LogEntry, UsageStats, ThinkingMode } from '../../types';
+import type { Session, LogEntry, UsageStats } from '../../types';
 import { createTab, getActiveTab } from '../../utils/tabHelpers';
 import { generateId } from '../../utils/ids';
 import type { RightPanelHandle } from '../../components/RightPanel';
@@ -39,8 +39,6 @@ export interface UseAgentSessionManagementDeps {
 	setAgentSessionsOpen: (open: boolean) => void;
 	/** Ref to the right panel for refreshing history */
 	rightPanelRef: React.RefObject<RightPanelHandle | null>;
-	/** Default value for showThinking on new tabs */
-	defaultShowThinking: ThinkingMode;
 }
 
 /**
@@ -83,7 +81,6 @@ export function useAgentSessionManagement(
 		setActiveAgentSessionId,
 		setAgentSessionsOpen,
 		rightPanelRef,
-		defaultShowThinking,
 	} = deps;
 
 	// Refs for functions that need to be accessed from other callbacks
@@ -268,7 +265,6 @@ export function useAgentSessionManagement(
 							name,
 							starred: isStarred,
 							usageStats: finalUsageStats,
-							showThinking: defaultShowThinking,
 						});
 						if (!result) return s;
 
@@ -287,7 +283,6 @@ export function useAgentSessionManagement(
 			activeSession?.toolType,
 			setSessions,
 			setActiveAgentSessionId,
-			defaultShowThinking,
 		]
 	);
 

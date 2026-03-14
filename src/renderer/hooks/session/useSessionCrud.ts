@@ -176,7 +176,6 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					stagedImages: [],
 					createdAt: Date.now(),
 					state: 'idle',
-					showThinking: currentDefaults.defaultShowThinking,
 				};
 
 				const newSession: Session = {

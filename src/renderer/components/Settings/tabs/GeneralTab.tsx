@@ -33,10 +33,14 @@ import {
 	Keyboard,
 	Trash2,
 	MessageSquareText,
+	Gauge,
+	Eye,
+	EyeOff,
+	Link,
 } from 'lucide-react';
 import { useSettings } from '../../../hooks';
 import type { Theme, ShellInfo } from '../../../types';
-import { OUTPUT_STYLE_OPTIONS } from '../../../../shared/types';
+import { OUTPUT_STYLE_OPTIONS, EFFORT_LEVEL_OPTIONS } from '../../../../shared/types';
 import { formatMetaKey, formatEnterToSend } from '../../../utils/shortcutFormatter';
 import { getOpenInLabel, isLinuxPlatform } from '../../../utils/platformUtils';
 import { ToggleButtonGroup } from '../../ToggleButtonGroup';
@@ -100,7 +104,48 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 		// Output Style
 		outputStyle,
 		setOutputStyle,
+		// Default Effort Level
+		defaultEffortLevel,
+		setDefaultEffortLevel,
+		// Linear integration
+		linearApiKey,
+		setLinearApiKey,
 	} = useSettings();
+
+	// Linear API key state
+	const [linearKeyVisible, setLinearKeyVisible] = useState(false);
+	const [linearKeyTesting, setLinearKeyTesting] = useState(false);
+	const [linearKeyTestResult, setLinearKeyTestResult] = useState<{
+		status: 'success' | 'error' | null;
+		message: string;
+	}>({ status: null, message: '' });
+
+	const testLinearApiKey = useCallback(async () => {
+		if (!linearApiKey.trim()) return;
+		setLinearKeyTesting(true);
+		setLinearKeyTestResult({ status: null, message: '' });
+		try {
+			const result = await window.maestro.linear.validateKey(linearApiKey.trim());
+			if (result.valid) {
+				setLinearKeyTestResult({
+					status: 'success',
+					message: result.user?.name ? `Connected as ${result.user.name}` : 'API key is valid',
+				});
+			} else {
+				setLinearKeyTestResult({
+					status: 'error',
+					message: result.error || 'Invalid API key',
+				});
+			}
+		} catch (err: any) {
+			setLinearKeyTestResult({
+				status: 'error',
+				message: err.message || 'Failed to validate key',
+			});
+		} finally {
+			setLinearKeyTesting(false);
+		}
+	}, [linearApiKey]);
 
 	// Shell state
 	const [shells, setShells] = useState<ShellInfo[]>([]);
@@ -558,6 +603,101 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 				</div>
 			</div>
 
+			{/* Integrations */}
+			<div>
+				<div className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
+					<Link className="w-3 h-3" />
+					Integrations
+				</div>
+				<div
+					className="p-3 rounded border space-y-3"
+					style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
+				>
+					<div>
+						<div className="block text-xs opacity-60 mb-1">Linear API Key</div>
+						<div className="flex gap-2">
+							<div
+								className="flex-1 flex items-center border rounded px-2"
+								style={{ borderColor: theme.colors.border }}
+							>
+								<Key className="w-3 h-3 opacity-40 mr-2 flex-shrink-0" />
+								<input
+									type={linearKeyVisible ? 'text' : 'password'}
+									value={linearApiKey}
+									onChange={(e) => {
+										setLinearApiKey(e.target.value);
+										setLinearKeyTestResult({ status: null, message: '' });
+									}}
+									placeholder="lin_api_..."
+									className="flex-1 p-1.5 bg-transparent outline-none text-xs font-mono"
+									style={{ color: theme.colors.textMain }}
+								/>
+								<button
+									onClick={() => setLinearKeyVisible(!linearKeyVisible)}
+									className="opacity-40 hover:opacity-100 transition-opacity cursor-pointer ml-1 flex-shrink-0"
+									title={linearKeyVisible ? 'Hide key' : 'Show key'}
+								>
+									{linearKeyVisible ? (
+										<EyeOff className="w-3.5 h-3.5" />
+									) : (
+										<Eye className="w-3.5 h-3.5" />
+									)}
+								</button>
+							</div>
+							<button
+								onClick={testLinearApiKey}
+								disabled={!linearApiKey.trim() || linearKeyTesting}
+								className="px-3 py-1 rounded text-xs font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+								style={{
+									backgroundColor: theme.colors.bgActivity,
+									color: theme.colors.textMain,
+								}}
+							>
+								{linearKeyTesting ? 'Testing...' : 'Test'}
+							</button>
+						</div>
+						{linearKeyTestResult.status && (
+							<div
+								className="mt-2 px-2 py-1.5 rounded text-xs flex items-center gap-1.5"
+								style={{
+									backgroundColor:
+										linearKeyTestResult.status === 'success'
+											? theme.colors.success + '20'
+											: theme.colors.error + '20',
+									color:
+										linearKeyTestResult.status === 'success'
+											? theme.colors.success
+											: theme.colors.error,
+								}}
+							>
+								{linearKeyTestResult.status === 'success' ? (
+									<Check className="w-3 h-3 flex-shrink-0" />
+								) : (
+									<X className="w-3 h-3 flex-shrink-0" />
+								)}
+								{linearKeyTestResult.message}
+							</div>
+						)}
+						<p className="text-xs opacity-40 mt-2">
+							Personal API key for Linear integration.{' '}
+							<a
+								href="https://linear.app/settings/api"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="underline hover:opacity-100 transition-opacity"
+								style={{ color: theme.colors.accent }}
+								onClick={(e) => {
+									e.preventDefault();
+									window.maestro?.shell?.openExternal('https://linear.app/settings/api');
+								}}
+							>
+								Generate one in Linear Settings
+							</a>
+						</p>
+					</div>
+				</div>
+			</div>
+
 			{/* Input Behavior Settings */}
 			<div>
 				<div className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
@@ -682,6 +822,37 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 					/>
 					<p className="text-xs opacity-50 mt-2">
 						Only applies to Claude Code agents. Can be overridden per-project in project settings.
+					</p>
+				</div>
+			</div>
+
+			{/* Default Effort Level */}
+			<div>
+				<div className="block text-xs font-bold opacity-70 uppercase mb-2 flex items-center gap-2">
+					<Gauge className="w-3 h-3" />
+					Default Effort Level
+				</div>
+				<div
+					className="p-3 rounded border"
+					style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
+				>
+					<div className="font-medium mb-1" style={{ color: theme.colors.textMain }}>
+						Control how much effort Claude Code puts into responses
+					</div>
+					<div className="text-sm opacity-60 mb-3" style={{ color: theme.colors.textDim }}>
+						{EFFORT_LEVEL_OPTIONS.find((o) => o.id === defaultEffortLevel)?.description}
+					</div>
+					<ToggleButtonGroup
+						options={EFFORT_LEVEL_OPTIONS.map((o) => ({
+							value: o.id,
+							label: o.label,
+						}))}
+						value={defaultEffortLevel}
+						onChange={setDefaultEffortLevel}
+						theme={theme}
+					/>
+					<p className="text-xs opacity-50 mt-2">
+						Only applies to Claude Code agents. Can be overridden per-tab using the Effort pill.
 					</p>
 				</div>
 			</div>

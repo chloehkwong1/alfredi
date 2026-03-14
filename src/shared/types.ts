@@ -26,6 +26,19 @@ export const OUTPUT_STYLE_OPTIONS: { id: OutputStyle; label: string; description
 ];
 
 /**
+ * EffortLevel controls how much effort Claude Code puts into its responses.
+ * Maps to the --effort CLI flag. 'medium' is the default (no flag sent).
+ */
+export type EffortLevel = 'low' | 'medium' | 'high' | 'max';
+
+export const EFFORT_LEVEL_OPTIONS: { id: EffortLevel; label: string; description: string }[] = [
+	{ id: 'low', label: 'Low', description: 'Quick, minimal effort' },
+	{ id: 'medium', label: 'Medium', description: 'Default effort level' },
+	{ id: 'high', label: 'High', description: 'Thorough, detailed responses' },
+	{ id: 'max', label: 'Max', description: 'Maximum effort and depth' },
+];
+
+/**
  * Kanban-style status for worktree children in the Left Bar.
  * Worktrees flow: todo → in_progress → in_review → done.
  * Auto-detected from PR status and agent activity, or set manually via drag-and-drop.

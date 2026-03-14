@@ -232,24 +232,12 @@ describe('tabHelpers', () => {
 			expect(result.tab.usageStats).toEqual(options.usageStats);
 		});
 
-		it('creates a tab with showThinking option', () => {
+		it('creates a tab without showThinking (uses global setting)', () => {
 			const session = createMockSession({ aiTabs: [] });
 
-			// Default should be 'off'
+			// showThinking was removed from AITab — global defaultShowThinking is used instead
 			const defaultResult = createTab(session);
-			expect(defaultResult.tab.showThinking).toBe('off');
-
-			// Explicit 'on'
-			const trueResult = createTab(session, { showThinking: 'on' });
-			expect(trueResult.tab.showThinking).toBe('on');
-
-			// Explicit 'off'
-			const falseResult = createTab(session, { showThinking: 'off' });
-			expect(falseResult.tab.showThinking).toBe('off');
-
-			// Explicit 'sticky'
-			const stickyResult = createTab(session, { showThinking: 'sticky' });
-			expect(stickyResult.tab.showThinking).toBe('sticky');
+			expect((defaultResult.tab as any).showThinking).toBeUndefined();
 		});
 
 		it('appends tab to existing tabs', () => {
@@ -1531,46 +1519,16 @@ describe('tabHelpers', () => {
 			expect(session.aiTabs[0].usageStats).toEqual(usageStats);
 		});
 
-		it('creates a session with showThinking option', () => {
-			const { session: sessionWithThinking } = createMergedSession({
-				name: 'With Thinking',
-				projectRoot: '/project',
-				toolType: 'claude-code',
-				mergedLogs: [],
-				showThinking: 'on',
-			});
-
-			expect(sessionWithThinking.aiTabs[0].showThinking).toBe('on');
-
-			const { session: sessionWithoutThinking } = createMergedSession({
-				name: 'Without Thinking',
-				projectRoot: '/project',
-				toolType: 'claude-code',
-				mergedLogs: [],
-				showThinking: 'off',
-			});
-
-			expect(sessionWithoutThinking.aiTabs[0].showThinking).toBe('off');
-
-			const { session: sessionWithSticky } = createMergedSession({
-				name: 'Sticky Thinking',
-				projectRoot: '/project',
-				toolType: 'claude-code',
-				mergedLogs: [],
-				showThinking: 'sticky',
-			});
-
-			expect(sessionWithSticky.aiTabs[0].showThinking).toBe('sticky');
-
-			// Default should be 'off'
-			const { session: sessionDefault } = createMergedSession({
-				name: 'Default Thinking',
+		it('creates a session without showThinking (uses global setting)', () => {
+			// showThinking was removed from AITab — global defaultShowThinking is used instead
+			const { session } = createMergedSession({
+				name: 'No Per-Tab Thinking',
 				projectRoot: '/project',
 				toolType: 'claude-code',
 				mergedLogs: [],
 			});
 
-			expect(sessionDefault.aiTabs[0].showThinking).toBe('off');
+			expect((session.aiTabs[0] as any).showThinking).toBeUndefined();
 		});
 
 		it('creates a session with terminal toolType sets correct inputMode', () => {

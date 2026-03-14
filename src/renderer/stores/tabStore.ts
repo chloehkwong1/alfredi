@@ -26,6 +26,7 @@
 
 import { create } from 'zustand';
 import type { AITab, DiffViewTab, FilePreviewTab, UnifiedTab, Session } from '../types';
+import { useSettingsStore } from './settingsStore';
 /** Gist metadata for a published file */
 export interface GistInfo {
 	gistUrl: string;
@@ -463,15 +464,13 @@ export const useTabStore = create<TabStore>()((set) => ({
 		updateAiTab(tabId, { readOnlyMode: !tab.readOnlyMode });
 	},
 
-	cycleThinkingMode: (tabId) => {
-		const session = getActiveSession();
-		if (!session) return;
-		const tab = session.aiTabs.find((t) => t.id === tabId);
-		if (!tab) return;
-		const currentMode = tab.showThinking ?? 'off';
+	cycleThinkingMode: (_tabId) => {
+		// Thinking mode is now a global setting (defaultShowThinking), not per-tab.
+		// Cycle the global setting via settingsStore.
+		const currentMode = useSettingsStore.getState().defaultShowThinking ?? 'off';
 		const currentIndex = THINKING_CYCLE.indexOf(currentMode);
 		const nextMode = THINKING_CYCLE[(currentIndex + 1) % THINKING_CYCLE.length];
-		updateAiTab(tabId, { showThinking: nextMode });
+		useSettingsStore.getState().setDefaultShowThinking(nextMode);
 	},
 
 	// Tab reordering

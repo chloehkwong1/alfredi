@@ -263,10 +263,7 @@ export function useModalHandlers(
 
 	const handleStartNewSessionAfterError = useCallback(
 		(sessionId: string) => {
-			const { defaultShowThinking } = useSettingsStore.getState();
-			useAgentStore.getState().startNewSessionAfterError(sessionId, {
-				showThinking: defaultShowThinking,
-			});
+			useAgentStore.getState().startNewSessionAfterError(sessionId);
 			getModalActions().setAgentErrorModalSessionId(null);
 			setTimeout(() => inputRef.current?.focus(), 0);
 		},

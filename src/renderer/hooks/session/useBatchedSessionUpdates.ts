@@ -16,6 +16,7 @@
 import { useRef, useCallback, useEffect, useMemo } from 'react';
 import type { Session, SessionState, UsageStats, LogEntry } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 // Default flush interval in milliseconds (imperceptible to users)
 export const DEFAULT_BATCH_FLUSH_INTERVAL = 150;
@@ -209,11 +210,12 @@ export function useBatchedSessionUpdates(
 								if (!logData) return tab;
 
 								// Clear thinking/tool entries when new AI output arrives (final result replaces thinking)
-								// BUT: if showThinking is 'sticky', preserve both thinking and tool logs
+								// BUT: if global showThinking is 'sticky', preserve both thinking and tool logs
+								const globalShowThinking = useSettingsStore.getState().defaultShowThinking;
 								const existingLogs = tab.logs.filter((log) => {
 									if (log.source === 'thinking' || log.source === 'tool') {
 										// Only preserve thinking/tool logs in sticky mode
-										return tab.showThinking === 'sticky';
+										return globalShowThinking === 'sticky';
 									}
 									return true;
 								});

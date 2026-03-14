@@ -128,7 +128,6 @@ function createSession(overrides: Partial<Session> = {}): Session {
 				createdAt: Date.now(),
 				state: 'idle',
 				saveToHistory: false,
-				showThinking: false,
 			},
 		],
 		activeTabId: 'tab-1',
@@ -428,7 +427,6 @@ describe('useSessionCrud', () => {
 			const session = useSessionStore.getState().sessions[0];
 			expect(session.aiTabs).toHaveLength(1);
 			expect(session.aiTabs[0].saveToHistory).toBe(true);
-			expect(session.aiTabs[0].showThinking).toBe(true);
 			expect(session.aiTabs[0].state).toBe('idle');
 		});
 

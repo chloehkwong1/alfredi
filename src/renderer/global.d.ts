@@ -39,6 +39,7 @@ interface ProcessConfig {
 	agentSessionId?: string;
 	readOnlyMode?: boolean;
 	modelId?: string;
+	effortLevel?: string;
 	yoloMode?: boolean;
 	// Per-session overrides (take precedence over agent-level config)
 	sessionCustomPath?: string;
