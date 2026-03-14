@@ -1800,7 +1800,13 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		'worktree:startServer',
 		createIpcHandler(
 			handlerOpts('startServer'),
-			async (sessionId: string, cwd: string, script: string, sshRemoteId?: string) => {
+			async (
+				sessionId: string,
+				cwd: string,
+				script: string,
+				sshRemoteId?: string,
+				initialCols?: number
+			) => {
 				const pm = gitGetProcessManager?.();
 				if (!pm) {
 					return { success: false, error: 'ProcessManager not available' };
@@ -1838,13 +1844,21 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				}
 
 				try {
+					// Use PTY so the server process gets proper terminal dimensions.
+					// Tools like foreman/overmind format column-aligned output based on
+					// terminal width — without PTY they have no width info and output is garbled.
+					const terminalWidth = gitSettingsStore
+						? (gitSettingsStore.get('terminalWidth', 100) as number)
+						: 100;
 					const result = pm.spawn({
 						sessionId: processId,
 						toolType: 'worktree-server',
 						cwd: spawnCwd || cwd,
 						command,
 						args,
-						requiresPty: false,
+						requiresPty: true,
+						initialCols: initialCols || terminalWidth,
+						initialRows: 24,
 						sshRemoteId,
 					});
 

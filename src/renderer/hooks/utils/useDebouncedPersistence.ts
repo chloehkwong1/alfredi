@@ -107,6 +107,8 @@ const prepareSessionForPersistence = (session: Session): Session => {
 		currentCycleTokens: undefined,
 		currentCycleBytes: undefined,
 		statusMessage: undefined,
+		// Server processId is runtime-only — processes don't survive restart
+		worktreeServerProcessId: undefined,
 		// Clear runtime SSH state - these are populated from process:ssh-remote event after each spawn
 		// They represent the state of the LAST spawn, not configuration. On app restart,
 		// they'll be repopulated based on sessionSshRemoteConfig when the agent next spawns.

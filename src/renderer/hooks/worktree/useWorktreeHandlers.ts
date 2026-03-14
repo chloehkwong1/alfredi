@@ -667,6 +667,14 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 						title: 'Stop Server Failed',
 						message: err instanceof Error ? err.message : String(err),
 					});
+					// Still clear the processId — the process is likely gone even if IPC failed
+					useSessionStore
+						.getState()
+						.setSessions((prev) =>
+							prev.map((s) =>
+								s.id === session.id ? { ...s, worktreeServerProcessId: undefined } : s
+							)
+						);
 				});
 		} else {
 			// Start the server
@@ -677,8 +685,9 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 			if (!serverConfig?.runScript) return;
 
 			const sshRemoteId = getSshRemoteId(session);
+			const terminalWidth = useSettingsStore.getState().terminalWidth || 100;
 			window.maestro.git
-				.startServer(session.id, session.cwd, serverConfig.runScript, sshRemoteId)
+				.startServer(session.id, session.cwd, serverConfig.runScript, sshRemoteId, terminalWidth)
 				.then((result) => {
 					if (result.success && result.processId) {
 						useSessionStore

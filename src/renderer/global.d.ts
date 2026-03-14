@@ -686,7 +686,8 @@ interface MaestroAPI {
 			sessionId: string,
 			cwd: string,
 			script: string,
-			sshRemoteId?: string
+			sshRemoteId?: string,
+			initialCols?: number
 		) => Promise<{ success: boolean; processId?: string; error?: string }>;
 		/**
 		 * Stop a running worktree server process

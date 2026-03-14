@@ -921,7 +921,8 @@ describe('handleToggleWorktreeServer', () => {
 			'wt-child-1',
 			'/projects/worktrees/feature-1',
 			'npm run dev',
-			undefined
+			undefined,
+			100 // terminalWidth from settings store
 		);
 	});
 

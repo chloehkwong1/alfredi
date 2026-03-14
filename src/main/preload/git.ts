@@ -487,9 +487,10 @@ export function createGitApi() {
 			sessionId: string,
 			cwd: string,
 			script: string,
-			sshRemoteId?: string
+			sshRemoteId?: string,
+			initialCols?: number
 		): Promise<{ success: boolean; processId?: string; error?: string }> =>
-			ipcRenderer.invoke('worktree:startServer', sessionId, cwd, script, sshRemoteId),
+			ipcRenderer.invoke('worktree:startServer', sessionId, cwd, script, sshRemoteId, initialCols),
 
 		/**
 		 * Stop a running worktree server process

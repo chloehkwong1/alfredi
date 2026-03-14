@@ -4469,7 +4469,8 @@ branch refs/heads/bugfix-123
 					cwd: '/projects/app',
 					command: 'sh',
 					args: ['-c', 'npm start'],
-					requiresPty: false,
+					requiresPty: true,
+					initialRows: 24,
 				})
 			);
 			expect(result).toEqual({ success: true, processId: 'session-123-server' });
