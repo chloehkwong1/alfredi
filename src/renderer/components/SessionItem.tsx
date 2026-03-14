@@ -94,11 +94,7 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 	const checkIcon = prCheckStatus ? getPrCheckIcon(prCheckStatus) : '';
 	const checkSummary = prCheckStatus ? `${prCheckStatus.passing}/${prCheckStatus.total}` : '';
 
-	const chipText = [
-		`PR #${prNumber}`,
-		reviewLabel,
-		checkSummary ? `${checkSummary} ${checkIcon}` : null,
-	]
+	const metaText = [reviewLabel, checkSummary ? `${checkSummary} ${checkIcon}` : null]
 		.filter(Boolean)
 		.join(' \u00B7 '); // · separator
 
@@ -110,14 +106,24 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 	};
 
 	return (
-		<button
-			onClick={handleClick}
-			className="truncate text-[10px] font-medium hover:underline cursor-pointer"
-			style={{ color }}
-			title={prUrl ? `Open PR #${prNumber} in browser` : `PR #${prNumber}`}
-		>
-			{chipText}
-		</button>
+		<span className="flex items-center gap-1.5 truncate text-[10px]">
+			<button
+				onClick={handleClick}
+				className="shrink-0 px-1.5 py-[1px] rounded-full text-[10px] font-semibold hover:brightness-125 cursor-pointer"
+				style={{
+					backgroundColor: color + '20',
+					color,
+				}}
+				title={prUrl ? `Open PR #${prNumber} in browser` : `PR #${prNumber}`}
+			>
+				PR #{prNumber}
+			</button>
+			{metaText && (
+				<span className="truncate font-medium" style={{ color }}>
+					{metaText}
+				</span>
+			)}
+		</span>
 	);
 });
 

@@ -18,6 +18,8 @@ const COMMON_MONOSPACE_FONTS = [
 	'Source Code Pro',
 ];
 
+const COMMON_PROPORTIONAL_FONTS = ['Inter', 'SF Pro', 'Helvetica Neue', 'Segoe UI', 'system-ui'];
+
 export interface FontConfigurationPanelProps {
 	/** Currently selected font family */
 	fontFamily: string;
@@ -128,6 +130,16 @@ export function FontConfigurationPanel({
 					>
 						<optgroup label="Common Monospace Fonts">
 							{COMMON_MONOSPACE_FONTS.map((font) => {
+								const available = fontsLoaded ? isFontAvailable(font) : true;
+								return (
+									<option key={font} value={font} style={{ opacity: available ? 1 : 0.4 }}>
+										{font} {fontsLoaded && !available && '(Not Found)'}
+									</option>
+								);
+							})}
+						</optgroup>
+						<optgroup label="Proportional Fonts">
+							{COMMON_PROPORTIONAL_FONTS.map((font) => {
 								const available = fontsLoaded ? isFontAvailable(font) : true;
 								return (
 									<option key={font} value={font} style={{ opacity: available ? 1 : 0.4 }}>

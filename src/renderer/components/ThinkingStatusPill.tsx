@@ -1,6 +1,6 @@
 /**
  * ThinkingStatusPill - Displays status when AI is actively processing/thinking.
- * Shows session name, bytes received, elapsed time, and Claude session ID.
+ * Shows live token count, elapsed time, and stop button.
  * Appears centered above the input area when the AI is busy.
  *
  * When AutoRun is active, shows a special AutoRun pill with total elapsed time instead.
@@ -28,17 +28,26 @@ interface ThinkingStatusPillProps {
 
 // ElapsedTimeDisplay - shows time since thinking started
 const ElapsedTimeDisplay = memo(
-	({ startTime, textColor }: { startTime: number; textColor: string }) => {
+	({
+		startTime,
+		textColor,
+		paused,
+	}: {
+		startTime: number;
+		textColor: string;
+		paused?: boolean;
+	}) => {
 		const [elapsedSeconds, setElapsedSeconds] = useState(
 			Math.floor((Date.now() - startTime) / 1000)
 		);
 
 		useEffect(() => {
+			if (paused) return;
 			const interval = setInterval(() => {
 				setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
 			}, 1000);
 			return () => clearInterval(interval);
-		}, [startTime]);
+		}, [startTime, paused]);
 
 		const formatTime = (seconds: number): string => {
 			const days = Math.floor(seconds / 86400);
@@ -65,37 +74,61 @@ const ElapsedTimeDisplay = memo(
 
 ElapsedTimeDisplay.displayName = 'ElapsedTimeDisplay';
 
-// Helper to get display name for a thinking item (used in pill and dropdown)
+// ThinkingEllipsis - three dots that appear sequentially (1st, 2nd, 3rd) then reset
+const ThinkingEllipsis = memo(({ color }: { color: string }) => {
+	const [step, setStep] = useState(0);
+
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setStep((s) => (s + 1) % 4); // 0=none, 1=one dot, 2=two dots, 3=three dots
+		}, 400);
+		return () => clearInterval(interval);
+	}, []);
+
+	return (
+		<span className="inline-flex items-center gap-1 w-[24px]" style={{ color }}>
+			<span
+				className="w-1.5 h-1.5 rounded-full"
+				style={{ backgroundColor: color, opacity: step >= 1 ? 1 : 0.2 }}
+			/>
+			<span
+				className="w-1.5 h-1.5 rounded-full"
+				style={{ backgroundColor: color, opacity: step >= 2 ? 1 : 0.2 }}
+			/>
+			<span
+				className="w-1.5 h-1.5 rounded-full"
+				style={{ backgroundColor: color, opacity: step >= 3 ? 1 : 0.2 }}
+			/>
+		</span>
+	);
+});
+
+ThinkingEllipsis.displayName = 'ThinkingEllipsis';
+
+// Helper to get display name for a thinking item (used in dropdown)
 // Priority: 1. namedSessions lookup, 2. tab name, 3. UUID octet
 function getItemDisplayName(
 	session: Session,
 	tab: AITab | null,
 	namedSessions?: Record<string, string>
 ): string {
-	// Use tab's agentSessionId if available, fallback to session's (legacy)
 	const agentSessionId = tab?.agentSessionId || session.agentSessionId;
 
-	// Priority 1: Named session from namedSessions lookup
 	if (agentSessionId) {
 		const customName = namedSessions?.[agentSessionId];
 		if (customName) return customName;
 	}
 
-	// Priority 2: Tab name if available
 	if (tab?.name) {
 		return tab.name;
 	}
 
-	// Priority 3: UUID octet (first 8 chars uppercase)
 	if (agentSessionId) {
 		return agentSessionId.substring(0, 8).toUpperCase();
 	}
 
-	// Fall back to Maestro session name
 	return session.name;
 }
-
-// formatTokensCompact imported from ../utils/formatters
 
 // Single row in the expanded dropdown — represents one (session, tab) thinking item
 const ThinkingItemRow = memo(
@@ -276,9 +309,7 @@ AutoRunPill.displayName = 'AutoRunPill';
 
 /**
  * ThinkingStatusPill Inner Component
- * Shows the primary thinking item with an expandable list when multiple tabs are thinking.
- * Each "thinking item" is a (session, tab) pair — one entry per busy tab across all agents.
- * Features: pulsing indicator, session name, bytes/tokens, elapsed time, Claude session UUID.
+ * Streamlined pill: ellipsis animation | token count | elapsed time | (+N) | Stop
  *
  * When AutoRun is active for the active session, shows AutoRunPill instead.
  */
@@ -314,35 +345,15 @@ function ThinkingStatusPillInner({
 
 	const { session: primarySession, tab: primaryTab } = primaryItem;
 
+	// Check if the primary session is waiting for user input
+	const isWaitingInput = primarySession.state === 'waiting_input';
+
 	// Get tokens for current thinking cycle only (not cumulative context)
 	const primaryTokens = primarySession.currentCycleTokens || 0;
-
-	// Get display components
-	const maestroSessionName = primarySession.name;
-
-	// Use tab's agentSessionId if available, fallback to session's (legacy)
-	const agentSessionId = primaryTab?.agentSessionId || primarySession.agentSessionId;
-
-	// Priority: 1. namedSessions lookup, 2. tab's name, 3. UUID octet
-	const customName = agentSessionId ? namedSessions?.[agentSessionId] : undefined;
-	const tabName = primaryTab?.name;
-
-	// Display name for the tab slot (to the left of Stop button):
-	// prefer namedSessions, then tab name, then UUID octet (NOT session name - that's already shown)
-	const displayClaudeId =
-		customName || tabName || (agentSessionId ? agentSessionId.substring(0, 8).toUpperCase() : null);
-
-	// For tooltip, show all available info
-	const tooltipParts = [maestroSessionName];
-	if (agentSessionId) tooltipParts.push(`Claude: ${agentSessionId}`);
-	if (tabName) tooltipParts.push(`Tab: ${tabName}`);
-	if (customName) tooltipParts.push(`Named: ${customName}`);
-	const fullTooltip = tooltipParts.join(' | ');
 
 	return (
 		// Thinking Pill - centered container with negative top margin to offset parent padding
 		<div className="relative flex justify-center pb-2 -mt-2">
-			{/* Thinking Pill - shrinks to fit content */}
 			<div
 				className="flex items-center gap-2 px-4 py-1.5 rounded-full"
 				style={{
@@ -350,76 +361,34 @@ function ThinkingStatusPillInner({
 					border: `1px solid ${theme.colors.border}`,
 				}}
 			>
-				{/* Thinking Pill - Pulsing yellow circle indicator */}
-				<div
-					className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse"
-					style={{ backgroundColor: theme.colors.warning }}
-				/>
-
-				{/* Maestro session name - always visible, not clickable */}
-				<span
-					className="text-xs font-medium shrink-0"
-					style={{ color: theme.colors.textMain }}
-					title={fullTooltip}
-				>
-					{maestroSessionName}
-				</span>
-
-				{/* Divider */}
-				<div className="w-px h-4 shrink-0" style={{ backgroundColor: theme.colors.border }} />
-
-				{/* Token info for this thought cycle - only show when available */}
-				{primaryTokens > 0 && (
-					<div
-						className="flex items-center gap-1 shrink-0 text-xs"
-						style={{ color: theme.colors.textDim }}
-					>
-						<span>Tokens:</span>
-						<span className="font-medium" style={{ color: theme.colors.textMain }}>
-							{formatTokensCompact(primaryTokens)}
-						</span>
-					</div>
+				{/* Sequential ellipsis animation (pauses when waiting for input) */}
+				{isWaitingInput ? (
+					<span className="text-xs" style={{ color: theme.colors.textDim }}>
+						Waiting for input
+					</span>
+				) : (
+					<ThinkingEllipsis color={theme.colors.warning} />
 				)}
 
-				{/* Placeholder when no tokens yet */}
-				{primaryTokens === 0 && (
-					<div
-						className="flex items-center gap-1 shrink-0 text-xs"
-						style={{ color: theme.colors.textDim }}
-					>
-						<span>Thinking...</span>
-					</div>
-				)}
-
-				{/* Elapsed time - prefer tab's time for accurate parallel tracking */}
-				{(primaryTab?.thinkingStartTime || primarySession.thinkingStartTime) && (
+				{/* Live token count for current cycle */}
+				{primaryTokens > 0 && !isWaitingInput && (
 					<>
 						<div className="w-px h-4 shrink-0" style={{ backgroundColor: theme.colors.border }} />
-						<div
-							className="flex items-center gap-1 shrink-0 text-xs"
-							style={{ color: theme.colors.textDim }}
-						>
-							<span>Elapsed:</span>
-							<ElapsedTimeDisplay
-								startTime={primaryTab?.thinkingStartTime || primarySession.thinkingStartTime!}
-								textColor={theme.colors.textMain}
-							/>
-						</div>
+						<span className="text-xs font-mono shrink-0" style={{ color: theme.colors.textMain }}>
+							{formatTokensCompact(primaryTokens)}
+						</span>
 					</>
 				)}
 
-				{/* Thinking Pill - Claude session ID / tab name */}
-				{displayClaudeId && (
+				{/* Elapsed time */}
+				{(primaryTab?.thinkingStartTime || primarySession.thinkingStartTime) && (
 					<>
 						<div className="w-px h-4 shrink-0" style={{ backgroundColor: theme.colors.border }} />
-						<button
-							onClick={() => onSessionClick?.(primarySession.id, primaryTab?.id)}
-							className="text-xs font-mono hover:underline cursor-pointer"
-							style={{ color: theme.colors.accent }}
-							title={agentSessionId ? `Claude Session: ${agentSessionId}` : 'Claude Session'}
-						>
-							{displayClaudeId}
-						</button>
+						<ElapsedTimeDisplay
+							startTime={primaryTab?.thinkingStartTime || primarySession.thinkingStartTime!}
+							textColor={theme.colors.textDim}
+							paused={isWaitingInput}
+						/>
 					</>
 				)}
 
@@ -499,7 +468,6 @@ function ThinkingStatusPillInner({
 					</>
 				)}
 			</div>
-			{/* End Thinking Pill */}
 		</div>
 	);
 }
@@ -543,8 +511,6 @@ export const ThinkingStatusPill = memo(ThinkingStatusPillInner, (prevProps, next
 		// Compare session-level properties
 		if (
 			prev.session.id !== next.session.id ||
-			prev.session.name !== next.session.name ||
-			prev.session.agentSessionId !== next.session.agentSessionId ||
 			prev.session.state !== next.session.state ||
 			prev.session.thinkingStartTime !== next.session.thinkingStartTime ||
 			prev.session.currentCycleTokens !== next.session.currentCycleTokens
@@ -554,23 +520,9 @@ export const ThinkingStatusPill = memo(ThinkingStatusPillInner, (prevProps, next
 		// Compare tab-level properties
 		if (
 			prev.tab?.id !== next.tab?.id ||
-			prev.tab?.name !== next.tab?.name ||
-			prev.tab?.agentSessionId !== next.tab?.agentSessionId ||
 			prev.tab?.thinkingStartTime !== next.tab?.thinkingStartTime
 		) {
 			return false;
-		}
-	}
-
-	// Check if namedSessions changed for any thinking item
-	if (prevProps.namedSessions !== nextProps.namedSessions) {
-		for (const item of nextItems) {
-			const claudeId = item.tab?.agentSessionId || item.session.agentSessionId;
-			if (claudeId) {
-				const prevName = prevProps.namedSessions?.[claudeId];
-				const nextName = nextProps.namedSessions?.[claudeId];
-				if (prevName !== nextName) return false;
-			}
 		}
 	}
 

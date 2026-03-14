@@ -382,7 +382,8 @@ export function createMarkdownComponents(options: MarkdownComponentsOptions): Pa
 						padding: '1em',
 						background: theme.colors.bgActivity,
 						fontSize: '0.9em',
-						borderRadius: '6px',
+						borderRadius: '8px',
+						border: `1px solid ${theme.colors.border}`,
 					},
 					PreTag: 'div',
 					children: codeContent,
@@ -493,27 +494,27 @@ export function generateTerminalProseStyles(theme: Theme, scopeSelector: string)
 	const s = `${scopeSelector} .prose`;
 
 	return `
-    ${s} { line-height: 1.4; overflow: visible; }
+    ${s} { font-family: var(--font-sans); line-height: 1.6; overflow: visible; }
     ${s} > *:first-child { margin-top: 0 !important; }
     ${s} > *:last-child { margin-bottom: 0 !important; }
     ${s} * { margin-top: 0; margin-bottom: 0; }
-    ${s} h1 { color: ${c.accent}; font-size: 2em; font-weight: bold; margin: 0.25em 0 !important; line-height: 1.4; }
-    ${s} h2 { color: ${c.success}; font-size: 1.75em; font-weight: bold; margin: 0.25em 0 !important; line-height: 1.4; }
-    ${s} h3 { color: ${c.warning}; font-size: 1.5em; font-weight: bold; margin: 0.25em 0 !important; line-height: 1.4; }
-    ${s} h4 { color: ${c.textMain}; font-size: 1.35em; font-weight: bold; margin: 0.2em 0 !important; line-height: 1.4; }
-    ${s} h5 { color: ${c.textMain}; font-size: 1.2em; font-weight: bold; margin: 0.2em 0 !important; line-height: 1.4; }
-    ${s} h6 { color: ${c.textDim}; font-size: 1.1em; font-weight: bold; margin: 0.2em 0 !important; line-height: 1.4; }
-    ${s} p { color: ${c.textMain}; margin: 0 !important; line-height: 1.4; }
+    ${s} h1 { color: ${c.accent}; font-size: 2em; font-weight: bold; margin: 0.25em 0 !important; line-height: 1.4; letter-spacing: -0.02em; }
+    ${s} h2 { color: ${c.success}; font-size: 1.75em; font-weight: bold; margin: 0.25em 0 !important; line-height: 1.4; letter-spacing: -0.02em; }
+    ${s} h3 { color: ${c.warning}; font-size: 1.5em; font-weight: bold; margin: 0.25em 0 !important; line-height: 1.4; letter-spacing: -0.02em; }
+    ${s} h4 { color: ${c.textMain}; font-size: 1.35em; font-weight: bold; margin: 0.2em 0 !important; line-height: 1.4; letter-spacing: -0.02em; }
+    ${s} h5 { color: ${c.textMain}; font-size: 1.2em; font-weight: bold; margin: 0.2em 0 !important; line-height: 1.4; letter-spacing: -0.02em; }
+    ${s} h6 { color: ${c.textDim}; font-size: 1.1em; font-weight: bold; margin: 0.2em 0 !important; line-height: 1.4; letter-spacing: -0.02em; }
+    ${s} p { color: ${c.textMain}; margin: 0 !important; line-height: 1.6; }
     ${s} p + p { margin-top: 0.5em !important; }
     ${s} p:empty { display: none; }
     ${s} > ul, ${s} > ol { color: ${c.textMain}; margin: 0.25em 0 !important; padding-left: 2em; list-style-position: outside; }
     ${s} li ul, ${s} li ol { margin: 0 !important; padding-left: 1.5em; list-style-position: outside; }
-    ${s} li { margin: 0 !important; padding: 0; line-height: 1.4; display: list-item; }
+    ${s} li { margin: 0 !important; padding: 0; line-height: 1.6; display: list-item; }
     ${s} li > p { margin: 0 !important; display: inline; vertical-align: baseline; line-height: inherit; }
     ${s} li > p + ul, ${s} li > p + ol { margin-top: 0 !important; }
     ${s} li:has(> input[type="checkbox"]) { list-style: none; margin-left: -1.5em; }
-    ${s} code { background-color: ${c.bgSidebar}; color: ${c.textMain}; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.9em; }
-    ${s} pre { background-color: ${c.bgSidebar}; color: ${c.textMain}; padding: 0.5em; border-radius: 6px; overflow-x: auto; margin: 0.35em 0 !important; }
+    ${s} code { background-color: ${c.bgSidebar}; color: ${c.textMain}; padding: 0.15em 0.3em; border-radius: 3px; font-size: 0.9em; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; }
+    ${s} pre { background-color: ${c.bgSidebar}; color: ${c.textMain}; padding: 0.5em; border-radius: 8px; border: 1px solid ${c.border}; overflow-x: auto; margin: 0.35em 0 !important; font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; }
     ${s} pre code { background: none; padding: 0; }
     ${s} blockquote { border-left: 3px solid ${c.border}; padding-left: 0.75em; margin: 0.25em 0 !important; color: ${c.textDim}; }
     ${s} a { color: ${c.accent}; text-decoration: underline; }
