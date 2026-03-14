@@ -14,8 +14,11 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { TerminalOutput } from '../../../renderer/components/TerminalOutput';
-import type { Session, Theme, LogEntry } from '../../../renderer/types';
+import {
+	TerminalOutput,
+	groupLogsIntoRenderUnits,
+} from '../../../renderer/components/TerminalOutput';
+import type { Session, Theme, LogEntry, WorkGroup } from '../../../renderer/types';
 
 // Mock dependencies
 vi.mock('react-syntax-highlighter', () => ({
@@ -2350,5 +2353,146 @@ describe('memoization behavior', () => {
 			(el as HTMLElement).style.fontFamily.includes('Monaco')
 		);
 		expect(hasNewFont).toBe(true);
+	});
+});
+
+// ============================================================================
+// Work Groups — unit tests for groupLogsIntoRenderUnits
+// ============================================================================
+
+describe('Work Groups', () => {
+	const mkLog = (
+		source: LogEntry['source'],
+		id: string,
+		text = '',
+		metadata?: LogEntry['metadata']
+	): LogEntry => ({
+		id,
+		timestamp: Date.now(),
+		source,
+		text,
+		...(metadata ? { metadata } : {}),
+	});
+
+	it('groups consecutive thinking+tool entries into a WorkGroup', () => {
+		const logs: LogEntry[] = [
+			mkLog('user', 'u1', 'hello'),
+			mkLog('thinking', 't1', 'considering...'),
+			mkLog('tool', 'tl1', 'running tool'),
+			mkLog('thinking', 't2', 'more thinking'),
+			mkLog('tool', 'tl2', 'another tool'),
+			mkLog('ai', 'a1', 'response'),
+		];
+
+		const result = groupLogsIntoRenderUnits(logs);
+
+		expect(result).toHaveLength(3);
+		// First: standalone user entry
+		expect(result[0]).toMatchObject({ id: 'u1', source: 'user' });
+		// Second: work group with 4 entries
+		const group = result[1] as WorkGroup;
+		expect(group.type).toBe('workGroup');
+		expect(group.entries).toHaveLength(4);
+		expect(group.id).toBe('t1'); // Uses first entry's ID
+		// Third: standalone AI entry
+		expect(result[2]).toMatchObject({ id: 'a1', source: 'ai' });
+	});
+
+	it('splits groups when AI text appears between them', () => {
+		const logs: LogEntry[] = [
+			mkLog('thinking', 't1', 'thinking 1'),
+			mkLog('tool', 'tl1', 'tool 1'),
+			mkLog('ai', 'a1', 'intermediate response'),
+			mkLog('thinking', 't2', 'thinking 2'),
+			mkLog('tool', 'tl2', 'tool 2'),
+		];
+
+		const result = groupLogsIntoRenderUnits(logs);
+
+		expect(result).toHaveLength(3);
+		// First work group
+		const group1 = result[0] as WorkGroup;
+		expect(group1.type).toBe('workGroup');
+		expect(group1.entries).toHaveLength(2);
+		// Standalone AI
+		expect(result[1]).toMatchObject({ id: 'a1', source: 'ai' });
+		// Second work group
+		const group2 = result[2] as WorkGroup;
+		expect(group2.type).toBe('workGroup');
+		expect(group2.entries).toHaveLength(2);
+	});
+
+	it('keeps a single thinking/tool entry standalone (no group)', () => {
+		const logs: LogEntry[] = [
+			mkLog('user', 'u1', 'hello'),
+			mkLog('thinking', 't1', 'brief thought'),
+			mkLog('ai', 'a1', 'response'),
+		];
+
+		const result = groupLogsIntoRenderUnits(logs);
+
+		expect(result).toHaveLength(3);
+		// The single thinking entry should NOT be wrapped in a group
+		expect(result[1]).toMatchObject({ id: 't1', source: 'thinking' });
+		expect((result[1] as any).type).toBeUndefined();
+	});
+
+	it('extracts tool status in summary', () => {
+		const logs: LogEntry[] = [
+			mkLog('thinking', 't1', 'thinking'),
+			mkLog('tool', 'tl1', 'Read file', {
+				toolState: {
+					status: 'completed',
+					input: { tool: 'Read' },
+				},
+			}),
+			mkLog('tool', 'tl2', 'Write file', {
+				toolState: {
+					status: 'running',
+					input: { tool: 'Write' },
+				},
+			}),
+			mkLog('tool', 'tl3', 'unknown tool', {
+				toolState: {
+					status: 'error',
+				},
+			}),
+		];
+
+		const result = groupLogsIntoRenderUnits(logs);
+
+		expect(result).toHaveLength(1);
+		const group = result[0] as WorkGroup;
+		expect(group.type).toBe('workGroup');
+		expect(group.toolSummary).toHaveLength(3);
+		expect(group.toolSummary[0]).toEqual({ name: 'Read', status: 'completed' });
+		expect(group.toolSummary[1]).toEqual({ name: 'Write', status: 'running' });
+		expect(group.toolSummary[2]).toEqual({ name: 'tool', status: 'error' });
+	});
+
+	it('search filter includes groups with matching entries', () => {
+		const logs: LogEntry[] = [
+			mkLog('user', 'u1', 'hello'),
+			mkLog('thinking', 't1', 'planning a push'),
+			mkLog('tool', 'tl1', 'git push origin main'),
+			mkLog('ai', 'a1', 'done'),
+		];
+
+		const grouped = groupLogsIntoRenderUnits(logs);
+		const searchQuery = 'git push';
+
+		// Replicate the search filter logic from TerminalOutput
+		const filtered = grouped.filter((unit) => {
+			if (unit.type === 'workGroup') {
+				return unit.entries.some((e) => e.text.toLowerCase().includes(searchQuery.toLowerCase()));
+			}
+			return unit.text.toLowerCase().includes(searchQuery.toLowerCase());
+		});
+
+		// The work group should be included because the tool entry matches
+		expect(filtered).toHaveLength(1);
+		const group = filtered[0] as WorkGroup;
+		expect(group.type).toBe('workGroup');
+		expect(group.entries.some((e) => e.text.includes('git push'))).toBe(true);
 	});
 });

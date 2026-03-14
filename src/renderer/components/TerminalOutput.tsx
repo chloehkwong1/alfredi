@@ -11,12 +11,23 @@ import {
 	AlertCircle,
 	Save,
 } from 'lucide-react';
-import type { Session, Theme, LogEntry, FocusArea, AgentError } from '../types';
+import type {
+	Session,
+	Theme,
+	LogEntry,
+	FocusArea,
+	AgentError,
+	RenderUnit,
+	WorkGroup,
+	ThinkingMode,
+} from '../types';
 import type { FileNode } from '../types/fileTree';
 import Convert from 'ansi-to-html';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { getActiveTab } from '../utils/tabHelpers';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useSessionStore } from '../stores/sessionStore';
 import { useDebouncedValue, useThrottledCallback, useHighlightSearch } from '../hooks';
 import {
 	processLogTextHelper,
@@ -66,151 +77,202 @@ const summarizeTodos = (v: unknown): string | null => {
 };
 
 // ============================================================================
-// InteractiveQuestion - Renders AskUserQuestion inline with clickable options
+// Work Group grouping logic (pure function, exported for testing)
 // ============================================================================
 
-const InteractiveQuestion = memo(({ log, theme }: { log: LogEntry; theme: Theme }) => {
-	const [selectedOption, setSelectedOption] = useState<string | null>(log.answered ?? null);
-	const [freeformValue, setFreeformValue] = useState('');
-	const freeformInputRef = useRef<HTMLInputElement>(null);
+/**
+ * Groups consecutive thinking+tool log entries into WorkGroup render units.
+ * Standalone entries (user, ai, system, etc.) pass through unchanged.
+ * A group of 2+ consecutive thinking/tool entries becomes a WorkGroup;
+ * a single thinking or tool entry stays standalone.
+ */
+export function groupLogsIntoRenderUnits(logs: LogEntry[]): RenderUnit[] {
+	const result: RenderUnit[] = [];
+	let currentGroup: LogEntry[] = [];
 
-	const isFreeform = !log.options || log.options.length === 0;
-
-	const handleAnswer = useCallback(
-		(answer: string) => {
-			if (selectedOption) return; // Already answered
-			setSelectedOption(answer);
-
-			const processSessionId = log.metadata?.processSessionId;
-			const toolUseId = log.metadata?.toolUseId;
-
-			if (processSessionId && toolUseId) {
-				// SDK mode: resolve the pending AskUserQuestion Promise
-				window.maestro.process.answerQuestion(processSessionId, toolUseId, answer);
-			} else if (processSessionId) {
-				// Legacy CLI mode: write to stdin
-				window.maestro.process.write(processSessionId, answer + '\n');
-			}
-		},
-		[selectedOption, log.metadata?.processSessionId, log.metadata?.toolUseId]
-	);
-
-	const handleFreeformSubmit = useCallback(() => {
-		const trimmed = freeformValue.trim();
-		if (!trimmed) return;
-		handleAnswer(trimmed);
-	}, [freeformValue, handleAnswer]);
-
-	const handleFreeformKeyDown = useCallback(
-		(e: React.KeyboardEvent<HTMLInputElement>) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				handleFreeformSubmit();
-			}
-		},
-		[handleFreeformSubmit]
-	);
-
-	// Auto-focus freeform input when rendered
-	useEffect(() => {
-		if (isFreeform && !selectedOption && freeformInputRef.current) {
-			freeformInputRef.current.focus();
+	const flushGroup = () => {
+		if (currentGroup.length >= 2) {
+			const toolSummary = currentGroup
+				.filter((e) => e.source === 'tool')
+				.map((e) => ({
+					name: e.metadata?.toolState?.input
+						? (safeStr((e.metadata.toolState.input as Record<string, unknown>)?.tool) ?? 'tool')
+						: 'tool',
+					status: e.metadata?.toolState?.status,
+				}));
+			result.push({
+				type: 'workGroup',
+				id: currentGroup[0].id,
+				entries: currentGroup,
+				toolSummary,
+			});
+		} else if (currentGroup.length === 1) {
+			result.push(currentGroup[0]);
 		}
-	}, [isFreeform, selectedOption]);
+		currentGroup = [];
+	};
 
-	return (
-		<div
-			className="px-4 py-3 border-l-2"
-			style={{
-				borderColor: theme.colors.accent,
-			}}
-		>
-			<div className="text-sm mb-2 whitespace-pre-wrap" style={{ color: theme.colors.textMain }}>
-				{log.text}
-			</div>
-			{isFreeform ? (
-				selectedOption ? (
-					<div
-						className="px-3 py-1 rounded-full text-xs font-medium inline-block"
-						style={{
-							backgroundColor: theme.colors.accent,
-							color: theme.colors.accentForeground,
-							border: `1px solid ${theme.colors.accent}`,
-						}}
-					>
-						{selectedOption} ✓
-					</div>
-				) : (
-					<div className="flex gap-2 items-center">
-						<input
-							ref={freeformInputRef}
-							type="text"
-							value={freeformValue}
-							onChange={(e) => setFreeformValue(e.target.value)}
-							onKeyDown={handleFreeformKeyDown}
-							placeholder="Type your response…"
-							className="flex-1 px-3 py-1 rounded text-xs outline-none"
-							style={{
-								backgroundColor: 'transparent',
-								border: `1px solid ${theme.colors.accent}40`,
-								color: theme.colors.textMain,
-							}}
-						/>
-						<button
-							onClick={handleFreeformSubmit}
-							disabled={!freeformValue.trim()}
-							className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-							style={{
-								backgroundColor: freeformValue.trim()
-									? `${theme.colors.accent}20`
-									: `${theme.colors.textDim}20`,
-								color: freeformValue.trim() ? theme.colors.accent : theme.colors.textDim,
-								cursor: freeformValue.trim() ? 'pointer' : 'default',
-								border: `1px solid ${freeformValue.trim() ? `${theme.colors.accent}40` : 'transparent'}`,
-							}}
-						>
-							Send
-						</button>
-					</div>
-				)
-			) : (
-				<div className="flex flex-wrap gap-2">
-					{log.options?.map((label) => {
-						const isSelected = selectedOption === label;
-						const isDisabled = selectedOption !== null;
+	for (const log of logs) {
+		if (log.source === 'thinking' || (log.source === 'tool' && log.text !== 'AskUserQuestion')) {
+			currentGroup.push(log);
+		} else if (log.source === 'tool' && log.text === 'AskUserQuestion') {
+			// Skip AskUserQuestion tool entries — rendered inline by InteractiveQuestion
+			continue;
+		} else {
+			flushGroup();
+			result.push(log);
+		}
+	}
 
-						return (
-							<button
-								key={label}
-								onClick={() => handleAnswer(label)}
-								disabled={isDisabled}
-								className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-								style={{
-									backgroundColor: isSelected
-										? theme.colors.accent
-										: isDisabled
-											? `${theme.colors.textDim}20`
-											: `${theme.colors.accent}20`,
-									color: isSelected
-										? theme.colors.accentForeground
-										: isDisabled
-											? theme.colors.textDim
-											: theme.colors.accent,
-									cursor: isDisabled ? 'default' : 'pointer',
-									opacity: isDisabled && !isSelected ? 0.5 : 1,
-									border: `1px solid ${isSelected ? theme.colors.accent : isDisabled ? 'transparent' : `${theme.colors.accent}40`}`,
-								}}
-							>
-								{label}
-								{isSelected && ' ✓'}
-							</button>
-						);
-					})}
+	flushGroup();
+
+	return result;
+}
+
+// ============================================================================
+// InteractiveQuestion - Renders AskUserQuestion as plain text (CLI-style)
+// ============================================================================
+
+const InteractiveQuestion = memo(
+	({
+		log,
+		theme,
+		onAnswerQuestion,
+	}: {
+		log: LogEntry;
+		theme: Theme;
+		onAnswerQuestion?: (processSessionId: string, toolUseId: string, answer: string) => void;
+	}) => {
+		const hasOptions = log.options && log.options.length > 0;
+		const isAnswered = !!log.answered;
+		const [selectedIndex, setSelectedIndex] = useState(0);
+		const containerRef = useRef<HTMLDivElement>(null);
+
+		const handleSelect = useCallback(
+			(index: number) => {
+				if (isAnswered || !log.options || !onAnswerQuestion) return;
+				const option = log.options[index];
+				if (!option || !log.metadata?.processSessionId || !log.metadata?.toolUseId) return;
+				onAnswerQuestion(log.metadata.processSessionId, log.metadata.toolUseId, option.label);
+			},
+			[isAnswered, log.options, log.metadata, onAnswerQuestion]
+		);
+
+		const handleKeyDown = useCallback(
+			(e: React.KeyboardEvent) => {
+				if (isAnswered || !log.options?.length) return;
+
+				if (e.key === 'ArrowDown' || e.key === 'j') {
+					e.preventDefault();
+					setSelectedIndex((prev) => Math.min(prev + 1, log.options!.length - 1));
+				} else if (e.key === 'ArrowUp' || e.key === 'k') {
+					e.preventDefault();
+					setSelectedIndex((prev) => Math.max(prev - 1, 0));
+				} else if (e.key === 'Enter') {
+					e.preventDefault();
+					handleSelect(selectedIndex);
+				} else if (e.key >= '1' && e.key <= '9') {
+					const num = parseInt(e.key, 10) - 1;
+					if (num < log.options!.length) {
+						e.preventDefault();
+						handleSelect(num);
+					}
+				}
+			},
+			[isAnswered, log.options, selectedIndex, handleSelect]
+		);
+
+		// Auto-focus when question appears
+		useEffect(() => {
+			if (!isAnswered && hasOptions && containerRef.current) {
+				containerRef.current.focus();
+			}
+		}, [isAnswered, hasOptions]);
+
+		return (
+			<div
+				ref={containerRef}
+				className="px-4 py-2 outline-none"
+				style={{ color: theme.colors.textMain }}
+				tabIndex={-1}
+				onKeyDown={handleKeyDown}
+			>
+				{/* Question text */}
+				<div className="text-sm whitespace-pre-wrap" style={{ color: theme.colors.accent }}>
+					{log.questionHeader ? `${log.questionHeader}: ` : ''}
+					{log.text}
 				</div>
-			)}
-		</div>
-	);
-});
+				{/* Interactive option cards */}
+				{hasOptions && !isAnswered && (
+					<div className="mt-2 flex flex-col gap-1">
+						{log.options!.map((option, idx) => (
+							<div
+								key={option.label}
+								className="flex items-start gap-2 px-3 py-1.5 rounded cursor-pointer text-sm transition-colors"
+								style={{
+									backgroundColor: idx === selectedIndex ? theme.colors.bgActivity : 'transparent',
+									borderLeft:
+										idx === selectedIndex
+											? `2px solid ${theme.colors.accent}`
+											: '2px solid transparent',
+								}}
+								onClick={() => handleSelect(idx)}
+								onMouseEnter={() => setSelectedIndex(idx)}
+							>
+								<span
+									className="shrink-0 w-5 text-center font-mono text-xs leading-5"
+									style={{ color: theme.colors.textDim }}
+								>
+									{idx + 1}
+								</span>
+								<div className="min-w-0">
+									<div
+										style={{
+											color: idx === selectedIndex ? theme.colors.textMain : theme.colors.textDim,
+										}}
+									>
+										{option.label}
+									</div>
+									{option.description && (
+										<div
+											className="text-xs mt-0.5"
+											style={{ color: theme.colors.textDim, opacity: 0.7 }}
+										>
+											{option.description}
+										</div>
+									)}
+								</div>
+							</div>
+						))}
+						{/* Keyboard hints */}
+						<div
+							className="flex gap-3 mt-1 text-xs px-3"
+							style={{ color: theme.colors.textDim, opacity: 0.5 }}
+						>
+							<span>↑↓ navigate</span>
+							<span>Enter select</span>
+							<span>1-9 quick select</span>
+						</div>
+					</div>
+				)}
+				{/* Answered: show selected option with checkmark */}
+				{isAnswered && hasOptions && (
+					<div className="mt-2 flex items-center gap-2 text-sm">
+						<Check size={14} style={{ color: theme.colors.success }} />
+						<span style={{ color: theme.colors.success }}>{log.answered}</span>
+					</div>
+				)}
+				{/* Answered: freetext (no options) */}
+				{isAnswered && !hasOptions && (
+					<div className="mt-1 text-sm" style={{ color: theme.colors.success }}>
+						{'> '}
+						{log.answered}
+					</div>
+				)}
+			</div>
+		);
+	}
+);
 InteractiveQuestion.displayName = 'InteractiveQuestion';
 
 // ============================================================================
@@ -228,7 +290,7 @@ interface LogItemProps {
 	lastUserCommand?: string;
 	// Expansion state
 	isExpanded: boolean;
-	onToggleExpanded: (logId: string) => void;
+	onToggleExpanded: (logId: string, isWorkGroup?: boolean) => void;
 	// Local filter state
 	localFilterQuery: string;
 	filterMode: { mode: 'include' | 'exclude'; regex: boolean };
@@ -273,6 +335,12 @@ interface LogItemProps {
 	onSaveToFile?: (text: string) => void;
 	// Message alignment
 	userMessageAlignment: 'left' | 'right';
+	// Previous log source for turn-based spacing (AI mode)
+	prevSource?: string;
+	// Duration in ms from the user's message to this AI response (AI mode only)
+	turnDurationMs?: number;
+	// Callback when user selects an option in an interactive question
+	onAnswerQuestion?: (processSessionId: string, toolUseId: string, answer: string) => void;
 }
 
 const LogItemComponent = memo(
@@ -311,6 +379,9 @@ const LogItemComponent = memo(
 		onShowErrorDetails,
 		onSaveToFile,
 		userMessageAlignment,
+		prevSource,
+		turnDurationMs,
+		onAnswerQuestion,
 	}: LogItemProps) => {
 		// Ref for the log item container - used for scroll-into-view on expand
 		const logItemRef = useRef<HTMLDivElement>(null);
@@ -423,285 +494,217 @@ const LogItemComponent = memo(
 				: htmlContent;
 
 		const isUserMessage = log.source === 'user';
-		const isReversed = isUserMessage
-			? userMessageAlignment === 'left'
-			: userMessageAlignment === 'right';
+		// In AI mode, "right" alignment means user messages right-align their content block
+		const isRightAligned = isAIMode ? isUserMessage && userMessageAlignment === 'right' : false;
+		const isReversed = isAIMode
+			? false
+			: isUserMessage
+				? userMessageAlignment === 'left'
+				: userMessageAlignment === 'right';
+
+		// In AI mode, use proportional sans font for prose content (user messages + AI responses).
+		// Tool entries and thinking entries keep the monospace font from settings.
+		const contentFontFamily =
+			isAIMode && log.source !== 'tool' && log.source !== 'thinking'
+				? 'var(--font-sans)'
+				: fontFamily;
+
+		// In AI mode, apply larger spacing at turn boundaries (user↔non-user transitions)
+		// Tool, thinking, AI, error, stderr are all "assistant side" — only user is different
+		const isUserSource = (s: string) => s === 'user';
+		const isTurnBoundary =
+			isAIMode && prevSource !== undefined && isUserSource(prevSource) !== isUserSource(log.source);
+		const aiModeSpacing = isAIMode
+			? isTurnBoundary
+				? 'mt-6 py-1' // 24px top margin at turn boundaries
+				: 'mt-1 py-1' // 4px within same speaker
+			: 'py-2';
 
 		return (
 			<div
 				ref={logItemRef}
-				className={`flex gap-4 group ${isReversed ? 'flex-row-reverse' : ''} px-6 py-2`}
+				className={`flex gap-4 group ${isReversed ? 'flex-row-reverse' : ''} ${isAIMode ? '' : 'px-6'} ${aiModeSpacing}`}
 				data-log-index={index}
 			>
-				<div
-					className={`w-20 shrink-0 text-[10px] pt-2 ${isReversed ? 'text-right' : 'text-left'}`}
-					style={{ fontFamily, color: theme.colors.textDim, opacity: 0.6 }}
-				>
-					{(() => {
-						const logDate = new Date(log.timestamp);
-						const today = new Date();
-						const isToday = logDate.toDateString() === today.toDateString();
-						const time = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-						if (isToday) {
-							return time;
-						}
-						// Format: YYYY-MM-DD on first line, time on second
-						const year = logDate.getFullYear();
-						const month = String(logDate.getMonth() + 1).padStart(2, '0');
-						const day = String(logDate.getDate()).padStart(2, '0');
-						return (
-							<>
-								<div>
-									{year}-{month}-{day}
-								</div>
-								<div>{time}</div>
-							</>
-						);
-					})()}
-				</div>
-				<div
-					className={`flex-1 min-w-0 p-4 pb-10 rounded-xl border ${isReversed ? 'rounded-tr-none' : 'rounded-tl-none'} relative overflow-hidden`}
-					style={{
-						backgroundColor: isUserMessage
-							? isAIMode
-								? `color-mix(in srgb, ${theme.colors.accent} 20%, ${theme.colors.bgSidebar})`
-								: `color-mix(in srgb, ${theme.colors.accent} 15%, ${theme.colors.bgActivity})`
-							: log.source === 'stderr' || log.source === 'error'
-								? `color-mix(in srgb, ${theme.colors.error} 8%, ${theme.colors.bgActivity})`
-								: isAIMode
-									? theme.colors.bgActivity
-									: 'transparent',
-						borderColor:
-							isUserMessage && isAIMode
-								? theme.colors.accent + '40'
-								: log.source === 'stderr' || log.source === 'error'
-									? theme.colors.error
-									: theme.colors.border,
-					}}
-				>
-					{/* Local filter icon for system output only */}
-					{log.source !== 'user' && isTerminal && (
-						<div className="absolute top-2 right-2 flex items-center gap-2">
-							<LogFilterControls
-								logId={log.id}
-								fontFamily={fontFamily}
-								theme={theme}
-								filterQuery={localFilterQuery}
-								filterMode={filterMode}
-								isActive={activeLocalFilter === log.id}
-								onToggleFilter={onToggleLocalFilter}
-								onSetFilterQuery={onSetLocalFilterQuery}
-								onSetFilterMode={onSetFilterMode}
-								onClearFilter={onClearLocalFilter}
-							/>
-						</div>
-					)}
-					{log.images && log.images.length > 0 && (
-						<div
-							className="flex gap-2 mb-2 overflow-x-auto scrollbar-thin"
-							style={{ overscrollBehavior: 'contain' }}
-						>
-							{log.images.map((img, imgIdx) => (
-								<button
-									key={`${img}-${imgIdx}`}
-									type="button"
-									className="shrink-0 p-0 bg-transparent outline-none focus:ring-2 focus:ring-accent rounded"
-									onClick={() => setLightboxImage(img, log.images, 'history')}
-								>
-									<img
-										src={img}
-										alt={`Terminal output image ${imgIdx + 1}`}
-										className="h-20 rounded border cursor-zoom-in block"
-										style={{ objectFit: 'contain', maxWidth: '200px' }}
-									/>
-								</button>
-							))}
-						</div>
-					)}
-					{log.source === 'stderr' && (
-						<div className="mb-2">
-							<span
-								className="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"
-								style={{
-									backgroundColor: theme.colors.error,
-									color: '#fff',
-								}}
-							>
-								STDERR
-							</span>
-						</div>
-					)}
-					{/* Special rendering for error log entries */}
-					{log.source === 'error' && (
-						<div className="flex flex-col gap-3">
-							<div className="flex items-center gap-2">
-								<AlertCircle className="w-5 h-5" style={{ color: theme.colors.error }} />
-								<span className="text-sm font-medium" style={{ color: theme.colors.error }}>
-									Error
-								</span>
-							</div>
-							<p className="text-sm" style={{ color: theme.colors.textMain }}>
-								{log.text}
-							</p>
-							{!!log.agentError?.parsedJson && onShowErrorDetails && (
-								<button
-									onClick={() => onShowErrorDetails(log.agentError!)}
-									className="self-start flex items-center gap-2 px-3 py-1.5 text-xs rounded border hover:opacity-80 transition-opacity"
-									style={{
-										backgroundColor: theme.colors.error + '15',
-										borderColor: theme.colors.error + '40',
-										color: theme.colors.error,
-									}}
-								>
-									<Eye className="w-3 h-3" />
-									View Details
-								</button>
-							)}
-						</div>
-					)}
-					{/* Special rendering for thinking/streaming content (AI reasoning in real-time) */}
-					{log.source === 'thinking' && (
-						<div
-							className="px-4 py-2 text-sm font-mono border-l-2"
-							style={{
-								color: theme.colors.textMain,
-								borderColor: theme.colors.accent,
-							}}
-						>
-							<div className="flex items-center gap-2 mb-1">
-								<span
-									className="text-[10px] px-1.5 py-0.5 rounded"
-									style={{
-										backgroundColor: `${theme.colors.accent}30`,
-										color: theme.colors.accent,
-									}}
-								>
-									thinking
-								</span>
-							</div>
-							<div className="whitespace-pre-wrap text-sm break-words">
-								{isAIMode && !markdownEditMode ? (
-									<MarkdownRenderer
-										content={log.text}
-										theme={theme}
-										onCopy={copyToClipboard}
-										fileTree={fileTree}
-										cwd={cwd}
-										projectRoot={projectRoot}
-										onFileClick={onFileClick}
-									/>
-								) : (
-									log.text
-								)}
-							</div>
-						</div>
-					)}
-					{/* Special rendering for interactive AskUserQuestion events */}
-					{log.interactive === true && log.options && log.options.length > 0 && (
-						<InteractiveQuestion log={log} theme={theme} />
-					)}
-					{/* Special rendering for tool execution events (shown alongside thinking) */}
-					{log.source === 'tool' &&
-						(() => {
-							// Extract tool input details for display
-							const toolInput = log.metadata?.toolState?.input as
-								| Record<string, unknown>
-								| undefined;
-							const toolDetail = toolInput
-								? safeCommand(toolInput.command) ||
-									safeStr(toolInput.pattern) ||
-									safeStr(toolInput.file_path) ||
-									safeStr(toolInput.filePath) || // OpenCode read tool
-									safeStr(toolInput.query) ||
-									safeStr(toolInput.description) || // Task tool
-									safeStr(toolInput.prompt) || // Task tool fallback
-									safeStr(toolInput.task_id) || // TaskOutput tool
-									summarizeTodos(toolInput.todos) || // TodoWrite tool
-									// Codex-specific tool arg patterns
-									safeStr(toolInput.path) || // Codex file operations
-									safeStr(toolInput.cmd) || // Codex shell commands
-									safeStr(toolInput.code) || // Codex code execution
-									truncateStr(toolInput.content, 100) || // Codex write operations (truncated)
-									null
-								: null;
-
+				{/* Timestamp column — fixed in terminal mode, hidden in AI mode (shown inline on hover) */}
+				{!isAIMode && (
+					<div
+						className={`w-20 shrink-0 text-[10px] pt-2 ${isReversed ? 'text-right' : 'text-left'}`}
+						style={{ fontFamily, color: theme.colors.textDim, opacity: 0.6 }}
+					>
+						{(() => {
+							const logDate = new Date(log.timestamp);
+							const today = new Date();
+							const isToday = logDate.toDateString() === today.toDateString();
+							const time = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+							if (isToday) {
+								return time;
+							}
+							const year = logDate.getFullYear();
+							const month = String(logDate.getMonth() + 1).padStart(2, '0');
+							const day = String(logDate.getDate()).padStart(2, '0');
 							return (
-								<div
-									className="px-4 py-1.5 text-xs font-mono border-l-2"
-									style={{
-										color: theme.colors.textMain,
-										borderColor: theme.colors.accent,
-									}}
-								>
-									<div className="flex items-start gap-2">
-										<span
-											className="px-1.5 py-0.5 rounded shrink-0"
-											style={{
-												backgroundColor: `${theme.colors.accent}30`,
-												color: theme.colors.accent,
-											}}
-										>
-											{log.text}
-										</span>
-										{log.metadata?.toolState?.status === 'running' && (
-											<span
-												className="animate-pulse shrink-0 pt-0.5"
-												style={{ color: theme.colors.warning }}
-											>
-												●
-											</span>
-										)}
-										{log.metadata?.toolState?.status === 'completed' && (
-											<span className="shrink-0 pt-0.5" style={{ color: theme.colors.success }}>
-												✓
-											</span>
-										)}
-										{toolDetail && (
-											<span
-												className="opacity-70 break-words whitespace-pre-wrap"
-												style={{ color: theme.colors.textMain }}
-											>
-												{toolDetail}
-											</span>
-										)}
+								<>
+									<div>
+										{year}-{month}-{day}
 									</div>
-								</div>
+									<div>{time}</div>
+								</>
 							);
 						})()}
-					{log.source !== 'error' &&
-						log.source !== 'thinking' &&
-						log.source !== 'tool' &&
-						!log.interactive &&
-						(hasNoMatches ? (
-							<div
-								className="flex items-center justify-center py-8 text-sm"
-								style={{ color: theme.colors.textDim }}
-							>
-								<span>No matches found for filter</span>
+					</div>
+				)}
+				{/* Outer container: transparent in AI mode, bubble in terminal mode */}
+				<div
+					className={
+						isAIMode
+							? 'flex-1 min-w-0 relative overflow-hidden px-6 py-1'
+							: `flex-1 min-w-0 p-4 pb-10 rounded-xl border ${isReversed ? 'rounded-tr-none' : 'rounded-tl-none'} relative overflow-hidden`
+					}
+					style={
+						isAIMode
+							? {
+									// AI mode: error/stderr get a left accent border on the outer container
+									...(log.source === 'stderr' || log.source === 'error'
+										? {
+												backgroundColor: `color-mix(in srgb, ${theme.colors.error} 8%, ${theme.colors.bgActivity})`,
+												borderLeft: `3px solid ${theme.colors.error}`,
+											}
+										: {}),
+								}
+							: {
+									backgroundColor: isUserMessage
+										? `color-mix(in srgb, ${theme.colors.accent} 15%, ${theme.colors.bgActivity})`
+										: log.source === 'stderr' || log.source === 'error'
+											? `color-mix(in srgb, ${theme.colors.error} 8%, ${theme.colors.bgActivity})`
+											: 'transparent',
+									borderColor:
+										log.source === 'stderr' || log.source === 'error'
+											? theme.colors.error
+											: theme.colors.border,
+								}
+					}
+				>
+					{/* AI mode: constrain content width; user messages get card styling */}
+					<div
+						className={
+							isAIMode
+								? `${isUserMessage ? 'max-w-[600px] rounded-lg border px-4 py-3' : 'max-w-[680px]'} ${isRightAligned ? 'ml-auto' : ''}`
+								: ''
+						}
+						style={
+							isAIMode && isUserMessage
+								? {
+										backgroundColor: `color-mix(in srgb, ${theme.colors.accent} 12%, ${theme.colors.bgActivity})`,
+										borderColor: `${theme.colors.accent}30`,
+									}
+								: undefined
+						}
+					>
+						{/* Local filter icon for system output only */}
+						{log.source !== 'user' && isTerminal && (
+							<div className="absolute top-2 right-2 flex items-center gap-2">
+								<LogFilterControls
+									logId={log.id}
+									fontFamily={fontFamily}
+									theme={theme}
+									filterQuery={localFilterQuery}
+									filterMode={filterMode}
+									isActive={activeLocalFilter === log.id}
+									onToggleFilter={onToggleLocalFilter}
+									onSetFilterQuery={onSetLocalFilterQuery}
+									onSetFilterMode={onSetFilterMode}
+									onClearFilter={onClearLocalFilter}
+								/>
 							</div>
-						) : shouldCollapse && !isExpanded ? (
-							<div>
-								<div
-									className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm' : 'whitespace-pre-wrap text-sm break-words'}`}
+						)}
+						{log.images && log.images.length > 0 && (
+							<div
+								className="flex gap-2 mb-2 overflow-x-auto scrollbar-thin"
+								style={{ overscrollBehavior: 'contain' }}
+							>
+								{log.images.map((img, imgIdx) => (
+									<button
+										key={`${img}-${imgIdx}`}
+										type="button"
+										className="shrink-0 p-0 bg-transparent outline-none focus:ring-2 focus:ring-accent rounded"
+										onClick={() => setLightboxImage(img, log.images, 'history')}
+									>
+										<img
+											src={img}
+											alt={`Terminal output image ${imgIdx + 1}`}
+											className="h-20 rounded border cursor-zoom-in block"
+											style={{ objectFit: 'contain', maxWidth: '200px' }}
+										/>
+									</button>
+								))}
+							</div>
+						)}
+						{log.source === 'stderr' && (
+							<div className="mb-2">
+								<span
+									className="px-2 py-1 rounded text-xs font-bold uppercase tracking-wide"
 									style={{
-										maxHeight: `${maxOutputLines * 1.5}em`,
-										overflow: isTerminal && log.source !== 'user' ? 'hidden' : 'hidden',
-										color: theme.colors.textMain,
-										fontFamily,
-										overflowWrap: isTerminal && log.source !== 'user' ? undefined : 'break-word',
+										backgroundColor: theme.colors.error,
+										color: '#fff',
 									}}
 								>
-									{isTerminal && log.source !== 'user' ? (
-										// Content sanitized via getCachedAnsiHtml
-										// Horizontal scroll for terminal output to preserve column alignment
-										<div
-											className="overflow-x-auto scrollbar-thin"
-											dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
-										/>
-									) : isAIMode && !markdownEditMode ? (
-										// Collapsed markdown preview with rendered markdown
+									STDERR
+								</span>
+							</div>
+						)}
+						{/* Special rendering for error log entries */}
+						{log.source === 'error' && (
+							<div className="flex flex-col gap-3">
+								<div className="flex items-center gap-2">
+									<AlertCircle className="w-5 h-5" style={{ color: theme.colors.error }} />
+									<span className="text-sm font-medium" style={{ color: theme.colors.error }}>
+										Error
+									</span>
+								</div>
+								<p className="text-sm" style={{ color: theme.colors.textMain }}>
+									{log.text}
+								</p>
+								{!!log.agentError?.parsedJson && onShowErrorDetails && (
+									<button
+										onClick={() => onShowErrorDetails(log.agentError!)}
+										className="self-start flex items-center gap-2 px-3 py-1.5 text-xs rounded border hover:opacity-80 transition-opacity"
+										style={{
+											backgroundColor: theme.colors.error + '15',
+											borderColor: theme.colors.error + '40',
+											color: theme.colors.error,
+										}}
+									>
+										<Eye className="w-3 h-3" />
+										View Details
+									</button>
+								)}
+							</div>
+						)}
+						{/* Special rendering for thinking/streaming content (AI reasoning in real-time) */}
+						{log.source === 'thinking' && (
+							<div
+								className="px-4 py-1.5 text-sm font-mono border-l-2"
+								style={{
+									color: theme.colors.textMain,
+									borderColor: theme.colors.accent,
+								}}
+							>
+								<div className="flex items-center gap-2 mb-1">
+									<span
+										className="text-[10px] px-1.5 py-0.5 rounded"
+										style={{
+											backgroundColor: `${theme.colors.accent}30`,
+											color: theme.colors.accent,
+										}}
+									>
+										thinking
+									</span>
+								</div>
+								<div className="whitespace-pre-wrap text-sm break-words">
+									{isAIMode && !markdownEditMode ? (
 										<MarkdownRenderer
-											content={displayText}
+											content={log.text}
 											theme={theme}
 											onCopy={copyToClipboard}
 											fileTree={fileTree}
@@ -710,53 +713,243 @@ const LogItemComponent = memo(
 											onFileClick={onFileClick}
 										/>
 									) : (
-										displayText
+										log.text
 									)}
 								</div>
-								<button
-									onClick={handleExpandToggle}
-									className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
-									style={{
-										borderColor: theme.colors.border,
-										backgroundColor: theme.colors.bgActivity,
-										color: theme.colors.accent,
-									}}
-								>
-									<ChevronDown className="w-3 h-3" />
-									Show all {lineCount} lines
-								</button>
 							</div>
-						) : shouldCollapse && isExpanded ? (
-							<div>
-								<div
-									className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm scrollbar-thin' : 'whitespace-pre-wrap text-sm break-words'}`}
-									style={{
-										maxHeight: '600px',
-										overflow: 'auto',
-										overscrollBehavior: 'contain',
-										color: theme.colors.textMain,
-										fontFamily,
-										overflowWrap: isTerminal && log.source !== 'user' ? undefined : 'break-word',
-									}}
-									onWheel={(e) => {
-										// Prevent scroll from propagating to parent when this container can scroll
-										const el = e.currentTarget;
-										const { scrollTop, scrollHeight, clientHeight } = el;
-										const atTop = scrollTop <= 0;
-										const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+						)}
+						{/* Special rendering for interactive AskUserQuestion events */}
+						{log.interactive === true && (
+							<InteractiveQuestion log={log} theme={theme} onAnswerQuestion={onAnswerQuestion} />
+						)}
+						{/* Special rendering for tool execution events (shown alongside thinking) */}
+						{log.source === 'tool' &&
+							log.text !== 'AskUserQuestion' &&
+							(() => {
+								// Extract tool input details for display
+								const toolInput = log.metadata?.toolState?.input as
+									| Record<string, unknown>
+									| undefined;
+								const toolDetail = toolInput
+									? safeCommand(toolInput.command) ||
+										safeStr(toolInput.pattern) ||
+										safeStr(toolInput.file_path) ||
+										safeStr(toolInput.filePath) || // OpenCode read tool
+										safeStr(toolInput.query) ||
+										safeStr(toolInput.description) || // Task tool
+										safeStr(toolInput.prompt) || // Task tool fallback
+										safeStr(toolInput.task_id) || // TaskOutput tool
+										summarizeTodos(toolInput.todos) || // TodoWrite tool
+										// Codex-specific tool arg patterns
+										safeStr(toolInput.path) || // Codex file operations
+										safeStr(toolInput.cmd) || // Codex shell commands
+										safeStr(toolInput.code) || // Codex code execution
+										truncateStr(toolInput.content, 100) || // Codex write operations (truncated)
+										null
+									: null;
 
-										// Only stop propagation if we're not at the boundary we're scrolling towards
-										if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
-											e.stopPropagation();
-										}
-									}}
+								return (
+									<div
+										className="px-4 py-1 text-xs font-mono border-l-2"
+										style={{
+											color: theme.colors.textMain,
+											borderColor: theme.colors.accent,
+										}}
+									>
+										<div className="flex items-start gap-2">
+											<span
+												className="px-1.5 py-0.5 rounded shrink-0"
+												style={{
+													backgroundColor: `${theme.colors.accent}30`,
+													color: theme.colors.accent,
+												}}
+											>
+												{log.text}
+											</span>
+											{log.metadata?.toolState?.status === 'running' && (
+												<span
+													className="animate-pulse shrink-0 pt-0.5"
+													style={{ color: theme.colors.warning }}
+												>
+													●
+												</span>
+											)}
+											{log.metadata?.toolState?.status === 'completed' && (
+												<span className="shrink-0 pt-0.5" style={{ color: theme.colors.success }}>
+													✓
+												</span>
+											)}
+											{toolDetail && (
+												<span
+													className="opacity-70 break-words whitespace-pre-wrap"
+													style={{ color: theme.colors.textMain }}
+												>
+													{toolDetail}
+												</span>
+											)}
+										</div>
+									</div>
+								);
+							})()}
+						{log.source !== 'error' &&
+							log.source !== 'thinking' &&
+							log.source !== 'tool' &&
+							!log.interactive &&
+							(hasNoMatches ? (
+								<div
+									className="flex items-center justify-center py-8 text-sm"
+									style={{ color: theme.colors.textDim }}
 								>
+									<span>No matches found for filter</span>
+								</div>
+							) : shouldCollapse && !isExpanded ? (
+								<div>
+									<div
+										className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm' : 'whitespace-pre-wrap text-sm break-words'}`}
+										style={{
+											maxHeight: `${maxOutputLines * 1.5}em`,
+											overflow: isTerminal && log.source !== 'user' ? 'hidden' : 'hidden',
+											color: theme.colors.textMain,
+											fontFamily: contentFontFamily,
+											overflowWrap: isTerminal && log.source !== 'user' ? undefined : 'break-word',
+										}}
+									>
+										{isTerminal && log.source !== 'user' ? (
+											// Content sanitized via getCachedAnsiHtml
+											// Horizontal scroll for terminal output to preserve column alignment
+											<div
+												className="overflow-x-auto scrollbar-thin"
+												dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
+											/>
+										) : isAIMode && !markdownEditMode ? (
+											// Collapsed markdown preview with rendered markdown
+											<MarkdownRenderer
+												content={displayText}
+												theme={theme}
+												onCopy={copyToClipboard}
+												fileTree={fileTree}
+												cwd={cwd}
+												projectRoot={projectRoot}
+												onFileClick={onFileClick}
+											/>
+										) : (
+											displayText
+										)}
+									</div>
+									<button
+										onClick={handleExpandToggle}
+										className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
+										style={{
+											borderColor: theme.colors.border,
+											backgroundColor: theme.colors.bgActivity,
+											color: theme.colors.accent,
+										}}
+									>
+										<ChevronDown className="w-3 h-3" />
+										Show all {lineCount} lines
+									</button>
+								</div>
+							) : shouldCollapse && isExpanded ? (
+								<div>
+									<div
+										className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm scrollbar-thin' : 'whitespace-pre-wrap text-sm break-words'}`}
+										style={{
+											maxHeight: '600px',
+											overflow: 'auto',
+											overscrollBehavior: 'contain',
+											color: theme.colors.textMain,
+											fontFamily: contentFontFamily,
+											overflowWrap: isTerminal && log.source !== 'user' ? undefined : 'break-word',
+										}}
+										onWheel={(e) => {
+											// Prevent scroll from propagating to parent when this container can scroll
+											const el = e.currentTarget;
+											const { scrollTop, scrollHeight, clientHeight } = el;
+											const atTop = scrollTop <= 0;
+											const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+
+											// Only stop propagation if we're not at the boundary we're scrolling towards
+											if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
+												e.stopPropagation();
+											}
+										}}
+									>
+										{isTerminal && log.source !== 'user' ? (
+											// Content sanitized via getCachedAnsiHtml
+											// Horizontal scroll for terminal output to preserve column alignment
+											<div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
+										) : log.source === 'user' && isTerminal ? (
+											<div style={{ fontFamily }}>
+												<span style={{ color: theme.colors.accent }}>$ </span>
+												{filteredText}
+											</div>
+										) : log.aiCommand ? (
+											<div className="space-y-3">
+												<div
+													className="flex items-center gap-2 px-3 py-2 rounded-lg border"
+													style={{
+														backgroundColor: theme.colors.accent + '15',
+														borderColor: theme.colors.accent + '30',
+													}}
+												>
+													<span
+														className="font-mono font-bold text-sm"
+														style={{ color: theme.colors.accent }}
+													>
+														{log.aiCommand.command}:
+													</span>
+													<span className="text-sm" style={{ color: theme.colors.textMain }}>
+														{log.aiCommand.description}
+													</span>
+												</div>
+												<div>{filteredText}</div>
+											</div>
+										) : isAIMode && !markdownEditMode ? (
+											// Expanded markdown rendering
+											<MarkdownRenderer
+												content={filteredText}
+												theme={theme}
+												onCopy={copyToClipboard}
+												fileTree={fileTree}
+												cwd={cwd}
+												projectRoot={projectRoot}
+												onFileClick={onFileClick}
+											/>
+										) : (
+											<div>{filteredText}</div>
+										)}
+									</div>
+									<button
+										onClick={handleExpandToggle}
+										className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
+										style={{
+											borderColor: theme.colors.border,
+											backgroundColor: theme.colors.bgActivity,
+											color: theme.colors.accent,
+										}}
+									>
+										<ChevronUp className="w-3 h-3" />
+										Show less
+									</button>
+								</div>
+							) : (
+								<>
 									{isTerminal && log.source !== 'user' ? (
 										// Content sanitized via getCachedAnsiHtml
-										// Horizontal scroll for terminal output to preserve column alignment
-										<div dangerouslySetInnerHTML={{ __html: displayHtmlContent }} />
+										<div
+											className="whitespace-pre text-sm overflow-x-auto scrollbar-thin"
+											style={{
+												color: theme.colors.textMain,
+												fontFamily: contentFontFamily,
+												overscrollBehavior: 'contain',
+											}}
+											dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
+										/>
 									) : log.source === 'user' && isTerminal ? (
-										<div style={{ fontFamily }}>
+										<div
+											className="whitespace-pre-wrap text-sm break-words"
+											style={{ color: theme.colors.textMain, fontFamily: contentFontFamily }}
+										>
 											<span style={{ color: theme.colors.accent }}>$ </span>
 											{filteredText}
 										</div>
@@ -779,10 +972,15 @@ const LogItemComponent = memo(
 													{log.aiCommand.description}
 												</span>
 											</div>
-											<div>{filteredText}</div>
+											<div
+												className="whitespace-pre-wrap text-sm break-words"
+												style={{ color: theme.colors.textMain }}
+											>
+												{filteredText}
+											</div>
 										</div>
 									) : isAIMode && !markdownEditMode ? (
-										// Expanded markdown rendering
+										// Rendered markdown for AI responses
 										<MarkdownRenderer
 											content={filteredText}
 											theme={theme}
@@ -793,95 +991,43 @@ const LogItemComponent = memo(
 											onFileClick={onFileClick}
 										/>
 									) : (
-										<div>{filteredText}</div>
-									)}
-								</div>
-								<button
-									onClick={handleExpandToggle}
-									className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
-									style={{
-										borderColor: theme.colors.border,
-										backgroundColor: theme.colors.bgActivity,
-										color: theme.colors.accent,
-									}}
-								>
-									<ChevronUp className="w-3 h-3" />
-									Show less
-								</button>
-							</div>
-						) : (
-							<>
-								{isTerminal && log.source !== 'user' ? (
-									// Content sanitized via getCachedAnsiHtml
-									<div
-										className="whitespace-pre text-sm overflow-x-auto scrollbar-thin"
-										style={{
-											color: theme.colors.textMain,
-											fontFamily,
-											overscrollBehavior: 'contain',
-										}}
-										dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
-									/>
-								) : log.source === 'user' && isTerminal ? (
-									<div
-										className="whitespace-pre-wrap text-sm break-words"
-										style={{ color: theme.colors.textMain, fontFamily }}
-									>
-										<span style={{ color: theme.colors.accent }}>$ </span>
-										{filteredText}
-									</div>
-								) : log.aiCommand ? (
-									<div className="space-y-3">
-										<div
-											className="flex items-center gap-2 px-3 py-2 rounded-lg border"
-											style={{
-												backgroundColor: theme.colors.accent + '15',
-												borderColor: theme.colors.accent + '30',
-											}}
-										>
-											<span
-												className="font-mono font-bold text-sm"
-												style={{ color: theme.colors.accent }}
-											>
-												{log.aiCommand.command}:
-											</span>
-											<span className="text-sm" style={{ color: theme.colors.textMain }}>
-												{log.aiCommand.description}
-											</span>
-										</div>
+										// Raw markdown source mode (show original text with markdown syntax visible)
 										<div
 											className="whitespace-pre-wrap text-sm break-words"
 											style={{ color: theme.colors.textMain }}
 										>
 											{filteredText}
 										</div>
-									</div>
-								) : isAIMode && !markdownEditMode ? (
-									// Rendered markdown for AI responses
-									<MarkdownRenderer
-										content={filteredText}
-										theme={theme}
-										onCopy={copyToClipboard}
-										fileTree={fileTree}
-										cwd={cwd}
-										projectRoot={projectRoot}
-										onFileClick={onFileClick}
-									/>
-								) : (
-									// Raw markdown source mode (show original text with markdown syntax visible)
-									<div
-										className="whitespace-pre-wrap text-sm break-words"
-										style={{ color: theme.colors.textMain }}
-									>
-										{filteredText}
-									</div>
-								)}
-							</>
-						))}
+									)}
+								</>
+							))}
+						{/* AI mode: show turn duration ("Baked for Xm Ys") on AI responses */}
+						{isAIMode && !isUserMessage && turnDurationMs != null && turnDurationMs > 0 && (
+							<div
+								className="mt-3 text-[11px]"
+								style={{ color: theme.colors.textDim, opacity: 0.4 }}
+							>
+								{(() => {
+									const totalSeconds = Math.round(turnDurationMs / 1000);
+									if (totalSeconds < 1) return 'Baked for <1s';
+									const minutes = Math.floor(totalSeconds / 60);
+									const seconds = totalSeconds % 60;
+									if (minutes > 0) {
+										return `Baked for ${minutes}m ${seconds}s`;
+									}
+									return `Baked for ${seconds}s`;
+								})()}
+							</div>
+						)}
+					</div>
+					{/* close max-width wrapper */}
 					{/* Action buttons - bottom right corner */}
 					<div
-						className="absolute bottom-2 right-2 flex items-center gap-1"
-						style={{ transition: 'opacity 0.15s ease-in-out' }}
+						className={`absolute bottom-2 ${isAIMode ? 'right-4' : 'right-2'} flex items-center gap-1 ${isAIMode ? 'opacity-0 group-hover:opacity-100 backdrop-blur-sm rounded-md px-1 py-0.5' : ''}`}
+						style={{
+							transition: 'opacity 0.15s ease-in-out',
+							...(isAIMode ? { backgroundColor: `${theme.colors.bgMain}cc` } : {}),
+						}}
 					>
 						{/* Markdown toggle button for AI responses */}
 						{log.source !== 'user' && isAIMode && (
@@ -1003,6 +1149,7 @@ const LogItemComponent = memo(
 			prevProps.log.text === nextProps.log.text &&
 			prevProps.log.delivered === nextProps.log.delivered &&
 			prevProps.log.readOnly === nextProps.log.readOnly &&
+			prevProps.log.answered === nextProps.log.answered &&
 			prevProps.isExpanded === nextProps.isExpanded &&
 			prevProps.localFilterQuery === nextProps.localFilterQuery &&
 			prevProps.filterMode.mode === nextProps.filterMode.mode &&
@@ -1025,7 +1172,7 @@ LogItemComponent.displayName = 'LogItemComponent';
 // ============================================================================
 
 // Separate component for elapsed time to prevent re-renders of the entire list
-const ElapsedTimeDisplay = memo(
+const _ElapsedTimeDisplay = memo(
 	({ thinkingStartTime, textColor }: { thinkingStartTime: number; textColor: string }) => {
 		const [elapsedSeconds, setElapsedSeconds] = useState(() =>
 			Math.floor((Date.now() - thinkingStartTime) / 1000)
@@ -1059,6 +1206,300 @@ const ElapsedTimeDisplay = memo(
 		);
 	}
 );
+
+// ============================================================================
+// WorkGroupComponent — collapsible block for consecutive thinking+tool entries
+// ============================================================================
+
+interface WorkGroupComponentProps {
+	group: WorkGroup;
+	isExpanded: boolean;
+	onToggleExpanded: (logId: string, isWorkGroup?: boolean) => void;
+	showThinking: ThinkingMode;
+	isBusy: boolean;
+	theme: Theme;
+	// Pass-through props needed by LogItemComponent for rendering child entries
+	isTerminal: boolean;
+	isAIMode: boolean;
+	fontFamily: string;
+	maxOutputLines: number;
+	expandedLogs: Set<string>;
+	localFilters: Map<string, string>;
+	filterModes: Map<string, { mode: 'include' | 'exclude'; regex: boolean }>;
+	activeLocalFilter: string | null;
+	onToggleLocalFilter: (logId: string) => void;
+	onSetLocalFilterQuery: (logId: string, query: string) => void;
+	onSetFilterMode: (
+		logId: string,
+		update: (current: { mode: 'include' | 'exclude'; regex: boolean }) => {
+			mode: 'include' | 'exclude';
+			regex: boolean;
+		}
+	) => void;
+	onClearLocalFilter: (logId: string) => void;
+	deleteConfirmLogId: string | null;
+	onDeleteLog?: (logId: string) => number | null;
+	onSetDeleteConfirmLogId: (logId: string | null) => void;
+	scrollContainerRef: React.RefObject<HTMLDivElement>;
+	setLightboxImage: (
+		image: string | null,
+		contextImages?: string[],
+		source?: 'staged' | 'history'
+	) => void;
+	copyToClipboard: (text: string) => void;
+	ansiConverter: Convert;
+	markdownEditMode: boolean;
+	onToggleMarkdownEditMode: () => void;
+	onReplayMessage?: (text: string, images?: string[]) => void;
+	fileTree?: FileNode[];
+	cwd?: string;
+	projectRoot?: string;
+	onFileClick?: (path: string) => void;
+	onShowErrorDetails?: (error: AgentError) => void;
+	onSaveToFile?: (text: string) => void;
+	userMessageAlignment: 'left' | 'right';
+	onAnswerQuestion?: (processSessionId: string, toolUseId: string, answer: string) => void;
+}
+
+const WorkGroupComponent = memo(
+	({
+		group,
+		isExpanded,
+		onToggleExpanded,
+		showThinking,
+		isBusy,
+		theme,
+		isTerminal,
+		isAIMode,
+		fontFamily,
+		maxOutputLines,
+		expandedLogs,
+		localFilters,
+		filterModes,
+		activeLocalFilter,
+		onToggleLocalFilter,
+		onSetLocalFilterQuery,
+		onSetFilterMode,
+		onClearLocalFilter,
+		deleteConfirmLogId,
+		onDeleteLog,
+		onSetDeleteConfirmLogId,
+		scrollContainerRef,
+		setLightboxImage,
+		copyToClipboard,
+		ansiConverter,
+		markdownEditMode,
+		onToggleMarkdownEditMode,
+		onReplayMessage,
+		fileTree,
+		cwd,
+		projectRoot,
+		onFileClick,
+		onShowErrorDetails,
+		onSaveToFile,
+		userMessageAlignment,
+		onAnswerQuestion,
+	}: WorkGroupComponentProps) => {
+		// Filter entries based on showThinking mode
+		const visibleEntries = useMemo(() => {
+			if (showThinking === 'sticky') return group.entries;
+			if (showThinking === 'off') return group.entries.filter((e) => e.source !== 'thinking');
+			// 'on' mode: show thinking during busy, hide on idle
+			if (isBusy) return group.entries;
+			return group.entries.filter((e) => e.source !== 'thinking');
+		}, [group.entries, showThinking, isBusy]);
+
+		const handleToggle = useCallback(() => {
+			onToggleExpanded(group.id, true);
+		}, [onToggleExpanded, group.id]);
+
+		// If filtering out thinking entries leaves <2 entries, render standalone (no group wrapper)
+		if (visibleEntries.length === 0) return null;
+		if (visibleEntries.length === 1) {
+			const entry = visibleEntries[0];
+			return (
+				<LogItemComponent
+					key={entry.id}
+					log={entry}
+					index={0}
+					prevSource={undefined}
+					isTerminal={isTerminal}
+					isAIMode={isAIMode}
+					theme={theme}
+					fontFamily={fontFamily}
+					maxOutputLines={maxOutputLines}
+					isExpanded={expandedLogs.has(entry.id)}
+					onToggleExpanded={onToggleExpanded}
+					localFilterQuery={localFilters.get(entry.id) || ''}
+					filterMode={filterModes.get(entry.id) || { mode: 'include', regex: false }}
+					activeLocalFilter={activeLocalFilter}
+					onToggleLocalFilter={onToggleLocalFilter}
+					onSetLocalFilterQuery={onSetLocalFilterQuery}
+					onSetFilterMode={onSetFilterMode}
+					onClearLocalFilter={onClearLocalFilter}
+					deleteConfirmLogId={deleteConfirmLogId}
+					onDeleteLog={onDeleteLog}
+					onSetDeleteConfirmLogId={onSetDeleteConfirmLogId}
+					scrollContainerRef={scrollContainerRef}
+					setLightboxImage={setLightboxImage}
+					copyToClipboard={copyToClipboard}
+					ansiConverter={ansiConverter}
+					markdownEditMode={markdownEditMode}
+					onToggleMarkdownEditMode={onToggleMarkdownEditMode}
+					onReplayMessage={onReplayMessage}
+					fileTree={fileTree}
+					cwd={cwd}
+					projectRoot={projectRoot}
+					onFileClick={onFileClick}
+					onShowErrorDetails={onShowErrorDetails}
+					onSaveToFile={onSaveToFile}
+					userMessageAlignment={userMessageAlignment}
+					onAnswerQuestion={onAnswerQuestion}
+				/>
+			);
+		}
+
+		const toolEntries = visibleEntries.filter((e) => e.source === 'tool');
+		const stepCount = toolEntries.length;
+
+		// Compute duration from first to last entry in the group
+		const firstTs = group.entries[0]?.timestamp;
+		const lastTs = group.entries[group.entries.length - 1]?.timestamp;
+		const durationMs = firstTs && lastTs ? lastTs - firstTs : 0;
+		const durationLabel = (() => {
+			const totalSeconds = Math.round(durationMs / 1000);
+			if (totalSeconds < 1) return '';
+			const minutes = Math.floor(totalSeconds / 60);
+			const seconds = totalSeconds % 60;
+			if (minutes > 0) return `${minutes}m ${seconds}s`;
+			return `${seconds}s`;
+		})();
+
+		const chevron = isExpanded ? '\u25BE' : '\u25B8'; // ▾ or ▸
+
+		return (
+			<div className="px-6" style={{ maxWidth: isAIMode ? 'calc(680px + 3rem)' : undefined }}>
+				{/* Header row — always visible */}
+				<div
+					className="py-1.5 text-[11px] cursor-pointer select-none flex items-center gap-2 transition-colors rounded px-2 -mx-2"
+					style={{ color: theme.colors.textDim }}
+					onClick={handleToggle}
+					onMouseEnter={(e) => {
+						e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}80`;
+					}}
+					onMouseLeave={(e) => {
+						e.currentTarget.style.backgroundColor = 'transparent';
+					}}
+				>
+					<span style={{ width: '0.75em', flexShrink: 0, fontFamily }}>{chevron}</span>
+					<span style={{ opacity: 0.7 }}>
+						{stepCount} step{stepCount !== 1 ? 's' : ''}
+						{durationLabel && ` · ${durationLabel}`}
+					</span>
+				</div>
+
+				{/* Expanded: compact step list */}
+				{isExpanded && (
+					<div
+						className="ml-3 pl-3 py-1"
+						style={{ borderLeft: `1px solid ${theme.colors.border}` }}
+					>
+						{visibleEntries.map((entry) => {
+							if (entry.source === 'thinking') {
+								// Thinking: prominent — bold label, full text, normal weight
+								return (
+									<div
+										key={entry.id}
+										className="py-1 text-[11px] min-w-0"
+										style={{ color: theme.colors.textDim, fontFamily: 'var(--font-sans)' }}
+									>
+										<span
+											style={{
+												color: theme.colors.textMain,
+												fontWeight: 600,
+												marginRight: '0.5em',
+											}}
+										>
+											Thinking
+										</span>
+										<span
+											className="whitespace-pre-wrap"
+											style={{ color: theme.colors.textMain, opacity: 0.7 }}
+										>
+											{entry.text.trim()}
+										</span>
+									</div>
+								);
+							}
+
+							// Tool entry: compact single line
+							const toolInput = entry.metadata?.toolState?.input as
+								| Record<string, unknown>
+								| undefined;
+							const toolName = toolInput ? (safeStr(toolInput.tool) ?? entry.text) : entry.text;
+							const toolDetail = toolInput
+								? safeCommand(toolInput.command) ||
+									safeStr(toolInput.pattern) ||
+									safeStr(toolInput.file_path) ||
+									safeStr(toolInput.filePath) ||
+									safeStr(toolInput.query) ||
+									safeStr(toolInput.description) ||
+									safeStr(toolInput.prompt) ||
+									safeStr(toolInput.task_id) ||
+									safeStr(toolInput.path) ||
+									safeStr(toolInput.cmd) ||
+									safeStr(toolInput.code) ||
+									truncateStr(toolInput.content, 80) ||
+									null
+								: null;
+							const status = entry.metadata?.toolState?.status;
+							const statusIcon =
+								status === 'completed' ? '\u2713' : status === 'error' ? '\u2717' : '\u25CF';
+							const statusColor =
+								status === 'completed'
+									? theme.colors.success || '#22c55e'
+									: status === 'error'
+										? theme.colors.error || '#ef4444'
+										: theme.colors.accent;
+
+							return (
+								<div
+									key={entry.id}
+									className="py-0.5 text-[11px] flex items-center gap-1.5 min-w-0 cursor-pointer rounded px-1 -mx-1 transition-colors"
+									style={{
+										color: theme.colors.textDim,
+										fontFamily,
+										fontStyle: 'italic',
+										opacity: 0.5,
+									}}
+									onClick={() => onToggleExpanded(entry.id)}
+									onMouseEnter={(e) => {
+										e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
+									}}
+									onMouseLeave={(e) => {
+										e.currentTarget.style.backgroundColor = 'transparent';
+									}}
+								>
+									<span style={{ color: statusColor, fontSize: '0.7em', flexShrink: 0 }}>
+										{status === 'running' ? (
+											<span className="animate-pulse">{statusIcon}</span>
+										) : (
+											statusIcon
+										)}
+									</span>
+									<span style={{ flexShrink: 0 }}>{toolName}</span>
+									{toolDetail && <span className="truncate">{toolDetail}</span>}
+								</div>
+							);
+						})}
+					</div>
+				)}
+			</div>
+		);
+	}
+);
+
+WorkGroupComponent.displayName = 'WorkGroupComponent';
 
 interface TerminalOutputProps {
 	session: Session;
@@ -1142,6 +1583,35 @@ export const TerminalOutput = memo(
 			onOpenInTab,
 		} = props;
 
+		// Handler for interactive question option selection (click-to-answer)
+		const handleAnswerQuestion = useCallback(
+			(processSessionId: string, toolUseId: string, answer: string) => {
+				// Send answer via IPC
+				window.maestro.process.answerQuestion(processSessionId, toolUseId, answer);
+				// Update session state: clear pendingQuestion + mark logs as answered
+				const { setSessions } = useSessionStore.getState();
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== session.id) return s;
+						return {
+							...s,
+							aiTabs: s.aiTabs.map((tab) => ({
+								...tab,
+								pendingQuestion:
+									tab.pendingQuestion?.toolUseId === toolUseId ? undefined : tab.pendingQuestion,
+								logs: tab.logs.map((log) =>
+									log.metadata?.toolUseId === toolUseId && log.interactive
+										? { ...log, answered: answer }
+										: log
+								),
+							})),
+						};
+					})
+				);
+			},
+			[session.id]
+		);
+
 		// Use the forwarded ref if provided, otherwise create a local one
 		const localRef = useRef<HTMLDivElement>(null);
 		const terminalOutputRef = (ref as React.RefObject<HTMLDivElement>) || localRef;
@@ -1156,6 +1626,9 @@ export const TerminalOutput = memo(
 		expandedLogsRef.current = expandedLogs;
 		// Counter to force re-render of LogItem when expanded state changes
 		const [_expandedTrigger, setExpandedTrigger] = useState(0);
+
+		// Track which work group IDs the user has manually toggled (prevents auto-expand/collapse override)
+		const manuallyToggledGroups = useRef<Set<string>>(new Set());
 
 		// Track local filters per log entry (log ID -> filter query)
 		const [localFilters, setLocalFilters] = useState<Map<string, string>>(new Map());
@@ -1268,7 +1741,7 @@ export const TerminalOutput = memo(
 			}
 		}, [outputSearchOpen, updateLayerHandler]);
 
-		const toggleExpanded = useCallback((logId: string) => {
+		const toggleExpanded = useCallback((logId: string, isWorkGroup?: boolean) => {
 			setExpandedLogs((prev) => {
 				const newSet = new Set(prev);
 				if (newSet.has(logId)) {
@@ -1278,6 +1751,10 @@ export const TerminalOutput = memo(
 				}
 				return newSet;
 			});
+			// Track manual toggles for work groups (prevents auto-expand/collapse override)
+			if (isWorkGroup) {
+				manuallyToggledGroups.current.add(logId);
+			}
 			// Trigger re-render after state update
 			setExpandedTrigger((t) => t + 1);
 		}, []);
@@ -1368,6 +1845,43 @@ export const TerminalOutput = memo(
 		// PERF: Memoize active tab lookup to avoid O(n) .find() on every render
 		const activeTab = useMemo(() => getActiveTab(session), [session.aiTabs, session.activeTabId]);
 
+		// Derive busy state and thinking mode from global setting
+		const isBusy = activeTab?.state === 'busy';
+		const showThinking: ThinkingMode = useSettingsStore((s) => s.defaultShowThinking);
+
+		// Track previous busy state for idle transition detection
+		const prevIsBusyRef = useRef(isBusy);
+
+		// Auto-collapse work groups when transitioning from busy → idle
+		useEffect(() => {
+			if (prevIsBusyRef.current && !isBusy) {
+				// Transition: busy → idle — collapse non-manually-toggled groups
+				setExpandedLogs((prev) => {
+					const newSet = new Set(prev);
+					for (const id of prev) {
+						if (!manuallyToggledGroups.current.has(id)) {
+							newSet.delete(id);
+						}
+					}
+					return newSet;
+				});
+				manuallyToggledGroups.current.clear();
+				setExpandedTrigger((t) => t + 1);
+			}
+			prevIsBusyRef.current = isBusy;
+		}, [isBusy]);
+
+		// Determine if a work group is expanded — auto-expands during busy unless manually collapsed
+		const isGroupExpanded = useCallback(
+			(groupId: string): boolean => {
+				if (isBusy && !manuallyToggledGroups.current.has(groupId)) {
+					return true; // Auto-expand during busy
+				}
+				return expandedLogs.has(groupId);
+			},
+			[isBusy, expandedLogs]
+		);
+
 		// PERF: Memoize activeLogs to provide stable reference for collapsedLogs dependency
 		const activeLogs = useMemo((): LogEntry[] => activeTab?.logs ?? [], [activeTab?.logs]);
 
@@ -1413,6 +1927,12 @@ export const TerminalOutput = memo(
 			return result;
 		}, [activeLogs]);
 
+		// Group consecutive thinking+tool entries into WorkGroups for collapsible display
+		const groupedLogs = useMemo(
+			(): RenderUnit[] => groupLogsIntoRenderUnits(collapsedLogs),
+			[collapsedLogs]
+		);
+
 		// PERF: Debounce search query to avoid filtering on every keystroke
 		const debouncedSearchQuery = useDebouncedValue(outputSearchQuery, 150);
 
@@ -1424,11 +1944,17 @@ export const TerminalOutput = memo(
 
 		// Filter logs based on search query - memoized for performance
 		// Uses debounced query to reduce CPU usage during rapid typing
-		const filteredLogs = useMemo(() => {
-			if (!debouncedSearchQuery) return collapsedLogs;
+		const filteredLogs = useMemo((): RenderUnit[] => {
+			if (!debouncedSearchQuery) return groupedLogs;
 			const lowerQuery = debouncedSearchQuery.toLowerCase();
-			return collapsedLogs.filter((log) => log.text.toLowerCase().includes(lowerQuery));
-		}, [collapsedLogs, debouncedSearchQuery]);
+			return groupedLogs.filter((unit) => {
+				if (unit.type === 'workGroup') {
+					// Include WorkGroup if ANY entry matches the search query
+					return unit.entries.some((e) => e.text.toLowerCase().includes(lowerQuery));
+				}
+				return unit.text.toLowerCase().includes(lowerQuery);
+			});
+		}, [groupedLogs, debouncedSearchQuery]);
 
 		// PERF: Throttle scroll handler to reduce state updates (4ms = ~240fps for smooth scrollbar)
 		// The actual logic is in handleScrollInner, wrapped with useThrottledCallback
@@ -1644,8 +2170,9 @@ export const TerminalOutput = memo(
 		const getLastUserCommand = useCallback(
 			(index: number): string | undefined => {
 				for (let i = index - 1; i >= 0; i--) {
-					if (filteredLogs[i]?.source === 'user') {
-						return filteredLogs[i].text;
+					const unit = filteredLogs[i];
+					if (unit && unit.type !== 'workGroup' && unit.source === 'user') {
+						return unit.text;
 					}
 				}
 				return undefined;
@@ -1774,48 +2301,124 @@ export const TerminalOutput = memo(
 					}}
 					onScroll={handleScroll}
 				>
-					{/* Log entries */}
-					{filteredLogs.map((log, index) => (
-						<LogItemComponent
-							key={log.id}
-							log={log}
-							index={index}
-							isTerminal={isTerminal}
-							isAIMode={isAIMode}
-							theme={theme}
-							fontFamily={fontFamily}
-							maxOutputLines={maxOutputLines}
-							lastUserCommand={
-								isTerminal && log.source !== 'user' ? getLastUserCommand(index) : undefined
+					{/* Log entries — render WorkGroups as collapsible blocks, standalone entries as before */}
+					{filteredLogs.map((unit, unitIndex) => {
+						if (unit.type === 'workGroup') {
+							return (
+								<WorkGroupComponent
+									key={unit.id}
+									group={unit}
+									isExpanded={isGroupExpanded(unit.id)}
+									onToggleExpanded={toggleExpanded}
+									showThinking={showThinking}
+									isBusy={isBusy}
+									theme={theme}
+									isTerminal={isTerminal}
+									isAIMode={isAIMode}
+									fontFamily={fontFamily}
+									maxOutputLines={maxOutputLines}
+									expandedLogs={expandedLogs}
+									localFilters={localFilters}
+									filterModes={filterModes}
+									activeLocalFilter={activeLocalFilter}
+									onToggleLocalFilter={toggleLocalFilter}
+									onSetLocalFilterQuery={setLocalFilterQuery}
+									onSetFilterMode={setFilterModeForLog}
+									onClearLocalFilter={clearLocalFilter}
+									deleteConfirmLogId={deleteConfirmLogId}
+									onDeleteLog={onDeleteLog}
+									onSetDeleteConfirmLogId={setDeleteConfirmLogId}
+									scrollContainerRef={scrollContainerRef}
+									setLightboxImage={setLightboxImage}
+									copyToClipboard={copyToClipboard}
+									ansiConverter={ansiConverter}
+									markdownEditMode={markdownEditMode}
+									onToggleMarkdownEditMode={toggleMarkdownEditMode}
+									onReplayMessage={onReplayMessage}
+									fileTree={fileTree}
+									cwd={cwd}
+									projectRoot={projectRoot}
+									onFileClick={onFileClick}
+									onShowErrorDetails={onShowErrorDetails}
+									onSaveToFile={handleSaveToFile}
+									userMessageAlignment={userMessageAlignment}
+									onAnswerQuestion={handleAnswerQuestion}
+								/>
+							);
+						}
+
+						// Standalone log entry
+						const log = unit;
+						let prevSource: LogEntry['source'] | undefined;
+						if (unitIndex > 0) {
+							const prevUnit = filteredLogs[unitIndex - 1];
+							if (prevUnit.type === 'workGroup') {
+								prevSource = prevUnit.entries[prevUnit.entries.length - 1].source;
+							} else {
+								prevSource = prevUnit.source;
 							}
-							isExpanded={expandedLogs.has(log.id)}
-							onToggleExpanded={toggleExpanded}
-							localFilterQuery={localFilters.get(log.id) || ''}
-							filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}
-							activeLocalFilter={activeLocalFilter}
-							onToggleLocalFilter={toggleLocalFilter}
-							onSetLocalFilterQuery={setLocalFilterQuery}
-							onSetFilterMode={setFilterModeForLog}
-							onClearLocalFilter={clearLocalFilter}
-							deleteConfirmLogId={deleteConfirmLogId}
-							onDeleteLog={onDeleteLog}
-							onSetDeleteConfirmLogId={setDeleteConfirmLogId}
-							scrollContainerRef={scrollContainerRef}
-							setLightboxImage={setLightboxImage}
-							copyToClipboard={copyToClipboard}
-							ansiConverter={ansiConverter}
-							markdownEditMode={markdownEditMode}
-							onToggleMarkdownEditMode={toggleMarkdownEditMode}
-							onReplayMessage={onReplayMessage}
-							fileTree={fileTree}
-							cwd={cwd}
-							projectRoot={projectRoot}
-							onFileClick={onFileClick}
-							onShowErrorDetails={onShowErrorDetails}
-							onSaveToFile={handleSaveToFile}
-							userMessageAlignment={userMessageAlignment}
-						/>
-					))}
+						}
+
+						// Compute turn duration: time from the last user message to this AI response
+						let turnDurationMs: number | undefined;
+						if (isAIMode && log.source === 'ai') {
+							for (let j = unitIndex - 1; j >= 0; j--) {
+								const prev = filteredLogs[j];
+								if (prev.type === 'workGroup') continue;
+								if (prev.source === 'user') {
+									turnDurationMs = log.timestamp - prev.timestamp;
+									break;
+								}
+								// Stop searching if we hit another AI message (different turn)
+								if (prev.source === 'ai') break;
+							}
+						}
+
+						return (
+							<LogItemComponent
+								key={log.id}
+								log={log}
+								index={unitIndex}
+								prevSource={prevSource}
+								turnDurationMs={turnDurationMs}
+								isTerminal={isTerminal}
+								isAIMode={isAIMode}
+								theme={theme}
+								fontFamily={fontFamily}
+								maxOutputLines={maxOutputLines}
+								lastUserCommand={
+									isTerminal && log.source !== 'user' ? getLastUserCommand(unitIndex) : undefined
+								}
+								isExpanded={expandedLogs.has(log.id)}
+								onToggleExpanded={toggleExpanded}
+								localFilterQuery={localFilters.get(log.id) || ''}
+								filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}
+								activeLocalFilter={activeLocalFilter}
+								onToggleLocalFilter={toggleLocalFilter}
+								onSetLocalFilterQuery={setLocalFilterQuery}
+								onSetFilterMode={setFilterModeForLog}
+								onClearLocalFilter={clearLocalFilter}
+								deleteConfirmLogId={deleteConfirmLogId}
+								onDeleteLog={onDeleteLog}
+								onSetDeleteConfirmLogId={setDeleteConfirmLogId}
+								scrollContainerRef={scrollContainerRef}
+								setLightboxImage={setLightboxImage}
+								copyToClipboard={copyToClipboard}
+								ansiConverter={ansiConverter}
+								markdownEditMode={markdownEditMode}
+								onToggleMarkdownEditMode={toggleMarkdownEditMode}
+								onReplayMessage={onReplayMessage}
+								fileTree={fileTree}
+								cwd={cwd}
+								projectRoot={projectRoot}
+								onFileClick={onFileClick}
+								onShowErrorDetails={onShowErrorDetails}
+								onSaveToFile={handleSaveToFile}
+								userMessageAlignment={userMessageAlignment}
+								onAnswerQuestion={handleAnswerQuestion}
+							/>
+						);
+					})}
 
 					{/* Queued items section - filtered to active tab */}
 					{session.executionQueue && session.executionQueue.length > 0 && (
