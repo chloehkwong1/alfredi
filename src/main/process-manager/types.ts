@@ -85,6 +85,12 @@ export interface ManagedProcess {
 	sdkAdapter?: ClaudeSDKAdapter;
 	/** Whether this process uses the SDK adapter instead of CLI */
 	isSDKMode?: boolean;
+	/** Last per-API-call usage from SDK assistant messages (for accurate context estimation) */
+	lastApiCallUsage?: {
+		inputTokens: number;
+		cacheReadInputTokens: number;
+		cacheCreationInputTokens: number;
+	};
 }
 
 export interface UsageTotals {

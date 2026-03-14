@@ -310,9 +310,29 @@ export class ClaudeSDKAdapter {
 	}
 
 	/**
-	 * Handle complete assistant message — extract tool_use blocks.
+	 * Handle complete assistant message — extract tool_use blocks and per-call usage.
+	 *
+	 * Each SDKAssistantMessage corresponds to one Anthropic API call. The message.usage
+	 * field contains per-call token counts (input, cacheRead, cacheCreation) that accurately
+	 * represent the CURRENT context window usage for that call.
+	 *
+	 * We store these per-call values so buildUsageFromResult can use them instead of the
+	 * cumulative session totals from the result message. The cumulative totals sum
+	 * cacheRead across all internal API calls, grossly inflating the context percentage.
 	 */
 	private handleAssistantMessage(sessionId: string, message: SDKAssistantMessage): void {
+		const managedProcess = this.processes.get(sessionId);
+
+		// Extract per-API-call usage from the BetaMessage for accurate context tracking
+		if (managedProcess && message.message?.usage) {
+			const apiUsage = message.message.usage as Record<string, number>;
+			managedProcess.lastApiCallUsage = {
+				inputTokens: apiUsage.input_tokens || 0,
+				cacheReadInputTokens: apiUsage.cache_read_input_tokens || 0,
+				cacheCreationInputTokens: apiUsage.cache_creation_input_tokens || 0,
+			};
+		}
+
 		if (!message.message?.content) return;
 
 		const content = message.message.content;
@@ -465,8 +485,16 @@ export class ClaudeSDKAdapter {
 
 	/**
 	 * Build UsageStats from an SDK result message.
-	 * The SDK's result includes both modelUsage (per-model breakdown) and
-	 * flat usage/total_cost_usd fields, matching the CLI output format.
+	 *
+	 * The SDK's result includes cumulative modelUsage/usage across ALL internal API calls.
+	 * For context estimation, these cumulative values are wrong: cacheRead is summed across
+	 * N calls (each re-reads the conversation from cache), inflating the total by ~Nx.
+	 *
+	 * To fix this, we use the per-API-call usage from the last SDKAssistantMessage
+	 * (stored in managedProcess.lastApiCallUsage) for context-related tokens. These
+	 * per-call values accurately represent the CURRENT context window usage.
+	 *
+	 * Cost and output tokens still come from the cumulative result (correct for totals).
 	 */
 	private buildUsageFromResult(
 		managedProcess: ManagedProcess,
@@ -481,14 +509,23 @@ export class ClaudeSDKAdapter {
 			return null;
 		}
 
-		// Use the same aggregation helper as the CLI path
+		// Aggregate cumulative values for cost and output tokens
 		const aggregated = aggregateModelUsage(modelUsage, usage || {}, totalCostUsd || 0);
 
-		return {
+		// Use per-API-call context tokens from the last assistant message when available.
+		// These represent the actual current context size, not the inflated cumulative sum.
+		const lastCall = managedProcess.lastApiCallUsage;
+		const contextTokens = lastCall || {
 			inputTokens: aggregated.inputTokens,
-			outputTokens: aggregated.outputTokens,
 			cacheReadInputTokens: aggregated.cacheReadInputTokens,
 			cacheCreationInputTokens: aggregated.cacheCreationInputTokens,
+		};
+
+		return {
+			inputTokens: contextTokens.inputTokens,
+			outputTokens: aggregated.outputTokens,
+			cacheReadInputTokens: contextTokens.cacheReadInputTokens,
+			cacheCreationInputTokens: contextTokens.cacheCreationInputTokens,
 			totalCostUsd: aggregated.totalCostUsd,
 			contextWindow: aggregated.contextWindow || managedProcess.contextWindow || 200000,
 		};
