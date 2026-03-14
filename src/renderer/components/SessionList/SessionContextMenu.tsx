@@ -118,7 +118,7 @@ export function SessionContextMenu({
 				style={{ color: theme.colors.textMain }}
 			>
 				<Settings className="w-3.5 h-3.5" />
-				Edit Agent...
+				Edit Project...
 			</button>
 
 			<button
@@ -259,7 +259,7 @@ export function SessionContextMenu({
 						style={{ color: theme.colors.error }}
 					>
 						<Trash2 className="w-3.5 h-3.5" />
-						Remove Agent
+						Remove Project
 					</button>
 				</>
 			)}

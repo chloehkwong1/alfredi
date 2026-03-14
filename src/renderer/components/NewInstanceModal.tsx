@@ -667,10 +667,10 @@ export function NewInstanceModal({
 	if (!isOpen) return null;
 
 	return (
-		<div onKeyDown={handleKeyDown} role="group" aria-label="Create new agent dialog">
+		<div onKeyDown={handleKeyDown} role="group" aria-label="Create new project dialog">
 			<Modal
 				theme={theme}
-				title="Create New Agent"
+				title="Create New Project"
 				priority={MODAL_PRIORITIES.NEW_INSTANCE}
 				onClose={onClose}
 				width={600}
@@ -680,18 +680,18 @@ export function NewInstanceModal({
 						theme={theme}
 						onCancel={onClose}
 						onConfirm={handleCreate}
-						confirmLabel="Create Agent"
+						confirmLabel="Create Project"
 						confirmDisabled={!isFormValid}
 					/>
 				}
 			>
 				<div className="space-y-5">
-					{/* Agent Name */}
+					{/* Project Name */}
 					<FormInput
 						ref={nameInputRef}
 						id="agent-name-input"
 						theme={theme}
-						label="Agent Name"
+						label="Project Name"
 						value={instanceName}
 						onChange={setInstanceName}
 						placeholder=""
@@ -1561,10 +1561,10 @@ export function EditAgentModal({
 	const agentName = agentNameMap[selectedToolType] || selectedToolType;
 
 	return (
-		<div onKeyDown={handleKeyDown} role="group" aria-label="Edit agent dialog">
+		<div onKeyDown={handleKeyDown} role="group" aria-label="Edit project dialog">
 			<Modal
 				theme={theme}
-				title={`Edit Agent: ${session.name}`}
+				title={`Edit Project: ${session.name}`}
 				priority={MODAL_PRIORITIES.NEW_INSTANCE}
 				onClose={onClose}
 				width={600}
@@ -1575,7 +1575,7 @@ export function EditAgentModal({
 						style={{ borderColor: theme.colors.border }}
 					>
 						<h2 className="text-sm font-bold" style={{ color: theme.colors.textMain }}>
-							Edit Agent: {session.name}
+							Edit Project: {session.name}
 						</h2>
 						<div className="flex items-center gap-2">
 							<button
@@ -1617,12 +1617,12 @@ export function EditAgentModal({
 				}
 			>
 				<div className="space-y-5">
-					{/* Agent Name */}
+					{/* Project Name */}
 					<FormInput
 						ref={nameInputRef}
 						id="edit-agent-name-input"
 						theme={theme}
-						label="Agent Name"
+						label="Project Name"
 						value={instanceName}
 						onChange={setInstanceName}
 						placeholder=""
@@ -1692,7 +1692,7 @@ export function EditAgentModal({
 							{session.projectRoot}
 						</div>
 						<p className="mt-1 text-xs" style={{ color: theme.colors.textDim }}>
-							Directory cannot be changed. Create a new agent for a different directory.
+							Directory cannot be changed. Create a new project for a different directory.
 						</p>
 						{/* Remote path validation status (only shown when SSH is enabled) */}
 						{isSshEnabled && (

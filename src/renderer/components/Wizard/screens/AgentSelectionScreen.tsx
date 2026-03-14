@@ -1078,7 +1078,7 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
 			{/* Section 1: Header + Name/Location Row */}
 			<div className="flex flex-col items-center gap-4">
 				<h3 className="text-2xl font-semibold" style={{ color: theme.colors.textMain }}>
-					Create a Maestro Agent
+					Create a Maestro Project
 				</h3>
 
 				{/* Name + Location Row */}

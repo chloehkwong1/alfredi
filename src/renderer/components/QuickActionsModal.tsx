@@ -282,7 +282,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		...sessionActions,
 		{
 			id: 'new',
-			label: 'Create New Agent',
+			label: 'Create New Project',
 			shortcut: shortcuts.newInstance,
 			action: addNewSession,
 		},
@@ -290,7 +290,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'wizard',
-						label: 'New Agent Wizard',
+						label: 'New Project Wizard',
 						shortcut: shortcuts.openWizard,
 						action: () => {
 							openWizard();
@@ -303,7 +303,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'rename',
-						label: `Rename Agent: ${activeSession.name}`,
+						label: `Rename Project: ${activeSession.name}`,
 						action: () => {
 							setRenameInstanceValue(activeSession.name);
 							setRenameInstanceModalOpen(true);
@@ -316,7 +316,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'editAgent',
-						label: `Edit Agent: ${activeSession.name}`,
+						label: `Edit Project: ${activeSession.name}`,
 						shortcut: shortcuts.agentSettings,
 						action: () => {
 							onEditAgent(activeSession);
@@ -520,7 +520,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'kill',
-						label: `Remove Agent: ${activeSession.name}`,
+						label: `Remove Project: ${activeSession.name}`,
 						shortcut: shortcuts.killInstance,
 						action: () => deleteSession(activeSessionId),
 					},
@@ -600,7 +600,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'agentSessions',
-						label: `View Agent Sessions for ${activeSession.name}`,
+						label: `View Project Sessions for ${activeSession.name}`,
 						shortcut: shortcuts.agentSessions,
 						action: () => {
 							setActiveAgentSessionId(null);
@@ -642,9 +642,9 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'sendToAgent',
-						label: 'Context: Send to Agent',
+						label: 'Context: Send to Project',
 						shortcut: shortcuts.sendToAgent,
-						subtext: 'Transfer context to a different AI agent',
+						subtext: 'Transfer context to a different project',
 						action: () => {
 							onOpenSendToAgent();
 							setQuickActionOpen(false);
@@ -890,8 +890,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		// Search actions - focus search inputs in various panels
 		{
 			id: 'searchAgents',
-			label: 'Search: Agents',
-			subtext: 'Filter agents in the sidebar',
+			label: 'Search: Projects',
+			subtext: 'Filter projects in the sidebar',
 			action: () => {
 				setQuickActionOpen(false);
 				setLeftSidebarOpen(true);
@@ -1164,7 +1164,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						<input
 							ref={inputRef}
 							className="flex-1 bg-transparent outline-none text-lg placeholder-opacity-50"
-							placeholder="Type a command or jump to agent..."
+							placeholder="Type a command or jump to project..."
 							style={{ color: theme.colors.textMain }}
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}

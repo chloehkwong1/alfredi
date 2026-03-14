@@ -125,7 +125,7 @@ export function DeleteAgentConfirmModal({
 						{workingDirectory}
 					</code>
 					<p className="text-xs leading-relaxed" style={{ color: theme.colors.textDim }}>
-						Enter agent name below to enable working directory deletion:
+						Enter project name below to enable working directory deletion:
 					</p>
 					<input
 						type="text"
@@ -138,7 +138,7 @@ export function DeleteAgentConfirmModal({
 							color: theme.colors.textMain,
 							border: `1px solid ${theme.colors.border}`,
 						}}
-						aria-label="Confirm agent name"
+						aria-label="Confirm project name"
 					/>
 				</div>
 			</div>

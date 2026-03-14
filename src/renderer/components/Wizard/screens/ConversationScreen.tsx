@@ -669,7 +669,7 @@ export function ConversationScreen({
 				// Safety check: selectedAgent should always be set at this point
 				// but we guard against null to prevent crashes
 				if (!state.selectedAgent) {
-					setConversationError('No agent selected. Please go back and select an agent.');
+					setConversationError('No agent selected. Please go back and select an agent provider.');
 					setConversationLoading(false);
 					return;
 				}
@@ -904,7 +904,7 @@ export function ConversationScreen({
 			// Re-initialize conversation if needed
 			if (!conversationManager.isConversationActive()) {
 				if (!state.selectedAgent) {
-					setConversationError('No agent selected. Please go back and select an agent.');
+					setConversationError('No agent selected. Please go back and select an agent provider.');
 					setConversationLoading(false);
 					return;
 				}

@@ -32,7 +32,7 @@ export const SidebarActions = memo(function SidebarActions({
 				className={`flex items-center justify-center p-2 rounded transition-colors w-8 h-8 shrink-0 ${hasNoSessions && leftSidebarOpen ? 'opacity-20 cursor-not-allowed' : 'hover:bg-white/5'}`}
 				title={
 					hasNoSessions && leftSidebarOpen
-						? 'Add an agent first to collapse sidebar'
+						? 'Add a project first to collapse sidebar'
 						: `${leftSidebarOpen ? 'Collapse' : 'Expand'} Sidebar (${formatShortcutKeys(shortcuts.toggleSidebar.keys)})`
 				}
 			>
@@ -50,7 +50,7 @@ export const SidebarActions = memo(function SidebarActions({
 					className="flex-1 flex items-center justify-center gap-2 py-2 rounded text-xs font-bold transition-colors hover:opacity-90"
 					style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
 				>
-					<Bot className="w-3 h-3" /> New Agent
+					<Bot className="w-3 h-3" /> New Project
 				</button>
 			)}
 		</div>

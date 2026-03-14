@@ -14,7 +14,6 @@ import type { WorktreeStatus } from '../../../shared/types';
 
 import { SessionItem } from '../SessionItem';
 import { useLiveOverlay, useResizablePanel } from '../../hooks';
-import { useGitFileStatus } from '../../contexts/GitStatusContext';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -74,7 +73,6 @@ interface SessionListProps {
 	onOpenWorktreeConfig?: (session: Session) => void;
 	onDeleteWorktree?: (session: Session) => void;
 	onRunWorktreeScript?: (session: Session) => void;
-	onToggleWorktreeServer?: (session: Session) => void;
 }
 
 function SessionListInner(props: SessionListProps) {
@@ -142,7 +140,6 @@ function SessionListInner(props: SessionListProps) {
 		onOpenWorktreeConfig,
 		onDeleteWorktree,
 		onRunWorktreeScript,
-		onToggleWorktreeServer,
 		showSessionJumpNumbers = false,
 		visibleSessions = [],
 		sidebarContainerRef,
@@ -363,11 +360,6 @@ function SessionListInner(props: SessionListProps) {
 		return () => window.removeEventListener('tour:action', handleTourAction);
 	}, []);
 
-	// Get git file change counts per session from focused context
-	// Using useGitFileStatus instead of full useGitStatus reduces re-renders
-	// when only branch data changes (we only need file counts here)
-	const { getFileCount } = useGitFileStatus();
-
 	const {
 		sortedWorktreeChildrenByParentId,
 		sortedSessionIndexById,
@@ -451,8 +443,6 @@ function SessionListInner(props: SessionListProps) {
 					isKeyboardSelected={isKeyboardSelected}
 					isDragging={draggingSessionId === session.id}
 					isEditing={editingSessionId === `${options.keyPrefix}-${session.id}`}
-					leftSidebarOpen={leftSidebarOpen}
-					gitFileCount={getFileCount(session.id)}
 					isInBatch={activeBatchSessionIds.includes(session.id)}
 					jumpNumber={getSessionJumpNumber(session.id)}
 					onSelect={selectHandlers.get(session.id)!}
@@ -507,8 +497,6 @@ function SessionListInner(props: SessionListProps) {
 									isKeyboardSelected={isChildKeyboardSelected}
 									isDragging={draggingSessionId === child.id}
 									isEditing={editingSessionId === `worktree-${session.id}-${child.id}`}
-									leftSidebarOpen={leftSidebarOpen}
-									gitFileCount={getFileCount(child.id)}
 									isInBatch={activeBatchSessionIds.includes(child.id)}
 									jumpNumber={getSessionJumpNumber(child.id)}
 									onSelect={selectHandlers.get(child.id)!}
@@ -517,10 +505,6 @@ function SessionListInner(props: SessionListProps) {
 									onFinishRename={finishRenameHandlers.get(child.id)!}
 									onStartRename={() => startRenamingSession(`worktree-${session.id}-${child.id}`)}
 									onToggleBookmark={toggleBookmarkHandlers.get(child.id)!}
-									hasRunScript={!!session.worktreeConfig?.runScript}
-									onToggleServer={
-										onToggleWorktreeServer ? () => onToggleWorktreeServer(child) : undefined
-									}
 								/>
 							);
 						};
@@ -861,7 +845,7 @@ function SessionListInner(props: SessionListProps) {
 							<input
 								autoFocus
 								type="text"
-								placeholder="Filter agents..."
+								placeholder="Filter projects..."
 								value={sessionFilter}
 								onChange={(e) => setSessionFilter(e.target.value)}
 								onKeyDown={(e) => {
@@ -926,7 +910,6 @@ function SessionListInner(props: SessionListProps) {
 											leftSidebarWidth={leftSidebarWidthState}
 											contextWarningYellowThreshold={contextWarningYellowThreshold}
 											contextWarningRedThreshold={contextWarningRedThreshold}
-											getFileCount={getFileCount}
 											getWorktreeChildren={getWorktreeChildren}
 											setActiveSessionId={setActiveSessionId}
 										/>
@@ -955,7 +938,6 @@ function SessionListInner(props: SessionListProps) {
 					activeBatchSessionIds={activeBatchSessionIds}
 					contextWarningYellowThreshold={contextWarningYellowThreshold}
 					contextWarningRedThreshold={contextWarningRedThreshold}
-					getFileCount={getFileCount}
 					setActiveSessionId={setActiveSessionId}
 					handleContextMenu={handleContextMenu}
 				/>

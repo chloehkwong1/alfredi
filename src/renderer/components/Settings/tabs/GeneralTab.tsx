@@ -681,7 +681,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 						theme={theme}
 					/>
 					<p className="text-xs opacity-50 mt-2">
-						Only applies to Claude Code agents. Can be overridden per-agent in agent settings.
+						Only applies to Claude Code agents. Can be overridden per-project in project settings.
 					</p>
 				</div>
 			</div>

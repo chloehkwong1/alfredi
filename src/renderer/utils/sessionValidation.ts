@@ -39,7 +39,7 @@ export function validateNewSession(
 	if (duplicateName) {
 		return {
 			valid: false,
-			error: `An agent named "${duplicateName.name}" already exists`,
+			error: `A project named "${duplicateName.name}" already exists`,
 			errorField: 'name',
 		};
 	}
@@ -59,7 +59,7 @@ export function validateNewSession(
 			agentNames.length === 1 ? `"${agentNames[0]}"` : agentNames.map((n) => `"${n}"`).join(', ');
 		return {
 			valid: true, // User can proceed after acknowledgment
-			warning: `This directory is already used by ${agentList}. Running multiple agents in the same directory may cause them to clobber each other's work.`,
+			warning: `This directory is already used by ${agentList}. Running multiple projects in the same directory may cause them to clobber each other's work.`,
 			warningField: 'directory',
 			conflictingAgents: agentNames,
 		};
@@ -89,7 +89,7 @@ export function validateEditSession(
 	if (duplicateName) {
 		return {
 			valid: false,
-			error: `An agent named "${duplicateName.name}" already exists`,
+			error: `A project named "${duplicateName.name}" already exists`,
 			errorField: 'name',
 		};
 	}
