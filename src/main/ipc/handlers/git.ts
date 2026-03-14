@@ -1766,7 +1766,13 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 
 				const result = await execFileNoThrow(
 					ghCommand,
-					['pr', 'view', branch, '--json', 'state,url,number,headRefName'],
+					[
+						'pr',
+						'view',
+						branch,
+						'--json',
+						'state,url,number,headRefName,title,reviewDecision,statusCheckRollup',
+					],
 					repoPath
 				);
 
@@ -1777,10 +1783,57 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 
 				try {
 					const data = JSON.parse(result.stdout.trim());
+
+					// Summarize statusCheckRollup into counts
+					let checkStatus: {
+						total: number;
+						passing: number;
+						failing: number;
+						pending: number;
+					} | null = null;
+					if (Array.isArray(data.statusCheckRollup) && data.statusCheckRollup.length > 0) {
+						const counts = { total: 0, passing: 0, failing: 0, pending: 0 };
+						for (const check of data.statusCheckRollup) {
+							counts.total++;
+							const conclusion = (check.conclusion || '').toUpperCase();
+							const status = (check.status || '').toUpperCase();
+							if (
+								conclusion === 'SUCCESS' ||
+								conclusion === 'NEUTRAL' ||
+								conclusion === 'SKIPPED'
+							) {
+								counts.passing++;
+							} else if (
+								conclusion === 'FAILURE' ||
+								conclusion === 'TIMED_OUT' ||
+								conclusion === 'CANCELLED' ||
+								conclusion === 'ACTION_REQUIRED'
+							) {
+								counts.failing++;
+							} else if (
+								status === 'IN_PROGRESS' ||
+								status === 'QUEUED' ||
+								status === 'PENDING' ||
+								status === 'WAITING' ||
+								conclusion === ''
+							) {
+								counts.pending++;
+							} else {
+								// Unknown state — treat as pending
+								counts.pending++;
+							}
+						}
+						checkStatus = counts;
+					}
+
 					return {
 						state: data.state as 'OPEN' | 'MERGED' | 'CLOSED',
 						url: data.url as string,
 						number: data.number as number,
+						title: (data.title as string) || undefined,
+						reviewDecision:
+							(data.reviewDecision as 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED') || null,
+						checkStatus,
 					};
 				} catch {
 					logger.warn(

@@ -42,14 +42,12 @@ function getWorktreesToPoll(sessions: Session[]): Session[] {
 	}
 
 	// Return worktree children of active parents that have a branch and aren't done/archived
-	// Skip worktrees whose status was manually set via drag-and-drop (manual override takes priority)
 	return sessions.filter(
 		(s) =>
 			s.parentSessionId &&
 			parentIds.has(s.parentSessionId) &&
 			s.worktreeBranch &&
-			s.worktreeStatus !== 'done' &&
-			!s.worktreeManualStatus
+			s.worktreeStatus !== 'done'
 	);
 }
 
@@ -95,20 +93,33 @@ export function useWorktreeStatusPoller(): void {
 				if (current.worktreePrUrl !== prStatus.url) {
 					prUpdates.worktreePrUrl = prStatus.url;
 				}
+				// Populate new PR fields used by PrChip in SessionItem
+				if (current.prNumber !== prStatus.number) {
+					prUpdates.prNumber = prStatus.number;
+				}
+				if (current.prUrl !== prStatus.url) {
+					prUpdates.prUrl = prStatus.url;
+				}
+				if (current.prTitle !== prStatus.title) {
+					prUpdates.prTitle = prStatus.title;
+				}
+				if (current.prReviewDecision !== prStatus.reviewDecision) {
+					prUpdates.prReviewDecision = prStatus.reviewDecision;
+				}
+				// Always update checkStatus (object comparison not worth the complexity)
+				prUpdates.prCheckStatus = prStatus.checkStatus;
 
-				if (prStatus.state === 'OPEN' && current.worktreeStatus !== 'in_review') {
-					updateSession(worktree.id, {
-						...prUpdates,
-						worktreeStatus: 'in_review',
-					});
-				} else if (prStatus.state === 'MERGED' && current.worktreeStatus !== 'done') {
-					updateSession(worktree.id, {
-						...prUpdates,
-						worktreeStatus: 'done',
-						worktreeArchivedAt: Date.now(),
-					});
-				} else if (Object.keys(prUpdates).length > 0) {
-					// Just update PR info without changing status
+				// Auto-transition kanban status unless manually overridden via drag-and-drop
+				if (!current.worktreeManualStatus) {
+					if (prStatus.state === 'OPEN' && current.worktreeStatus !== 'in_review') {
+						prUpdates.worktreeStatus = 'in_review';
+					} else if (prStatus.state === 'MERGED' && current.worktreeStatus !== 'done') {
+						prUpdates.worktreeStatus = 'done';
+						prUpdates.worktreeArchivedAt = Date.now();
+					}
+				}
+
+				if (Object.keys(prUpdates).length > 0) {
 					updateSession(worktree.id, prUpdates);
 				}
 			})

@@ -642,6 +642,14 @@ export interface Session {
 	worktreeManualStatus?: boolean; // True when status was manually set via drag-and-drop (overrides auto-detection)
 	worktreePrNumber?: number; // Linked PR number (for status detection and quick access)
 	worktreePrUrl?: string; // PR URL for quick access (e.g., open in browser)
+	// Current git branch for this session (set for all git-backed agents, not just worktrees)
+	currentBranch?: string;
+	// PR display fields (populated from gh pr view for the PR chip in the left bar)
+	prNumber?: number;
+	prUrl?: string;
+	prTitle?: string;
+	prReviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+	prCheckStatus?: { total: number; passing: number; failing: number; pending: number } | null;
 	worktreeArchivedAt?: number; // Timestamp when moved to Done (for auto-archive countdown)
 	worktreeArchived?: boolean; // True when auto-archived (hidden from sidebar, worktree dir kept on disk)
 	worktreeServerProcessId?: string; // ProcessManager key (e.g., `${sessionId}-server`) when a server is running

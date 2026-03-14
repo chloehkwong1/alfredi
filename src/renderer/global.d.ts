@@ -655,6 +655,9 @@ interface MaestroAPI {
 			state: 'OPEN' | 'MERGED' | 'CLOSED';
 			url: string;
 			number: number;
+			title?: string;
+			reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+			checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
 		} | null>;
 		/**
 		 * Discard unstaged changes for a single file

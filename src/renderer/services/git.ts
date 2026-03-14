@@ -278,7 +278,14 @@ export const gitService = {
 	async getPrStatus(
 		repoPath: string,
 		branch: string
-	): Promise<{ state: 'OPEN' | 'MERGED' | 'CLOSED'; url: string; number: number } | null> {
+	): Promise<{
+		state: 'OPEN' | 'MERGED' | 'CLOSED';
+		url: string;
+		number: number;
+		title?: string;
+		reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+		checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
+	} | null> {
 		return createIpcMethod({
 			call: () => window.maestro.git.getPrStatus(repoPath, branch),
 			errorContext: 'Git getPrStatus',

@@ -445,8 +445,14 @@ export function createGitApi() {
 		getPrStatus: (
 			repoPath: string,
 			branch: string
-		): Promise<{ state: 'OPEN' | 'MERGED' | 'CLOSED'; url: string; number: number } | null> =>
-			ipcRenderer.invoke('git:prStatus', repoPath, branch),
+		): Promise<{
+			state: 'OPEN' | 'MERGED' | 'CLOSED';
+			url: string;
+			number: number;
+			title?: string;
+			reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+			checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
+		} | null> => ipcRenderer.invoke('git:prStatus', repoPath, branch),
 
 		/**
 		 * Discard unstaged changes for a single file
