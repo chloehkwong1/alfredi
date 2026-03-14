@@ -103,8 +103,8 @@ export class PtySpawner {
 
 			const ptyProcess = pty.spawn(ptyCommand, ptyArgs, {
 				name: 'xterm-256color',
-				cols: 100,
-				rows: 30,
+				cols: config.initialCols || 80,
+				rows: config.initialRows || 24,
 				cwd: cwd,
 				env: ptyEnv as Record<string, string>,
 			});
@@ -137,10 +137,10 @@ export class PtySpawner {
 					this.bufferManager.emitDataBuffered(sessionId, cleanedData);
 				}
 
-				// For terminal processes, also emit raw unfiltered data for xterm.js
-				if (isTerminal) {
-					this.bufferManager.emitRawDataBuffered(sessionId, data);
-				}
+				// Emit raw unfiltered data for xterm.js rendering.
+				// Needed for terminal sessions and any PTY process rendered in an xterm viewer
+				// (e.g., worktree-server processes shown in the Server tab).
+				this.bufferManager.emitRawDataBuffered(sessionId, data);
 			});
 
 			ptyProcess.onExit(({ exitCode }) => {

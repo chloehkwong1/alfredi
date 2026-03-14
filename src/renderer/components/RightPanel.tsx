@@ -162,14 +162,24 @@ function TerminalTabInstance({
 	themeColors,
 	onReady,
 }: TerminalTabInstanceProps) {
+	// Track terminal container dimensions — spawn is deferred until these are known
+	const [termDims, setTermDims] = useState<{ cols: number; rows: number } | null>(null);
+
 	const persistentTerminal = usePersistentTerminal({
 		sessionId,
 		tabId,
 		cwd,
 		enabled,
+		initialCols: termDims?.cols,
+		initialRows: termDims?.rows,
 	});
 
 	const xtermRef = useRef<import('./XTerminal').XTerminalHandle>(null);
+
+	// Capture initial terminal dimensions from XTerminal's first fit
+	const handleInitialFit = useCallback((cols: number, rows: number) => {
+		setTermDims({ cols, rows });
+	}, []);
 
 	// Bridge XTerminal imperative handle to the hook's terminalRef
 	React.useEffect(() => {
@@ -203,6 +213,7 @@ function TerminalTabInstance({
 				fontFamily={fontFamily}
 				fontSize={fontSize}
 				themeColors={themeColors}
+				onInitialFit={handleInitialFit}
 			/>
 		</div>
 	);
@@ -234,9 +245,9 @@ function ServerTerminalTabInstance({
 }: ServerTerminalTabInstanceProps) {
 	const xtermRef = useRef<import('./XTerminal').XTerminalHandle>(null);
 
-	// Subscribe to non-PTY data events for the server process
+	// Subscribe to raw PTY data for the server process (preserves ANSI escape sequences)
 	React.useEffect(() => {
-		const unsubData = window.maestro.process.onData((sid: string, data: string) => {
+		const unsubData = window.maestro.process.onRawData((sid: string, data: string) => {
 			if (sid === serverProcessId && xtermRef.current) {
 				xtermRef.current.write(data);
 			}

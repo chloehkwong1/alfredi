@@ -39,6 +39,9 @@ export interface ProcessConfig {
 	// Stats tracking options
 	querySource?: 'user' | 'auto'; // Whether this query is user-initiated or from Auto Run
 	tabId?: string; // Tab ID for multi-tab tracking
+	// Initial PTY dimensions (from the actual terminal container)
+	initialCols?: number;
+	initialRows?: number;
 }
 
 /**

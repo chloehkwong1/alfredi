@@ -897,6 +897,9 @@ export interface ProcessConfig {
 	// Windows command line length workaround
 	sendPromptViaStdin?: boolean; // If true, send the prompt via stdin as JSON instead of command line
 	sendPromptViaStdinRaw?: boolean; // If true, send the prompt via stdin as raw text instead of command line
+	// Initial PTY dimensions (from the actual terminal container)
+	initialCols?: number;
+	initialRows?: number;
 }
 
 // Directory entry from fs:readDir

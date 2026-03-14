@@ -18,6 +18,8 @@ export interface XTerminalProps {
 	fontFamily: string;
 	fontSize: number;
 	themeColors: ThemeColors;
+	/** Called once after the first fit with the actual terminal dimensions */
+	onInitialFit?: (cols: number, rows: number) => void;
 }
 
 export interface XTerminalHandle {
@@ -28,7 +30,7 @@ export interface XTerminalHandle {
 }
 
 const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
-	({ sessionId, fontFamily, fontSize, themeColors }, ref) => {
+	({ sessionId, fontFamily, fontSize, themeColors, onInitialFit }, ref) => {
 		const containerRef = useRef<HTMLDivElement>(null);
 		const terminalRef = useRef<Terminal | null>(null);
 		const fitAddonRef = useRef<FitAddon | null>(null);
@@ -37,6 +39,9 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 		// Track the latest sessionId so callbacks always reference the current one
 		const sessionIdRef = useRef(sessionId);
 		sessionIdRef.current = sessionId;
+		const initialFitFiredRef = useRef(false);
+		const onInitialFitRef = useRef(onInitialFit);
+		onInitialFitRef.current = onInitialFit;
 
 		const [searchVisible, setSearchVisible] = useState(false);
 		const [searchQuery, setSearchQuery] = useState('');
@@ -185,6 +190,10 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			// Forward resize events to the PTY
 			const onResizeDisposable = terminal.onResize(({ cols, rows }) => {
 				window.maestro.process.resize(sessionIdRef.current, cols, rows);
+				if (!initialFitFiredRef.current) {
+					initialFitFiredRef.current = true;
+					onInitialFitRef.current?.(cols, rows);
+				}
 			});
 
 			// Auto-fit when the container resizes

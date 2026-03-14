@@ -27,6 +27,10 @@ export interface UsePersistentTerminalDeps {
 	cwd: string;
 	/** Whether the terminal should be active (spawn/attach). Set false to defer. */
 	enabled?: boolean;
+	/** Initial PTY columns from the actual terminal container. Spawn is deferred until set. */
+	initialCols?: number;
+	/** Initial PTY rows from the actual terminal container. Spawn is deferred until set. */
+	initialRows?: number;
 }
 
 export interface UsePersistentTerminalReturn {
@@ -70,7 +74,7 @@ export function getTerminalProcessId(sessionId: string, tabId: string): string {
 export function usePersistentTerminal(
 	deps: UsePersistentTerminalDeps
 ): UsePersistentTerminalReturn {
-	const { sessionId, tabId, cwd, enabled = true } = deps;
+	const { sessionId, tabId, cwd, enabled = true, initialCols, initialRows } = deps;
 
 	const terminalRef = useRef<Terminal | null>(null);
 	const [isReady, setIsReady] = useState(false);
@@ -115,6 +119,8 @@ export function usePersistentTerminal(
 				command: shell,
 				args,
 				shell,
+				initialCols,
+				initialRows,
 			});
 
 			if (!unmountedRef.current) {
@@ -125,7 +131,7 @@ export function usePersistentTerminal(
 		} finally {
 			spawningRef.current = false;
 		}
-	}, [processId, cwd, getShellCommand, shellArgs]);
+	}, [processId, cwd, getShellCommand, shellArgs, initialCols, initialRows]);
 
 	// ------------------------------------------------------------------
 	// Respawn (kill existing + spawn fresh)
@@ -151,6 +157,12 @@ export function usePersistentTerminal(
 		if (!enabled) return;
 
 		unmountedRef.current = false;
+
+		// Defer spawn until the terminal container has reported its dimensions
+		// via onInitialFit. This ensures the PTY starts at the correct size,
+		// preventing garbled output from tools like foreman/overmind that format
+		// based on terminal width at startup.
+		if (!initialCols) return;
 
 		// Spawn the shell
 		spawnShell();
@@ -184,7 +196,7 @@ export function usePersistentTerminal(
 				// Process may already be dead
 			});
 		};
-	}, [enabled, processId, spawnShell]);
+	}, [enabled, processId, spawnShell, initialCols]);
 
 	return { terminalRef, isReady, respawn };
 }

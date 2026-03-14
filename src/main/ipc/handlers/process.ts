@@ -114,6 +114,9 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 				// Stats tracking options
 				querySource?: 'user' | 'auto'; // Whether this query is user-initiated or from Auto Run
 				tabId?: string; // Tab ID for multi-tab tracking
+				// Initial PTY dimensions (from the actual terminal container)
+				initialCols?: number;
+				initialRows?: number;
 			}) => {
 				const processManager = requireProcessManager(getProcessManager);
 				const agentDetector = requireDependency(getAgentDetector, 'Agent detector');
