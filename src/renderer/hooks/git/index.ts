@@ -21,6 +21,9 @@ export type {
 	RightPanelHandle,
 } from './useFileTreeManagement';
 
+// Branch + PR status polling for regular agents
+export { useBranchPoller } from './useBranchPoller';
+
 // File explorer effects & keyboard navigation (Phase 2.6)
 export { useFileExplorerEffects } from './useFileExplorerEffects';
 export type {
