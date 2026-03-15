@@ -16,6 +16,7 @@ import { setupUsageListener } from './usage-listener';
 import { setupSessionIdListener } from './session-id-listener';
 import { setupErrorListener } from './error-listener';
 import { setupStatsListener } from './stats-listener';
+import { setupPlanTabListener } from './plan-tab-listener';
 import { setupExitListener } from './exit-listener';
 
 // Re-export types for consumers
@@ -49,6 +50,9 @@ export function setupProcessListeners(
 
 	// Stats/query-complete listener
 	setupStatsListener(processManager, deps);
+
+	// Plan/research file tab opener
+	setupPlanTabListener(processManager, deps);
 
 	// Exit listener
 	setupExitListener(processManager, deps);

@@ -1053,6 +1053,25 @@ function MaestroConsoleInner() {
 		contextWarningYellowThreshold: contextManagementSettings.contextWarningYellowThreshold,
 	});
 
+	// --- PLAN TAB AUTO-OPEN LISTENER ---
+	// When a plan/research file is written via Write tool, auto-open it as a pinned file tab
+	useEffect(() => {
+		const cleanup = window.maestro.process.onOpenFileTab(async (_sessionId, { path }) => {
+			try {
+				const content = await window.maestro.fs.readFile(path);
+				if (content === null || content === undefined) {
+					console.warn('[plan-tab] Could not read file:', path);
+					return;
+				}
+				const name = path.split('/').pop() || 'plan.md';
+				handleOpenFileTab({ path, name, content: String(content), isPreview: false });
+			} catch (err) {
+				console.warn('[plan-tab] Error opening file tab:', err);
+			}
+		});
+		return cleanup;
+	}, [handleOpenFileTab]);
+
 	const handleRemoveQueuedItem = useCallback((itemId: string) => {
 		setSessions((prev) =>
 			prev.map((s) => {

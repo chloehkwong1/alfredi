@@ -305,6 +305,19 @@ export function createProcessApi() {
 		},
 
 		/**
+		 * Subscribe to plan/research file tab open events
+		 * Emitted when a Write tool creates a -plan.md or -research.md inside .claude/
+		 */
+		onOpenFileTab: (
+			callback: (sessionId: string, data: { path: string }) => void
+		): (() => void) => {
+			const handler = (_: unknown, sessionId: string, data: { path: string }) =>
+				callback(sessionId, data);
+			ipcRenderer.on('plan-tab:open', handler);
+			return () => ipcRenderer.removeListener('plan-tab:open', handler);
+		},
+
+		/**
 		 * Subscribe to AskUserQuestion events from Claude Code
 		 */
 		onUserQuestion: (

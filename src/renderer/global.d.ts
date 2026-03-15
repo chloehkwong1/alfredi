@@ -256,6 +256,7 @@ interface MaestroAPI {
 				toolEvent: { toolName: string; state?: unknown; timestamp: number }
 			) => void
 		) => () => void;
+		onOpenFileTab: (callback: (sessionId: string, data: { path: string }) => void) => () => void;
 		onUserQuestion: (
 			callback: (
 				sessionId: string,
