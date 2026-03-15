@@ -1141,6 +1141,51 @@ export function NewInstanceModal({
 						)}
 					</div>
 
+					{/* Directory mode selector (hidden when SSH remote is enabled) */}
+					{!isSshEnabled && (
+						<div>
+							<label
+								className="block text-sm font-medium mb-1.5"
+								style={{ color: theme.colors.textMain }}
+							>
+								Directory
+							</label>
+							<div
+								className="flex rounded-md overflow-hidden border"
+								style={{ borderColor: theme.colors.border }}
+							>
+								<button
+									type="button"
+									onClick={() => {
+										setCreateNewDir(false);
+										setNewDirName('');
+										setCreateGitHubRepo(false);
+										setCreateDirError(null);
+									}}
+									className="flex-1 px-3 py-1.5 text-sm font-medium transition-colors"
+									style={{
+										backgroundColor: !createNewDir ? theme.colors.accent + '20' : 'transparent',
+										color: !createNewDir ? theme.colors.accent : theme.colors.textDim,
+										borderRight: `1px solid ${theme.colors.border}`,
+									}}
+								>
+									Existing Directory
+								</button>
+								<button
+									type="button"
+									onClick={() => setCreateNewDir(true)}
+									className="flex-1 px-3 py-1.5 text-sm font-medium transition-colors"
+									style={{
+										backgroundColor: createNewDir ? theme.colors.accent + '20' : 'transparent',
+										color: createNewDir ? theme.colors.accent : theme.colors.textDim,
+									}}
+								>
+									New Directory
+								</button>
+							</div>
+						</div>
+					)}
+
 					{/* Working Directory */}
 					<FormInput
 						theme={theme}
@@ -1199,114 +1244,90 @@ export function NewInstanceModal({
 						</div>
 					)}
 
-					{/* Create new directory toggle (hidden when SSH remote is enabled) */}
-					{!isSshEnabled && (
-						<div>
-							<label className="flex items-center gap-2 cursor-pointer">
-								<input
-									type="checkbox"
-									checked={createNewDir}
-									onChange={(e) => {
-										setCreateNewDir(e.target.checked);
-										if (!e.target.checked) {
-											setNewDirName('');
-											setCreateGitHubRepo(false);
-											setCreateDirError(null);
-										}
-									}}
-									className="w-4 h-4 rounded"
-									style={{ accentColor: theme.colors.accent }}
-								/>
-								<span className="text-sm" style={{ color: theme.colors.textMain }}>
-									Create new directory
-								</span>
-							</label>
+					{/* New directory fields (shown when "New Directory" tab is active) */}
+					{!isSshEnabled && createNewDir && (
+						<div className="space-y-3">
+							{/* Directory name input */}
+							<FormInput
+								theme={theme}
+								label="Directory Name"
+								value={newDirName}
+								onChange={(value) => {
+									setNewDirName(value);
+									setCreateDirError(null);
+								}}
+								placeholder="my-project"
+								monospace
+								heightClass="p-2"
+							/>
 
-							{createNewDir && (
-								<div className="mt-3 space-y-3 pl-6">
-									{/* Directory name input */}
-									<FormInput
-										theme={theme}
-										label="Directory Name"
-										value={newDirName}
-										onChange={(value) => {
-											setNewDirName(value);
-											setCreateDirError(null);
-										}}
-										placeholder="my-project"
-										monospace
-										heightClass="p-2"
-									/>
+							{/* Computed path preview */}
+							{workingDir.trim() && newDirName.trim() && (
+								<p className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
+									{expandTilde(workingDir.trim())}/{newDirName.trim()}
+								</p>
+							)}
 
-									{/* Computed path preview */}
-									{workingDir.trim() && newDirName.trim() && (
-										<p className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
-											{expandTilde(workingDir.trim())}/{newDirName.trim()}
-										</p>
-									)}
+							{/* GitHub repo option (only when gh CLI is available) */}
+							{ghAvailable && (
+								<div className="space-y-2">
+									<label className="flex items-center gap-2 cursor-pointer">
+										<input
+											type="checkbox"
+											checked={createGitHubRepo}
+											onChange={(e) => setCreateGitHubRepo(e.target.checked)}
+											className="w-4 h-4 rounded"
+											style={{ accentColor: theme.colors.accent }}
+										/>
+										<span className="text-sm" style={{ color: theme.colors.textMain }}>
+											Create GitHub repository
+										</span>
+									</label>
 
-									{/* GitHub repo option (only when gh CLI is available) */}
-									{ghAvailable && (
-										<div className="space-y-2">
-											<label className="flex items-center gap-2 cursor-pointer">
-												<input
-													type="checkbox"
-													checked={createGitHubRepo}
-													onChange={(e) => setCreateGitHubRepo(e.target.checked)}
-													className="w-4 h-4 rounded"
-													style={{ accentColor: theme.colors.accent }}
-												/>
-												<span className="text-sm" style={{ color: theme.colors.textMain }}>
-													Create GitHub repository
-												</span>
-											</label>
-
-											{createGitHubRepo && (
-												<div className="flex items-center gap-3 pl-6">
-													<label className="flex items-center gap-1.5 cursor-pointer">
-														<input
-															type="radio"
-															name="repo-visibility"
-															checked={isPrivate}
-															onChange={() => setIsPrivate(true)}
-															className="w-3.5 h-3.5"
-															style={{ accentColor: theme.colors.accent }}
-														/>
-														<span className="text-sm" style={{ color: theme.colors.textMain }}>
-															Private
-														</span>
-													</label>
-													<label className="flex items-center gap-1.5 cursor-pointer">
-														<input
-															type="radio"
-															name="repo-visibility"
-															checked={!isPrivate}
-															onChange={() => setIsPrivate(false)}
-															className="w-3.5 h-3.5"
-															style={{ accentColor: theme.colors.accent }}
-														/>
-														<span className="text-sm" style={{ color: theme.colors.textMain }}>
-															Public
-														</span>
-													</label>
-												</div>
-											)}
-										</div>
-									)}
-
-									{/* Error message for mkdir/createRepo failures */}
-									{createDirError && (
+									{createGitHubRepo && (
 										<div
-											className="p-2 rounded border text-xs"
-											style={{
-												backgroundColor: theme.colors.error + '10',
-												borderColor: theme.colors.error + '40',
-												color: theme.colors.error,
-											}}
+											className="flex rounded-md overflow-hidden border"
+											style={{ borderColor: theme.colors.border }}
 										>
-											{createDirError}
+											<button
+												type="button"
+												onClick={() => setIsPrivate(true)}
+												className="flex-1 px-3 py-1 text-xs font-medium transition-colors"
+												style={{
+													backgroundColor: isPrivate ? theme.colors.accent + '20' : 'transparent',
+													color: isPrivate ? theme.colors.accent : theme.colors.textDim,
+													borderRight: `1px solid ${theme.colors.border}`,
+												}}
+											>
+												Private
+											</button>
+											<button
+												type="button"
+												onClick={() => setIsPrivate(false)}
+												className="flex-1 px-3 py-1 text-xs font-medium transition-colors"
+												style={{
+													backgroundColor: !isPrivate ? theme.colors.accent + '20' : 'transparent',
+													color: !isPrivate ? theme.colors.accent : theme.colors.textDim,
+												}}
+											>
+												Public
+											</button>
 										</div>
 									)}
+								</div>
+							)}
+
+							{/* Error message for mkdir/createRepo failures */}
+							{createDirError && (
+								<div
+									className="p-2 rounded border text-xs"
+									style={{
+										backgroundColor: theme.colors.error + '10',
+										borderColor: theme.colors.error + '40',
+										color: theme.colors.error,
+									}}
+								>
+									{createDirError}
 								</div>
 							)}
 						</div>
