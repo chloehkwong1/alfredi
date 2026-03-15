@@ -759,80 +759,60 @@ export const RightPanel = memo(
 						}
 					}}
 				>
-					{/* Terminal tab bar — only shown when 2+ tabs */}
-					{terminalTabs.length >= 2 ? (
-						<div
-							className="flex items-center h-8 shrink-0 border-b overflow-x-auto"
-							style={{ borderColor: theme.colors.border }}
-						>
-							{terminalTabs.map((tab) => (
-								<button
-									key={tab.id}
-									className="flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors"
-									style={{
-										color:
-											tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
-										borderColor:
-											tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
-										backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
+					{/* Terminal tab bar */}
+					<div
+						className="flex items-center h-8 shrink-0 border-b overflow-x-auto"
+						style={{ borderColor: theme.colors.border }}
+					>
+						{terminalTabs.map((tab) => (
+							<button
+								key={tab.id}
+								className="flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors"
+								style={{
+									color:
+										tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
+									borderColor: tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
+									backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
+								}}
+								onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
+							>
+								{tab.serverProcessId ? (
+									<Server className="w-3 h-3" />
+								) : (
+									<Terminal className="w-3 h-3" />
+								)}
+								<span>{tab.name}</span>
+								{/* Loading spinner for this tab (only for shell tabs) */}
+								{!tab.serverProcessId && !tabReadyMap[tab.id] && (
+									<Loader2
+										className="w-3 h-3 animate-spin"
+										style={{ color: theme.colors.textDim }}
+									/>
+								)}
+								{/* Close button */}
+								<span
+									className="ml-0.5 rounded hover:bg-white/10 p-0.5"
+									onClick={(e) => {
+										e.stopPropagation();
+										if (session) removeTerminalTab(session.id, tab.id);
 									}}
-									onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
 								>
-									{tab.serverProcessId ? (
-										<Server className="w-3 h-3" />
-									) : (
-										<Terminal className="w-3 h-3" />
-									)}
-									<span>{tab.name}</span>
-									{/* Loading spinner for this tab (only for shell tabs) */}
-									{!tab.serverProcessId && !tabReadyMap[tab.id] && (
-										<Loader2
-											className="w-3 h-3 animate-spin"
-											style={{ color: theme.colors.textDim }}
-										/>
-									)}
-									{/* Close button */}
-									<span
-										className="ml-0.5 rounded hover:bg-white/10 p-0.5"
-										onClick={(e) => {
-											e.stopPropagation();
-											if (session) removeTerminalTab(session.id, tab.id);
-										}}
-									>
-										<X className="w-3 h-3" />
-									</span>
-								</button>
-							))}
-							{/* Add tab button */}
-							{terminalTabs.length < MAX_TERMINAL_TABS && (
-								<button
-									className="flex items-center justify-center w-7 h-full shrink-0 transition-colors"
-									style={{ color: theme.colors.textDim }}
-									title="New terminal tab (⌘T)"
-									onClick={() => session && addTerminalTab(session.id)}
-								>
-									<Plus className="w-3.5 h-3.5" />
-								</button>
-							)}
-						</div>
-					) : (
-						/* Single tab — minimal "+" button only */
-						<div
-							className="flex items-center justify-end h-6 shrink-0 border-b px-1"
-							style={{ borderColor: theme.colors.border }}
-						>
-							{terminalTabs.length < MAX_TERMINAL_TABS && (
-								<button
-									className="flex items-center justify-center w-5 h-5 rounded transition-colors hover:bg-white/10"
-									style={{ color: theme.colors.textDim }}
-									title="New terminal tab (⌘T)"
-									onClick={() => session && addTerminalTab(session.id)}
-								>
-									<Plus className="w-3 h-3" />
-								</button>
-							)}
-						</div>
-					)}
+									<X className="w-3 h-3" />
+								</span>
+							</button>
+						))}
+						{/* Add tab button */}
+						{terminalTabs.length < MAX_TERMINAL_TABS && (
+							<button
+								className="flex items-center justify-center w-7 h-full shrink-0 transition-colors"
+								style={{ color: theme.colors.textDim }}
+								title="New terminal tab (⌘T)"
+								onClick={() => session && addTerminalTab(session.id)}
+							>
+								<Plus className="w-3.5 h-3.5" />
+							</button>
+						)}
+					</div>
 
 					{/* Terminal instances — all rendered, only active visible */}
 					<div className="flex-1 overflow-hidden relative">

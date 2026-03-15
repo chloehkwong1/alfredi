@@ -17,6 +17,7 @@
 import { ipcMain, dialog, shell, BrowserWindow, App } from 'electron';
 import * as path from 'path';
 import * as fsSync from 'fs';
+import { execFile, execFileSync } from 'child_process';
 import Store from 'electron-store';
 import { execFileNoThrow } from '../../utils/execFile';
 import { logger } from '../../utils/logger';
@@ -286,6 +287,127 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 		const errorMessage = await shell.openPath(absolutePath);
 		if (errorMessage) {
 			logger.warn(`shell:openPath failed for ${absolutePath}: ${errorMessage}`, 'Shell');
+		}
+	});
+
+	// ============ Open in Terminal / Editor Handlers ============
+
+	// Open a directory in the system terminal
+	ipcMain.handle('shell:openInTerminal', async (_event, cwd: string) => {
+		if (!cwd || typeof cwd !== 'string') {
+			logger.warn('shell:openInTerminal - invalid cwd', 'Shell');
+			return;
+		}
+		const absolutePath = path.resolve(cwd);
+		if (!fsSync.existsSync(absolutePath)) {
+			logger.warn(`shell:openInTerminal - path does not exist: ${absolutePath}`, 'Shell');
+			return;
+		}
+
+		try {
+			if (process.platform === 'darwin') {
+				execFile('open', ['-a', 'Terminal', absolutePath], (err) => {
+					if (err) logger.warn(`shell:openInTerminal failed: ${err.message}`, 'Shell');
+				});
+			} else if (process.platform === 'win32') {
+				// Try Windows Terminal first, fall back to cmd
+				execFile('wt', ['-d', absolutePath], (err) => {
+					if (err) {
+						execFile('cmd', ['/c', 'start', 'cmd', '/K', `cd /d "${absolutePath}"`], (err2) => {
+							if (err2) logger.warn(`shell:openInTerminal failed: ${err2.message}`, 'Shell');
+						});
+					}
+				});
+			} else {
+				// Linux: try common terminal emulators
+				const terminals = [
+					{ cmd: 'gnome-terminal', args: [`--working-directory=${absolutePath}`] },
+					{ cmd: 'konsole', args: [`--workdir=${absolutePath}`] },
+					{ cmd: 'xfce4-terminal', args: [`--working-directory=${absolutePath}`] },
+					{ cmd: 'xterm', args: ['-e', `cd "${absolutePath}" && $SHELL`] },
+				];
+
+				let launched = false;
+				for (const terminal of terminals) {
+					try {
+						execFileSync('which', [terminal.cmd]);
+						execFile(terminal.cmd, terminal.args, (err) => {
+							if (err)
+								logger.warn(
+									`shell:openInTerminal (${terminal.cmd}) failed: ${err.message}`,
+									'Shell'
+								);
+						});
+						launched = true;
+						break;
+					} catch {
+						// Terminal not available, try next
+					}
+				}
+				if (!launched) {
+					logger.warn('shell:openInTerminal - no supported terminal emulator found', 'Shell');
+				}
+			}
+		} catch (error) {
+			logger.warn(
+				`shell:openInTerminal failed: ${error instanceof Error ? error.message : String(error)}`,
+				'Shell'
+			);
+		}
+	});
+
+	// Cached editor detection result
+	let cachedEditor: string | null | undefined = undefined; // undefined = not yet detected
+
+	/**
+	 * Detect available code editor CLI. Checks cursor, code, zed in order.
+	 * Caches the result so subsequent calls are instant.
+	 */
+	function detectEditor(): string | null {
+		if (cachedEditor !== undefined) return cachedEditor;
+
+		const editors = ['cursor', 'code', 'zed'];
+		for (const editor of editors) {
+			try {
+				execFileSync('which', [editor], { stdio: 'ignore' });
+				logger.info(`Detected editor: ${editor}`, 'Shell');
+				cachedEditor = editor;
+				return editor;
+			} catch {
+				// Not available, try next
+			}
+		}
+
+		logger.info('No code editor detected, will use OS default', 'Shell');
+		cachedEditor = null;
+		return null;
+	}
+
+	// Open a directory in the preferred code editor
+	ipcMain.handle('shell:openInEditor', async (_event, cwd: string) => {
+		if (!cwd || typeof cwd !== 'string') {
+			logger.warn('shell:openInEditor - invalid cwd', 'Shell');
+			return;
+		}
+		const absolutePath = path.resolve(cwd);
+		if (!fsSync.existsSync(absolutePath)) {
+			logger.warn(`shell:openInEditor - path does not exist: ${absolutePath}`, 'Shell');
+			return;
+		}
+
+		const editor = detectEditor();
+		if (editor) {
+			execFile(editor, [absolutePath], (err) => {
+				if (err) logger.warn(`shell:openInEditor (${editor}) failed: ${err.message}`, 'Shell');
+			});
+		} else if (process.platform === 'darwin') {
+			// macOS fallback: open in Finder
+			const errorMessage = await shell.openPath(absolutePath);
+			if (errorMessage) {
+				logger.warn(`shell:openInEditor fallback failed: ${errorMessage}`, 'Shell');
+			}
+		} else {
+			logger.warn('shell:openInEditor - no editor found and no fallback available', 'Shell');
 		}
 	});
 

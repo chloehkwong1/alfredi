@@ -2064,7 +2064,7 @@ function MaestroConsoleInner() {
 		<GitStatusProvider sessions={sessions} activeSessionId={activeSessionId}>
 			<div
 				className={`flex h-screen w-full font-mono overflow-hidden transition-colors duration-300 ${
-					isMobileLandscape || useNativeTitleBar ? 'pt-0' : 'pt-10'
+					isMobileLandscape || useNativeTitleBar ? 'pt-0' : 'pt-0'
 				}`}
 				style={{
 					backgroundColor: theme.colors.bgMain,
@@ -2111,38 +2111,7 @@ function MaestroConsoleInner() {
 					</div>
 				)}
 
-				{/* --- DRAGGABLE TITLE BAR (hidden in mobile landscape or when using native title bar) --- */}
-				{!isMobileLandscape && !useNativeTitleBar && (
-					<div
-						className="fixed top-0 left-0 right-0 h-10 flex items-center justify-center"
-						style={
-							{
-								WebkitAppRegion: 'drag',
-							} as React.CSSProperties
-						}
-					>
-						{activeSession && (
-							<span
-								className="text-xs select-none opacity-50"
-								style={{ color: theme.colors.textDim }}
-							>
-								{(() => {
-									const parts: string[] = [];
-									// Agent name
-									parts.push(activeSession.name);
-									// Active tab name (skip session ID — it's noise in the title bar)
-									const activeTab = activeSession.aiTabs?.find(
-										(t) => t.id === activeSession.activeTabId
-									);
-									if (activeTab?.name) {
-										parts.push(activeTab.name);
-									}
-									return parts.join(' | ');
-								})()}
-							</span>
-						)}
-					</div>
-				)}
+				{/* Title bar removed — drag region is now on the MainPanel workspace bar */}
 
 				{/* --- UNIFIED MODALS (all modal sections consolidated into AppModals) --- */}
 				<AppModals

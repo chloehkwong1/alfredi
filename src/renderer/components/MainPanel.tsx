@@ -27,6 +27,8 @@ import {
 	Square,
 	ChevronDown,
 	Search,
+	TerminalSquare,
+	Code2,
 } from 'lucide-react';
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
@@ -1109,14 +1111,20 @@ export const MainPanel = React.memo(
 						{!isMobileLandscape && (
 							<div
 								ref={headerRef}
-								className={`header-container h-16 border-b flex items-center justify-between px-6 shrink-0 relative z-20 ${isCurrentSessionAutoMode ? 'header-auto-mode' : ''}`}
-								style={{
-									borderColor: theme.colors.border,
-									backgroundColor: theme.colors.bgSidebar,
-								}}
+								className={`header-container h-10 border-b flex items-center justify-between px-4 shrink-0 relative z-20 ${isCurrentSessionAutoMode ? 'header-auto-mode' : ''}`}
+								style={
+									{
+										borderColor: theme.colors.border,
+										backgroundColor: theme.colors.bgSidebar,
+										WebkitAppRegion: 'drag',
+									} as React.CSSProperties
+								}
 								data-tour="header-controls"
 							>
-								<div className="flex items-center gap-4 min-w-0 flex-1">
+								<div
+									className="flex items-center gap-4 min-w-0 flex-1"
+									style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+								>
 									<div className="flex items-center gap-2 text-sm font-medium min-w-0 flex-1">
 										{/* Session name - hidden for worktree children (branch is the identity), hidden at narrow widths via CSS container query */}
 										{!(isWorktreeChild && currentBranchName) && (
@@ -1407,13 +1415,16 @@ export const MainPanel = React.memo(
 										}}
 										disabled={isCurrentSessionStopping}
 										className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-bold text-xs transition-all shrink-0 ${isCurrentSessionStopping ? 'cursor-not-allowed' : 'hover:opacity-90 cursor-pointer'}`}
-										style={{
-											backgroundColor: isCurrentSessionStopping
-												? theme.colors.warning
-												: theme.colors.error,
-											color: isCurrentSessionStopping ? theme.colors.bgMain : 'white',
-											pointerEvents: isCurrentSessionStopping ? 'none' : 'auto',
-										}}
+										style={
+											{
+												WebkitAppRegion: 'no-drag',
+												backgroundColor: isCurrentSessionStopping
+													? theme.colors.warning
+													: theme.colors.error,
+												color: isCurrentSessionStopping ? theme.colors.bgMain : 'white',
+												pointerEvents: isCurrentSessionStopping ? 'none' : 'auto',
+											} as React.CSSProperties
+										}
 										title={
 											isCurrentSessionStopping
 												? 'Stopping after current task...'
@@ -1445,7 +1456,10 @@ export const MainPanel = React.memo(
 									</button>
 								)}
 
-								<div className="flex items-center gap-3 justify-end shrink-0 ml-3">
+								<div
+									className="flex items-center gap-3 justify-end shrink-0 ml-3"
+									style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+								>
 									{/* Server Run/Stop Pill - only shown for worktrees with runScript configured */}
 									{activeSessionRunScript && (
 										<button
@@ -1481,6 +1495,30 @@ export const MainPanel = React.memo(
 										</button>
 									)}
 
+									{/* Open in Terminal */}
+									<button
+										className="p-2 rounded hover:bg-white/5"
+										title="Open in Terminal"
+										onClick={(e) => {
+											e.stopPropagation();
+											window.maestro?.shell?.openInTerminal(activeSession.cwd);
+										}}
+									>
+										<TerminalSquare className="w-4 h-4" style={{ color: theme.colors.textDim }} />
+									</button>
+
+									{/* Open in Editor */}
+									<button
+										className="p-2 rounded hover:bg-white/5"
+										title="Open in Editor"
+										onClick={(e) => {
+											e.stopPropagation();
+											window.maestro?.shell?.openInEditor(activeSession.cwd);
+										}}
+									>
+										<Code2 className="w-4 h-4" style={{ color: theme.colors.textDim }} />
+									</button>
+
 									{/* Context Window Widget with Tooltip - only show when context window is configured and agent supports usage stats */}
 									{/* Hide when file preview tab is focused - context usage is only relevant for AI tabs */}
 									{activeSession.inputMode === 'ai' &&
@@ -1489,7 +1527,7 @@ export const MainPanel = React.memo(
 										hasCapability('supportsUsageStats') &&
 										activeTabContextWindow > 0 && (
 											<div
-												className="header-context-widget flex flex-col items-end mr-2 relative cursor-pointer"
+												className="header-context-widget flex items-center gap-2 mr-2 relative cursor-pointer"
 												{...contextTooltip.triggerHandlers}
 											>
 												{/* Full label shown at wide widths, compact label shown at narrow widths via CSS */}
@@ -1508,7 +1546,7 @@ export const MainPanel = React.memo(
 												</span>
 												{/* Gauge width controlled via CSS container query */}
 												<div
-													className="header-context-gauge w-24 h-1.5 rounded-full mt-1 overflow-hidden"
+													className="header-context-gauge w-24 h-1.5 rounded-full overflow-hidden"
 													style={{ backgroundColor: theme.colors.border }}
 												>
 													<div

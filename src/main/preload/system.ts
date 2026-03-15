@@ -74,6 +74,8 @@ export function createShellApi() {
 		openPath: (itemPath: string) => ipcRenderer.invoke('shell:openPath', itemPath),
 		trashItem: (itemPath: string) => ipcRenderer.invoke('shell:trashItem', itemPath),
 		showItemInFolder: (itemPath: string) => ipcRenderer.invoke('shell:showItemInFolder', itemPath),
+		openInTerminal: (cwd: string) => ipcRenderer.invoke('shell:openInTerminal', cwd),
+		openInEditor: (cwd: string) => ipcRenderer.invoke('shell:openInEditor', cwd),
 	};
 }
 
