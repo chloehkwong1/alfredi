@@ -1,14 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
-import {
-	Wand2,
-	ChevronRight,
-	ChevronDown,
-	ChevronUp,
-	Radio,
-	GitBranch,
-	Menu,
-	Bookmark,
-} from 'lucide-react';
+import { Wand2, ChevronRight, ChevronDown, Radio, GitBranch, Menu, Bookmark } from 'lucide-react';
 import type { Session, Theme } from '../../types';
 import type { WorktreeStatus } from '../../../shared/types';
 
@@ -424,20 +415,21 @@ function SessionListInner(props: SessionListProps) {
 	) => {
 		const worktreeChildren = getWorktreeChildren(session.id);
 		const hasWorktrees = worktreeChildren.length > 0;
+		const isProject = hasWorktrees || !!session.worktreeConfig;
 		const isCollapsed = session.collapsed ?? false;
 		const globalIdx = sortedSessionIndexById.get(session.id) ?? -1;
 		const isKeyboardSelected = activeFocus === 'sidebar' && globalIdx === selectedSidebarIndex;
 
 		// Wrap sessions with worktrees in a left-bordered container
 		// to visually associate parent and worktrees together
-		const needsWorktreeWrapper = hasWorktrees;
+		const needsWorktreeWrapper = isProject;
 
 		const content = (
 			<>
-				{/* Parent session - no chevron, maintains alignment */}
+				{/* Parent session - clicking header toggles worktree expand/collapse */}
 				<SessionItem
 					session={session}
-					variant={needsWorktreeWrapper ? 'project-head' : variant}
+					variant={isProject ? 'project-head' : variant}
 					theme={theme}
 					isActive={activeSessionId === session.id}
 					isKeyboardSelected={isKeyboardSelected}
@@ -445,7 +437,14 @@ function SessionListInner(props: SessionListProps) {
 					isEditing={editingSessionId === `${options.keyPrefix}-${session.id}`}
 					isInBatch={activeBatchSessionIds.includes(session.id)}
 					jumpNumber={getSessionJumpNumber(session.id)}
-					onSelect={selectHandlers.get(session.id)!}
+					hasWorktrees={hasWorktrees}
+					isWorktreeExpanded={isProject && !isCollapsed}
+					onSelect={() => {
+						selectHandlers.get(session.id)?.();
+						if (isProject && onToggleWorktreeExpanded) {
+							onToggleWorktreeExpanded(session.id);
+						}
+					}}
 					onDragStart={dragStartHandlers.get(session.id)!}
 					onDragOver={handleDragOver}
 					onContextMenu={contextMenuHandlers.get(session.id)!}
@@ -454,30 +453,19 @@ function SessionListInner(props: SessionListProps) {
 					onToggleBookmark={toggleBookmarkHandlers.get(session.id)!}
 				/>
 
-				{/* Collapsed worktree handle - click to expand */}
-				{hasWorktrees && isCollapsed && onToggleWorktreeExpanded && (
-					<button
-						onClick={(e) => {
-							e.stopPropagation();
-							onToggleWorktreeExpanded(session.id);
-						}}
-						className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
-						style={{
-							backgroundColor: theme.colors.accent + '10',
-							color: theme.colors.textDim,
-						}}
-						title="Click to expand worktrees"
-					>
-						<ChevronDown className="w-3 h-3" />
-						<span>Show worktrees</span>
-					</button>
-				)}
-
 				{/* Worktree children drawer (when expanded) */}
-				{hasWorktrees &&
+				{isProject &&
 					!isCollapsed &&
 					onToggleWorktreeExpanded &&
 					(() => {
+						if (!hasWorktrees) {
+							return (
+								<div className="px-4 py-3 mb-2" style={{ color: theme.colors.textDim }}>
+									<div className="text-[11px]">No worktrees yet.</div>
+									<div className="text-[10px] opacity-50 mt-0.5">⌘N to create one.</div>
+								</div>
+							);
+						}
 						const useKanban = hasWorktrees;
 
 						const renderWorktreeChild = (child: Session) => {
@@ -602,21 +590,6 @@ function SessionListInner(props: SessionListProps) {
 										)}
 									</div>
 								)}
-								{/* Drawer handle at bottom - click to collapse */}
-								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										onToggleWorktreeExpanded(session.id);
-									}}
-									className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] font-medium hover:opacity-70 transition-opacity cursor-pointer"
-									style={{
-										color: theme.colors.textDim,
-									}}
-									title="Click to collapse worktrees"
-								>
-									<ChevronUp className="w-3 h-3" />
-									<span>Hide worktrees</span>
-								</button>
 							</div>
 						);
 					})()}

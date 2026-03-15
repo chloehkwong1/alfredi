@@ -5,6 +5,7 @@ import {
 	Bot,
 	Bookmark,
 	AlertTriangle,
+	ChevronDown,
 	ChevronRight,
 	Circle,
 	LayoutDashboard,
@@ -159,6 +160,8 @@ export interface SessionItemProps {
 	// Optional data
 	isInBatch?: boolean;
 	jumpNumber?: string | null; // Session jump shortcut number (1-9, 0)
+	isWorktreeExpanded?: boolean; // Whether worktree children are visible (project-head only)
+	hasWorktrees?: boolean; // Whether this project has worktree children
 
 	// Handlers
 	onSelect: () => void;
@@ -193,6 +196,8 @@ export const SessionItem = memo(function SessionItem({
 	isEditing,
 	isInBatch = false,
 	jumpNumber,
+	isWorktreeExpanded = false,
+	hasWorktrees = false,
 	onSelect,
 	onDragStart,
 	onDragOver,
@@ -282,6 +287,19 @@ export const SessionItem = memo(function SessionItem({
 					<>
 						{/* TOP ROW: Name + inline indicators */}
 						<div className="flex items-center gap-1.5" onDoubleClick={onStartRename}>
+							{/* Worktree expand/collapse chevron (project-head with worktrees only) */}
+							{variant === 'project-head' &&
+								(isWorktreeExpanded ? (
+									<ChevronDown
+										className="w-3.5 h-3.5 shrink-0"
+										style={{ color: theme.colors.textDim }}
+									/>
+								) : (
+									<ChevronRight
+										className="w-3.5 h-3.5 shrink-0"
+										style={{ color: theme.colors.textDim }}
+									/>
+								))}
 							{/* Bookmark icon (only in bookmark variant, always filled) */}
 							{variant === 'bookmark' && session.bookmarked && (
 								<Bookmark
