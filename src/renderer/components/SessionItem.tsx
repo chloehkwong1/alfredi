@@ -9,7 +9,6 @@ import {
 	Circle,
 	LayoutDashboard,
 	Loader2,
-	Minus,
 	RefreshCw,
 	Server,
 } from 'lucide-react';
@@ -493,7 +492,7 @@ export const SessionItem = memo(function SessionItem({
 									default:
 										return (
 											<span title="Ready and waiting">
-												<Minus className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+												<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
 											</span>
 										);
 								}

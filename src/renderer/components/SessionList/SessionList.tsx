@@ -437,7 +437,7 @@ function SessionListInner(props: SessionListProps) {
 				{/* Parent session - no chevron, maintains alignment */}
 				<SessionItem
 					session={session}
-					variant={needsWorktreeWrapper ? 'flat' : variant}
+					variant={needsWorktreeWrapper ? 'project-head' : variant}
 					theme={theme}
 					isActive={activeSessionId === session.id}
 					isKeyboardSelected={isKeyboardSelected}
@@ -454,25 +454,22 @@ function SessionListInner(props: SessionListProps) {
 					onToggleBookmark={toggleBookmarkHandlers.get(session.id)!}
 				/>
 
-				{/* Thin band below parent when worktrees exist but collapsed - click to expand */}
+				{/* Collapsed worktree handle - click to expand */}
 				{hasWorktrees && isCollapsed && onToggleWorktreeExpanded && (
 					<button
 						onClick={(e) => {
 							e.stopPropagation();
 							onToggleWorktreeExpanded(session.id);
 						}}
-						className="w-full flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
+						className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
 						style={{
-							backgroundColor: theme.colors.accent + '15',
-							color: theme.colors.accent,
+							backgroundColor: theme.colors.accent + '10',
+							color: theme.colors.textDim,
 						}}
-						title={`${worktreeChildren.length} worktree${worktreeChildren.length > 1 ? 's' : ''} (click to expand)`}
+						title="Click to expand worktrees"
 					>
-						<GitBranch className="w-2.5 h-2.5" />
-						<span>
-							{worktreeChildren.length} worktree{worktreeChildren.length > 1 ? 's' : ''}
-						</span>
-						<ChevronDown className="w-2.5 h-2.5" />
+						<ChevronDown className="w-3 h-3" />
+						<span>Show worktrees</span>
 					</button>
 				)}
 
@@ -511,11 +508,9 @@ function SessionListInner(props: SessionListProps) {
 
 						return (
 							<div
-								className={`rounded-bl overflow-hidden ${needsWorktreeWrapper ? '' : 'ml-1'}`}
+								className={`rounded-bl overflow-hidden mb-2 ${needsWorktreeWrapper ? '' : 'ml-1'}`}
 								style={{
-									backgroundColor: theme.colors.accent + '10',
-									borderLeft: needsWorktreeWrapper ? 'none' : `1px solid ${theme.colors.accent}30`,
-									borderBottom: `1px solid ${theme.colors.accent}30`,
+									borderLeft: needsWorktreeWrapper ? 'none' : `1px solid ${theme.colors.textDim}15`,
 								}}
 							>
 								{useKanban ? (
@@ -525,22 +520,27 @@ function SessionListInner(props: SessionListProps) {
 											[
 												{
 													status: 'todo' as WorktreeStatus,
-													label: 'TO DO',
+													label: 'To Do',
 													color: theme.colors.textDim,
 												},
 												{
 													status: 'in_progress' as WorktreeStatus,
-													label: 'IN PROGRESS',
+													label: 'In Progress',
 													color: theme.colors.warning,
 												},
 												{
 													status: 'in_review' as WorktreeStatus,
-													label: 'IN REVIEW',
-													color: theme.colors.accent,
+													label: 'In Review',
+													color: '#f59e0b',
+												},
+												{
+													status: 'blocked' as WorktreeStatus,
+													label: 'Blocked',
+													color: theme.colors.error,
 												},
 												{
 													status: 'done' as WorktreeStatus,
-													label: 'DONE',
+													label: 'Done',
 													color: theme.colors.success,
 												},
 											] as const
@@ -548,8 +548,7 @@ function SessionListInner(props: SessionListProps) {
 											const statusChildren = worktreeChildrenByStatus(session.id)[status];
 											const isDragTarget =
 												draggingSessionId && draggingWorktreeTargetStatus === status;
-											// Show section even if empty when it's a drag target
-											if (statusChildren.length === 0 && !draggingSessionId) return null;
+											// Always show all status headers
 											const collapsed = isKanbanSectionCollapsed(session.id, status);
 											return (
 												<div
@@ -570,25 +569,20 @@ function SessionListInner(props: SessionListProps) {
 															e.stopPropagation();
 															toggleKanbanSection(session.id, status);
 														}}
-														className="w-full flex items-center gap-1.5 px-3 py-1 text-[9px] font-bold uppercase tracking-wider hover:opacity-80 transition-opacity cursor-pointer"
-														style={{ color }}
-														title={`${label} (${statusChildren.length}) - click to ${collapsed ? 'expand' : 'collapse'}`}
+														className="w-full flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer"
+														style={{ color: theme.colors.textDim }}
+														title={`${label} - click to ${collapsed ? 'expand' : 'collapse'}`}
 													>
 														{collapsed ? (
 															<ChevronRight className="w-2.5 h-2.5" />
 														) : (
 															<ChevronDown className="w-2.5 h-2.5" />
 														)}
-														<span>{label}</span>
 														<span
-															className="px-1 py-0.5 rounded text-[8px] font-bold"
-															style={{
-																backgroundColor: color + '25',
-																color,
-															}}
-														>
-															{statusChildren.length}
-														</span>
+															className="w-1.5 h-1.5 rounded-full shrink-0"
+															style={{ backgroundColor: color }}
+														/>
+														<span>{label}</span>
 													</button>
 													{!collapsed && statusChildren.length > 0 && (
 														<div>{statusChildren.map(renderWorktreeChild)}</div>
@@ -611,18 +605,14 @@ function SessionListInner(props: SessionListProps) {
 										e.stopPropagation();
 										onToggleWorktreeExpanded(session.id);
 									}}
-									className="w-full flex items-center justify-center gap-1.5 py-0.5 text-[9px] font-medium hover:opacity-80 transition-opacity cursor-pointer"
+									className="w-full flex items-center justify-center gap-1.5 py-1 text-[10px] font-medium hover:opacity-70 transition-opacity cursor-pointer"
 									style={{
-										backgroundColor: theme.colors.accent + '20',
-										color: theme.colors.accent,
+										color: theme.colors.textDim,
 									}}
 									title="Click to collapse worktrees"
 								>
-									<GitBranch className="w-2.5 h-2.5" />
-									<span>
-										{worktreeChildren.length} worktree{worktreeChildren.length > 1 ? 's' : ''}
-									</span>
-									<ChevronUp className="w-2.5 h-2.5" />
+									<ChevronUp className="w-3 h-3" />
+									<span>Hide worktrees</span>
 								</button>
 							</div>
 						);
