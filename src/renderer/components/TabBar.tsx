@@ -22,6 +22,7 @@ import {
 	FolderOpen,
 	GitCompare,
 	LayoutDashboard,
+	BarChart3,
 } from 'lucide-react';
 import type { AITab, Theme, DiffViewTab, FilePreviewTab, UnifiedTab } from '../types';
 import { hasDraft } from '../utils/tabHelpers';
@@ -98,6 +99,12 @@ interface TabBarProps {
 	activeDashboardTabId?: string | null;
 	/** Handler to select a dashboard tab */
 	onDashboardTabSelect?: (tabId: string) => void;
+
+	// Usage tab support
+	/** Currently active usage tab ID (null if a non-usage tab is active) */
+	activeUsageTabId?: string | null;
+	/** Handler to select the usage tab */
+	onUsageTabSelect?: (tabId: string) => void;
 
 	// === Accessibility ===
 	/** Whether colorblind-friendly colors should be used for extension badges */
@@ -2039,6 +2046,9 @@ function TabBarInner({
 	// Dashboard tab
 	activeDashboardTabId,
 	onDashboardTabSelect,
+	// Usage tab
+	activeUsageTabId,
+	onUsageTabSelect,
 	// Accessibility
 	colorBlindMode,
 }: TabBarProps) {
@@ -2121,6 +2131,8 @@ function TabBarInner({
 			}
 			// Dashboard tabs: always show
 			if (ut.type === 'dashboard') return true;
+			// Usage tabs: always show when present
+			if (ut.type === 'usage') return true;
 			// File tabs: only show if active
 			return ut.id === activeFileTabId;
 		});
@@ -2413,14 +2425,17 @@ function TabBarInner({
 									!activeFileTabId &&
 									!activeDiffTabId &&
 									!activeCommitDiffTabId &&
-									!activeDashboardTabId
+									!activeDashboardTabId &&
+									!activeUsageTabId
 								: unifiedTab.type === 'file'
 									? unifiedTab.id === activeFileTabId
 									: unifiedTab.type === 'diff'
 										? unifiedTab.id === activeDiffTabId
 										: unifiedTab.type === 'dashboard'
 											? unifiedTab.id === activeDashboardTabId
-											: unifiedTab.id === activeCommitDiffTabId;
+											: unifiedTab.type === 'usage'
+												? unifiedTab.id === activeUsageTabId
+												: unifiedTab.id === activeCommitDiffTabId;
 
 						// Check previous tab's active state for separator logic
 						const prevUnifiedTab = index > 0 ? displayedUnifiedTabs[index - 1] : null;
@@ -2430,14 +2445,17 @@ function TabBarInner({
 									!activeFileTabId &&
 									!activeDiffTabId &&
 									!activeCommitDiffTabId &&
-									!activeDashboardTabId
+									!activeDashboardTabId &&
+									!activeUsageTabId
 								: prevUnifiedTab.type === 'file'
 									? prevUnifiedTab.id === activeFileTabId
 									: prevUnifiedTab.type === 'diff'
 										? prevUnifiedTab.id === activeDiffTabId
 										: prevUnifiedTab.type === 'dashboard'
 											? prevUnifiedTab.id === activeDashboardTabId
-											: prevUnifiedTab.id === activeCommitDiffTabId
+											: prevUnifiedTab.type === 'usage'
+												? prevUnifiedTab.id === activeUsageTabId
+												: prevUnifiedTab.id === activeCommitDiffTabId
 							: false;
 
 						// Get original index in the FULL unified list (not filtered)
@@ -2685,6 +2703,35 @@ function TabBarInner({
 									>
 										<LayoutDashboard className="w-3.5 h-3.5" />
 										<span>Dashboard</span>
+									</div>
+								</React.Fragment>
+							);
+						} else if (unifiedTab.type === 'usage') {
+							// Usage tab - Anthropic rate limit display
+							return (
+								<React.Fragment key={unifiedTab.id}>
+									{showSeparator && (
+										<div
+											className="w-px h-4 self-center shrink-0"
+											style={{ backgroundColor: theme.colors.border }}
+										/>
+									)}
+									<div
+										className={`group relative flex items-center gap-1.5 px-3 py-1.5 cursor-pointer shrink-0 text-xs font-medium transition-colors duration-100 select-none ${
+											isActive ? 'rounded-t-md' : 'rounded-t-md opacity-70 hover:opacity-100'
+										}`}
+										style={{
+											backgroundColor: isActive ? theme.colors.bgMain : 'transparent',
+											color: isActive ? theme.colors.accent : theme.colors.textDim,
+											borderBottom: isActive
+												? `2px solid ${theme.colors.accent}`
+												: '2px solid transparent',
+										}}
+										onClick={() => onUsageTabSelect?.(unifiedTab.id)}
+										ref={(el) => registerTabRef(unifiedTab.id, el)}
+									>
+										<BarChart3 className="w-3.5 h-3.5" />
+										<span>Usage</span>
 									</div>
 								</React.Fragment>
 							);

@@ -4,6 +4,7 @@
  */
 
 import type { ProcessManager } from '../process-manager';
+import type { RateLimitInfo } from '../../shared/types';
 import type { ProcessListenerDependencies, ToolExecution, UserQuestion } from './types';
 
 /**
@@ -46,5 +47,11 @@ export function setupForwardingListeners(
 	// Handle command exit (from runCommand - separate from PTY exit)
 	processManager.on('command-exit', (sessionId: string, code: number) => {
 		safeSend('process:command-exit', sessionId, code);
+	});
+
+	// Handle rate limit events from Claude Agent SDK
+	// These are account-level limits, forwarded to renderer for global display
+	processManager.on('rate-limit', (sessionId: string, info: RateLimitInfo) => {
+		safeSend('process:rate-limit', sessionId, info);
 	});
 }

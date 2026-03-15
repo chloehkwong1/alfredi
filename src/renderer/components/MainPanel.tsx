@@ -220,6 +220,8 @@ interface MainPanelProps {
 	// Dashboard tab support
 	activeDashboardTabId?: string | null;
 	onDashboardTabSelect?: (tabId: string) => void;
+	// Usage tab support
+	activeUsageTabId?: string | null;
 	/** Handler to open the CreateWorktree modal */
 	onNewWorktree?: () => void;
 	/** Handler to open the WorktreeConfig modal */
@@ -526,6 +528,8 @@ export const MainPanel = React.memo(
 			onDashboardTabSelect,
 			onNewWorktree,
 			onOpenConfig,
+			// Usage tab props
+			activeUsageTabId,
 		} = props;
 
 		// Get the active tab for header display
@@ -1722,6 +1726,23 @@ export const MainPanel = React.memo(
 									// Dashboard tab
 									activeDashboardTabId={activeDashboardTabId}
 									onDashboardTabSelect={onDashboardTabSelect}
+									// Usage tab
+									activeUsageTabId={activeUsageTabId}
+									onUsageTabSelect={(tabId) => {
+										useSessionStore.getState().setSessions((prev: Session[]) =>
+											prev.map((s) => {
+												if (s.id !== activeSession?.id) return s;
+												return {
+													...s,
+													activeUsageTabId: tabId,
+													activeFileTabId: null,
+													activeDiffTabId: null,
+													activeCommitDiffTabId: null,
+													activeDashboardTabId: null,
+												};
+											})
+										);
+									}}
 									// Accessibility
 									colorBlindMode={colorBlindMode}
 								/>

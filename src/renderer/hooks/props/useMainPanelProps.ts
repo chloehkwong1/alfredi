@@ -227,6 +227,9 @@ export interface UseMainPanelPropsDeps {
 	handleNewWorktree: () => void;
 	handleOpenWorktreeConfigFromDashboard: () => void;
 
+	// Usage tab props
+	activeUsageTabId: string | null;
+
 	handleScrollPositionChange: (scrollTop: number) => void;
 	handleAtBottomChange: (isAtBottom: boolean) => void;
 	handleMainPanelInputBlur: () => void;
@@ -416,6 +419,8 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			onDashboardTabSelect: deps.handleSelectDashboardTab,
 			onNewWorktree: deps.handleNewWorktree,
 			onOpenConfig: deps.handleOpenWorktreeConfigFromDashboard,
+			// Usage tab props
+			activeUsageTabId: deps.activeUsageTabId,
 			onToggleTabShowThinking: deps.handleToggleTabShowThinking,
 			onScrollPositionChange: deps.handleScrollPositionChange,
 			onAtBottomChange: deps.handleAtBottomChange,
@@ -635,6 +640,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.handleSelectDashboardTab,
 			deps.handleNewWorktree,
 			deps.handleOpenWorktreeConfigFromDashboard,
+			deps.activeUsageTabId,
 			deps.handleScrollPositionChange,
 			deps.handleAtBottomChange,
 			deps.handleMainPanelInputBlur,

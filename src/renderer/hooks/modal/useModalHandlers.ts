@@ -42,6 +42,7 @@ export interface ModalHandlersReturn {
 	handleCloseAboutModal: () => void;
 	handleCloseUpdateCheckModal: () => void;
 	handleCloseProcessMonitor: () => void;
+	handleCloseUsagePanel: () => void;
 	handleCloseLogViewer: () => void;
 	handleCloseConfirmModal: () => void;
 
@@ -173,6 +174,10 @@ export function useModalHandlers(
 
 	const handleCloseProcessMonitor = useCallback(() => {
 		getModalActions().setProcessMonitorOpen(false);
+	}, []);
+
+	const handleCloseUsagePanel = useCallback(() => {
+		getModalActions().setUsagePanelOpen(false);
 	}, []);
 
 	const handleCloseLogViewer = useCallback(() => {
@@ -566,6 +571,7 @@ export function useModalHandlers(
 		handleCloseAboutModal,
 		handleCloseUpdateCheckModal,
 		handleCloseProcessMonitor,
+		handleCloseUsagePanel,
 		handleCloseLogViewer,
 		handleCloseConfirmModal,
 

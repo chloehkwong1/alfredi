@@ -118,6 +118,9 @@ export interface TabHandlersReturn {
 	handleSelectDiffTab: (tabId: string) => void;
 	handleCloseDiffTab: (tabId: string) => void;
 
+	// Usage Tab handlers
+	openUsageTab: () => void;
+
 	// Commit Diff Tab handlers
 	handleOpenCommitDiffTab: (
 		commit: {
@@ -289,6 +292,7 @@ export function useTabHandlers(): TabHandlersReturn {
 							activeFileTabId: existingTab.id,
 							activeTabId: s.activeTabId,
 							activeDashboardTabId: null,
+							activeUsageTabId: null,
 							unifiedTabOrder: ensureInUnifiedTabOrder(
 								sessionWithPreviewClosed.unifiedTabOrder,
 								'file',
@@ -443,6 +447,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						unifiedTabOrder: updatedUnifiedTabOrder,
 						activeFileTabId: newTabId,
 						activeDashboardTabId: null,
+						activeUsageTabId: null,
 					};
 				})
 			);
@@ -588,6 +593,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						activeFileTabId: null,
 						activeCommitDiffTabId: null,
 						activeDashboardTabId: null,
+						activeUsageTabId: null,
 						unifiedTabOrder: ensureInUnifiedTabOrder(
 							sessionWithUpdatedTabs.unifiedTabOrder,
 							'diff',
@@ -644,6 +650,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					activeFileTabId: null,
 					activeCommitDiffTabId: null,
 					activeDashboardTabId: null,
+					activeUsageTabId: null,
 					unifiedTabOrder: updatedUnifiedTabOrder,
 				};
 			})
@@ -662,6 +669,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					activeFileTabId: null,
 					activeCommitDiffTabId: null,
 					activeDashboardTabId: null,
+					activeUsageTabId: null,
 				};
 			})
 		);
@@ -724,6 +732,7 @@ export function useTabHandlers(): TabHandlersReturn {
 							activeFileTabId: null,
 							activeDiffTabId: null,
 							activeDashboardTabId: null,
+							activeUsageTabId: null,
 							unifiedTabOrder: ensureInUnifiedTabOrder(
 								session.unifiedTabOrder,
 								'commit-diff',
@@ -789,6 +798,7 @@ export function useTabHandlers(): TabHandlersReturn {
 						activeFileTabId: null,
 						activeDiffTabId: null,
 						activeDashboardTabId: null,
+						activeUsageTabId: null,
 						unifiedTabOrder: updatedUnifiedTabOrder,
 					};
 				})
@@ -812,6 +822,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					activeFileTabId: null,
 					activeDiffTabId: null,
 					activeDashboardTabId: null,
+					activeUsageTabId: null,
 				};
 			})
 		);
@@ -1016,6 +1027,7 @@ export function useTabHandlers(): TabHandlersReturn {
 					activeFileTabId: tabId,
 					activeCommitDiffTabId: null,
 					activeDashboardTabId: null,
+					activeUsageTabId: null,
 				};
 			})
 		);
@@ -1413,6 +1425,24 @@ export function useTabHandlers(): TabHandlersReturn {
 		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
 		const session = sessions.find((s) => s.id === activeSessionId);
 		if (!session) return { type: 'none' };
+
+		// Check if the usage tab is active
+		if (session.activeUsageTabId) {
+			const tabId = session.activeUsageTabId;
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== activeSessionId) return s;
+					return {
+						...s,
+						activeUsageTabId: null,
+						unifiedTabOrder: s.unifiedTabOrder.filter(
+							(ref) => !(ref.type === 'usage' && ref.id === tabId)
+						),
+					};
+				})
+			);
+			return { type: 'none' };
+		}
 
 		// Check if a diff tab is active first
 		if (session.activeDiffTabId) {
@@ -1984,6 +2014,57 @@ export function useTabHandlers(): TabHandlersReturn {
 	}, []);
 
 	// ========================================================================
+	// Usage Tab
+	// ========================================================================
+
+	/** Open or focus the singleton usage panel tab */
+	const openUsageTab = useCallback(() => {
+		const { activeSessionId, setSessions } = useSessionStore.getState();
+
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+
+				// If already open, just focus it
+				if (s.activeUsageTabId) {
+					return {
+						...s,
+						activeFileTabId: null,
+						activeDiffTabId: null,
+						activeCommitDiffTabId: null,
+						activeDashboardTabId: null,
+					};
+				}
+
+				// Check if a usage tab already exists in unified tab order
+				const existingRef = s.unifiedTabOrder.find((ref) => ref.type === 'usage');
+				if (existingRef) {
+					return {
+						...s,
+						activeUsageTabId: existingRef.id,
+						activeFileTabId: null,
+						activeDiffTabId: null,
+						activeCommitDiffTabId: null,
+						activeDashboardTabId: null,
+					};
+				}
+
+				// Create new usage tab
+				const usageTabId = generateId();
+				return {
+					...s,
+					activeUsageTabId: usageTabId,
+					activeFileTabId: null,
+					activeDiffTabId: null,
+					activeCommitDiffTabId: null,
+					activeDashboardTabId: null,
+					unifiedTabOrder: [...s.unifiedTabOrder, { type: 'usage' as const, id: usageTabId }],
+				};
+			})
+		);
+	}, []);
+
+	// ========================================================================
 	// Return
 	// ========================================================================
 
@@ -2040,6 +2121,9 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleOpenCommitDiffTab,
 		handleSelectCommitDiffTab,
 		handleCloseCommitDiffTab,
+
+		// Usage Tab handlers
+		openUsageTab,
 
 		// Preview Tab handlers
 		handlePinTab,

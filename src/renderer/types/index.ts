@@ -628,7 +628,7 @@ export interface DashboardTab {
  * Used for unified tab ordering across different tab types.
  */
 export type UnifiedTabRef = {
-	type: 'ai' | 'file' | 'diff' | 'commit-diff' | 'dashboard';
+	type: 'ai' | 'file' | 'diff' | 'commit-diff' | 'dashboard' | 'usage';
 	id: string;
 };
 
@@ -642,7 +642,8 @@ export type UnifiedTab =
 	| { type: 'file'; id: string; data: FilePreviewTab }
 	| { type: 'diff'; id: string; data: DiffViewTab }
 	| { type: 'commit-diff'; id: string; data: CommitDiffTab }
-	| { type: 'dashboard'; id: string; data: DashboardTab };
+	| { type: 'dashboard'; id: string; data: DashboardTab }
+	| { type: 'usage'; id: string };
 
 /**
  * Unified closed tab entry for undo functionality (Cmd+Shift+T).
@@ -800,6 +801,9 @@ export interface Session {
 
 	// Dashboard Tab - project head dashboard (only one per project head, not closable)
 	activeDashboardTabId?: string | null;
+
+	// Usage Tab - Anthropic rate limit usage panel (singleton, closable)
+	activeUsageTabId?: string | null;
 
 	// Unified tab ordering - determines visual order of all tabs (AI, file, and diff)
 	unifiedTabOrder: UnifiedTabRef[];

@@ -67,6 +67,42 @@ export interface SessionInfo {
 	projectRoot: string;
 }
 
+// ============================================================================
+// Rate Limit Types (from Claude Agent SDK)
+// ============================================================================
+
+/**
+ * Type of rate limit bucket.
+ * Account-level limits that apply globally (not per-session).
+ */
+export type RateLimitType =
+	| 'five_hour'
+	| 'seven_day'
+	| 'seven_day_opus'
+	| 'seven_day_sonnet'
+	| 'overage';
+
+/**
+ * Status of a rate limit check.
+ */
+export type RateLimitStatus = 'allowed' | 'allowed_warning' | 'rejected';
+
+/**
+ * Rate limit information from the Claude Agent SDK.
+ * Emitted as `rate_limit_event` messages during SDK conversations.
+ * These are account-level limits, not per-session.
+ */
+export interface RateLimitInfo {
+	status: RateLimitStatus;
+	resetsAt?: number;
+	rateLimitType?: RateLimitType;
+	utilization?: number;
+	isUsingOverage?: boolean;
+	overageStatus?: RateLimitStatus;
+	overageResetsAt?: number;
+	surpassedThreshold?: number;
+}
+
 // Usage statistics from AI agent CLI (Claude Code, Codex, etc.)
 export interface UsageStats {
 	inputTokens: number;

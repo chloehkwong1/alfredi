@@ -217,6 +217,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					commitDiffTabs: [],
 					activeCommitDiffTabId: null,
 					activeDashboardTabId: null,
+					activeUsageTabId: null,
 					unifiedTabOrder: [{ type: 'ai' as const, id: initialTabId }],
 					unifiedClosedTabHistory: [],
 					nudgeMessage,

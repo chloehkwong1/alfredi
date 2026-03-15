@@ -151,6 +151,21 @@ export interface UserQuestionEvent {
 }
 
 /**
+ * Rate limit event from Claude Agent SDK.
+ * Account-level limits (not per-session).
+ */
+export interface RateLimitEvent {
+	status: 'allowed' | 'allowed_warning' | 'rejected';
+	resetsAt?: number;
+	rateLimitType?: 'five_hour' | 'seven_day' | 'seven_day_opus' | 'seven_day_sonnet' | 'overage';
+	utilization?: number;
+	isUsingOverage?: boolean;
+	overageStatus?: 'allowed' | 'allowed_warning' | 'rejected';
+	overageResetsAt?: number;
+	surpassedThreshold?: number;
+}
+
+/**
  * SSH remote info
  */
 export interface SshRemoteInfo {
@@ -511,6 +526,17 @@ export function createProcessApi() {
 				callback(sessionId, error);
 			ipcRenderer.on('agent:error', handler);
 			return () => ipcRenderer.removeListener('agent:error', handler);
+		},
+
+		/**
+		 * Subscribe to rate limit events from Claude Agent SDK.
+		 * These are account-level limits (not per-session), forwarded for global display.
+		 */
+		onRateLimit: (callback: (sessionId: string, info: RateLimitEvent) => void): (() => void) => {
+			const handler = (_: unknown, sessionId: string, info: RateLimitEvent) =>
+				callback(sessionId, info);
+			ipcRenderer.on('process:rate-limit', handler);
+			return () => ipcRenderer.removeListener('process:rate-limit', handler);
 		},
 	};
 }

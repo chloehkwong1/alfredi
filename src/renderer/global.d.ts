@@ -321,6 +321,26 @@ interface MaestroAPI {
 				}
 			) => void
 		) => () => void;
+		onRateLimit: (
+			callback: (
+				sessionId: string,
+				info: {
+					status: 'allowed' | 'allowed_warning' | 'rejected';
+					resetsAt?: number;
+					rateLimitType?:
+						| 'five_hour'
+						| 'seven_day'
+						| 'seven_day_opus'
+						| 'seven_day_sonnet'
+						| 'overage';
+					utilization?: number;
+					isUsingOverage?: boolean;
+					overageStatus?: 'allowed' | 'allowed_warning' | 'rejected';
+					overageResetsAt?: number;
+					surpassedThreshold?: number;
+				}
+			) => void
+		) => () => void;
 	};
 	agentError: {
 		clearError: (sessionId: string) => Promise<{ success: boolean }>;

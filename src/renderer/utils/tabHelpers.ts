@@ -41,6 +41,12 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 		dashboardTabMap.set(session.activeDashboardTabId, { id: session.activeDashboardTabId });
 	}
 
+	// Track usage tab IDs (singleton per session)
+	const usageTabIds = new Set<string>();
+	if (session.activeUsageTabId) {
+		usageTabIds.add(session.activeUsageTabId);
+	}
+
 	const result: UnifiedTab[] = [];
 
 	// Follow unified order for tabs that have entries
@@ -75,6 +81,11 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 				result.push({ type: 'dashboard', id: ref.id, data: tab });
 				dashboardTabMap.delete(ref.id);
 			}
+		} else if (ref.type === 'usage') {
+			if (usageTabIds.has(ref.id)) {
+				result.push({ type: 'usage', id: ref.id });
+				usageTabIds.delete(ref.id);
+			}
 		}
 	}
 
@@ -93,6 +104,9 @@ export function buildUnifiedTabs(session: Session): UnifiedTab[] {
 	}
 	for (const [id, tab] of dashboardTabMap) {
 		result.push({ type: 'dashboard', id, data: tab });
+	}
+	for (const id of usageTabIds) {
+		result.push({ type: 'usage', id });
 	}
 
 	return result;

@@ -39,6 +39,7 @@ import type {
 	SDKResultError,
 	SDKToolProgressMessage,
 	SDKToolUseSummaryMessage,
+	SDKRateLimitEvent,
 	Query,
 	Options,
 	CanUseTool,
@@ -284,6 +285,10 @@ export class ClaudeSDKAdapter {
 
 			case 'tool_use_summary':
 				this.handleToolUseSummary(sessionId, message as SDKToolUseSummaryMessage);
+				break;
+
+			case 'rate_limit_event':
+				this.emitter.emit('rate-limit', sessionId, (message as SDKRateLimitEvent).rate_limit_info);
 				break;
 
 			// Other message types (task_*, auth_status, etc.) are not needed

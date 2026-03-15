@@ -30,6 +30,7 @@ import type { HistoryEntryInput } from './useAgentSessionManagement';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useRateLimitStore } from '../../stores/rateLimitStore';
 import { gitService } from '../../services/git';
 import { generateId } from '../../utils/ids';
 import { parseSessionId, isSynopsisSession, isBatchSession } from '../../utils/sessionIdParser';
@@ -1528,6 +1529,16 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		);
 
 		// ================================================================
+		// onRateLimit — Handle rate limit events from Claude Agent SDK
+		// These are account-level limits, not per-session.
+		// ================================================================
+		const unsubscribeRateLimit = window.maestro.process.onRateLimit?.(
+			(_sessionId: string, info) => {
+				useRateLimitStore.getState().updateLimit(info);
+			}
+		);
+
+		// ================================================================
 		// Cleanup — unsubscribe all listeners on unmount
 		// ================================================================
 		return () => {
@@ -1543,6 +1554,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			unsubscribeSshRemote?.();
 			unsubscribeToolExecution?.();
 			unsubscribeUserQuestion?.();
+			unsubscribeRateLimit?.();
 			// Cancel any pending thinking chunk RAF and clear buffer
 			if (thinkingChunkRafIdRef.current !== null) {
 				cancelAnimationFrame(thinkingChunkRafIdRef.current);

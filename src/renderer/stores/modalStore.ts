@@ -156,6 +156,8 @@ export type ModalId =
 	| 'playground'
 	| 'logViewer'
 	| 'processMonitor'
+	// Usage
+	| 'usagePanel'
 	// Confirmations
 	| 'confirm'
 	| 'quitConfirm'
@@ -457,6 +459,10 @@ function _buildModalActions() {
 		// Playground Panel
 		setPlaygroundOpen: (open: boolean) =>
 			open ? openModal('playground') : closeModal('playground'),
+
+		// Usage Panel
+		setUsagePanelOpen: (open: boolean) =>
+			open ? openModal('usagePanel') : closeModal('usagePanel'),
 
 		// Confirmation Modal
 		setConfirmModalOpen: (open: boolean) => (open ? openModal('confirm') : closeModal('confirm')),

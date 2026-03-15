@@ -1,7 +1,7 @@
 import type { ChildProcess } from 'child_process';
 import type { IPty } from 'node-pty';
 import type { AgentOutputParser } from '../parsers';
-import type { AgentError } from '../../shared/types';
+import type { AgentError, RateLimitInfo } from '../../shared/types';
 import type { ClaudeSDKAdapter } from './spawners/ClaudeSDKAdapter';
 
 /**
@@ -137,6 +137,7 @@ export interface ProcessManagerEvents {
 	'user-question': (sessionId: string, question: UserQuestion) => void;
 	'slash-commands': (sessionId: string, commands: unknown[]) => void;
 	'query-complete': (sessionId: string, data: QueryCompleteData) => void;
+	'rate-limit': (sessionId: string, info: RateLimitInfo) => void;
 }
 
 export interface UserQuestionOption {
@@ -174,4 +175,9 @@ export interface QueryCompleteData {
 
 // Re-export for backwards compatibility
 export type { ParsedEvent, AgentOutputParser } from '../parsers';
-export type { AgentError, AgentErrorType, SshRemoteConfig } from '../../shared/types';
+export type {
+	AgentError,
+	AgentErrorType,
+	SshRemoteConfig,
+	RateLimitInfo,
+} from '../../shared/types';

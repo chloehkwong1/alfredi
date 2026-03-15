@@ -540,8 +540,9 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							return {
 								...s,
 								executionQueue: [...s.executionQueue, queuedItem],
-								// Switch away from dashboard tab so AI terminal is visible
+								// Switch away from dashboard/usage tab so AI terminal is visible
 								activeDashboardTabId: null,
+								activeUsageTabId: null,
 							};
 						})
 					);

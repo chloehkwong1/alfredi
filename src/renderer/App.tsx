@@ -100,7 +100,7 @@ import { useAgentListeners } from './hooks/agent/useAgentListeners';
 // Import contexts
 import { useLayerStack } from './contexts/LayerStackContext';
 import { notifyToast } from './stores/notificationStore';
-import { useModalActions, useModalStore } from './stores/modalStore';
+import { useModalActions, useModalStore, getModalActions } from './stores/modalStore';
 import { GitStatusProvider } from './contexts/GitStatusContext';
 import { InputProvider, useInputContext } from './contexts/InputContext';
 // batchStore removed (Auto Run stripped)
@@ -670,6 +670,7 @@ function MaestroConsoleInner() {
 		handleOpenCommitDiffTab,
 		handleSelectCommitDiffTab,
 		handleCloseCommitDiffTab,
+		openUsageTab,
 	} = useTabHandlers();
 
 	// --- MODAL HANDLERS (open/close, error recovery, lightbox) ---
@@ -683,6 +684,7 @@ function MaestroConsoleInner() {
 		handleCloseAboutModal,
 		handleCloseUpdateCheckModal,
 		handleCloseProcessMonitor,
+		handleCloseUsagePanel,
 		handleCloseLogViewer,
 		handleCloseConfirmModal,
 		handleCloseDeleteAgentModal,
@@ -751,6 +753,7 @@ function MaestroConsoleInner() {
 			activeFileTabId: null,
 			activeDiffTabId: null,
 			activeCommitDiffTabId: null,
+			activeUsageTabId: null,
 		});
 	}, []);
 
@@ -1673,6 +1676,9 @@ function MaestroConsoleInner() {
 		// Clear context action
 		clearContext,
 
+		// Usage panel modal
+		setUsagePanelOpen: getModalActions().setUsagePanelOpen,
+
 		// Merge session modal and send to agent modal
 		setMergeSessionModalOpen,
 		setSendToAgentModalOpen,
@@ -1906,6 +1912,9 @@ function MaestroConsoleInner() {
 		handleNewWorktree: handleNewWorktreeFromDashboard,
 		handleOpenWorktreeConfigFromDashboard: handleOpenWorktreeConfig,
 
+		// Usage tab props
+		activeUsageTabId: activeSession?.activeUsageTabId ?? null,
+
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleMainPanelInputBlur,
@@ -2119,21 +2128,14 @@ function MaestroConsoleInner() {
 							>
 								{(() => {
 									const parts: string[] = [];
-									// Agent name (user-given name for this agent instance)
+									// Agent name
 									parts.push(activeSession.name);
-									// Active tab name or UUID octet
+									// Active tab name (skip session ID — it's noise in the title bar)
 									const activeTab = activeSession.aiTabs?.find(
 										(t) => t.id === activeSession.activeTabId
 									);
-									if (activeTab) {
-										const tabLabel =
-											activeTab.name ||
-											(activeTab.agentSessionId
-												? activeTab.agentSessionId.split('-')[0].toUpperCase()
-												: null);
-										if (tabLabel) {
-											parts.push(tabLabel);
-										}
+									if (activeTab?.name) {
+										parts.push(activeTab.name);
 									}
 									return parts.join(' | ');
 								})()}
@@ -2156,6 +2158,7 @@ function MaestroConsoleInner() {
 					handsOnTimeMs={totalActiveTimeMs}
 					onCloseUpdateCheckModal={handleCloseUpdateCheckModal}
 					onCloseProcessMonitor={handleCloseProcessMonitor}
+					onCloseUsagePanel={handleCloseUsagePanel}
 					onNavigateToSession={handleProcessMonitorNavigateToSession}
 					// AppConfirmModals props
 					confirmModalMessage={confirmModalMessage}

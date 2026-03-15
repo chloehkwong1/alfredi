@@ -43,6 +43,7 @@ import type { GroomingProgress, MergeResult } from '../types/contextMerge';
 // Info/Display Modal Components
 import { AboutModal } from './AboutModal';
 import { UpdateCheckModal } from './UpdateCheckModal';
+import { UsagePanel } from './UsagePanel';
 
 // Lazy-loaded heavy modals (rarely used, loaded on-demand)
 const ProcessMonitor = lazy(() =>
@@ -114,6 +115,10 @@ export interface AppInfoModalsProps {
 	onCloseProcessMonitor: () => void;
 	sessions: Session[]; // Used by ProcessMonitor
 	onNavigateToSession: (sessionId: string, tabId?: string) => void;
+
+	// Usage Panel
+	usagePanelOpen: boolean;
+	onCloseUsagePanel: () => void;
 }
 
 /**
@@ -143,6 +148,9 @@ export const AppInfoModals = memo(function AppInfoModals({
 	onCloseProcessMonitor,
 	sessions,
 	onNavigateToSession,
+	// Usage Panel
+	usagePanelOpen,
+	onCloseUsagePanel,
 }: AppInfoModalsProps) {
 	return (
 		<>
@@ -171,6 +179,9 @@ export const AppInfoModals = memo(function AppInfoModals({
 					/>
 				</Suspense>
 			)}
+
+			{/* --- USAGE PANEL --- */}
+			{usagePanelOpen && <UsagePanel theme={theme} onClose={onCloseUsagePanel} />}
 		</>
 	);
 });
@@ -1165,8 +1176,7 @@ export interface AppModalsProps {
 	onCloseUpdateCheckModal: () => void;
 	onCloseProcessMonitor: () => void;
 	onNavigateToSession: (sessionId: string, tabId?: string) => void;
-	/** Default time range for the Usage Dashboard from settings */
-	/** Enable colorblind-friendly colors for dashboard charts */
+	onCloseUsagePanel: () => void;
 
 	// --- AppConfirmModals props ---
 	confirmModalMessage: string;
@@ -1427,11 +1437,13 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		gitLogOpen,
 		mergeSessionModalOpen,
 		sendToAgentModalOpen,
+		usagePanelOpen,
 	} = useModalStore(
 		useShallow((s) => ({
 			aboutModalOpen: s.modals.get('about')?.open ?? false,
 			updateCheckModalOpen: s.modals.get('updateCheck')?.open ?? false,
 			processMonitorOpen: s.modals.get('processMonitor')?.open ?? false,
+			usagePanelOpen: s.modals.get('usagePanel')?.open ?? false,
 			confirmModalOpen: s.modals.get('confirm')?.open ?? false,
 			quitConfirmModalOpen: s.modals.get('quitConfirm')?.open ?? false,
 			newInstanceModalOpen: s.modals.get('newInstance')?.open ?? false,
@@ -1465,6 +1477,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		handsOnTimeMs,
 		onCloseUpdateCheckModal,
 		onCloseProcessMonitor,
+		onCloseUsagePanel,
 		onNavigateToSession,
 		// Confirm modals
 		confirmModalMessage,
@@ -1641,6 +1654,8 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onCloseProcessMonitor={onCloseProcessMonitor}
 				sessions={sessions}
 				onNavigateToSession={onNavigateToSession}
+				usagePanelOpen={usagePanelOpen}
+				onCloseUsagePanel={onCloseUsagePanel}
 			/>
 
 			{/* Confirmation Modals */}

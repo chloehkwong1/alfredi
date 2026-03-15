@@ -384,6 +384,10 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 				ctx.setProcessMonitorOpen(true);
 				trackShortcut('processMonitor');
+			} else if (ctx.isShortcut(e, 'usagePanel')) {
+				e.preventDefault();
+				ctx.setUsagePanelOpen(true);
+				trackShortcut('usagePanel');
 			} else if (ctx.isShortcut(e, 'toggleAutoScroll')) {
 				e.preventDefault();
 				ctx.setAutoScrollAiMode(!ctx.autoScrollAiMode);

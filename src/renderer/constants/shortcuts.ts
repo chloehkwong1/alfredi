@@ -63,6 +63,7 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 		label: 'Toggle Auto-Scroll AI Output',
 		keys: ['Alt', 'Meta', 's'],
 	},
+	usagePanel: { id: 'usagePanel', label: 'Usage Panel', keys: ['Alt', 'Meta', 'u'] },
 };
 
 // Non-editable shortcuts (displayed in help but not configurable)

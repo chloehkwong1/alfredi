@@ -167,6 +167,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 							commitDiffTabs: [],
 							activeCommitDiffTabId: null,
 							activeDashboardTabId: null,
+							activeUsageTabId: null,
 							unifiedTabOrder: [{ type: 'ai' as const, id: newTabId }],
 							unifiedClosedTabHistory: [],
 							// Reset agent runtime state
@@ -461,6 +462,7 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 			activeFileTabId: null,
 			activeDiffTabId: null,
 			activeCommitDiffTabId: null,
+			activeUsageTabId: null,
 			// Insert dashboard tab at the front of unified tab order
 			unifiedTabOrder: [
 				{ type: 'dashboard' as const, id: dashboardTabId },

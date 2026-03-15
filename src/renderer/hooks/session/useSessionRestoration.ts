@@ -176,6 +176,7 @@ export function useSessionRestoration(): SessionRestorationReturn {
 					commitDiffTabs: [],
 					activeCommitDiffTabId: null,
 					activeDashboardTabId: null,
+					activeUsageTabId: null,
 					unifiedTabOrder: [{ type: 'ai' as const, id: defaultTabId }],
 					unifiedClosedTabHistory: [],
 				};
