@@ -367,6 +367,20 @@ export function createGitApi() {
 		}> => ipcRenderer.invoke('git:createGist', filename, content, description, isPublic, ghPath),
 
 		/**
+		 * Create a GitHub repository from a local directory
+		 */
+		createRepo: (
+			repoName: string,
+			dirPath: string,
+			isPrivate: boolean,
+			ghPath?: string
+		): Promise<{
+			success: boolean;
+			repoUrl?: string;
+			error?: string;
+		}> => ipcRenderer.invoke('git:createRepo', repoName, dirPath, isPrivate, ghPath),
+
+		/**
 		 * List all worktrees for a git repository
 		 * Supports SSH remote execution via optional sshRemoteId parameter
 		 */

@@ -542,6 +542,16 @@ interface MaestroAPI {
 			gistUrl?: string;
 			error?: string;
 		}>;
+		createRepo: (
+			repoName: string,
+			dirPath: string,
+			isPrivate: boolean,
+			ghPath?: string
+		) => Promise<{
+			success: boolean;
+			repoUrl?: string;
+			error?: string;
+		}>;
 		// Git worktree operations for Auto Run parallelization
 		// All worktree operations support SSH remote execution via optional sshRemoteId parameter
 		worktreeInfo: (
@@ -819,6 +829,7 @@ interface MaestroAPI {
 			folderCount: number;
 		}>;
 		fetchImageAsBase64: (url: string) => Promise<string | null>;
+		mkdir: (dirPath: string) => Promise<{ success: boolean; error?: string }>;
 		rename: (
 			oldPath: string,
 			newPath: string,

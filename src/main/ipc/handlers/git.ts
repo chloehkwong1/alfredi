@@ -1665,6 +1665,55 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// Create a GitHub repository from a local directory
+	// Uses gh CLI to create the repo and set up the remote
+	ipcMain.handle(
+		'git:createRepo',
+		withIpcErrorLogging(
+			handlerOpts('createRepo'),
+			async (repoName: string, dirPath: string, isPrivate: boolean, ghPath?: string) => {
+				// Resolve gh CLI path (uses cached detection or custom path)
+				const ghCommand = await resolveGhPath(ghPath);
+				logger.debug(`Using gh CLI for repo creation at: ${ghCommand}`, LOG_CONTEXT);
+
+				// gh repo create <name> --private|--public --source=<dir> --remote=origin --push
+				const args = ['repo', 'create', repoName];
+				args.push(isPrivate ? '--private' : '--public');
+				args.push(`--source=${dirPath}`);
+				args.push('--remote=origin');
+				args.push('--push');
+
+				const result = await execFileNoThrow(ghCommand, args);
+
+				if (result.exitCode !== 0) {
+					// Check if gh CLI is not installed
+					if (
+						result.stderr.includes('command not found') ||
+						result.stderr.includes('not recognized')
+					) {
+						return {
+							success: false,
+							error: 'GitHub CLI (gh) is not installed. Please install it to create repositories.',
+						};
+					}
+					// Check for authentication issues
+					if (result.stderr.includes('not logged') || result.stderr.includes('authentication')) {
+						return {
+							success: false,
+							error: 'GitHub CLI is not authenticated. Please run "gh auth login" first.',
+						};
+					}
+					return { success: false, error: result.stderr || 'Failed to create repository' };
+				}
+
+				// Extract repo URL from stdout (gh typically outputs the URL)
+				const repoUrl = result.stdout.trim();
+				logger.info(`${LOG_CONTEXT} Created repository: ${repoUrl}`);
+				return { success: true, repoUrl };
+			}
+		)
+	);
+
 	// Run a lifecycle script in a worktree's working directory
 	// Supports SSH remote execution via optional sshRemoteId parameter
 	ipcMain.handle(
