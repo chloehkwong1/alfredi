@@ -1676,6 +1676,37 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				const ghCommand = await resolveGhPath(ghPath);
 				logger.debug(`Using gh CLI for repo creation at: ${ghCommand}`, LOG_CONTEXT);
 
+				// Initialize git repo if the directory isn't already one
+				// (required by --source flag)
+				const gitCheckResult = await execFileNoThrow('git', [
+					'-C',
+					dirPath,
+					'rev-parse',
+					'--git-dir',
+				]);
+				if (gitCheckResult.exitCode !== 0) {
+					const initResult = await execFileNoThrow('git', ['-C', dirPath, 'init']);
+					if (initResult.exitCode !== 0) {
+						return {
+							success: false,
+							error: `Failed to initialize git repository: ${initResult.stderr}`,
+						};
+					}
+				}
+
+				// Ensure at least one commit exists (required by --push flag)
+				const hasCommits = await execFileNoThrow('git', ['-C', dirPath, 'rev-parse', 'HEAD']);
+				if (hasCommits.exitCode !== 0) {
+					await execFileNoThrow('git', [
+						'-C',
+						dirPath,
+						'commit',
+						'--allow-empty',
+						'-m',
+						'Initial commit',
+					]);
+				}
+
 				// gh repo create <name> --private|--public --source=<dir> --remote=origin --push
 				const args = ['repo', 'create', repoName];
 				args.push(isPrivate ? '--private' : '--public');
