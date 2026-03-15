@@ -993,24 +993,9 @@ const LogItemComponent = memo(
 									<div
 										className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm scrollbar-thin' : 'whitespace-pre-wrap text-sm break-words'}`}
 										style={{
-											maxHeight: '600px',
-											overflow: 'auto',
-											overscrollBehavior: 'contain',
 											color: theme.colors.textMain,
 											fontFamily: contentFontFamily,
 											overflowWrap: isTerminal && log.source !== 'user' ? undefined : 'break-word',
-										}}
-										onWheel={(e) => {
-											// Prevent scroll from propagating to parent when this container can scroll
-											const el = e.currentTarget;
-											const { scrollTop, scrollHeight, clientHeight } = el;
-											const atTop = scrollTop <= 0;
-											const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
-
-											// Only stop propagation if we're not at the boundary we're scrolling towards
-											if ((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) {
-												e.stopPropagation();
-											}
 										}}
 									>
 										{isTerminal && log.source !== 'user' ? (
@@ -1481,7 +1466,7 @@ const WorkGroupComponent = memo(
 					theme={theme}
 					fontFamily={fontFamily}
 					maxOutputLines={maxOutputLines}
-					isExpanded={expandedLogs.has(entry.id)}
+					isExpanded={!expandedLogs.has(entry.id)}
 					onToggleExpanded={onToggleExpanded}
 					localFilterQuery={localFilters.get(entry.id) || ''}
 					filterMode={filterModes.get(entry.id) || { mode: 'include', regex: false }}
@@ -1832,7 +1817,7 @@ export const TerminalOutput = memo(
 		// Scroll container ref for native scrolling
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-		// Track which log entries are expanded (by log ID)
+		// Track which log entries have been manually collapsed (by log ID) — entries default to expanded
 		const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
 		// Use a ref to access current value without recreating LogItem callback
 		const expandedLogsRef = useRef(expandedLogs);
@@ -2603,7 +2588,7 @@ export const TerminalOutput = memo(
 								lastUserCommand={
 									isTerminal && log.source !== 'user' ? getLastUserCommand(unitIndex) : undefined
 								}
-								isExpanded={expandedLogs.has(log.id)}
+								isExpanded={!expandedLogs.has(log.id)}
 								onToggleExpanded={toggleExpanded}
 								localFilterQuery={localFilters.get(log.id) || ''}
 								filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}
