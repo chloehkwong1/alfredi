@@ -43,6 +43,14 @@ export const CollapsedSessionPill = memo(function CollapsedSessionPill({
 				const isFirst = idx === 0;
 				const isLast = idx === allSessions.length - 1;
 				const isInBatch = activeBatchSessionIds.includes(s.id);
+				const noSession = s.toolType === 'claude-code' && !s.agentSessionId && !isInBatch;
+
+				// Determine pill segment color: batch > unread > state-based
+				const segmentColor = isInBatch
+					? theme.colors.warning
+					: hasUnreadTabs
+						? theme.colors.accent
+						: getStatusColor(s.state, theme);
 
 				return (
 					<div
@@ -52,13 +60,9 @@ export const CollapsedSessionPill = memo(function CollapsedSessionPill({
 						aria-label={`Switch to ${s.name}`}
 						className={`group/segment relative flex-1 h-full ${isInBatch ? 'animate-pulse' : ''}`}
 						style={{
-							...(s.toolType === 'claude-code' && !s.agentSessionId && !isInBatch
+							...(noSession
 								? { border: `1px solid ${theme.colors.textDim}`, backgroundColor: 'transparent' }
-								: {
-										backgroundColor: isInBatch
-											? theme.colors.warning
-											: getStatusColor(s.state, theme),
-									}),
+								: { backgroundColor: segmentColor }),
 							borderRadius: hasWorktrees
 								? `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`
 								: '9999px',
@@ -84,12 +88,6 @@ export const CollapsedSessionPill = memo(function CollapsedSessionPill({
 							}
 						}}
 					>
-						{hasUnreadTabs && isLast && (
-							<div
-								className="absolute -right-0.5 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full"
-								style={{ backgroundColor: theme.colors.error }}
-							/>
-						)}
 						<div
 							className="fixed rounded px-3 py-2 z-[100] opacity-0 group-hover/segment:opacity-100 pointer-events-none transition-opacity shadow-xl"
 							style={{

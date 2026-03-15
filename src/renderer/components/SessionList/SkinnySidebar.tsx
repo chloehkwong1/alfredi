@@ -27,14 +27,21 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 	return (
 		<div className="flex-1 flex flex-col items-center py-4 gap-2 overflow-y-auto overflow-x-visible no-scrollbar">
 			{sortedSessions.map((session) => {
+				const isActive = activeSessionId === session.id;
 				const isInBatch = activeBatchSessionIds.includes(session.id);
-				const hasUnreadTabs = session.aiTabs?.some((tab) => tab.hasUnread);
-				const effectiveStatusColor = isInBatch
-					? theme.colors.warning
-					: session.toolType === 'claude-code' && !session.agentSessionId
-						? undefined
-						: getStatusColor(session.state, theme);
+				const hasUnreadTabs = !isActive && session.aiTabs?.some((tab) => tab.hasUnread);
+				const noSession =
+					session.toolType === 'claude-code' && !session.agentSessionId && !isInBatch;
 				const shouldPulse = session.state === 'busy' || isInBatch;
+
+				// Determine dot color: batch > unread > state-based
+				const dotColor = isInBatch
+					? theme.colors.warning
+					: noSession
+						? undefined
+						: hasUnreadTabs
+							? theme.colors.accent
+							: getStatusColor(session.state, theme);
 
 				return (
 					<div
@@ -50,35 +57,30 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 								setActiveSessionId(session.id);
 							}
 						}}
-						className={`group relative w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-all outline-none ${activeSessionId === session.id ? '' : 'hover:bg-white/10'}`}
+						className={`group relative w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-all outline-none ${isActive ? '' : 'hover:bg-white/10'}`}
 					>
-						<div className="relative">
+						<div>
 							<div
 								className={`w-3 h-3 rounded-full ${shouldPulse ? 'animate-pulse' : ''}`}
 								style={{
-									opacity: activeSessionId === session.id ? 1 : 0.25,
-									...(session.toolType === 'claude-code' && !session.agentSessionId && !isInBatch
+									opacity: isActive ? 1 : hasUnreadTabs ? 1 : 0.25,
+									...(noSession
 										? {
 												border: `1.5px solid ${theme.colors.textDim}`,
 												backgroundColor: 'transparent',
 											}
 										: {
-												backgroundColor: effectiveStatusColor,
+												backgroundColor: dotColor,
 											}),
 								}}
 								title={
-									session.toolType === 'claude-code' && !session.agentSessionId
+									noSession
 										? 'No active Claude session'
-										: undefined
+										: hasUnreadTabs
+											? 'Unread messages'
+											: undefined
 								}
 							/>
-							{activeSessionId !== session.id && hasUnreadTabs && (
-								<div
-									className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-									style={{ backgroundColor: theme.colors.error }}
-									title="Unread messages"
-								/>
-							)}
 						</div>
 
 						{/* Hover Tooltip for Skinny Mode */}

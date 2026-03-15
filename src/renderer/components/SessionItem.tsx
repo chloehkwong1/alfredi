@@ -325,7 +325,7 @@ export const SessionItem = memo(function SessionItem({
 								</div>
 							)}
 							<span
-								className={`font-medium truncate ${variant === 'worktree' ? 'text-xs' : 'text-sm'}`}
+								className={`truncate ${variant === 'worktree' ? 'text-xs' : 'text-sm'} ${!isActive && session.aiTabs?.some((tab) => tab.hasUnread) ? 'font-semibold' : 'font-medium'}`}
 								style={{ color: theme.colors.textMain }}
 							>
 								{session.name}
@@ -451,11 +451,12 @@ export const SessionItem = memo(function SessionItem({
 								</button>
 							))}
 
-						{/* AI Status Indicator with Unread Badge - ml-auto ensures it aligns to right edge */}
-						<div className="relative ml-auto">
+						{/* AI Status Indicator - ml-auto ensures it aligns to right edge */}
+						<div className="ml-auto">
 							{(() => {
 								const noSession =
 									session.toolType === 'claude-code' && !session.agentSessionId && !isInBatch;
+								const hasUnread = !isActive && session.aiTabs?.some((tab) => tab.hasUnread);
 
 								if (noSession) {
 									return (
@@ -503,26 +504,31 @@ export const SessionItem = memo(function SessionItem({
 										}
 										return (
 											<span title="Agent not running">
-												<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+												<Circle className="w-3 h-3" style={{ color: theme.colors.error }} />
 											</span>
 										);
 									case 'idle':
 									default:
+										if (hasUnread) {
+											return (
+												<span title="Unread messages">
+													<div
+														className="w-2.5 h-2.5 rounded-full"
+														style={{ backgroundColor: theme.colors.accent }}
+													/>
+												</span>
+											);
+										}
 										return (
-											<span title="Ready and waiting">
-												<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+											<span title="Ready">
+												<div
+													className="w-2.5 h-2.5 rounded-full"
+													style={{ backgroundColor: theme.colors.success }}
+												/>
 											</span>
 										);
 								}
 							})()}
-							{/* Unread Notification Badge */}
-							{!isActive && session.aiTabs?.some((tab) => tab.hasUnread) && (
-								<div
-									className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-									style={{ backgroundColor: theme.colors.error }}
-									title="Unread messages"
-								/>
-							)}
 						</div>
 					</div>
 				);
