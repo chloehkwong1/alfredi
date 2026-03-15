@@ -105,6 +105,14 @@ export function NewInstanceModal({
 	const [availableModels, setAvailableModels] = useState<Record<string, string[]>>({});
 	const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
 	const [directoryWarningAcknowledged, setDirectoryWarningAcknowledged] = useState(false);
+	// Create new directory + GitHub repo
+	const [createNewDir, setCreateNewDir] = useState(false);
+	const [newDirName, setNewDirName] = useState('');
+	const [createGitHubRepo, setCreateGitHubRepo] = useState(false);
+	const [isPrivate, setIsPrivate] = useState(true);
+	const [ghAvailable, setGhAvailable] = useState(false);
+	const [createDirError, setCreateDirError] = useState<string | null>(null);
+	const [isCreatingDir, setIsCreatingDir] = useState(false);
 	// SSH Remote configuration
 	const [sshRemotes, setSshRemotes] = useState<SshRemoteConfig[]>([]);
 	const [agentSshRemoteConfigs, setAgentSshRemoteConfigs] = useState<
@@ -143,7 +151,9 @@ export function NewInstanceModal({
 	// Validate session uniqueness
 	const validation = useMemo(() => {
 		const name = instanceName.trim();
-		const expandedDir = expandTilde(workingDir.trim());
+		const baseDir = expandTilde(workingDir.trim());
+		const expandedDir =
+			createNewDir && newDirName.trim() ? `${baseDir}/${newDirName.trim()}` : baseDir;
 		if (!name || !expandedDir || !selectedAgent) {
 			return { valid: true }; // Don't show errors until fields are filled
 		}
@@ -156,7 +166,16 @@ export function NewInstanceModal({
 			existingSessions,
 			sshRemoteId
 		);
-	}, [instanceName, workingDir, selectedAgent, existingSessions, homeDir, agentSshRemoteConfigs]);
+	}, [
+		instanceName,
+		workingDir,
+		selectedAgent,
+		existingSessions,
+		homeDir,
+		agentSshRemoteConfigs,
+		createNewDir,
+		newDirName,
+	]);
 
 	// Check if SSH remote is enabled for the selected agent or pending config
 	// When no agent is selected, check the _pending_ config (user may select SSH before choosing agent)
@@ -422,11 +441,13 @@ export function NewInstanceModal({
 		[agents, availableModels]
 	);
 
-	const handleCreate = React.useCallback(() => {
+	const handleCreate = React.useCallback(async () => {
 		const name = instanceName.trim();
 		if (!name) return; // Name is required
 		// Expand tilde before passing to callback
-		const expandedWorkingDir = expandTilde(workingDir.trim());
+		const baseDir = expandTilde(workingDir.trim());
+		const expandedWorkingDir =
+			createNewDir && newDirName.trim() ? `${baseDir}/${newDirName.trim()}` : baseDir;
 
 		// Validate before creating
 		const sshConfig = agentSshRemoteConfigs[selectedAgent] || agentSshRemoteConfigs['_pending_'];
@@ -439,6 +460,37 @@ export function NewInstanceModal({
 			sshRemoteId
 		);
 		if (!result.valid) return;
+
+		// Create new directory and optionally GitHub repo
+		if (createNewDir && newDirName.trim()) {
+			setIsCreatingDir(true);
+			setCreateDirError(null);
+			try {
+				const mkdirResult = await window.maestro.fs.mkdir(expandedWorkingDir);
+				if (!mkdirResult.success) {
+					setCreateDirError(mkdirResult.error || 'Failed to create directory');
+					setIsCreatingDir(false);
+					return;
+				}
+				if (createGitHubRepo) {
+					const repoResult = await window.maestro.git.createRepo(
+						newDirName.trim(),
+						expandedWorkingDir,
+						isPrivate
+					);
+					if (!repoResult.success) {
+						setCreateDirError(repoResult.error || 'Failed to create GitHub repository');
+						setIsCreatingDir(false);
+						return;
+					}
+				}
+			} catch (err) {
+				setCreateDirError(err instanceof Error ? err.message : 'An unexpected error occurred');
+				setIsCreatingDir(false);
+				return;
+			}
+			setIsCreatingDir(false);
+		}
 
 		// Get per-agent config values
 		const agentCustomPath = customAgentPaths[selectedAgent]?.trim() || undefined;
@@ -485,6 +537,11 @@ export function NewInstanceModal({
 		setInstanceName('');
 		handleWorkingDirChange('');
 		setNudgeMessage('');
+		setCreateNewDir(false);
+		setNewDirName('');
+		setCreateGitHubRepo(false);
+		setIsPrivate(true);
+		setCreateDirError(null);
 		// Reset per-agent config for selected agent
 		setCustomAgentPaths((prev) => ({ ...prev, [selectedAgent]: '' }));
 		setCustomAgentArgs((prev) => ({ ...prev, [selectedAgent]: '' }));
@@ -499,6 +556,10 @@ export function NewInstanceModal({
 		selectedAgent,
 		workingDir,
 		nudgeMessage,
+		createNewDir,
+		newDirName,
+		createGitHubRepo,
+		isPrivate,
 		customAgentPaths,
 		customAgentArgs,
 		customAgentEnvVars,
@@ -520,6 +581,8 @@ export function NewInstanceModal({
 		// 2. User specified a custom path for it
 		const hasCustomPath = customAgentPaths[selectedAgent]?.trim();
 		const isAgentUsable = agent?.available || !!hasCustomPath;
+		// When creating a new directory, require a directory name
+		const dirNameValid = !createNewDir || !!newDirName.trim();
 		// Remote path validation is informational only - don't block creation
 		// Users may want to set up agent for a remote before the path exists
 		return (
@@ -528,7 +591,9 @@ export function NewInstanceModal({
 			workingDir.trim() &&
 			instanceName.trim() &&
 			validation.valid &&
-			!hasWarningThatNeedsAck
+			!hasWarningThatNeedsAck &&
+			dirNameValid &&
+			!isCreatingDir
 		);
 	}, [
 		selectedAgent,
@@ -539,6 +604,9 @@ export function NewInstanceModal({
 		validation.warning,
 		directoryWarningAcknowledged,
 		customAgentPaths,
+		createNewDir,
+		newDirName,
+		isCreatingDir,
 	]);
 
 	// Handle keyboard shortcuts
@@ -588,6 +656,20 @@ export function NewInstanceModal({
 			}
 			// Reset warning acknowledgment when modal opens
 			setDirectoryWarningAcknowledged(false);
+			// Reset create-new-dir state
+			setCreateNewDir(false);
+			setNewDirName('');
+			setCreateGitHubRepo(false);
+			setIsPrivate(true);
+			setCreateDirError(null);
+			setIsCreatingDir(false);
+			// Check if GitHub CLI is available
+			window.maestro.git
+				.checkGhCli()
+				.then((result) => {
+					setGhAvailable(result.installed && result.authenticated);
+				})
+				.catch(() => setGhAvailable(false));
 		}
 	}, [isOpen, sourceSession]);
 
@@ -680,7 +762,7 @@ export function NewInstanceModal({
 						theme={theme}
 						onCancel={onClose}
 						onConfirm={handleCreate}
-						confirmLabel="Create Project"
+						confirmLabel={isCreatingDir ? 'Creating...' : 'Create Project'}
 						confirmDisabled={!isFormValid}
 					/>
 				}
@@ -1062,13 +1144,15 @@ export function NewInstanceModal({
 					{/* Working Directory */}
 					<FormInput
 						theme={theme}
-						label="Working Directory"
+						label={createNewDir ? 'Parent Directory' : 'Working Directory'}
 						value={workingDir}
 						onChange={handleWorkingDirChange}
 						placeholder={
 							isSshEnabled
 								? `Enter remote path${sshRemoteHost ? ` on ${sshRemoteHost}` : ''} (e.g., /home/user/project)`
-								: 'Select directory...'
+								: createNewDir
+									? 'Select parent directory...'
+									: 'Select directory...'
 						}
 						error={validation.errorField === 'directory' ? validation.error : undefined}
 						monospace
@@ -1112,6 +1196,119 @@ export function NewInstanceModal({
 									<span style={{ color: theme.colors.error }}>{remotePathValidation.error}</span>
 								</>
 							) : null}
+						</div>
+					)}
+
+					{/* Create new directory toggle (hidden when SSH remote is enabled) */}
+					{!isSshEnabled && (
+						<div>
+							<label className="flex items-center gap-2 cursor-pointer">
+								<input
+									type="checkbox"
+									checked={createNewDir}
+									onChange={(e) => {
+										setCreateNewDir(e.target.checked);
+										if (!e.target.checked) {
+											setNewDirName('');
+											setCreateGitHubRepo(false);
+											setCreateDirError(null);
+										}
+									}}
+									className="w-4 h-4 rounded"
+									style={{ accentColor: theme.colors.accent }}
+								/>
+								<span className="text-sm" style={{ color: theme.colors.textMain }}>
+									Create new directory
+								</span>
+							</label>
+
+							{createNewDir && (
+								<div className="mt-3 space-y-3 pl-6">
+									{/* Directory name input */}
+									<FormInput
+										theme={theme}
+										label="Directory Name"
+										value={newDirName}
+										onChange={(value) => {
+											setNewDirName(value);
+											setCreateDirError(null);
+										}}
+										placeholder="my-project"
+										monospace
+										heightClass="p-2"
+									/>
+
+									{/* Computed path preview */}
+									{workingDir.trim() && newDirName.trim() && (
+										<p className="text-xs font-mono" style={{ color: theme.colors.textDim }}>
+											{expandTilde(workingDir.trim())}/{newDirName.trim()}
+										</p>
+									)}
+
+									{/* GitHub repo option (only when gh CLI is available) */}
+									{ghAvailable && (
+										<div className="space-y-2">
+											<label className="flex items-center gap-2 cursor-pointer">
+												<input
+													type="checkbox"
+													checked={createGitHubRepo}
+													onChange={(e) => setCreateGitHubRepo(e.target.checked)}
+													className="w-4 h-4 rounded"
+													style={{ accentColor: theme.colors.accent }}
+												/>
+												<span className="text-sm" style={{ color: theme.colors.textMain }}>
+													Create GitHub repository
+												</span>
+											</label>
+
+											{createGitHubRepo && (
+												<div className="flex items-center gap-3 pl-6">
+													<label className="flex items-center gap-1.5 cursor-pointer">
+														<input
+															type="radio"
+															name="repo-visibility"
+															checked={isPrivate}
+															onChange={() => setIsPrivate(true)}
+															className="w-3.5 h-3.5"
+															style={{ accentColor: theme.colors.accent }}
+														/>
+														<span className="text-sm" style={{ color: theme.colors.textMain }}>
+															Private
+														</span>
+													</label>
+													<label className="flex items-center gap-1.5 cursor-pointer">
+														<input
+															type="radio"
+															name="repo-visibility"
+															checked={!isPrivate}
+															onChange={() => setIsPrivate(false)}
+															className="w-3.5 h-3.5"
+															style={{ accentColor: theme.colors.accent }}
+														/>
+														<span className="text-sm" style={{ color: theme.colors.textMain }}>
+															Public
+														</span>
+													</label>
+												</div>
+											)}
+										</div>
+									)}
+
+									{/* Error message for mkdir/createRepo failures */}
+									{createDirError && (
+										<div
+											className="p-2 rounded border text-xs"
+											style={{
+												backgroundColor: theme.colors.error + '10',
+												borderColor: theme.colors.error + '40',
+												color: theme.colors.error,
+											}}
+										>
+											{createDirError}
+										</div>
+									)}
+								</div>
+							)}
 						</div>
 					)}
 
