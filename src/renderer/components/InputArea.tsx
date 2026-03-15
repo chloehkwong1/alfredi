@@ -546,19 +546,21 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 			className="relative p-4 border-t"
 			style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }}
 		>
-			{/* ThinkingStatusPill - only show in AI mode when there are thinking items or AutoRun */}
-			{session.inputMode === 'ai' && (thinkingItems.length > 0 || autoRunState?.isRunning) && (
-				<ThinkingStatusPill
-					thinkingItems={thinkingItems}
-					theme={theme}
-					onSessionClick={onSessionClick}
-					namedSessions={namedSessions}
-					autoRunState={autoRunState}
-					activeSessionId={session.id}
-					onStopAutoRun={onStopAutoRun}
-					onInterrupt={handleInterrupt}
-				/>
-			)}
+			{/* ThinkingStatusPill - only show in AI mode when the current agent is thinking or AutoRun */}
+			{session.inputMode === 'ai' &&
+				(thinkingItems.some((item) => item.session.id === session.id) ||
+					autoRunState?.isRunning) && (
+					<ThinkingStatusPill
+						thinkingItems={thinkingItems.filter((item) => item.session.id === session.id)}
+						theme={theme}
+						onSessionClick={onSessionClick}
+						namedSessions={namedSessions}
+						autoRunState={autoRunState}
+						activeSessionId={session.id}
+						onStopAutoRun={onStopAutoRun}
+						onInterrupt={handleInterrupt}
+					/>
+				)}
 
 			{/* ExecutionQueueIndicator - show when items are queued in AI mode */}
 			{session.inputMode === 'ai' && onOpenQueueBrowser && (

@@ -7,6 +7,7 @@ import {
 	AlertTriangle,
 	ChevronRight,
 	Circle,
+	LayoutDashboard,
 	Loader2,
 	Minus,
 	RefreshCw,
@@ -121,7 +122,10 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 				PR #{prNumber}
 			</button>
 			{metaText && (
-				<span className="truncate font-medium" style={{ color }}>
+				<span
+					className="truncate font-medium opacity-0 group-hover:opacity-100 transition-opacity"
+					style={{ color }}
+				>
 					{metaText}
 				</span>
 			)}
@@ -137,9 +141,10 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
  * Variant determines the context in which the session item is rendered:
  * - 'bookmark': Session in the Bookmarks folder
  * - 'flat': Session in flat list
+ * - 'project-head': Project header that opens dashboard and toggles worktrees
  * - 'worktree': Worktree child session nested under parent (shows branch name)
  */
-export type SessionItemVariant = 'bookmark' | 'flat' | 'worktree';
+export type SessionItemVariant = 'bookmark' | 'flat' | 'project-head' | 'worktree';
 
 export interface SessionItemProps {
 	session: Session;
@@ -200,16 +205,20 @@ export const SessionItem = memo(function SessionItem({
 }: SessionItemProps) {
 	// Determine container styling based on variant
 	const getContainerClassName = () => {
-		const base = `cursor-move flex items-center justify-between group border-l-2 transition-all hover:bg-opacity-50 ${isDragging ? 'opacity-50' : ''}`;
+		const base = `flex items-center justify-between group transition-all hover:bg-opacity-50 ${isDragging ? 'opacity-50' : ''}`;
 
+		if (variant === 'project-head') {
+			// Full-width header with left accent border, cursor pointer instead of move
+			return `px-4 py-2.5 cursor-pointer border-l-2 ${base}`;
+		}
 		if (variant === 'flat') {
-			return `mx-3 px-3 py-2 rounded mb-1 ${base}`;
+			return `mx-3 px-3 py-2 rounded mb-1 cursor-move border-l-2 ${base}`;
 		}
 		if (variant === 'worktree') {
 			// Worktree children have extra left padding and smaller text
-			return `pl-8 pr-4 py-1.5 ${base}`;
+			return `pl-8 pr-4 py-1.5 cursor-move ${base}`;
 		}
-		return `px-4 py-2 ${base}`;
+		return `px-4 py-2 cursor-move border-l-2 ${base}`;
 	};
 
 	// Determine if this session has git context (branch/PR data worth showing)
@@ -221,25 +230,37 @@ export const SessionItem = memo(function SessionItem({
 	return (
 		<div
 			key={`${variant}-${session.id}`}
-			draggable
-			onDragStart={onDragStart}
+			draggable={variant !== 'project-head'}
+			onDragStart={variant !== 'project-head' ? onDragStart : undefined}
 			onDragOver={onDragOver}
 			onDrop={onDrop}
 			onClick={onSelect}
 			onContextMenu={onContextMenu}
 			className={getContainerClassName()}
 			style={{
-				borderColor:
-					isActive || isKeyboardSelected
-						? theme.colors.accent
-						: variant === 'worktree'
-							? (getWorktreeStatusColor(session.worktreeStatus, theme) ?? 'transparent')
-							: 'transparent',
-				backgroundColor: isActive
-					? theme.colors.bgActivity
-					: isKeyboardSelected
-						? theme.colors.bgActivity + '40'
-						: 'transparent',
+				...(variant === 'project-head'
+					? {
+							borderLeftColor: isActive ? theme.colors.accent : theme.colors.accent + '60',
+						}
+					: {
+							borderColor:
+								variant === 'worktree'
+									? undefined
+									: isActive || isKeyboardSelected
+										? theme.colors.accent
+										: 'transparent',
+						}),
+				backgroundColor:
+					variant === 'project-head'
+						? isActive
+							? theme.colors.accent + '12'
+							: 'transparent'
+						: isActive
+							? theme.colors.bgActivity
+							: isKeyboardSelected
+								? theme.colors.bgActivity + '40'
+								: 'transparent',
+				borderBottom: variant === 'project-head' ? `1px solid ${theme.colors.accent}30` : undefined,
 				minHeight: variant === 'worktree' ? '28px' : hasGitContext ? '56px' : undefined,
 			}}
 		>
@@ -336,141 +357,159 @@ export const SessionItem = memo(function SessionItem({
 			</div>
 
 			{/* Right side: Indicators and actions */}
-			<div className="flex items-center gap-2 ml-2">
-				{/* SSH Indicator (standalone, extracted from former GIT/LOCAL block) */}
-				{session.sessionSshRemoteConfig?.enabled && session.toolType !== 'terminal' && (
-					<div
-						className="px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5"
-						style={{
-							backgroundColor: theme.colors.warning + '30',
-							color: theme.colors.warning,
-						}}
-						title="Running on remote host via SSH"
-					>
-						<Server className="w-3 h-3" />
-						SSH
-					</div>
-				)}
+			{(() => {
+				if (variant === 'project-head') {
+					return (
+						<div className="flex items-center ml-2">
+							<span title="Open dashboard">
+								<LayoutDashboard className="w-4 h-4" style={{ color: theme.colors.textDim }} />
+							</span>
+						</div>
+					);
+				}
 
-				{/* AUTO Mode Indicator */}
-				{isInBatch && (
-					<div
-						className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase animate-pulse"
-						style={{
-							backgroundColor: theme.colors.warning + '30',
-							color: theme.colors.warning,
-						}}
-						title="Auto Run active"
-					>
-						<Bot className="w-2.5 h-2.5" />
-						AUTO
-					</div>
-				)}
+				return (
+					<div className="flex items-center gap-2 ml-2">
+						{/* SSH Indicator (standalone, extracted from former GIT/LOCAL block) */}
+						{session.sessionSshRemoteConfig?.enabled && session.toolType !== 'terminal' && (
+							<div
+								className="px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5"
+								style={{
+									backgroundColor: theme.colors.warning + '30',
+									color: theme.colors.warning,
+								}}
+								title="Running on remote host via SSH"
+							>
+								<Server className="w-3 h-3" />
+								SSH
+							</div>
+						)}
 
-				{/* Bookmark toggle - hidden for worktree children (they inherit from parent) */}
-				{!session.parentSessionId &&
-					(variant !== 'bookmark' ? (
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								onToggleBookmark();
-							}}
-							className={`p-0.5 rounded hover:bg-white/10 transition-all ${session.bookmarked ? '' : 'opacity-0 group-hover:opacity-100'}`}
-							title={session.bookmarked ? 'Remove bookmark' : 'Add bookmark'}
-						>
-							<Bookmark
-								className="w-3 h-3"
-								style={{ color: theme.colors.accent }}
-								fill={session.bookmarked ? theme.colors.accent : 'none'}
-							/>
-						</button>
-					) : (
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								onToggleBookmark();
-							}}
-							className="p-0.5 rounded hover:bg-white/10 transition-colors"
-							title="Remove bookmark"
-						>
-							<Bookmark
-								className="w-3 h-3"
-								style={{ color: theme.colors.accent }}
-								fill={theme.colors.accent}
-							/>
-						</button>
-					))}
+						{/* AUTO Mode Indicator */}
+						{isInBatch && (
+							<div
+								className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase animate-pulse"
+								style={{
+									backgroundColor: theme.colors.warning + '30',
+									color: theme.colors.warning,
+								}}
+								title="Auto Run active"
+							>
+								<Bot className="w-2.5 h-2.5" />
+								AUTO
+							</div>
+						)}
 
-				{/* AI Status Indicator with Unread Badge - ml-auto ensures it aligns to right edge */}
-				<div className="relative ml-auto">
-					{(() => {
-						const noSession =
-							session.toolType === 'claude-code' && !session.agentSessionId && !isInBatch;
+						{/* Bookmark toggle - hidden for worktree children (they inherit from parent) */}
+						{!session.parentSessionId &&
+							(variant !== 'bookmark' ? (
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										onToggleBookmark();
+									}}
+									className={`p-0.5 rounded hover:bg-white/10 transition-all ${session.bookmarked ? '' : 'opacity-0 group-hover:opacity-100'}`}
+									title={session.bookmarked ? 'Remove bookmark' : 'Add bookmark'}
+								>
+									<Bookmark
+										className="w-3 h-3"
+										style={{ color: theme.colors.accent }}
+										fill={session.bookmarked ? theme.colors.accent : 'none'}
+									/>
+								</button>
+							) : (
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										onToggleBookmark();
+									}}
+									className="p-0.5 rounded hover:bg-white/10 transition-colors"
+									title="Remove bookmark"
+								>
+									<Bookmark
+										className="w-3 h-3"
+										style={{ color: theme.colors.accent }}
+										fill={theme.colors.accent}
+									/>
+								</button>
+							))}
 
-						if (noSession) {
-							return (
-								<span title="No active Claude session">
-									<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
-								</span>
-							);
-						}
+						{/* AI Status Indicator with Unread Badge - ml-auto ensures it aligns to right edge */}
+						<div className="relative ml-auto">
+							{(() => {
+								const noSession =
+									session.toolType === 'claude-code' && !session.agentSessionId && !isInBatch;
 
-						switch (session.state) {
-							case 'busy':
-								return (
-									<span title={session.cliActivity ? 'CLI: Running task' : 'Agent is thinking'}>
-										<Loader2
-											className="w-3 h-3 animate-spin"
-											style={{ color: theme.colors.warning }}
-										/>
-									</span>
-								);
-							case 'waiting_input':
-								return (
-									<span title="Waiting for input">
-										<ChevronRight
-											className="w-3 h-3 animate-pulse"
-											style={{ color: theme.colors.warning }}
-										/>
-									</span>
-								);
-							case 'connecting':
-								return (
-									<span title="Attempting to establish connection">
-										<RefreshCw className="w-3 h-3 animate-spin" style={{ color: '#ff8800' }} />
-									</span>
-								);
-							case 'error':
-								return (
-									<span
-										title={
-											session.agentError?.message
-												? `Error: ${session.agentError.message}`
-												: 'No connection with agent'
+								if (noSession) {
+									return (
+										<span title="No active Claude session">
+											<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+										</span>
+									);
+								}
+
+								switch (session.state) {
+									case 'busy':
+										return (
+											<span title={session.cliActivity ? 'CLI: Running task' : 'Agent is thinking'}>
+												<Loader2
+													className="w-3 h-3 animate-spin"
+													style={{ color: theme.colors.warning }}
+												/>
+											</span>
+										);
+									case 'waiting_input':
+										return (
+											<span title="Waiting for input">
+												<ChevronRight
+													className="w-3 h-3 animate-pulse"
+													style={{ color: theme.colors.warning }}
+												/>
+											</span>
+										);
+									case 'connecting':
+										return (
+											<span title="Attempting to establish connection">
+												<RefreshCw className="w-3 h-3 animate-spin" style={{ color: '#ff8800' }} />
+											</span>
+										);
+									case 'error':
+										if (session.agentError?.message) {
+											return (
+												<span title={`Error: ${session.agentError.message}`}>
+													<AlertTriangle
+														className="w-3 h-3"
+														style={{ color: theme.colors.error }}
+													/>
+												</span>
+											);
 										}
-									>
-										<AlertTriangle className="w-3 h-3" style={{ color: theme.colors.error }} />
-									</span>
-								);
-							case 'idle':
-							default:
-								return (
-									<span title="Ready and waiting">
-										<Minus className="w-3 h-3" style={{ color: theme.colors.textDim }} />
-									</span>
-								);
-						}
-					})()}
-					{/* Unread Notification Badge */}
-					{!isActive && session.aiTabs?.some((tab) => tab.hasUnread) && (
-						<div
-							className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
-							style={{ backgroundColor: theme.colors.error }}
-							title="Unread messages"
-						/>
-					)}
-				</div>
-			</div>
+										return (
+											<span title="Agent not running">
+												<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+											</span>
+										);
+									case 'idle':
+									default:
+										return (
+											<span title="Ready and waiting">
+												<Minus className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+											</span>
+										);
+								}
+							})()}
+							{/* Unread Notification Badge */}
+							{!isActive && session.aiTabs?.some((tab) => tab.hasUnread) && (
+								<div
+									className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full"
+									style={{ backgroundColor: theme.colors.error }}
+									title="Unread messages"
+								/>
+							)}
+						</div>
+					</div>
+				);
+			})()}
 		</div>
 	);
 });

@@ -110,7 +110,8 @@ function parseFilesFromDiff(diffOutput: string): { path: string; status: string 
 
 export function useChangesPanel(
 	cwd: string | undefined,
-	sshRemoteId?: string
+	sshRemoteId?: string,
+	sessionBaseBranch?: string
 ): UseChangesPanelResult {
 	const [stagedFiles, setStagedFiles] = useState<ChangesFile[]>([]);
 	const [unstagedFiles, setUnstagedFiles] = useState<ChangesFile[]>([]);
@@ -179,10 +180,15 @@ export function useChangesPanel(
 
 			// 2. Get default branch + merge base for committed changes
 			try {
-				const defaultBranchResult = await window.maestro.git.getDefaultBranch(cwd);
-				if (!mountedRef.current) return;
-
-				const defaultBranch = defaultBranchResult.branch || 'main';
+				// Use session-persisted base branch if set, otherwise auto-detect
+				let defaultBranch: string;
+				if (sessionBaseBranch) {
+					defaultBranch = sessionBaseBranch;
+				} else {
+					const defaultBranchResult = await window.maestro.git.getDefaultBranch(cwd);
+					if (!mountedRef.current) return;
+					defaultBranch = defaultBranchResult.branch || 'main';
+				}
 				setBaseBranch(defaultBranch);
 
 				// Use origin/<branch> for merge-base to avoid stale local branch refs.
@@ -276,7 +282,7 @@ export function useChangesPanel(
 				hasLoadedOnceRef.current = true;
 			}
 		}
-	}, [cwd, sshRemoteId]);
+	}, [cwd, sshRemoteId, sessionBaseBranch]);
 
 	// Reset initial-load tracking when cwd changes (e.g. switching agents)
 	useEffect(() => {

@@ -82,6 +82,7 @@ function stripAgentFunctions(agent: any) {
 	const {
 		resumeArgs: _resumeArgs,
 		modelArgs: _modelArgs,
+		effortArgs: _effortArgs,
 		workingDirArgs: _workingDirArgs,
 		imageArgs: _imageArgs,
 		promptArgs: _promptArgs,

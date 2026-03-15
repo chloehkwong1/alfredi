@@ -25,6 +25,8 @@ import {
 	Server,
 	Play,
 	Square,
+	ChevronDown,
+	Search,
 } from 'lucide-react';
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
@@ -44,6 +46,7 @@ import { useGitBranch, useGitDetail, useGitFileStatus } from '../contexts/GitSta
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { calculateContextDisplay } from '../utils/contextUsage';
 import { useAgentCapabilities, useHoverTooltip } from '../hooks';
+import { useClickOutside } from '../hooks/ui/useClickOutside';
 import { useProjectDashboard } from '../hooks/worktree/useProjectDashboard';
 import { safeClipboardWrite } from '../utils/clipboard';
 import { useUIStore } from '../stores/uiStore';
@@ -484,6 +487,46 @@ export const MainPanel = React.memo(
 		const filePreviewRef = useRef<FilePreviewHandle>(null);
 		const [configuredContextWindow, setConfiguredContextWindow] = useState(0);
 
+		// Base branch selector state
+		const [baseBranchDropdownOpen, setBaseBranchDropdownOpen] = useState(false);
+		const [baseBranchFilter, setBaseBranchFilter] = useState('');
+		const baseBranchDropdownRef = useRef<HTMLDivElement>(null);
+		const baseBranchTriggerRef = useRef<HTMLSpanElement>(null);
+		const baseBranchSearchRef = useRef<HTMLInputElement>(null);
+		const [detectedDefaultBranch, setDetectedDefaultBranch] = useState<string>('main');
+
+		// Detect default branch for the active session
+		useEffect(() => {
+			if (!activeSession?.isGitRepo || !activeSession.cwd) return;
+			let cancelled = false;
+			window.maestro.git
+				.getDefaultBranch(activeSession.cwd)
+				.then((result) => {
+					if (!cancelled && result.branch) {
+						setDetectedDefaultBranch(result.branch);
+					}
+				})
+				.catch(() => {});
+			return () => {
+				cancelled = true;
+			};
+		}, [activeSession?.id, activeSession?.isGitRepo, activeSession?.cwd]);
+
+		// Close dropdown on click outside
+		useClickOutside(
+			[baseBranchDropdownRef, baseBranchTriggerRef],
+			() => setBaseBranchDropdownOpen(false),
+			baseBranchDropdownOpen
+		);
+
+		// Focus search input when dropdown opens
+		useEffect(() => {
+			if (baseBranchDropdownOpen) {
+				setBaseBranchFilter('');
+				setTimeout(() => baseBranchSearchRef.current?.focus(), 0);
+			}
+		}, [baseBranchDropdownOpen]);
+
 		// Extract tab handlers from props
 		const {
 			onTabSelect,
@@ -784,6 +827,25 @@ export const MainPanel = React.memo(
 			]
 		);
 
+		// Derived: effective base branch for display
+		const effectiveBaseBranch = activeSession?.baseBranch || detectedDefaultBranch;
+		const currentBranchName = gitInfo?.branch || '';
+		const isOnDefaultBranch = currentBranchName === effectiveBaseBranch;
+
+		// Handle selecting a base branch
+		const handleSelectBaseBranch = useCallback(
+			(branch: string) => {
+				if (!activeSession) return;
+				useSessionStore
+					.getState()
+					.setSessions((prev) =>
+						prev.map((s) => (s.id === activeSession.id ? { ...s, baseBranch: branch } : s))
+					);
+				setBaseBranchDropdownOpen(false);
+			},
+			[activeSession]
+		);
+
 		// Copy notification state (centered flash notice)
 		const [copyNotification, setCopyNotification] = useState<string | null>(null);
 
@@ -1054,12 +1116,14 @@ export const MainPanel = React.memo(
 								}}
 								data-tour="header-controls"
 							>
-								<div className="flex items-center gap-4 min-w-0 overflow-hidden">
-									<div className="flex items-center gap-2 text-sm font-medium min-w-0 overflow-hidden">
-										{/* Session name - hidden at narrow widths via CSS container query */}
-										<span className="header-session-name truncate">{activeSession.name}</span>
+								<div className="flex items-center gap-4 min-w-0 flex-1">
+									<div className="flex items-center gap-2 text-sm font-medium min-w-0 flex-1">
+										{/* Session name - hidden for worktree children (branch is the identity), hidden at narrow widths via CSS container query */}
+										{!(isWorktreeChild && currentBranchName) && (
+											<span className="header-session-name truncate">{activeSession.name}</span>
+										)}
 										<div
-											className="relative shrink-0"
+											className="relative min-w-0"
 											onMouseEnter={
 												activeSession.isGitRepo
 													? gitTooltip.triggerHandlers.onMouseEnter
@@ -1086,33 +1150,55 @@ export const MainPanel = React.memo(
 													<span className="truncate uppercase">{sshRemoteName}</span>
 												</span>
 											) : (
-												<span
-													className={`flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border cursor-pointer ${
-														activeSession.isGitRepo
-															? 'border-orange-500/30 text-orange-500 bg-orange-500/10 hover:bg-orange-500/20'
-															: 'border-blue-500/30 text-blue-500 bg-blue-500/10'
-													}`}
-													onClick={(e) => {
-														e.stopPropagation();
-														if (activeSession.isGitRepo) {
-															refreshGitStatus(); // Refresh git info immediately on click
-															setGitLogOpen?.(true);
-														}
-													}}
-													title={
-														activeSession.isGitRepo && gitInfo?.branch ? gitInfo.branch : undefined
-													}
-												>
+												<span className="flex items-center gap-1.5 text-xs min-w-0">
 													{activeSession.isGitRepo ? (
 														<>
-															<GitBranch className="w-3 h-3 shrink-0" />
-															{/* Hide branch name text at narrow widths via CSS container query */}
-															<span className="header-git-branch-text truncate">
-																{gitInfo?.branch || 'GIT'}
+															{/* Base branch selector (only when not on default branch) */}
+															{!isOnDefaultBranch && currentBranchName && (
+																<>
+																	<span
+																		ref={baseBranchTriggerRef}
+																		className="flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-orange-500/30 text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 cursor-pointer"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			setBaseBranchDropdownOpen((prev) => !prev);
+																		}}
+																		title={`Base branch: ${effectiveBaseBranch} (click to change)`}
+																	>
+																		<span className="header-git-branch-text truncate max-w-[100px]">
+																			{effectiveBaseBranch}
+																		</span>
+																		<ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+																	</span>
+																	<span
+																		style={{ color: theme.colors.textDim }}
+																		className="opacity-50"
+																	>
+																		←
+																	</span>
+																</>
+															)}
+															{/* Current branch pill */}
+															<span
+																className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-orange-500/30 text-orange-500 bg-orange-500/10 hover:bg-orange-500/20 cursor-pointer min-w-0"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	refreshGitStatus();
+																	setGitLogOpen?.(true);
+																}}
+																title={currentBranchName || undefined}
+															>
+																<GitBranch className="w-3 h-3 shrink-0" />
+																<span className="header-git-branch-text truncate min-w-0">
+																	{currentBranchName || 'GIT'}
+																</span>
 															</span>
+															{/* Base branch dropdown rendered at header level to escape overflow-hidden */}
 														</>
 													) : (
-														'LOCAL'
+														<span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-blue-500/30 text-blue-500 bg-blue-500/10">
+															LOCAL
+														</span>
 													)}
 												</span>
 											)}
@@ -1359,7 +1445,7 @@ export const MainPanel = React.memo(
 									</button>
 								)}
 
-								<div className="flex items-center gap-3 justify-end shrink-0">
+								<div className="flex items-center gap-3 justify-end shrink-0 ml-3">
 									{/* Server Run/Stop Pill - only shown for worktrees with runScript configured */}
 									{activeSessionRunScript && (
 										<button
@@ -1394,47 +1480,6 @@ export const MainPanel = React.memo(
 											)}
 										</button>
 									)}
-
-									{/* Session UUID Pill - click to copy full UUID, hidden at narrow widths via CSS container query */}
-									{/* Hide when file preview tab is focused - session stats are only relevant for AI tabs */}
-									{activeSession.inputMode === 'ai' &&
-										!activeFileTabId &&
-										activeTab?.agentSessionId &&
-										hasCapability('supportsSessionId') && (
-											<button
-												className="header-uuid-pill text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80"
-												style={{
-													backgroundColor: theme.colors.accent + '20',
-													color: theme.colors.accent,
-													borderColor: theme.colors.accent + '30',
-												}}
-												title={
-													activeTab.name
-														? `${activeTab.name}\nClick to copy: ${activeTab.agentSessionId}`
-														: `Click to copy: ${activeTab.agentSessionId}`
-												}
-												onClick={(e) => {
-													e.stopPropagation();
-													copyToClipboard(
-														activeTab.agentSessionId!,
-														'Session ID Copied to Clipboard'
-													);
-												}}
-											>
-												{activeTab.agentSessionId.split('-')[0].toUpperCase()}
-											</button>
-										)}
-
-									{/* Cost Tracker - styled as pill, hidden at narrow widths via CSS container query */}
-									{/* Hide when file preview tab is focused - cost tracking is only relevant for AI tabs */}
-									{activeSession.inputMode === 'ai' &&
-										!activeFileTabId &&
-										(activeTab?.agentSessionId || activeTab?.usageStats) &&
-										hasCapability('supportsCostTracking') && (
-											<span className="header-cost-widget text-xs font-mono font-bold px-2 py-0.5 rounded-full border border-green-500/30 text-green-500 bg-green-500/10">
-												${(activeTab?.usageStats?.totalCostUsd ?? 0).toFixed(2)}
-											</span>
-										)}
 
 									{/* Context Window Widget with Tooltip - only show when context window is configured and agent supports usage stats */}
 									{/* Hide when file preview tab is focused - context usage is only relevant for AI tabs */}
@@ -1675,6 +1720,107 @@ export const MainPanel = React.memo(
 										</button>
 									)}
 								</div>
+
+								{/* Base branch dropdown - rendered at header level to escape overflow-hidden ancestors */}
+								{baseBranchDropdownOpen &&
+									baseBranchTriggerRef.current &&
+									(() => {
+										const triggerRect = baseBranchTriggerRef.current!.getBoundingClientRect();
+										const headerRect = headerRef.current?.getBoundingClientRect();
+										const leftOffset = headerRect ? triggerRect.left - headerRect.left : 24;
+										return (
+											<div
+												ref={baseBranchDropdownRef}
+												className="absolute z-50 w-64 rounded-lg shadow-xl overflow-hidden"
+												style={{
+													top: `${triggerRect.bottom - (headerRect?.top ?? 0)}px`,
+													left: `${leftOffset}px`,
+													backgroundColor: theme.colors.bgSidebar,
+													border: `1px solid ${theme.colors.border}`,
+												}}
+												onClick={(e) => e.stopPropagation()}
+											>
+												{/* Search input */}
+												<div
+													className="flex items-center gap-2 px-3 py-2 border-b"
+													style={{ borderColor: theme.colors.border }}
+												>
+													<Search
+														className="w-3.5 h-3.5 shrink-0"
+														style={{ color: theme.colors.textDim }}
+													/>
+													<input
+														ref={baseBranchSearchRef}
+														type="text"
+														value={baseBranchFilter}
+														onChange={(e) => setBaseBranchFilter(e.target.value)}
+														onKeyDown={(e) => {
+															if (e.key === 'Escape') {
+																setBaseBranchDropdownOpen(false);
+															}
+														}}
+														placeholder="Filter branches..."
+														className="flex-1 bg-transparent text-xs outline-none"
+														style={{ color: theme.colors.textMain }}
+													/>
+												</div>
+												{/* Branch list */}
+												<div className="max-h-64 overflow-y-auto py-1 scrollbar-thin">
+													{(activeSession.gitBranches || [])
+														.filter(
+															(b) =>
+																b.toLowerCase().includes(baseBranchFilter.toLowerCase()) &&
+																b !== currentBranchName
+														)
+														.sort((a, b) => {
+															// Effective base branch first
+															if (a === effectiveBaseBranch) return -1;
+															if (b === effectiveBaseBranch) return 1;
+															// Common defaults next
+															const defaults = ['main', 'master', 'develop'];
+															const aDefault = defaults.indexOf(a);
+															const bDefault = defaults.indexOf(b);
+															if (aDefault !== -1 && bDefault !== -1) return aDefault - bDefault;
+															if (aDefault !== -1) return -1;
+															if (bDefault !== -1) return 1;
+															// Rest alphabetically
+															return a.localeCompare(b);
+														})
+														.map((branch) => (
+															<button
+																key={branch}
+																className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/10 flex items-center gap-2 transition-colors"
+																style={{
+																	color:
+																		branch === effectiveBaseBranch
+																			? theme.colors.accent
+																			: theme.colors.textMain,
+																}}
+																onClick={() => handleSelectBaseBranch(branch)}
+															>
+																<GitBranch className="w-3 h-3 shrink-0 opacity-50" />
+																<span className="truncate">{branch}</span>
+																{branch === effectiveBaseBranch && (
+																	<span className="ml-auto text-[10px] opacity-50">current</span>
+																)}
+															</button>
+														))}
+													{(activeSession.gitBranches || []).filter(
+														(b) =>
+															b.toLowerCase().includes(baseBranchFilter.toLowerCase()) &&
+															b !== currentBranchName
+													).length === 0 && (
+														<div
+															className="px-3 py-2 text-xs"
+															style={{ color: theme.colors.textDim }}
+														>
+															No matching branches
+														</div>
+													)}
+												</div>
+											</div>
+										);
+									})()}
 							</div>
 						)}
 

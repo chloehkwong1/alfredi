@@ -698,6 +698,8 @@ export interface Session {
 	worktreePrUrl?: string; // PR URL for quick access (e.g., open in browser)
 	// Current git branch for this session (set for all git-backed agents, not just worktrees)
 	currentBranch?: string;
+	// User-selected base branch for diff comparison (overrides auto-detected default)
+	baseBranch?: string;
 	// PR display fields (populated from gh pr view for the PR chip in the left bar)
 	prNumber?: number;
 	prUrl?: string;

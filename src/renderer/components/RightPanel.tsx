@@ -418,7 +418,8 @@ export const RightPanel = memo(
 		const sshRemoteId = session ? getSessionSshRemoteId(session) : undefined;
 		const changesPanel = useChangesPanel(
 			activeRightTopTab === 'changes' ? session?.fullPath : undefined,
-			sshRemoteId
+			sshRemoteId,
+			session?.baseBranch
 		);
 
 		/** Open a stacked commit diff tab for the given commit */
