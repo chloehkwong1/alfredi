@@ -299,7 +299,9 @@ function getStatusColor(status: WorktreeStatus, theme: Theme): string {
 		case 'in_progress':
 			return theme.colors.warning;
 		case 'in_review':
-			return theme.colors.accent;
+			return '#f59e0b';
+		case 'blocked':
+			return theme.colors.error;
 		case 'done':
 			return theme.colors.success;
 		case 'todo':
@@ -418,6 +420,7 @@ const WORKTREE_SECTIONS: Array<{
 }> = [
 	{ status: 'in_progress', label: 'IN PROGRESS' },
 	{ status: 'in_review', label: 'IN REVIEW' },
+	{ status: 'blocked', label: 'BLOCKED' },
 	{ status: 'todo', label: 'TO DO' },
 	{ status: 'done', label: 'DONE' },
 ];

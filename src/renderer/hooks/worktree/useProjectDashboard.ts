@@ -43,6 +43,7 @@ export interface GroupedWorktrees {
 	in_progress: WorktreeCardData[];
 	todo: WorktreeCardData[];
 	in_review: WorktreeCardData[];
+	blocked: WorktreeCardData[];
 	done: WorktreeCardData[];
 }
 
@@ -71,6 +72,7 @@ const EMPTY_GROUPED: GroupedWorktrees = {
 	in_progress: [],
 	todo: [],
 	in_review: [],
+	blocked: [],
 	done: [],
 };
 
@@ -331,6 +333,7 @@ export function useProjectDashboard(session: Session): UseProjectDashboardReturn
 			in_progress: [],
 			todo: [],
 			in_review: [],
+			blocked: [],
 			done: [],
 		};
 

@@ -70,6 +70,7 @@ export function useSessionCategories(
 				todo: [],
 				in_progress: [],
 				in_review: [],
+				blocked: [],
 				done: [],
 			};
 			for (const child of children) {
@@ -81,6 +82,7 @@ export function useSessionCategories(
 			grouped.todo.sort(sortFn);
 			grouped.in_progress.sort(sortFn);
 			grouped.in_review.sort(sortFn);
+			grouped.blocked.sort(sortFn);
 			grouped.done.sort(sortFn);
 			return grouped;
 		},

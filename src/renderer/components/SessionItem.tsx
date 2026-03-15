@@ -26,7 +26,9 @@ const getWorktreeStatusColor = (
 		case 'in_progress':
 			return theme.colors.warning;
 		case 'in_review':
-			return theme.colors.accent;
+			return '#f59e0b';
+		case 'blocked':
+			return theme.colors.error;
 		case 'done':
 			return theme.colors.success;
 		default:
