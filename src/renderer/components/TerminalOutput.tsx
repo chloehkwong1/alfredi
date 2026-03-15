@@ -168,7 +168,7 @@ const InteractiveQuestionCard = memo(
 
 		const currentQuestion = useMemo(() => {
 			if (log.questions && log.questions.length > 0 && pendingQuestion) {
-				const q = log.questions[pendingQuestion.currentQuestionIndex];
+				const q = log.questions[currentStep];
 				if (q) return q;
 			}
 			// Single-question / backwards compat fallback
@@ -1778,7 +1778,7 @@ export const TerminalOutput = memo(
 							...s,
 							aiTabs: s.aiTabs.map((tab) => {
 								if (tab.pendingQuestion?.toolUseId !== toolUseId) return tab;
-								const newAnswers = [...tab.pendingQuestion.answers];
+								const newAnswers = [...(tab.pendingQuestion.answers ?? [])];
 								newAnswers[questionIndex] = answer;
 								// Find the log to check total questions
 								const interactiveLog = tab.logs.find(

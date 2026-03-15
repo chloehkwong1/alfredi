@@ -410,13 +410,17 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				const activeTab = getActiveTab(activeSession);
 				const pendingQ = activeTab?.pendingQuestion;
 				if (pendingQ && effectiveInputValue.trim()) {
+					// Default for backwards compat with old pendingQuestion shape (no answers/currentQuestionIndex)
+					const currentIndex = pendingQ.currentQuestionIndex ?? 0;
+					const currentAnswers = pendingQ.answers ?? [];
+
 					// Find the interactive log entry for this question
 					const questionLog = activeTab?.logs.find(
 						(l) => l.metadata?.toolUseId === pendingQ.toolUseId && l.interactive
 					);
 
 					// Get the current question's options (multi-question or single-question compat)
-					const currentQuestion = questionLog?.questions?.[pendingQ.currentQuestionIndex];
+					const currentQuestion = questionLog?.questions?.[currentIndex];
 					const currentOptions = currentQuestion?.options ?? questionLog?.options;
 
 					// Resolve numbered option input (e.g. "1" → actual option label)
@@ -429,7 +433,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					}
 
 					const totalQuestions = questionLog?.questions?.length ?? 1;
-					const isLastQuestion = pendingQ.currentQuestionIndex >= totalQuestions - 1;
+					const isLastQuestion = currentIndex >= totalQuestions - 1;
 
 					if (!isLastQuestion) {
 						// Advance to next question — store answer, increment index
@@ -440,13 +444,13 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 									...s,
 									aiTabs: s.aiTabs.map((tab) => {
 										if (tab.id !== activeTab!.id) return tab;
-										const newAnswers = [...pendingQ.answers];
-										newAnswers[pendingQ.currentQuestionIndex] = answer;
+										const newAnswers = [...currentAnswers];
+										newAnswers[currentIndex] = answer;
 										return {
 											...tab,
 											pendingQuestion: {
 												...pendingQ,
-												currentQuestionIndex: pendingQ.currentQuestionIndex + 1,
+												currentQuestionIndex: currentIndex + 1,
 												answers: newAnswers,
 											},
 										};
@@ -456,8 +460,8 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 						);
 					} else {
 						// Final question — build combined answer and send via IPC
-						const allAnswers = [...pendingQ.answers];
-						allAnswers[pendingQ.currentQuestionIndex] = answer;
+						const allAnswers = [...currentAnswers];
+						allAnswers[currentIndex] = answer;
 
 						let serialized: string;
 						if (questionLog?.questions && questionLog.questions.length > 1) {
