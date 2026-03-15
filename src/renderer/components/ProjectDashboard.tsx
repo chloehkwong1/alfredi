@@ -418,10 +418,10 @@ const WORKTREE_SECTIONS: Array<{
 	status: WorktreeStatus;
 	label: string;
 }> = [
+	{ status: 'todo', label: 'TO DO' },
 	{ status: 'in_progress', label: 'IN PROGRESS' },
 	{ status: 'in_review', label: 'IN REVIEW' },
 	{ status: 'blocked', label: 'BLOCKED' },
-	{ status: 'todo', label: 'TO DO' },
 	{ status: 'done', label: 'DONE' },
 ];
 
@@ -448,17 +448,16 @@ const WorktreeSection = memo(function WorktreeSection({
 		<div className="space-y-3">
 			{WORKTREE_SECTIONS.map(({ status, label }) => {
 				const cards = groupedWorktrees[status];
-				if (cards.length === 0) return null;
-
 				const color = getStatusColor(status, theme);
-				const isCollapsed = collapsed[status] ?? false;
+				const isEmpty = cards.length === 0;
+				const isCollapsed = isEmpty || (collapsed[status] ?? false);
 
 				return (
 					<div key={status}>
 						{/* Section header */}
 						<button
-							onClick={() => toggleSection(status)}
-							className="flex items-center gap-2 mb-2 hover:opacity-80 transition-opacity cursor-pointer"
+							onClick={isEmpty ? undefined : () => toggleSection(status)}
+							className={`flex items-center gap-2 mb-2 transition-opacity ${isEmpty ? 'opacity-60 cursor-default' : 'hover:opacity-80 cursor-pointer'}`}
 						>
 							{isCollapsed ? (
 								<ChevronRight className="w-3.5 h-3.5" style={{ color }} />
