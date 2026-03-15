@@ -350,6 +350,21 @@ export class ClaudeSDKAdapter {
 				cacheReadInputTokens: apiUsage.cache_read_input_tokens || 0,
 				cacheCreationInputTokens: apiUsage.cache_creation_input_tokens || 0,
 			};
+
+			// Emit live usage so the ThinkingStatusPill can show token counts during thinking.
+			// output_tokens here is per-call; accumulate into cumulativeOutputTokens for the cycle total.
+			const outputTokens = apiUsage.output_tokens || 0;
+			managedProcess.cumulativeOutputTokens =
+				(managedProcess.cumulativeOutputTokens || 0) + outputTokens;
+
+			this.emitter.emit('usage', sessionId, {
+				inputTokens: apiUsage.input_tokens || 0,
+				outputTokens: managedProcess.cumulativeOutputTokens,
+				cacheReadInputTokens: apiUsage.cache_read_input_tokens || 0,
+				cacheCreationInputTokens: apiUsage.cache_creation_input_tokens || 0,
+				totalCostUsd: 0, // Cost only available at result time
+				contextWindow: managedProcess.contextWindow || 200000,
+			});
 		}
 
 		if (!message.message?.content) return;

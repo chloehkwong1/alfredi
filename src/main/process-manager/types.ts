@@ -91,6 +91,8 @@ export interface ManagedProcess {
 		cacheReadInputTokens: number;
 		cacheCreationInputTokens: number;
 	};
+	/** Cumulative output tokens across all API calls in this query (for live token display) */
+	cumulativeOutputTokens?: number;
 }
 
 export interface UsageTotals {
