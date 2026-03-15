@@ -214,6 +214,12 @@ export interface LogEntry {
 	text: string;
 	interactive?: boolean;
 	options?: Array<{ label: string; description?: string }>;
+	// For multi-question interactive entries — all questions from one toolUseId
+	questions?: Array<{
+		question: string;
+		header?: string;
+		options?: Array<{ label: string; description?: string }>;
+	}>;
 	// For interactive questions - optional header/category label (e.g., "Ticket")
 	questionHeader?: string;
 	// For interactive questions - tracks the selected answer label (disables buttons once set)
@@ -519,7 +525,12 @@ export interface AITab {
 	effortLevel?: import('../../shared/types').EffortLevel; // Per-tab effort level override (Claude Code only, defaults to 'medium')
 	wizardState?: SessionWizardState; // Per-tab inline wizard state for /wizard command
 	isGeneratingName?: boolean; // True while automatic tab naming is in progress
-	pendingQuestion?: { processSessionId: string; toolUseId: string }; // Set when a freeform AskUserQuestion arrives (no options), cleared on answer or exit
+	pendingQuestion?: {
+		processSessionId: string;
+		toolUseId: string;
+		currentQuestionIndex: number;
+		answers: string[];
+	}; // Set when a freeform AskUserQuestion arrives (no options), cleared on answer or exit
 }
 
 // A single "thinking item" — one busy tab within a session.

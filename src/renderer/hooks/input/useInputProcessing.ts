@@ -410,46 +410,93 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				const activeTab = getActiveTab(activeSession);
 				const pendingQ = activeTab?.pendingQuestion;
 				if (pendingQ && effectiveInputValue.trim()) {
+					// Find the interactive log entry for this question
+					const questionLog = activeTab?.logs.find(
+						(l) => l.metadata?.toolUseId === pendingQ.toolUseId && l.interactive
+					);
+
+					// Get the current question's options (multi-question or single-question compat)
+					const currentQuestion = questionLog?.questions?.[pendingQ.currentQuestionIndex];
+					const currentOptions = currentQuestion?.options ?? questionLog?.options;
+
 					// Resolve numbered option input (e.g. "1" → actual option label)
 					let answer = effectiveInputValue.trim();
-					const questionLog = activeTab?.logs.find(
-						(l) =>
-							l.metadata?.toolUseId === pendingQ.toolUseId && l.interactive && l.options?.length
-					);
-					if (questionLog?.options) {
+					if (currentOptions?.length) {
 						const num = parseInt(answer, 10);
-						if (!isNaN(num) && num >= 1 && num <= questionLog.options.length) {
-							answer = questionLog.options[num - 1].label;
+						if (!isNaN(num) && num >= 1 && num <= currentOptions.length) {
+							answer = currentOptions[num - 1].label;
 						}
 					}
 
-					// Route to pending AskUserQuestion instead of queuing
-					window.maestro.process.answerQuestion(
-						pendingQ.processSessionId,
-						pendingQ.toolUseId,
-						answer
-					);
-					// Clear pending question and mark log entries as answered
-					setSessions((prev) =>
-						prev.map((s) => {
-							if (s.id !== activeSessionId) return s;
-							return {
-								...s,
-								aiTabs: s.aiTabs.map((tab) => {
-									if (tab.id !== activeTab!.id) return tab;
-									return {
-										...tab,
-										pendingQuestion: undefined,
-										logs: tab.logs.map((log) =>
-											log.metadata?.toolUseId === pendingQ.toolUseId && log.interactive
-												? { ...log, answered: answer }
-												: log
-										),
-									};
-								}),
-							};
-						})
-					);
+					const totalQuestions = questionLog?.questions?.length ?? 1;
+					const isLastQuestion = pendingQ.currentQuestionIndex >= totalQuestions - 1;
+
+					if (!isLastQuestion) {
+						// Advance to next question — store answer, increment index
+						setSessions((prev) =>
+							prev.map((s) => {
+								if (s.id !== activeSessionId) return s;
+								return {
+									...s,
+									aiTabs: s.aiTabs.map((tab) => {
+										if (tab.id !== activeTab!.id) return tab;
+										const newAnswers = [...pendingQ.answers];
+										newAnswers[pendingQ.currentQuestionIndex] = answer;
+										return {
+											...tab,
+											pendingQuestion: {
+												...pendingQ,
+												currentQuestionIndex: pendingQ.currentQuestionIndex + 1,
+												answers: newAnswers,
+											},
+										};
+									}),
+								};
+							})
+						);
+					} else {
+						// Final question — build combined answer and send via IPC
+						const allAnswers = [...pendingQ.answers];
+						allAnswers[pendingQ.currentQuestionIndex] = answer;
+
+						let serialized: string;
+						if (questionLog?.questions && questionLog.questions.length > 1) {
+							// Multi-question: serialize as "Header: Answer\nHeader2: Answer2\n..."
+							serialized = questionLog.questions
+								.map((q, i) => `${q.header ? q.header + ': ' : ''}${allAnswers[i] ?? ''}`)
+								.join('\n');
+						} else {
+							// Single-question: backwards compat — just the answer
+							serialized = answer;
+						}
+
+						window.maestro.process.answerQuestion(
+							pendingQ.processSessionId,
+							pendingQ.toolUseId,
+							serialized
+						);
+						// Clear pending question and mark log entries as answered
+						setSessions((prev) =>
+							prev.map((s) => {
+								if (s.id !== activeSessionId) return s;
+								return {
+									...s,
+									aiTabs: s.aiTabs.map((tab) => {
+										if (tab.id !== activeTab!.id) return tab;
+										return {
+											...tab,
+											pendingQuestion: undefined,
+											logs: tab.logs.map((log) =>
+												log.metadata?.toolUseId === pendingQ.toolUseId && log.interactive
+													? { ...log, answered: serialized }
+													: log
+											),
+										};
+									}),
+								};
+							})
+						);
+					}
 					// Clear input
 					setInputValue('');
 					setStagedImages([]);

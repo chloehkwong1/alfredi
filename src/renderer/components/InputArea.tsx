@@ -864,7 +864,14 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 								style={{ color: theme.colors.textMain, maxHeight: '11rem' }}
 								placeholder={
 									activeTab?.pendingQuestion
-										? 'Type your response...'
+										? (() => {
+												const pq = activeTab.pendingQuestion;
+												const qLog = activeTab.logs.find(
+													(l) => l.metadata?.toolUseId === pq.toolUseId && l.interactive
+												);
+												const header = qLog?.questions?.[pq.currentQuestionIndex]?.header;
+												return header ? `Answer: ${header}...` : 'Type your response...';
+											})()
 										: `Talking to ${session.name} powered by ${getProviderDisplayName(session.toolType)}`
 								}
 								value={inputValue}

@@ -10,6 +10,7 @@ import {
 	RotateCcw,
 	AlertCircle,
 	Save,
+	MessageSquare,
 } from 'lucide-react';
 import type {
 	Session,
@@ -130,41 +131,89 @@ export function groupLogsIntoRenderUnits(logs: LogEntry[]): RenderUnit[] {
 }
 
 // ============================================================================
-// InteractiveQuestion - Renders AskUserQuestion as plain text (CLI-style)
+// InteractiveQuestionCard - Renders AskUserQuestion with multi-question wizard support
 // ============================================================================
 
-const InteractiveQuestion = memo(
+const InteractiveQuestionCard = memo(
 	({
 		log,
 		theme,
-		onAnswerQuestion,
+		pendingQuestion,
+		onAdvanceQuestion,
 	}: {
 		log: LogEntry;
 		theme: Theme;
-		onAnswerQuestion?: (processSessionId: string, toolUseId: string, answer: string) => void;
+		pendingQuestion?: {
+			processSessionId: string;
+			toolUseId: string;
+			currentQuestionIndex: number;
+			answers: string[];
+		};
+		onAdvanceQuestion?: (
+			processSessionId: string,
+			toolUseId: string,
+			questionIndex: number,
+			answer: string
+		) => void;
 	}) => {
-		const hasOptions = log.options && log.options.length > 0;
 		const isAnswered = !!log.answered;
 		const [selectedIndex, setSelectedIndex] = useState(0);
+		const [freeformMode, setFreeformMode] = useState(false);
 		const containerRef = useRef<HTMLDivElement>(null);
+
+		// Determine current question from multi-question array or single-question fallback
+		const totalQuestions = log.questions?.length ?? 1;
+		const currentStep = pendingQuestion?.currentQuestionIndex ?? 0;
+		const isMultiQuestion = totalQuestions > 1;
+
+		const currentQuestion = useMemo(() => {
+			if (log.questions && log.questions.length > 0 && pendingQuestion) {
+				const q = log.questions[pendingQuestion.currentQuestionIndex];
+				if (q) return q;
+			}
+			// Single-question / backwards compat fallback
+			return { question: log.text || '', header: log.questionHeader, options: log.options };
+		}, [log.questions, log.text, log.questionHeader, log.options, pendingQuestion]);
+
+		const hasOptions = currentQuestion.options && currentQuestion.options.length > 0;
+
+		// Reset freeformMode and selectedIndex when question changes
+		useEffect(() => {
+			setFreeformMode(false);
+			setSelectedIndex(0);
+		}, [currentStep]);
 
 		const handleSelect = useCallback(
 			(index: number) => {
-				if (isAnswered || !log.options || !onAnswerQuestion) return;
-				const option = log.options[index];
+				if (isAnswered || !currentQuestion.options || !onAdvanceQuestion) return;
+				const option = currentQuestion.options[index];
 				if (!option || !log.metadata?.processSessionId || !log.metadata?.toolUseId) return;
-				onAnswerQuestion(log.metadata.processSessionId, log.metadata.toolUseId, option.label);
+				onAdvanceQuestion(
+					log.metadata.processSessionId,
+					log.metadata.toolUseId,
+					currentStep,
+					option.label
+				);
 			},
-			[isAnswered, log.options, log.metadata, onAnswerQuestion]
+			[isAnswered, currentQuestion.options, log.metadata, onAdvanceQuestion, currentStep]
 		);
 
 		const handleKeyDown = useCallback(
 			(e: React.KeyboardEvent) => {
-				if (isAnswered || !log.options?.length) return;
+				if (isAnswered) return;
+
+				// 't' to toggle freeform mode when options are visible
+				if (e.key === 't' && hasOptions && !freeformMode) {
+					e.preventDefault();
+					setFreeformMode(true);
+					return;
+				}
+
+				if (freeformMode || !currentQuestion.options?.length) return;
 
 				if (e.key === 'ArrowDown' || e.key === 'j') {
 					e.preventDefault();
-					setSelectedIndex((prev) => Math.min(prev + 1, log.options!.length - 1));
+					setSelectedIndex((prev) => Math.min(prev + 1, currentQuestion.options!.length - 1));
 				} else if (e.key === 'ArrowUp' || e.key === 'k') {
 					e.preventDefault();
 					setSelectedIndex((prev) => Math.max(prev - 1, 0));
@@ -173,21 +222,24 @@ const InteractiveQuestion = memo(
 					handleSelect(selectedIndex);
 				} else if (e.key >= '1' && e.key <= '9') {
 					const num = parseInt(e.key, 10) - 1;
-					if (num < log.options!.length) {
+					if (num < currentQuestion.options!.length) {
 						e.preventDefault();
 						handleSelect(num);
 					}
 				}
 			},
-			[isAnswered, log.options, selectedIndex, handleSelect]
+			[isAnswered, hasOptions, freeformMode, currentQuestion.options, selectedIndex, handleSelect]
 		);
 
 		// Auto-focus when question appears
 		useEffect(() => {
-			if (!isAnswered && hasOptions && containerRef.current) {
+			if (!isAnswered && hasOptions && !freeformMode && containerRef.current) {
 				containerRef.current.focus();
 			}
-		}, [isAnswered, hasOptions]);
+		}, [isAnswered, hasOptions, freeformMode, currentStep]);
+
+		// Completed answers from earlier steps
+		const completedAnswers = pendingQuestion?.answers ?? [];
 
 		return (
 			<div
@@ -197,83 +249,145 @@ const InteractiveQuestion = memo(
 				tabIndex={-1}
 				onKeyDown={handleKeyDown}
 			>
-				{/* Question text */}
-				<div className="text-sm whitespace-pre-wrap" style={{ color: theme.colors.accent }}>
-					{log.questionHeader ? `${log.questionHeader}: ` : ''}
-					{log.text}
-				</div>
-				{/* Interactive option cards */}
-				{hasOptions && !isAnswered && (
-					<div className="mt-2 flex flex-col gap-1">
-						{log.options!.map((option, idx) => (
-							<div
-								key={option.label}
-								className="flex items-start gap-2 px-3 py-1.5 rounded cursor-pointer text-sm transition-colors"
-								style={{
-									backgroundColor: idx === selectedIndex ? theme.colors.bgActivity : 'transparent',
-									borderLeft:
-										idx === selectedIndex
-											? `2px solid ${theme.colors.accent}`
-											: '2px solid transparent',
-								}}
-								onClick={() => handleSelect(idx)}
-								onMouseEnter={() => setSelectedIndex(idx)}
-							>
-								<span
-									className="shrink-0 w-5 text-center font-mono text-xs leading-5"
-									style={{ color: theme.colors.textDim }}
-								>
-									{idx + 1}
+				{/* All answered — collapsed summary */}
+				{isAnswered && (
+					<div className="flex flex-col gap-0.5">
+						{log
+							.answered!.split('\n')
+							.filter(Boolean)
+							.map((line, i) => (
+								<div key={i} className="flex items-center gap-2 text-sm">
+									<Check size={14} style={{ color: theme.colors.success }} />
+									<span style={{ color: theme.colors.success }}>{line}</span>
+								</div>
+							))}
+					</div>
+				)}
+
+				{/* Active question UI */}
+				{!isAnswered && (
+					<>
+						{/* Completed answers above current question */}
+						{completedAnswers.map((answer, i) => {
+							if (i >= currentStep) return null;
+							const qHeader = log.questions?.[i]?.header;
+							return (
+								<div key={i} className="flex items-center gap-2 text-sm mb-0.5">
+									<Check size={14} style={{ color: theme.colors.success }} />
+									<span style={{ color: theme.colors.success }}>
+										{qHeader ? `${qHeader}: ` : ''}
+										{answer}
+									</span>
+								</div>
+							);
+						})}
+
+						{/* Header row: question header + step indicator */}
+						<div className="flex items-baseline gap-2">
+							{currentQuestion.header && (
+								<span className="text-sm font-bold" style={{ color: theme.colors.accent }}>
+									{currentQuestion.header}
 								</span>
-								<div className="min-w-0">
+							)}
+							{isMultiQuestion && (
+								<span className="text-xs" style={{ color: theme.colors.textDim, opacity: 0.5 }}>
+									Step {currentStep + 1} of {totalQuestions}
+								</span>
+							)}
+						</div>
+
+						{/* Question text */}
+						<div
+							className="text-sm whitespace-pre-wrap mt-0.5"
+							style={{ color: theme.colors.accent }}
+						>
+							{currentQuestion.question}
+						</div>
+
+						{/* Option cards (when not in freeform mode) */}
+						{hasOptions && !freeformMode && (
+							<div className="mt-2 flex flex-col gap-1">
+								{currentQuestion.options!.map((option, idx) => (
 									<div
+										key={option.label}
+										className="flex items-start gap-2 px-3 py-1.5 rounded cursor-pointer text-sm transition-colors"
 										style={{
-											color: idx === selectedIndex ? theme.colors.textMain : theme.colors.textDim,
+											backgroundColor:
+												idx === selectedIndex ? theme.colors.bgActivity : 'transparent',
+											borderLeft:
+												idx === selectedIndex
+													? `2px solid ${theme.colors.accent}`
+													: '2px solid transparent',
 										}}
+										onClick={() => handleSelect(idx)}
+										onMouseEnter={() => setSelectedIndex(idx)}
 									>
-										{option.label}
-									</div>
-									{option.description && (
-										<div
-											className="text-xs mt-0.5"
-											style={{ color: theme.colors.textDim, opacity: 0.7 }}
+										<span
+											className="shrink-0 w-5 text-center font-mono text-xs leading-5"
+											style={{ color: theme.colors.textDim }}
 										>
-											{option.description}
+											{idx + 1}
+										</span>
+										<div className="min-w-0">
+											<div
+												style={{
+													color:
+														idx === selectedIndex ? theme.colors.textMain : theme.colors.textDim,
+												}}
+											>
+												{option.label}
+											</div>
+											{option.description && (
+												<div
+													className="text-xs mt-0.5"
+													style={{ color: theme.colors.textDim, opacity: 0.7 }}
+												>
+													{option.description}
+												</div>
+											)}
 										</div>
-									)}
+									</div>
+								))}
+
+								{/* "Type my own answer" link */}
+								<div
+									className="flex items-center gap-1.5 px-3 py-1 cursor-pointer text-xs mt-0.5"
+									style={{ color: theme.colors.textDim, opacity: 0.7 }}
+									onClick={() => setFreeformMode(true)}
+								>
+									<MessageSquare size={12} />
+									<span>Type my own answer...</span>
+								</div>
+
+								{/* Keyboard hints */}
+								<div
+									className="flex gap-3 mt-1 text-xs px-3"
+									style={{ color: theme.colors.textDim, opacity: 0.5 }}
+								>
+									<span>↑↓ navigate</span>
+									<span>Enter select</span>
+									<span>1-9 quick select</span>
+									<span>t type own</span>
 								</div>
 							</div>
-						))}
-						{/* Keyboard hints */}
-						<div
-							className="flex gap-3 mt-1 text-xs px-3"
-							style={{ color: theme.colors.textDim, opacity: 0.5 }}
-						>
-							<span>↑↓ navigate</span>
-							<span>Enter select</span>
-							<span>1-9 quick select</span>
-						</div>
-					</div>
-				)}
-				{/* Answered: show selected option with checkmark */}
-				{isAnswered && hasOptions && (
-					<div className="mt-2 flex items-center gap-2 text-sm">
-						<Check size={14} style={{ color: theme.colors.success }} />
-						<span style={{ color: theme.colors.success }}>{log.answered}</span>
-					</div>
-				)}
-				{/* Answered: freetext (no options) */}
-				{isAnswered && !hasOptions && (
-					<div className="mt-1 text-sm" style={{ color: theme.colors.success }}>
-						{'> '}
-						{log.answered}
-					</div>
+						)}
+
+						{/* Freeform mode hint or no-options hint */}
+						{(freeformMode || !hasOptions) && (
+							<div
+								className="mt-2 text-xs flex items-center gap-1.5"
+								style={{ color: theme.colors.textDim, opacity: 0.6 }}
+							>
+								<span>Type your answer below ↓</span>
+							</div>
+						)}
+					</>
 				)}
 			</div>
 		);
 	}
 );
-InteractiveQuestion.displayName = 'InteractiveQuestion';
+InteractiveQuestionCard.displayName = 'InteractiveQuestionCard';
 
 // ============================================================================
 // LogItem - Memoized component for individual log entries
@@ -341,6 +455,20 @@ interface LogItemProps {
 	turnDurationMs?: number;
 	// Callback when user selects an option in an interactive question
 	onAnswerQuestion?: (processSessionId: string, toolUseId: string, answer: string) => void;
+	// Multi-question wizard: advance to next question
+	onAdvanceQuestion?: (
+		processSessionId: string,
+		toolUseId: string,
+		questionIndex: number,
+		answer: string
+	) => void;
+	// Pending question state for multi-question wizard
+	pendingQuestion?: {
+		processSessionId: string;
+		toolUseId: string;
+		currentQuestionIndex: number;
+		answers: string[];
+	};
 }
 
 const LogItemComponent = memo(
@@ -382,6 +510,8 @@ const LogItemComponent = memo(
 		prevSource,
 		turnDurationMs,
 		onAnswerQuestion,
+		onAdvanceQuestion,
+		pendingQuestion,
 	}: LogItemProps) => {
 		// Ref for the log item container - used for scroll-into-view on expand
 		const logItemRef = useRef<HTMLDivElement>(null);
@@ -720,7 +850,16 @@ const LogItemComponent = memo(
 						)}
 						{/* Special rendering for interactive AskUserQuestion events */}
 						{log.interactive === true && (
-							<InteractiveQuestion log={log} theme={theme} onAnswerQuestion={onAnswerQuestion} />
+							<InteractiveQuestionCard
+								log={log}
+								theme={theme}
+								pendingQuestion={
+									pendingQuestion?.toolUseId === log.metadata?.toolUseId
+										? pendingQuestion
+										: undefined
+								}
+								onAdvanceQuestion={onAdvanceQuestion}
+							/>
 						)}
 						{/* Special rendering for tool execution events (shown alongside thinking) */}
 						{log.source === 'tool' &&
@@ -1259,6 +1398,18 @@ interface WorkGroupComponentProps {
 	onSaveToFile?: (text: string) => void;
 	userMessageAlignment: 'left' | 'right';
 	onAnswerQuestion?: (processSessionId: string, toolUseId: string, answer: string) => void;
+	onAdvanceQuestion?: (
+		processSessionId: string,
+		toolUseId: string,
+		questionIndex: number,
+		answer: string
+	) => void;
+	pendingQuestion?: {
+		processSessionId: string;
+		toolUseId: string;
+		currentQuestionIndex: number;
+		answers: string[];
+	};
 }
 
 const WorkGroupComponent = memo(
@@ -1299,6 +1450,8 @@ const WorkGroupComponent = memo(
 		onSaveToFile,
 		userMessageAlignment,
 		onAnswerQuestion,
+		onAdvanceQuestion,
+		pendingQuestion,
 	}: WorkGroupComponentProps) => {
 		// Filter entries based on showThinking mode
 		const visibleEntries = useMemo(() => {
@@ -1355,6 +1508,8 @@ const WorkGroupComponent = memo(
 					onSaveToFile={onSaveToFile}
 					userMessageAlignment={userMessageAlignment}
 					onAnswerQuestion={onAnswerQuestion}
+					onAdvanceQuestion={onAdvanceQuestion}
+					pendingQuestion={pendingQuestion}
 				/>
 			);
 		}
@@ -1612,6 +1767,64 @@ export const TerminalOutput = memo(
 			[session.id]
 		);
 
+		// Handler for multi-question wizard: advance to next question or submit final answer
+		const handleAdvanceQuestion = useCallback(
+			(processSessionId: string, toolUseId: string, questionIndex: number, answer: string) => {
+				const { setSessions } = useSessionStore.getState();
+				setSessions((prev) =>
+					prev.map((s) => {
+						if (s.id !== session.id) return s;
+						return {
+							...s,
+							aiTabs: s.aiTabs.map((tab) => {
+								if (tab.pendingQuestion?.toolUseId !== toolUseId) return tab;
+								const newAnswers = [...tab.pendingQuestion.answers];
+								newAnswers[questionIndex] = answer;
+								// Find the log to check total questions
+								const interactiveLog = tab.logs.find(
+									(l) => l.metadata?.toolUseId === toolUseId && l.interactive
+								);
+								const totalQuestions = interactiveLog?.questions?.length ?? 1;
+								const nextIndex = questionIndex + 1;
+
+								if (nextIndex >= totalQuestions) {
+									// All questions answered — build combined answer string and send via IPC
+									const combinedAnswer = (interactiveLog?.questions ?? [])
+										.map((q, i) => `${q.header ? q.header + ': ' : ''}${newAnswers[i] ?? ''}`)
+										.join('\n');
+									window.maestro.process.answerQuestion(
+										processSessionId,
+										toolUseId,
+										combinedAnswer
+									);
+									return {
+										...tab,
+										pendingQuestion: undefined,
+										logs: tab.logs.map((log) =>
+											log.metadata?.toolUseId === toolUseId && log.interactive
+												? { ...log, answered: combinedAnswer }
+												: log
+										),
+									};
+								}
+
+								// Advance to next question
+								return {
+									...tab,
+									pendingQuestion: {
+										...tab.pendingQuestion,
+										currentQuestionIndex: nextIndex,
+										answers: newAnswers,
+									},
+								};
+							}),
+						};
+					})
+				);
+			},
+			[session.id]
+		);
+
 		// Use the forwarded ref if provided, otherwise create a local one
 		const localRef = useRef<HTMLDivElement>(null);
 		const terminalOutputRef = (ref as React.RefObject<HTMLDivElement>) || localRef;
@@ -1844,6 +2057,7 @@ export const TerminalOutput = memo(
 
 		// PERF: Memoize active tab lookup to avoid O(n) .find() on every render
 		const activeTab = useMemo(() => getActiveTab(session), [session.aiTabs, session.activeTabId]);
+		const activePendingQuestion = activeTab?.pendingQuestion;
 
 		// Derive busy state and thinking mode from global setting
 		const isBusy = activeTab?.state === 'busy';
@@ -2416,6 +2630,8 @@ export const TerminalOutput = memo(
 								onSaveToFile={handleSaveToFile}
 								userMessageAlignment={userMessageAlignment}
 								onAnswerQuestion={handleAnswerQuestion}
+								onAdvanceQuestion={handleAdvanceQuestion}
+								pendingQuestion={activePendingQuestion}
 							/>
 						);
 					})}

@@ -1489,22 +1489,27 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				const actualSessionId = aiTabMatch[1];
 				const tabId = aiTabMatch[2];
 
-				// Create one log entry per question in the event
-				const questionLogs: import('../../types').LogEntry[] = questionData.questions.map(
-					(q, idx) => ({
-						id: `question-${Date.now()}-${questionData.toolUseId}-${idx}`,
-						timestamp: Date.now(),
-						source: 'system' as const,
-						text: q.question,
-						questionHeader: q.header,
-						interactive: true,
-						options: q.options?.map((o) => ({ label: o.label, description: o.description })) ?? [],
-						metadata: {
-							processSessionId: sessionId,
-							toolUseId: questionData.toolUseId,
-						},
-					})
-				);
+				// Create a single log entry containing all questions for this toolUseId
+				const firstQ = questionData.questions[0];
+				const questionLog: import('../../types').LogEntry = {
+					id: `question-${Date.now()}-${questionData.toolUseId}`,
+					timestamp: Date.now(),
+					source: 'system' as const,
+					text: firstQ.question,
+					questionHeader: firstQ.header,
+					interactive: true,
+					options:
+						firstQ.options?.map((o) => ({ label: o.label, description: o.description })) ?? [],
+					questions: questionData.questions.map((q) => ({
+						question: q.question,
+						header: q.header,
+						options: q.options?.map((o) => ({ label: o.label, description: o.description })),
+					})),
+					metadata: {
+						processSessionId: sessionId,
+						toolUseId: questionData.toolUseId,
+					},
+				};
 
 				setSessions((prev) =>
 					prev.map((s) => {
@@ -1518,10 +1523,12 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									? {
 											...tab,
 											state: 'busy' as const,
-											logs: [...tab.logs, ...questionLogs],
+											logs: [...tab.logs, questionLog],
 											pendingQuestion: {
 												processSessionId: sessionId,
 												toolUseId: questionData.toolUseId,
+												currentQuestionIndex: 0,
+												answers: [],
 											},
 										}
 									: tab
