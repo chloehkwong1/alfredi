@@ -518,6 +518,12 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					globalEnvVarsCount: Object.keys(globalShellEnvVars).length,
 				});
 
+				logger.info('[process:spawn] About to call processManager.spawn', LOG_CONTEXT, {
+					sessionId: config.sessionId,
+					toolType: config.toolType,
+					hasPrompt: !!config.prompt,
+					sshRemoteUsed: !!sshRemoteUsed,
+				});
 				const result = processManager.spawn({
 					...config,
 					command: commandToSpawn,

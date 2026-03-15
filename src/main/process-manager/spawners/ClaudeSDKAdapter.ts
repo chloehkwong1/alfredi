@@ -105,6 +105,11 @@ export class ClaudeSDKAdapter {
 	 * Returns a SpawnResult matching the ChildProcessSpawner interface.
 	 */
 	async start(config: ProcessConfig): Promise<SpawnResult> {
+		logger.info('[ClaudeSDKAdapter] start() called', 'ClaudeSDKAdapter', {
+			sessionId: config.sessionId,
+			toolType: config.toolType,
+			hasPrompt: !!config.prompt,
+		});
 		const { sessionId, toolType, cwd, prompt, contextWindow, customEnvVars, shellEnvVars } = config;
 
 		if (!prompt) {
@@ -380,9 +385,19 @@ export class ClaudeSDKAdapter {
 			if (!delta) return;
 
 			const deltaType = delta.type as string;
+			logger.info('[ClaudeSDKAdapter] content_block_delta', 'ClaudeSDKAdapter', {
+				sessionId,
+				deltaType,
+				hasThinking: !!delta.thinking,
+				deltaKeys: Object.keys(delta),
+			});
 
 			// Thinking text deltas
 			if (deltaType === 'thinking_delta' && delta.thinking) {
+				logger.debug('[ClaudeSDKAdapter] Emitting thinking-chunk', 'ClaudeSDKAdapter', {
+					sessionId,
+					chunkLength: (delta.thinking as string).length,
+				});
 				this.emitter.emit('thinking-chunk', sessionId, delta.thinking as string);
 			}
 

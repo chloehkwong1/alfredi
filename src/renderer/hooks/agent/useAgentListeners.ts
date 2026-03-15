@@ -1220,6 +1220,10 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		// ================================================================
 		const unsubscribeThinkingChunk = window.maestro.process.onThinkingChunk?.(
 			(sessionId: string, content: string) => {
+				console.log('[DEBUG] Thinking chunk received:', {
+					sessionId,
+					contentLength: content.length,
+				});
 				const aiTabMatch = sessionId.match(/^(.+)-ai-(.+)$/);
 				if (!aiTabMatch) return;
 

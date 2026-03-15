@@ -56,10 +56,21 @@ export class ProcessManager extends EventEmitter {
 	spawn(config: ProcessConfig): SpawnResult {
 		// Claude Code with a prompt uses the SDK adapter (not CLI --print)
 		if (config.toolType === 'claude-code' && config.prompt && !config.sshRemoteId) {
+			logger.info('[ProcessManager] Routing to SDK adapter', 'ProcessManager', {
+				sessionId: config.sessionId,
+				toolType: config.toolType,
+			});
 			return this.spawnSDK(config);
 		}
 
 		const usePty = this.shouldUsePty(config);
+		logger.info('[ProcessManager] Routing to spawner', 'ProcessManager', {
+			sessionId: config.sessionId,
+			toolType: config.toolType,
+			usePty,
+			hasPrompt: !!config.prompt,
+			hasSshRemoteId: !!config.sshRemoteId,
+		});
 
 		if (usePty) {
 			return this.ptySpawner.spawn(config);
