@@ -583,6 +583,9 @@ function SessionListInner(props: SessionListProps) {
 															style={{ backgroundColor: color }}
 														/>
 														<span>{label}</span>
+														{statusChildren.length > 0 && (
+															<span style={{ opacity: 0.5 }}>({statusChildren.length})</span>
+														)}
 													</button>
 													{!collapsed && statusChildren.length > 0 && (
 														<div>{statusChildren.map(renderWorktreeChild)}</div>
@@ -939,8 +942,11 @@ function SessionListInner(props: SessionListProps) {
 				leftSidebarOpen={leftSidebarOpen}
 				hasNoSessions={sessions.length === 0}
 				shortcuts={shortcuts}
+				activeSession={sessions.find((s) => s.id === activeSessionId) ?? null}
+				sessions={sortedSessions}
 				addNewSession={addNewSession}
 				setLeftSidebarOpen={setLeftSidebarOpen}
+				onQuickCreateWorktree={onQuickCreateWorktree}
 			/>
 
 			{/* Session Context Menu */}

@@ -226,15 +226,18 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			} else if (ctx.isShortcut(e, 'toggleRightPanel')) {
 				ctx.setRightPanelOpen((p: boolean) => !p);
 				trackShortcut('toggleRightPanel');
-			} else if (ctx.isShortcut(e, 'newWorktree')) {
-				e.preventDefault();
-				if (ctx.activeSession?.worktreeConfig) {
-					useModalStore.getState().openModal('createWorktree', { session: ctx.activeSession });
-				}
-				trackShortcut('newWorktree');
 			} else if (ctx.isShortcut(e, 'newInstance')) {
 				e.preventDefault();
-				ctx.addNewSession();
+				const session = ctx.activeSession;
+				// Resolve project head: if worktree child, find parent
+				const projectHead = session?.parentSessionId
+					? ctx.sessions.find((s: Session) => s.id === session.parentSessionId)
+					: session;
+				if (projectHead?.worktreeConfig) {
+					useModalStore.getState().openModal('createWorktree', { session: projectHead });
+				} else {
+					ctx.addNewSession();
+				}
 				trackShortcut('newInstance');
 			} else if (ctx.isShortcut(e, 'killInstance')) {
 				if (ctx.activeSessionId) {
