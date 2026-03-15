@@ -9,19 +9,22 @@ import { homedir } from 'os';
 export interface CustomCommand {
 	name: string;
 	description: string;
+	prompt: string;
 }
 
 /**
- * Parse YAML frontmatter description from a command .md file.
- * Handles both `description: "quoted"` and `description: unquoted` formats.
+ * Parse a command .md file into its description and prompt body.
+ * Handles YAML frontmatter with `description: "quoted"` and `description: unquoted` formats.
+ * The prompt is the full file content (frontmatter is kept — the SDK/agent strips it).
  */
-function parseDescription(content: string): string | undefined {
-	if (!content.startsWith('---')) return undefined;
+function parseCommandFile(content: string): { description?: string; prompt: string } {
+	const prompt = content;
+	if (!content.startsWith('---')) return { prompt };
 	const endIdx = content.indexOf('---', 3);
-	if (endIdx === -1) return undefined;
+	if (endIdx === -1) return { prompt };
 	const frontmatter = content.slice(3, endIdx);
 	const match = frontmatter.match(/description:\s*["']?(.+?)["']?\s*$/m);
-	return match?.[1] || undefined;
+	return { description: match?.[1] || undefined, prompt };
 }
 
 /**
@@ -37,10 +40,10 @@ function readCommandDir(dir: string): CustomCommand[] {
 				const name = f.replace(/\.md$/, '');
 				try {
 					const content = readFileSync(join(dir, f), 'utf-8');
-					const description = parseDescription(content);
-					return { name, description: description || 'Custom command' };
+					const { description, prompt } = parseCommandFile(content);
+					return { name, description: description || 'Custom command', prompt };
 				} catch {
-					return { name, description: 'Custom command' };
+					return { name, description: 'Custom command', prompt: '' };
 				}
 			});
 	} catch {

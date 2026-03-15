@@ -1376,6 +1376,7 @@ interface MaestroAPI {
 			Array<{
 				name: string;
 				description: string;
+				prompt: string;
 			}>
 		>;
 		registerSessionOrigin: (

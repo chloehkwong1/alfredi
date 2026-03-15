@@ -145,7 +145,9 @@ export function createClaudeApi() {
 			logDeprecationWarning('getSkills');
 			return ipcRenderer.invoke('claude:getSkills', projectPath);
 		},
-		getCustomCommands: (cwd?: string): Promise<Array<{ name: string; description: string }>> =>
+		getCustomCommands: (
+			cwd?: string
+		): Promise<Array<{ name: string; description: string; prompt: string }>> =>
 			ipcRenderer.invoke('claude:getCustomCommands', cwd),
 		registerSessionOrigin: (
 			projectPath: string,

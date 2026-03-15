@@ -152,9 +152,7 @@ function createSession(overrides: Partial<Session> = {}): Session {
 function createDeps(overrides: Partial<UseQueueProcessingDeps> = {}): UseQueueProcessingDeps {
 	return {
 		conductorProfile: 'default',
-		customAICommandsRef: { current: [] },
-		speckitCommandsRef: { current: [] },
-		openspecCommandsRef: { current: [] },
+		customAICommands: [],
 		...overrides,
 	};
 }
@@ -205,10 +203,10 @@ describe('processQueuedItem — delegation to agentStore', () => {
 		});
 	});
 
-	it('passes customAICommands from ref', async () => {
+	it('passes customAICommands from deps', async () => {
 		const customCommands = [{ name: 'cmd1', prompt: 'do something' }] as any[];
 		const deps = createDeps({
-			customAICommandsRef: { current: customCommands },
+			customAICommands: customCommands,
 		});
 		const { result } = renderHook(() => useQueueProcessing(deps));
 
@@ -218,78 +216,6 @@ describe('processQueuedItem — delegation to agentStore', () => {
 
 		const callConfig = mockAgentStoreProcessQueuedItem.mock.calls[0][2];
 		expect(callConfig.customAICommands).toBe(customCommands);
-	});
-
-	it('passes speckitCommands from ref', async () => {
-		const speckitCommands = [{ name: 'spec-cmd', prompt: 'speckit prompt' }] as any[];
-		const deps = createDeps({
-			speckitCommandsRef: { current: speckitCommands },
-		});
-		const { result } = renderHook(() => useQueueProcessing(deps));
-
-		await act(async () => {
-			await result.current.processQueuedItem('session-1', createQueuedItem());
-		});
-
-		const callConfig = mockAgentStoreProcessQueuedItem.mock.calls[0][2];
-		expect(callConfig.speckitCommands).toBe(speckitCommands);
-	});
-
-	it('passes openspecCommands from ref', async () => {
-		const openspecCommands = [{ name: 'openspec-cmd', prompt: 'openspec prompt' }] as any[];
-		const deps = createDeps({
-			openspecCommandsRef: { current: openspecCommands },
-		});
-		const { result } = renderHook(() => useQueueProcessing(deps));
-
-		await act(async () => {
-			await result.current.processQueuedItem('session-1', createQueuedItem());
-		});
-
-		const callConfig = mockAgentStoreProcessQueuedItem.mock.calls[0][2];
-		expect(callConfig.openspecCommands).toBe(openspecCommands);
-	});
-
-	it('falls back to empty array when customAICommandsRef.current is null', async () => {
-		const deps = createDeps({
-			customAICommandsRef: { current: null as any },
-		});
-		const { result } = renderHook(() => useQueueProcessing(deps));
-
-		await act(async () => {
-			await result.current.processQueuedItem('session-1', createQueuedItem());
-		});
-
-		const callConfig = mockAgentStoreProcessQueuedItem.mock.calls[0][2];
-		expect(callConfig.customAICommands).toEqual([]);
-	});
-
-	it('falls back to empty array when speckitCommandsRef.current is null', async () => {
-		const deps = createDeps({
-			speckitCommandsRef: { current: null as any },
-		});
-		const { result } = renderHook(() => useQueueProcessing(deps));
-
-		await act(async () => {
-			await result.current.processQueuedItem('session-1', createQueuedItem());
-		});
-
-		const callConfig = mockAgentStoreProcessQueuedItem.mock.calls[0][2];
-		expect(callConfig.speckitCommands).toEqual([]);
-	});
-
-	it('falls back to empty array when openspecCommandsRef.current is null', async () => {
-		const deps = createDeps({
-			openspecCommandsRef: { current: null as any },
-		});
-		const { result } = renderHook(() => useQueueProcessing(deps));
-
-		await act(async () => {
-			await result.current.processQueuedItem('session-1', createQueuedItem());
-		});
-
-		const callConfig = mockAgentStoreProcessQueuedItem.mock.calls[0][2];
-		expect(callConfig.openspecCommands).toEqual([]);
 	});
 
 	it('updates config when conductorProfile changes between calls', async () => {

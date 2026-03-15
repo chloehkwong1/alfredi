@@ -894,9 +894,32 @@ function MaestroConsoleInner() {
 	} = useSummarizeAndContinue(activeSession ?? null);
 
 	// Custom AI commands for input processing (slash command execution)
-	const allCustomCommands = useMemo((): CustomAICommand[] => {
-		return [];
-	}, []);
+	// Loaded from ~/.claude/commands/ and <cwd>/.claude/commands/ via IPC
+	const [allCustomCommands, setAllCustomCommands] = useState<CustomAICommand[]>([]);
+	const activeSessionCwd = activeSession?.cwd;
+	useEffect(() => {
+		if (!activeSessionCwd) {
+			setAllCustomCommands([]);
+			return;
+		}
+		window.maestro.claude
+			.getCustomCommands(activeSessionCwd)
+			.then((cmds) => {
+				setAllCustomCommands(
+					cmds
+						.filter((cmd) => cmd.prompt)
+						.map((cmd) => ({
+							id: cmd.name,
+							command: `/${cmd.name}`,
+							description: cmd.description,
+							prompt: cmd.prompt,
+						}))
+				);
+			})
+			.catch(() => {
+				setAllCustomCommands([]);
+			});
+	}, [activeSessionCwd]);
 
 	// Combine built-in slash commands with agent-specific commands for autocomplete
 	const allSlashCommands = useMemo(() => {
@@ -1361,6 +1384,7 @@ function MaestroConsoleInner() {
 	// Queue processing (execution, startup recovery) — extracted to useQueueProcessing hook
 	const { processQueuedItem } = useQueueProcessing({
 		conductorProfile,
+		customAICommands: allCustomCommands,
 	});
 	// Bridge: keep the original processQueuedItemRef in sync
 	processQueuedItemRef.current = processQueuedItem;
