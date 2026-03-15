@@ -11,6 +11,7 @@
  * - rename: Rename file/directory (local & SSH remote)
  * - delete: Delete file/directory (local & SSH remote)
  * - countItems: Count files and folders recursively (local & SSH remote)
+ * - mkdir: Create a directory recursively (local only)
  * - fetchImageAsBase64: Fetch image from URL and return as base64
  *
  * Extracted from main/index.ts to improve code organization.
@@ -411,6 +412,19 @@ export function registerFilesystemHandlers(): void {
 			return { fileCount, folderCount };
 		} catch (error) {
 			throw new Error(`Failed to count items: ${error}`);
+		}
+	});
+
+	// Create a directory (local only, no SSH remote support needed)
+	ipcMain.handle('fs:mkdir', async (_, dirPath: string) => {
+		try {
+			if (!path.isAbsolute(dirPath)) {
+				return { success: false, error: 'Path must be absolute' };
+			}
+			await fs.mkdir(dirPath, { recursive: true });
+			return { success: true };
+		} catch (error) {
+			return { success: false, error: `Failed to create directory: ${error}` };
 		}
 	});
 

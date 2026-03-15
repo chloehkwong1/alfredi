@@ -99,6 +99,12 @@ export function createFsApi() {
 			ipcRenderer.invoke('fs:fetchImageAsBase64', url),
 
 		/**
+		 * Create a directory (recursively)
+		 */
+		mkdir: (dirPath: string): Promise<{ success: boolean; error?: string }> =>
+			ipcRenderer.invoke('fs:mkdir', dirPath),
+
+		/**
 		 * Rename a file or directory
 		 */
 		rename: (
