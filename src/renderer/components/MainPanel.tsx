@@ -900,20 +900,6 @@ export const MainPanel = React.memo(
 		const currentBranchName = gitInfo?.branch || '';
 		const isOnDefaultBranch = currentBranchName === effectiveBaseBranch;
 
-		// Handle selecting a base branch
-		const handleSelectBaseBranch = useCallback(
-			(branch: string) => {
-				if (!activeSession) return;
-				useSessionStore
-					.getState()
-					.setSessions((prev) =>
-						prev.map((s) => (s.id === activeSession.id ? { ...s, baseBranch: branch } : s))
-					);
-				setBaseBranchDropdownOpen(false);
-			},
-			[activeSession]
-		);
-
 		// Memoize sshRemoteId to prevent object recreation
 		const filePreviewSshRemoteId = useMemo(
 			() =>
@@ -926,6 +912,70 @@ export const MainPanel = React.memo(
 				activeSession?.sshRemoteId,
 				activeSession?.sessionSshRemoteConfig?.enabled,
 				activeSession?.sessionSshRemoteConfig?.remoteId,
+			]
+		);
+
+		// Handle selecting a base branch
+		const handleSelectBaseBranch = useCallback(
+			async (branch: string) => {
+				if (!activeSession) return;
+				useSessionStore
+					.getState()
+					.setSessions((prev) =>
+						prev.map((s) => (s.id === activeSession.id ? { ...s, baseBranch: branch } : s))
+					);
+				setBaseBranchDropdownOpen(false);
+
+				// Check if the selected base branch is an ancestor of current branch
+				if (activeSession.cwd && currentBranchName && branch !== currentBranchName) {
+					try {
+						const result = await window.maestro.git.isAncestor(
+							activeSession.cwd,
+							branch,
+							filePreviewSshRemoteId
+						);
+						setBaseIsAncestor(result.isAncestor);
+						if (!result.isAncestor) {
+							const shouldRebase = window.confirm(
+								`"${branch}" is not an ancestor of your current branch. Rebase onto ${branch}?`
+							);
+							if (shouldRebase) {
+								setIsRebasing(true);
+								try {
+									const rebaseResult = await window.maestro.git.rebaseOnto(
+										activeSession.cwd,
+										branch,
+										filePreviewSshRemoteId
+									);
+									if (rebaseResult.success) {
+										await refreshGitStatus();
+										setBaseIsAncestor(true);
+										showFlashNotification?.(`Rebased onto ${branch}`);
+									} else {
+										showFlashNotification?.(
+											rebaseResult.conflicted
+												? 'Rebase failed: conflicts detected (auto-aborted)'
+												: `Rebase failed: ${rebaseResult.error || 'unknown error'}`
+										);
+									}
+								} catch {
+									showFlashNotification?.('Rebase failed: unexpected error');
+								} finally {
+									setIsRebasing(false);
+								}
+							}
+						}
+					} catch {
+						setBaseIsAncestor(null);
+					}
+				}
+			},
+			[
+				activeSession,
+				currentBranchName,
+				filePreviewSshRemoteId,
+				refreshGitStatus,
+				showFlashNotification,
 			]
 		);
 
@@ -954,41 +1004,6 @@ export const MainPanel = React.memo(
 			currentBranchName,
 			isOnDefaultBranch,
 			filePreviewSshRemoteId,
-		]);
-
-		// Rebase current branch onto the effective base branch
-		const handleRebaseOntoBase = useCallback(async () => {
-			if (!activeSession?.cwd || !effectiveBaseBranch || isRebasing) return;
-			setIsRebasing(true);
-			try {
-				const result = await window.maestro.git.rebaseOnto(
-					activeSession.cwd,
-					effectiveBaseBranch,
-					filePreviewSshRemoteId
-				);
-				if (result.success) {
-					await refreshGitStatus();
-					setBaseIsAncestor(true);
-					showFlashNotification?.(`Rebased onto ${effectiveBaseBranch}`);
-				} else {
-					showFlashNotification?.(
-						result.conflicted
-							? 'Rebase failed: conflicts detected (auto-aborted)'
-							: `Rebase failed: ${result.error || 'unknown error'}`
-					);
-				}
-			} catch {
-				showFlashNotification?.('Rebase failed: unexpected error');
-			} finally {
-				setIsRebasing(false);
-			}
-		}, [
-			activeSession?.cwd,
-			effectiveBaseBranch,
-			isRebasing,
-			filePreviewSshRemoteId,
-			refreshGitStatus,
-			showFlashNotification,
 		]);
 
 		// Copy notification state (centered flash notice)
@@ -1315,24 +1330,6 @@ export const MainPanel = React.memo(
 																	>
 																		←
 																	</span>
-																	{baseIsAncestor === false && (
-																		<button
-																			className="flex items-center gap-1 px-2 py-0.5 rounded-full border border-orange-500/50 text-orange-500 bg-orange-500/15 hover:bg-orange-500/30 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				handleRebaseOntoBase();
-																			}}
-																			disabled={isRebasing}
-																			title={`Rebase onto ${effectiveBaseBranch}`}
-																		>
-																			{isRebasing ? (
-																				<Loader2 className="w-3 h-3 shrink-0 animate-spin" />
-																			) : (
-																				<ArrowDown className="w-3 h-3 shrink-0" />
-																			)}
-																			<span className="header-git-branch-text">Rebase</span>
-																		</button>
-																	)}
 																</>
 															)}
 															{/* Current branch pill */}
