@@ -516,6 +516,8 @@ const LogItemComponent = memo(
 		// Ref for the log item container - used for scroll-into-view on expand
 		const logItemRef = useRef<HTMLDivElement>(null);
 
+		// Track whether skill/command instructions are shown (collapsed by default)
+
 		// Handle expand toggle with scroll adjustment
 		const handleExpandToggle = useCallback(() => {
 			const wasExpanded = isExpanded;
@@ -609,7 +611,8 @@ const LogItemComponent = memo(
 
 		// Count lines in the filtered text
 		const lineCount = filteredText.split('\n').length;
-		const shouldCollapse = lineCount > maxOutputLines && maxOutputLines !== Infinity;
+		const shouldCollapse =
+			(lineCount > maxOutputLines && maxOutputLines !== Infinity) || !!log.aiCommand;
 
 		// Truncate text if collapsed
 		const displayText =
@@ -943,50 +946,78 @@ const LogItemComponent = memo(
 								</div>
 							) : shouldCollapse && !isExpanded ? (
 								<div>
-									<div
-										className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm' : 'whitespace-pre-wrap text-sm break-words'}`}
-										style={{
-											maxHeight: `${maxOutputLines * 1.5}em`,
-											overflow: isTerminal && log.source !== 'user' ? 'hidden' : 'hidden',
-											color: theme.colors.textMain,
-											fontFamily: contentFontFamily,
-											overflowWrap: isTerminal && log.source !== 'user' ? undefined : 'break-word',
-										}}
-									>
-										{isTerminal && log.source !== 'user' ? (
-											// Content sanitized via getCachedAnsiHtml
-											// Horizontal scroll for terminal output to preserve column alignment
+									{log.aiCommand ? (
+										<div
+											className="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+											onClick={handleExpandToggle}
+											style={{
+												backgroundColor: theme.colors.accent + '15',
+												borderColor: theme.colors.accent + '30',
+											}}
+										>
+											<span
+												className="font-mono font-bold text-sm"
+												style={{ color: theme.colors.accent }}
+											>
+												{log.aiCommand.command}:
+											</span>
+											<span className="text-sm flex-1" style={{ color: theme.colors.textMain }}>
+												{log.aiCommand.description}
+											</span>
+											<ChevronDown
+												className="w-3 h-3 opacity-60"
+												style={{ color: theme.colors.textDim }}
+											/>
+										</div>
+									) : (
+										<>
 											<div
-												className="overflow-x-auto scrollbar-thin"
-												dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
-											/>
-										) : isAIMode && !markdownEditMode ? (
-											// Collapsed markdown preview with rendered markdown
-											<MarkdownRenderer
-												content={displayText}
-												theme={theme}
-												onCopy={copyToClipboard}
-												fileTree={fileTree}
-												cwd={cwd}
-												projectRoot={projectRoot}
-												onFileClick={onFileClick}
-											/>
-										) : (
-											displayText
-										)}
-									</div>
-									<button
-										onClick={handleExpandToggle}
-										className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
-										style={{
-											borderColor: theme.colors.border,
-											backgroundColor: theme.colors.bgActivity,
-											color: theme.colors.accent,
-										}}
-									>
-										<ChevronDown className="w-3 h-3" />
-										Show all {lineCount} lines
-									</button>
+												className={`${isTerminal && log.source !== 'user' ? 'whitespace-pre text-sm' : 'whitespace-pre-wrap text-sm break-words'}`}
+												style={{
+													maxHeight: `${maxOutputLines * 1.5}em`,
+													overflow: isTerminal && log.source !== 'user' ? 'hidden' : 'hidden',
+													color: theme.colors.textMain,
+													fontFamily: contentFontFamily,
+													overflowWrap:
+														isTerminal && log.source !== 'user' ? undefined : 'break-word',
+												}}
+											>
+												{isTerminal && log.source !== 'user' ? (
+													// Content sanitized via getCachedAnsiHtml
+													// Horizontal scroll for terminal output to preserve column alignment
+													<div
+														className="overflow-x-auto scrollbar-thin"
+														dangerouslySetInnerHTML={{ __html: displayHtmlContent }}
+													/>
+												) : isAIMode && !markdownEditMode ? (
+													// Collapsed markdown preview with rendered markdown
+													<MarkdownRenderer
+														content={displayText}
+														theme={theme}
+														onCopy={copyToClipboard}
+														fileTree={fileTree}
+														cwd={cwd}
+														projectRoot={projectRoot}
+														onFileClick={onFileClick}
+													/>
+												) : (
+													displayText
+												)}
+											</div>
+											<button
+												onClick={handleExpandToggle}
+												className="flex items-center gap-2 mt-2 text-xs px-3 py-1.5 rounded border hover:opacity-70 transition-opacity"
+												style={{
+													borderColor: theme.colors.border,
+													backgroundColor: theme.colors.bgActivity,
+													color: theme.colors.accent,
+												}}
+											>
+												<ChevronDown className="w-3 h-3" />
+												Show all {lineCount} lines
+											</button>
+										</>
+									)}
 								</div>
 							) : shouldCollapse && isExpanded ? (
 								<div>
@@ -1008,7 +1039,7 @@ const LogItemComponent = memo(
 												{filteredText}
 											</div>
 										) : log.aiCommand ? (
-											<div className="space-y-3">
+											<div className="space-y-1">
 												<div
 													className="flex items-center gap-2 px-3 py-2 rounded-lg border"
 													style={{
@@ -1022,11 +1053,16 @@ const LogItemComponent = memo(
 													>
 														{log.aiCommand.command}:
 													</span>
-													<span className="text-sm" style={{ color: theme.colors.textMain }}>
+													<span className="text-sm flex-1" style={{ color: theme.colors.textMain }}>
 														{log.aiCommand.description}
 													</span>
 												</div>
-												<div>{filteredText}</div>
+												<div
+													className="whitespace-pre-wrap text-sm break-words"
+													style={{ color: theme.colors.textMain }}
+												>
+													{filteredText}
+												</div>
 											</div>
 										) : isAIMode && !markdownEditMode ? (
 											// Expanded markdown rendering
@@ -1078,7 +1114,7 @@ const LogItemComponent = memo(
 											{filteredText}
 										</div>
 									) : log.aiCommand ? (
-										<div className="space-y-3">
+										<div className="space-y-1">
 											<div
 												className="flex items-center gap-2 px-3 py-2 rounded-lg border"
 												style={{
@@ -1092,7 +1128,7 @@ const LogItemComponent = memo(
 												>
 													{log.aiCommand.command}:
 												</span>
-												<span className="text-sm" style={{ color: theme.colors.textMain }}>
+												<span className="text-sm flex-1" style={{ color: theme.colors.textMain }}>
 													{log.aiCommand.description}
 												</span>
 											</div>
@@ -1447,6 +1483,8 @@ const WorkGroupComponent = memo(
 			return group.entries.filter((e) => e.source !== 'thinking');
 		}, [group.entries, showThinking, isBusy]);
 
+		const [toolsExpanded, setToolsExpanded] = useState(false);
+
 		const handleToggle = useCallback(() => {
 			onToggleExpanded(group.id, true);
 		}, [onToggleExpanded, group.id]);
@@ -1538,102 +1576,191 @@ const WorkGroupComponent = memo(
 					</span>
 				</div>
 
-				{/* Expanded: compact step list */}
-				{isExpanded && (
-					<div
-						className="ml-3 pl-3 py-1"
-						style={{ borderLeft: `1px solid ${theme.colors.border}` }}
-					>
-						{visibleEntries.map((entry) => {
-							if (entry.source === 'thinking') {
-								// Thinking: prominent — bold label, full text, normal weight
-								return (
-									<div
-										key={entry.id}
-										className="py-1 text-[11px] min-w-0"
-										style={{ color: theme.colors.textDim, fontFamily: 'var(--font-sans)' }}
-									>
-										<span
-											style={{
-												color: theme.colors.textMain,
-												fontWeight: 600,
-												marginRight: '0.5em',
-											}}
-										>
-											Thinking
-										</span>
-										<span
-											className="whitespace-pre-wrap"
-											style={{ color: theme.colors.textMain, opacity: 0.7 }}
-										>
-											{entry.text.trim()}
-										</span>
-									</div>
-								);
-							}
+				{/* Expanded: thinking content + aggregated tool summary */}
+				{isExpanded &&
+					(() => {
+						const thinkingEntries = visibleEntries.filter((e) => e.source === 'thinking');
+						const toolEntriesVisible = visibleEntries.filter((e) => e.source === 'tool');
 
-							// Tool entry: compact single line
+						// Build human-readable tool summary
+						const toolCounts: Record<string, number> = {};
+						const errorCount = toolEntriesVisible.filter(
+							(e) => e.metadata?.toolState?.status === 'error'
+						).length;
+						// Only count as "running" when the agent is actually busy — stale 'running' statuses are treated as completed
+						const runningCount = isBusy
+							? toolEntriesVisible.filter((e) => e.metadata?.toolState?.status === 'running').length
+							: 0;
+						for (const entry of toolEntriesVisible) {
 							const toolInput = entry.metadata?.toolState?.input as
 								| Record<string, unknown>
 								| undefined;
-							const toolName = toolInput ? (safeStr(toolInput.tool) ?? entry.text) : entry.text;
-							const toolDetail = toolInput
-								? safeCommand(toolInput.command) ||
-									safeStr(toolInput.pattern) ||
-									safeStr(toolInput.file_path) ||
-									safeStr(toolInput.filePath) ||
-									safeStr(toolInput.query) ||
-									safeStr(toolInput.description) ||
-									safeStr(toolInput.prompt) ||
-									safeStr(toolInput.task_id) ||
-									safeStr(toolInput.path) ||
-									safeStr(toolInput.cmd) ||
-									safeStr(toolInput.code) ||
-									truncateStr(toolInput.content, 80) ||
-									null
-								: null;
-							const status = entry.metadata?.toolState?.status;
-							const statusIcon =
-								status === 'completed' ? '\u2713' : status === 'error' ? '\u2717' : '\u25CF';
-							const statusColor =
-								status === 'completed'
-									? theme.colors.success || '#22c55e'
-									: status === 'error'
-										? theme.colors.error || '#ef4444'
-										: theme.colors.accent;
+							const name = toolInput ? (safeStr(toolInput.tool) ?? entry.text) : entry.text;
+							const normalized = name.toLowerCase();
+							if (normalized === 'write' || normalized === 'edit') {
+								toolCounts['files changed'] = (toolCounts['files changed'] || 0) + 1;
+							} else if (normalized === 'read') {
+								toolCounts['files read'] = (toolCounts['files read'] || 0) + 1;
+							} else if (normalized === 'bash') {
+								toolCounts['commands run'] = (toolCounts['commands run'] || 0) + 1;
+							} else if (normalized === 'agent') {
+								toolCounts['agents spawned'] = (toolCounts['agents spawned'] || 0) + 1;
+							} else if (
+								normalized === 'glob' ||
+								normalized === 'grep' ||
+								normalized === 'toolsearch' ||
+								normalized === 'websearch' ||
+								normalized === 'webfetch'
+							) {
+								toolCounts['lookups'] = (toolCounts['lookups'] || 0) + 1;
+							} else {
+								toolCounts['other steps'] = (toolCounts['other steps'] || 0) + 1;
+							}
+						}
+						const summaryParts = Object.entries(toolCounts).map(
+							([label, count]) => `${count} ${label}`
+						);
 
-							return (
-								<div
-									key={entry.id}
-									className="py-0.5 text-[11px] flex items-center gap-1.5 min-w-0 cursor-pointer rounded px-1 -mx-1 transition-colors"
-									style={{
-										color: theme.colors.textDim,
-										fontFamily,
-										fontStyle: 'italic',
-										opacity: 0.5,
-									}}
-									onClick={() => onToggleExpanded(entry.id)}
-									onMouseEnter={(e) => {
-										e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
-									}}
-									onMouseLeave={(e) => {
-										e.currentTarget.style.backgroundColor = 'transparent';
-									}}
-								>
-									<span style={{ color: statusColor, fontSize: '0.7em', flexShrink: 0 }}>
-										{status === 'running' ? (
-											<span className="animate-pulse">{statusIcon}</span>
-										) : (
-											statusIcon
+						return (
+							<div
+								className="ml-3 pl-3 py-1"
+								style={{ borderLeft: `1px solid ${theme.colors.border}` }}
+							>
+								{/* Thinking content — prominent with label */}
+								{thinkingEntries.length > 0 && (
+									<div
+										className="text-[10px] font-semibold uppercase tracking-wide pt-1 pb-0.5"
+										style={{ color: theme.colors.warning, opacity: 0.7 }}
+									>
+										Thinking
+									</div>
+								)}
+								{thinkingEntries.map((entry) => (
+									<div
+										key={entry.id}
+										className="py-1.5 text-xs min-w-0 leading-relaxed"
+										style={{
+											color: theme.colors.textMain,
+											fontFamily: 'var(--font-sans)',
+											opacity: 0.85,
+										}}
+									>
+										<span className="whitespace-pre-wrap break-words">{entry.text.trim()}</span>
+									</div>
+								))}
+
+								{/* Tool summary line — compact, expandable */}
+								{toolEntriesVisible.length > 0 && (
+									<>
+										<div
+											className="py-1 text-[10px] flex items-center gap-1.5 cursor-pointer select-none rounded px-1 -mx-1 transition-colors"
+											style={{ color: theme.colors.textDim, opacity: 0.5 }}
+											onClick={() => setToolsExpanded((prev) => !prev)}
+											onMouseEnter={(e) => {
+												e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
+											}}
+											onMouseLeave={(e) => {
+												e.currentTarget.style.backgroundColor = 'transparent';
+											}}
+										>
+											<span style={{ width: '0.75em', flexShrink: 0, fontFamily }}>
+												{toolsExpanded ? '\u25BE' : '\u25B8'}
+											</span>
+											{runningCount > 0 ? (
+												<span className="animate-pulse" style={{ color: theme.colors.accent }}>
+													{'\u25CF'} {runningCount} running
+												</span>
+											) : errorCount > 0 ? (
+												<span style={{ color: theme.colors.error }}>
+													{'\u2717'} {errorCount} failed
+												</span>
+											) : (
+												<span style={{ color: theme.colors.success || '#22c55e' }}>{'\u2713'}</span>
+											)}
+											<span>{summaryParts.join(' \u00B7 ')}</span>
+										</div>
+
+										{/* Individual tool calls — shown on expand */}
+										{toolsExpanded && (
+											<div
+												className="ml-3 pl-2 py-0.5"
+												style={{ borderLeft: `1px solid ${theme.colors.border}40` }}
+											>
+												{toolEntriesVisible.map((entry) => {
+													const toolInput = entry.metadata?.toolState?.input as
+														| Record<string, unknown>
+														| undefined;
+													const toolName = toolInput
+														? (safeStr(toolInput.tool) ?? entry.text)
+														: entry.text;
+													const toolDetail = toolInput
+														? safeCommand(toolInput.command) ||
+															safeStr(toolInput.pattern) ||
+															safeStr(toolInput.file_path) ||
+															safeStr(toolInput.filePath) ||
+															safeStr(toolInput.query) ||
+															safeStr(toolInput.description) ||
+															safeStr(toolInput.prompt) ||
+															safeStr(toolInput.task_id) ||
+															safeStr(toolInput.path) ||
+															safeStr(toolInput.cmd) ||
+															safeStr(toolInput.code) ||
+															truncateStr(toolInput.content, 80) ||
+															null
+														: null;
+													const status = entry.metadata?.toolState?.status;
+													const statusIcon =
+														status === 'completed'
+															? '\u2713'
+															: status === 'error'
+																? '\u2717'
+																: '\u25CF';
+													const statusColor =
+														status === 'completed'
+															? theme.colors.success || '#22c55e'
+															: status === 'error'
+																? theme.colors.error || '#ef4444'
+																: theme.colors.accent;
+
+													return (
+														<div
+															key={entry.id}
+															className="py-0.5 text-[10px] flex items-center gap-1.5 min-w-0 cursor-pointer rounded px-1 -mx-1 transition-colors"
+															style={{
+																color: theme.colors.textDim,
+																fontFamily,
+																fontStyle: 'italic',
+																opacity: 0.5,
+															}}
+															onClick={() => onToggleExpanded(entry.id)}
+															onMouseEnter={(e) => {
+																e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
+															}}
+															onMouseLeave={(e) => {
+																e.currentTarget.style.backgroundColor = 'transparent';
+															}}
+														>
+															<span
+																style={{ color: statusColor, fontSize: '0.7em', flexShrink: 0 }}
+															>
+																{status === 'running' ? (
+																	<span className="animate-pulse">{statusIcon}</span>
+																) : (
+																	statusIcon
+																)}
+															</span>
+															<span style={{ flexShrink: 0 }}>{toolName}</span>
+															{toolDetail && <span className="truncate">{toolDetail}</span>}
+														</div>
+													);
+												})}
+											</div>
 										)}
-									</span>
-									<span style={{ flexShrink: 0 }}>{toolName}</span>
-									{toolDetail && <span className="truncate">{toolDetail}</span>}
-								</div>
-							);
-						})}
-					</div>
-				)}
+									</>
+								)}
+							</div>
+						);
+					})()}
 			</div>
 		);
 	}
