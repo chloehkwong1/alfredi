@@ -126,170 +126,118 @@ export function useChangesPanel(
 	const mountedRef = useRef(true);
 	const hasLoadedOnceRef = useRef(false);
 
-	const refresh = useCallback(async () => {
-		if (!cwd) return;
+	const refreshInternal = useCallback(
+		async (showSpinner: boolean) => {
+			if (!cwd) return;
 
-		// Only show loading spinner on initial load, not background refreshes
-		if (!hasLoadedOnceRef.current) {
-			setIsLoading(true);
-		}
-		try {
-			// 1. Fetch uncommitted status + numstat in parallel
-			const [statusResult, numstatResult] = await Promise.all([
-				gitService.getStatus(cwd, sshRemoteId),
-				gitService.getNumstat(cwd, sshRemoteId),
-			]);
-
-			if (!mountedRef.current) return;
-
-			// Build a numstat lookup by path
-			const numstatMap = new Map<string, { additions: number; deletions: number }>();
-			for (const f of numstatResult.files) {
-				numstatMap.set(f.path, { additions: f.additions, deletions: f.deletions });
+			if (showSpinner) {
+				setIsLoading(true);
 			}
-
-			// Classify files into staged vs unstaged based on porcelain status
-			const staged: ChangesFile[] = [];
-			const unstaged: ChangesFile[] = [];
-			for (const file of statusResult.files) {
-				const stats = numstatMap.get(file.path) || { additions: 0, deletions: 0 };
-				const entry: ChangesFile = {
-					path: file.path,
-					status: file.status,
-					additions: stats.additions,
-					deletions: stats.deletions,
-				};
-
-				// Porcelain XY: X = index status, Y = worktree status
-				const indexStatus = file.status[0];
-				const worktreeStatus = file.status[1];
-
-				// File is staged if X is not ' ' and not '?'
-				if (indexStatus !== ' ' && indexStatus !== '?') {
-					staged.push(entry);
-				}
-				// File is unstaged if Y is not ' '
-				if (worktreeStatus !== ' ' || file.status === '??') {
-					unstaged.push(entry);
-				}
-			}
-
-			setStagedFiles(staged);
-			setUnstagedFiles(unstaged);
-			setCurrentBranch(statusResult.branch);
-
-			// 2. Get default branch + merge base for committed changes
 			try {
-				// Use session-persisted base branch if set, otherwise auto-detect
-				let defaultBranch: string;
-				if (sessionBaseBranch) {
-					defaultBranch = sessionBaseBranch;
-				} else {
-					const defaultBranchResult = await window.maestro.git.getDefaultBranch(cwd);
-					if (!mountedRef.current) return;
-					defaultBranch = defaultBranchResult.branch || 'main';
+				// 1. Fetch uncommitted status + numstat in parallel
+				const [statusResult, numstatResult] = await Promise.all([
+					gitService.getStatus(cwd, sshRemoteId),
+					gitService.getNumstat(cwd, sshRemoteId),
+				]);
+
+				if (!mountedRef.current) return;
+
+				// Build a numstat lookup by path
+				const numstatMap = new Map<string, { additions: number; deletions: number }>();
+				for (const f of numstatResult.files) {
+					numstatMap.set(f.path, { additions: f.additions, deletions: f.deletions });
 				}
-				setBaseBranch(defaultBranch);
 
-				// Use origin/<branch> for merge-base to avoid stale local branch refs.
-				// After rebasing onto origin/main, the local main may be behind,
-				// causing the diff to include unrelated commits from main.
-				const compareRef = `origin/${defaultBranch}`;
+				// Classify files into staged vs unstaged based on porcelain status
+				const staged: ChangesFile[] = [];
+				const unstaged: ChangesFile[] = [];
+				for (const file of statusResult.files) {
+					const stats = numstatMap.get(file.path) || { additions: 0, deletions: 0 };
+					const entry: ChangesFile = {
+						path: file.path,
+						status: file.status,
+						additions: stats.additions,
+						deletions: stats.deletions,
+					};
 
-				// Only fetch committed changes if we're on a different branch
-				if (statusResult.branch && statusResult.branch !== defaultBranch) {
-					// Resolve the compare ref, falling back to local branch if origin doesn't exist
-					let resolvedCompareRef = compareRef;
-					try {
-						await gitService.getMergeBase(cwd, compareRef, 'HEAD', sshRemoteId);
-					} catch {
-						resolvedCompareRef = defaultBranch;
+					// Porcelain XY: X = index status, Y = worktree status
+					const indexStatus = file.status[0];
+					const worktreeStatus = file.status[1];
+
+					// File is staged if X is not ' ' and not '?'
+					if (indexStatus !== ' ' && indexStatus !== '?') {
+						staged.push(entry);
 					}
+					// File is unstaged if Y is not ' '
+					if (worktreeStatus !== ' ' || file.status === '??') {
+						unstaged.push(entry);
+					}
+				}
 
+				setStagedFiles(staged);
+				setUnstagedFiles(unstaged);
+				setCurrentBranch(statusResult.branch);
+
+				// 2. Get default branch + merge base for committed changes
+				try {
+					// Use session-persisted base branch if set, otherwise auto-detect
+					let defaultBranch: string;
 					if (sessionBaseBranch) {
-						// --- PR-style mode: two-dot diff for file list ---
-						// Still compute merge-base (needed for per-file diff viewer)
-						const [mergeBaseResult, branchLogResult, baseLogResult] = await Promise.all([
-							gitService.getMergeBase(cwd, resolvedCompareRef, 'HEAD', sshRemoteId).catch(() => ''),
-							window.maestro.git.log(
-								cwd,
-								{ limit: 100, range: `${resolvedCompareRef}..HEAD` },
-								sshRemoteId
-							),
-							window.maestro.git.log(
-								cwd,
-								{ limit: 100, range: `HEAD..${resolvedCompareRef}` },
-								sshRemoteId
-							),
-						]);
-
-						if (!mountedRef.current) return;
-
-						const base = mergeBaseResult?.trim();
-						setMergeBaseRef(base || undefined);
-
-						// Two-dot diff: pass full ref spec as baseRef, no headRef
-						const diffResult = await gitService.getDiffRefs(
-							cwd,
-							`${resolvedCompareRef}..HEAD`,
-							undefined,
-							undefined,
-							sshRemoteId
-						);
-
-						if (!mountedRef.current) return;
-
-						const parsedFiles = parseFilesFromDiff(diffResult.diff);
-						setCommittedFiles(
-							parsedFiles.map((f) => ({
-								path: f.path,
-								status: f.status,
-								additions: 0,
-								deletions: 0,
-							}))
-						);
-
-						// Map branch-only commits (above divider)
-						const mapEntry = (e: {
-							hash: string;
-							shortHash: string;
-							author: string;
-							date: string;
-							subject: string;
-						}) => ({
-							hash: e.hash,
-							shortHash: e.shortHash,
-							author: e.author,
-							date: e.date,
-							subject: e.subject,
-						});
-
-						const branchEntries = !branchLogResult.error
-							? branchLogResult.entries.map(mapEntry)
-							: [];
-						const baseEntries = !baseLogResult.error ? baseLogResult.entries.map(mapEntry) : [];
-
-						setBranchCommits(branchEntries);
-						// Combined: branch commits above divider, base commits below
-						setAllCommits([...branchEntries, ...baseEntries]);
+						defaultBranch = sessionBaseBranch;
 					} else {
-						// --- Standard mode: three-dot (merge-base) diff ---
-						const [mergeBaseResult, logResult] = await Promise.all([
-							gitService.getMergeBase(cwd, resolvedCompareRef, 'HEAD', sshRemoteId),
-							window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId),
-						]);
-
+						const defaultBranchResult = await window.maestro.git.getDefaultBranch(cwd);
 						if (!mountedRef.current) return;
+						defaultBranch = defaultBranchResult.branch || 'main';
+					}
+					setBaseBranch(defaultBranch);
 
-						const base = mergeBaseResult?.trim();
-						setMergeBaseRef(base || undefined);
+					// Use origin/<branch> for merge-base to avoid stale local branch refs.
+					// After rebasing onto origin/main, the local main may be behind,
+					// causing the diff to include unrelated commits from main.
+					const compareRef = `origin/${defaultBranch}`;
 
-						if (base) {
-							// Fetch committed file diff and branch-only commits in parallel
-							const [diffResult, branchLogResult] = await Promise.all([
-								gitService.getDiffRefs(cwd, base, 'HEAD', undefined, sshRemoteId),
-								window.maestro.git.log(cwd, { limit: 100, range: `${base}..HEAD` }, sshRemoteId),
+					// Only fetch committed changes if we're on a different branch
+					if (statusResult.branch && statusResult.branch !== defaultBranch) {
+						// Resolve the compare ref, falling back to local branch if origin doesn't exist
+						let resolvedCompareRef = compareRef;
+						try {
+							await gitService.getMergeBase(cwd, compareRef, 'HEAD', sshRemoteId);
+						} catch {
+							resolvedCompareRef = defaultBranch;
+						}
+
+						if (sessionBaseBranch) {
+							// --- PR-style mode: two-dot diff for file list ---
+							// Still compute merge-base (needed for per-file diff viewer)
+							const [mergeBaseResult, branchLogResult, baseLogResult] = await Promise.all([
+								gitService
+									.getMergeBase(cwd, resolvedCompareRef, 'HEAD', sshRemoteId)
+									.catch(() => ''),
+								window.maestro.git.log(
+									cwd,
+									{ limit: 100, range: `${resolvedCompareRef}..HEAD` },
+									sshRemoteId
+								),
+								window.maestro.git.log(
+									cwd,
+									{ limit: 100, range: `HEAD..${resolvedCompareRef}` },
+									sshRemoteId
+								),
 							]);
+
+							if (!mountedRef.current) return;
+
+							const base = mergeBaseResult?.trim();
+							setMergeBaseRef(base || undefined);
+
+							// Two-dot diff: pass full ref spec as baseRef, no headRef
+							const diffResult = await gitService.getDiffRefs(
+								cwd,
+								`${resolvedCompareRef}..HEAD`,
+								undefined,
+								undefined,
+								sshRemoteId
+							);
 
 							if (!mountedRef.current) return;
 
@@ -303,10 +251,81 @@ export function useChangesPanel(
 								}))
 							);
 
-							// Map branch-only log entries
-							if (!branchLogResult.error) {
-								setBranchCommits(
-									branchLogResult.entries.map((e) => ({
+							// Map branch-only commits (above divider)
+							const mapEntry = (e: {
+								hash: string;
+								shortHash: string;
+								author: string;
+								date: string;
+								subject: string;
+							}) => ({
+								hash: e.hash,
+								shortHash: e.shortHash,
+								author: e.author,
+								date: e.date,
+								subject: e.subject,
+							});
+
+							const branchEntries = !branchLogResult.error
+								? branchLogResult.entries.map(mapEntry)
+								: [];
+							const baseEntries = !baseLogResult.error ? baseLogResult.entries.map(mapEntry) : [];
+
+							setBranchCommits(branchEntries);
+							// Combined: branch commits above divider, base commits below
+							setAllCommits([...branchEntries, ...baseEntries]);
+						} else {
+							// --- Standard mode: three-dot (merge-base) diff ---
+							const [mergeBaseResult, logResult] = await Promise.all([
+								gitService.getMergeBase(cwd, resolvedCompareRef, 'HEAD', sshRemoteId),
+								window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId),
+							]);
+
+							if (!mountedRef.current) return;
+
+							const base = mergeBaseResult?.trim();
+							setMergeBaseRef(base || undefined);
+
+							if (base) {
+								// Fetch committed file diff and branch-only commits in parallel
+								const [diffResult, branchLogResult] = await Promise.all([
+									gitService.getDiffRefs(cwd, base, 'HEAD', undefined, sshRemoteId),
+									window.maestro.git.log(cwd, { limit: 100, range: `${base}..HEAD` }, sshRemoteId),
+								]);
+
+								if (!mountedRef.current) return;
+
+								const parsedFiles = parseFilesFromDiff(diffResult.diff);
+								setCommittedFiles(
+									parsedFiles.map((f) => ({
+										path: f.path,
+										status: f.status,
+										additions: 0,
+										deletions: 0,
+									}))
+								);
+
+								// Map branch-only log entries
+								if (!branchLogResult.error) {
+									setBranchCommits(
+										branchLogResult.entries.map((e) => ({
+											hash: e.hash,
+											shortHash: e.shortHash,
+											author: e.author,
+											date: e.date,
+											subject: e.subject,
+										}))
+									);
+								}
+							} else {
+								setCommittedFiles([]);
+								setBranchCommits([]);
+							}
+
+							// Map all log entries to our commit type
+							if (!logResult.error) {
+								setAllCommits(
+									logResult.entries.map((e) => ({
 										hash: e.hash,
 										shortHash: e.shortHash,
 										author: e.author,
@@ -315,12 +334,15 @@ export function useChangesPanel(
 									}))
 								);
 							}
-						} else {
-							setCommittedFiles([]);
-							setBranchCommits([]);
 						}
+					} else {
+						// On the default branch — no branch diff, but still show commit log
+						setCommittedFiles([]);
+						setBranchCommits([]);
+						setMergeBaseRef(undefined);
 
-						// Map all log entries to our commit type
+						const logResult = await window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId);
+						if (!mountedRef.current) return;
 						if (!logResult.error) {
 							setAllCommits(
 								logResult.entries.map((e) => ({
@@ -331,45 +353,30 @@ export function useChangesPanel(
 									subject: e.subject,
 								}))
 							);
+						} else {
+							setAllCommits([]);
 						}
 					}
-				} else {
-					// On the default branch — no branch diff, but still show commit log
+				} catch {
+					// getDefaultBranch or mergeBase may fail for repos without remotes
 					setCommittedFiles([]);
+					setAllCommits([]);
 					setBranchCommits([]);
-					setMergeBaseRef(undefined);
-
-					const logResult = await window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId);
-					if (!mountedRef.current) return;
-					if (!logResult.error) {
-						setAllCommits(
-							logResult.entries.map((e) => ({
-								hash: e.hash,
-								shortHash: e.shortHash,
-								author: e.author,
-								date: e.date,
-								subject: e.subject,
-							}))
-						);
-					} else {
-						setAllCommits([]);
-					}
 				}
 			} catch {
-				// getDefaultBranch or mergeBase may fail for repos without remotes
-				setCommittedFiles([]);
-				setAllCommits([]);
-				setBranchCommits([]);
+				// Swallow errors — the panel gracefully shows empty state
+			} finally {
+				if (mountedRef.current) {
+					setIsLoading(false);
+					hasLoadedOnceRef.current = true;
+				}
 			}
-		} catch {
-			// Swallow errors — the panel gracefully shows empty state
-		} finally {
-			if (mountedRef.current) {
-				setIsLoading(false);
-				hasLoadedOnceRef.current = true;
-			}
-		}
-	}, [cwd, sshRemoteId, sessionBaseBranch]);
+		},
+		[cwd, sshRemoteId, sessionBaseBranch]
+	);
+
+	// Public refresh — always shows spinner for user feedback
+	const refresh = useCallback(() => refreshInternal(true), [refreshInternal]);
 
 	// Reset initial-load tracking when cwd changes (e.g. switching agents)
 	useEffect(() => {
@@ -379,17 +386,17 @@ export function useChangesPanel(
 	// Initial fetch
 	useEffect(() => {
 		mountedRef.current = true;
-		refresh();
+		refreshInternal(!hasLoadedOnceRef.current);
 		return () => {
 			mountedRef.current = false;
 		};
-	}, [refresh]);
+	}, [refreshInternal]);
 
-	// Auto-refresh on interval
+	// Auto-refresh on interval (no spinner)
 	useEffect(() => {
-		const id = setInterval(refresh, REFRESH_INTERVAL_MS);
+		const id = setInterval(() => refreshInternal(false), REFRESH_INTERVAL_MS);
 		return () => clearInterval(id);
-	}, [refresh]);
+	}, [refreshInternal]);
 
 	// Refresh on window focus
 	useEffect(() => {

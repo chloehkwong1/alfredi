@@ -532,6 +532,11 @@ function SessionListInner(props: SessionListProps) {
 													color: '#f59e0b',
 												},
 												{
+													status: 'reviewing' as WorktreeStatus,
+													label: 'Reviewing',
+													color: '#8b5cf6',
+												},
+												{
 													status: 'blocked' as WorktreeStatus,
 													label: 'Blocked',
 													color: theme.colors.error,

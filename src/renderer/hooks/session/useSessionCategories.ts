@@ -70,6 +70,7 @@ export function useSessionCategories(
 				todo: [],
 				in_progress: [],
 				in_review: [],
+				reviewing: [],
 				blocked: [],
 				done: [],
 			};

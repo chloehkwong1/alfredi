@@ -43,7 +43,13 @@ export const EFFORT_LEVEL_OPTIONS: { id: EffortLevel; label: string; description
  * Worktrees flow: todo → in_progress → in_review → done. Can be marked blocked at any stage.
  * Auto-detected from PR status and agent activity, or set manually via drag-and-drop.
  */
-export type WorktreeStatus = 'todo' | 'in_progress' | 'in_review' | 'blocked' | 'done';
+export type WorktreeStatus =
+	| 'todo'
+	| 'in_progress'
+	| 'in_review'
+	| 'reviewing'
+	| 'blocked'
+	| 'done';
 
 // Worktree configuration at the Project level.
 // Persists across sessions — agents inherit this from their project.
