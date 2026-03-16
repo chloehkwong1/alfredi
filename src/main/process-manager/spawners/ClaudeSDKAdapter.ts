@@ -147,6 +147,7 @@ export class ClaudeSDKAdapter {
 			sshRemoteHost: config.sshRemoteHost,
 		};
 		this.processes.set(sessionId, managedProcess);
+		logger.info('[ClaudeSDKAdapter] Process registered', 'ClaudeSDKAdapter', { sessionId });
 
 		// Determine resume session ID from the original args
 		// The CLI path uses --resume <sessionId>; extract it for the SDK
@@ -261,6 +262,11 @@ export class ClaudeSDKAdapter {
 		} finally {
 			// If we haven't already emitted exit, do so now
 			const managedProcess = this.processes.get(sessionId);
+			logger.info('[ClaudeSDKAdapter] Query loop ended, cleaning up', 'ClaudeSDKAdapter', {
+				sessionId,
+				hasProcess: !!managedProcess,
+				pendingQuestions: this.pendingQuestionResolvers.size,
+			});
 			if (managedProcess) {
 				this.emitter.emit('query-complete', sessionId, {
 					sessionId,
@@ -642,6 +648,15 @@ export class ClaudeSDKAdapter {
 		});
 
 		// Return a Promise that resolves when the user responds
+		logger.info(
+			'[ClaudeSDKAdapter] AskUserQuestion blocking until user answers',
+			'ClaudeSDKAdapter',
+			{
+				sessionId,
+				toolUseID,
+				processExists: this.processes.has(sessionId),
+			}
+		);
 		return new Promise<PermissionResult>((resolve) => {
 			this.pendingQuestionResolvers.set(toolUseID, {
 				resolve,

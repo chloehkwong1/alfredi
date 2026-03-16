@@ -540,6 +540,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.forwardHistory,
 			deps.filePreviewHistoryIndex,
 			deps.activeTab?.agentError,
+			deps.activeTab?.pendingQuestion,
 			deps.activeTab?.readOnlyMode,
 			deps.activeTab?.modelId,
 			deps.activeTab?.outputStyle,

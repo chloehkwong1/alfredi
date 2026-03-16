@@ -621,8 +621,15 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 			handlerOpts('answerQuestion'),
 			async (sessionId: string, toolUseId: string, answer: string) => {
 				const processManager = requireProcessManager(getProcessManager);
+				logger.info('[answerQuestion] IPC received', LOG_CONTEXT, {
+					sessionId,
+					toolUseId,
+					answerLength: answer.length,
+				});
 				// Delegate to ProcessManager.write() with the expected JSON format
-				return processManager.write(sessionId, JSON.stringify({ toolUseId, answer }));
+				const result = processManager.write(sessionId, JSON.stringify({ toolUseId, answer }));
+				logger.info('[answerQuestion] write result', LOG_CONTEXT, { result });
+				return result;
 			}
 		)
 	);

@@ -482,11 +482,20 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							serialized = answer;
 						}
 
-						window.maestro.process.answerQuestion(
-							pendingQ.processSessionId,
-							pendingQ.toolUseId,
-							serialized
-						);
+						console.log('[processInput] Sending answer via IPC:', {
+							processSessionId: pendingQ.processSessionId,
+							toolUseId: pendingQ.toolUseId,
+							answerLength: serialized.length,
+							serialized,
+						});
+						window.maestro.process
+							.answerQuestion(pendingQ.processSessionId, pendingQ.toolUseId, serialized)
+							.then((result) => {
+								console.log('[processInput] answerQuestion IPC result:', result);
+							})
+							.catch((err) => {
+								console.error('[processInput] answerQuestion IPC failed:', err);
+							});
 						// Clear pending question and mark log entries as answered
 						setSessions((prev) =>
 							prev.map((s) => {
