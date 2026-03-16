@@ -19,6 +19,7 @@
 
 import { EventEmitter } from 'events';
 import { logger } from '../../utils/logger';
+import { getSettingsStore } from '../../stores/getters';
 import { aggregateModelUsage, type ModelStats } from '../../parsers/usage-aggregator';
 import { mergeSlashCommandsWithCustom } from '../utils/customCommands';
 import type {
@@ -40,11 +41,13 @@ import type {
 	SDKToolProgressMessage,
 	SDKToolUseSummaryMessage,
 	SDKRateLimitEvent,
+	SDKUserMessage,
 	Query,
 	Options,
 	CanUseTool,
 	PermissionResult,
 } from '@anthropic-ai/claude-agent-sdk';
+import { parseDataUrl } from '../utils/imageUtils';
 
 // Re-import query as a value — the SDK is an ESM module.
 // TypeScript's CJS output transforms `import()` into `require()`, which fails for ESM-only
@@ -110,7 +113,8 @@ export class ClaudeSDKAdapter {
 			toolType: config.toolType,
 			hasPrompt: !!config.prompt,
 		});
-		const { sessionId, toolType, cwd, prompt, contextWindow, customEnvVars, shellEnvVars } = config;
+		const { sessionId, toolType, cwd, prompt, images, contextWindow, customEnvVars, shellEnvVars } =
+			config;
 
 		if (!prompt) {
 			logger.error('[ClaudeSDKAdapter] No prompt provided', 'ClaudeSDKAdapter', { sessionId });
@@ -178,6 +182,9 @@ export class ClaudeSDKAdapter {
 			return this.handleCanUseTool(sessionId, toolName, input, options);
 		};
 
+		// Build MCP servers to inject
+		const mcpServers = this.buildMcpServers();
+
 		// Build SDK options
 		const sdkOptions: Options = {
 			abortController,
@@ -190,6 +197,7 @@ export class ClaudeSDKAdapter {
 			allowDangerouslySkipPermissions: true,
 			canUseTool,
 			includePartialMessages: true,
+			...(mcpServers && { mcpServers }),
 		};
 
 		logger.debug('[ClaudeSDKAdapter] Starting SDK query', 'ClaudeSDKAdapter', {
@@ -201,7 +209,7 @@ export class ClaudeSDKAdapter {
 		});
 
 		// Launch the query loop asynchronously
-		this.runQuery(sessionId, prompt, sdkOptions).catch((error) => {
+		this.runQuery(sessionId, prompt, images, sdkOptions).catch((error) => {
 			logger.error('[ClaudeSDKAdapter] Query failed', 'ClaudeSDKAdapter', {
 				sessionId,
 				error: String(error),
@@ -218,9 +226,18 @@ export class ClaudeSDKAdapter {
 	 * Run the SDK query async generator loop.
 	 * Iterates all messages and translates them to ProcessManager events.
 	 */
-	private async runQuery(sessionId: string, prompt: string, options: Options): Promise<void> {
+	private async runQuery(
+		sessionId: string,
+		prompt: string,
+		images: string[] | undefined,
+		options: Options
+	): Promise<void> {
 		const queryFn = await getQuery();
-		const queryInstance = queryFn({ prompt, options });
+
+		// Build the prompt — if images are attached, use a multi-part SDKUserMessage
+		// so Claude receives them as image content blocks alongside the text.
+		const sdkPrompt = this.buildPrompt(prompt, images, sessionId);
+		const queryInstance = queryFn({ prompt: sdkPrompt, options });
 		this.activeQueries.set(sessionId, queryInstance);
 
 		try {
@@ -701,6 +718,96 @@ export class ClaudeSDKAdapter {
 	 */
 	hasSession(sessionId: string): boolean {
 		return this.abortControllers.has(sessionId) || this.activeQueries.has(sessionId);
+	}
+
+	/**
+	 * Build the prompt for the SDK query.
+	 * When images are present, constructs an AsyncIterable<SDKUserMessage> with
+	 * multi-part content (image blocks + text). Otherwise returns the plain string.
+	 */
+	private buildPrompt(
+		prompt: string,
+		images: string[] | undefined,
+		sessionId: string
+	): string | AsyncIterable<SDKUserMessage> {
+		if (!images || images.length === 0) {
+			return prompt;
+		}
+
+		// Build content blocks: images first (Claude convention), then text
+		const content: Array<Record<string, unknown>> = [];
+
+		for (const dataUrl of images) {
+			const parsed = parseDataUrl(dataUrl);
+			if (parsed) {
+				content.push({
+					type: 'image',
+					source: {
+						type: 'base64',
+						media_type: parsed.mediaType,
+						data: parsed.base64,
+					},
+				});
+			}
+		}
+
+		content.push({ type: 'text', text: prompt });
+
+		const userMessage: SDKUserMessage = {
+			type: 'user',
+			message: {
+				role: 'user',
+				content,
+			} as SDKUserMessage['message'],
+			parent_tool_use_id: null,
+			session_id: sessionId,
+		};
+
+		logger.debug('[ClaudeSDKAdapter] Building prompt with images', 'ClaudeSDKAdapter', {
+			imageCount: images.length,
+			contentBlockCount: content.length,
+		});
+
+		// Return an async iterable that yields a single user message
+		return (async function* () {
+			yield userMessage;
+		})();
+	}
+
+	/**
+	 * Build MCP server configs to inject into the SDK options.
+	 * Currently auto-injects Linear when linearApiKey is configured.
+	 */
+	private buildMcpServers(): Options['mcpServers'] {
+		try {
+			const settingsStore = getSettingsStore();
+			const linearApiKey = settingsStore.get(
+				'linearApiKey' as keyof import('../../stores/types').MaestroSettings,
+				''
+			) as string;
+
+			if (!linearApiKey) return undefined;
+
+			const servers: NonNullable<Options['mcpServers']> = {
+				linear: {
+					type: 'stdio',
+					command: 'npx',
+					args: ['-y', '@anthropic-ai/linear-mcp-server'],
+					env: { LINEAR_API_KEY: linearApiKey },
+				},
+			};
+
+			logger.debug('[ClaudeSDKAdapter] Injecting MCP servers', 'ClaudeSDKAdapter', {
+				serverNames: Object.keys(servers),
+			});
+
+			return servers;
+		} catch (error) {
+			logger.warn('[ClaudeSDKAdapter] Failed to build MCP servers', 'ClaudeSDKAdapter', {
+				error: String(error),
+			});
+			return undefined;
+		}
 	}
 
 	/**
