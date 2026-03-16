@@ -9,6 +9,7 @@ import { useLiveOverlay, useResizablePanel } from '../../hooks';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { fontSizeToTertiary } from '../../utils/fontSizeClass';
 // batchStore removed (Auto Run stripped)
 const useBatchStore = (selector: any) => selector({ activeBatchSessionIds: [] });
 const selectActiveBatchSessionIds = (s: any) => s.activeBatchSessionIds ?? [];
@@ -78,6 +79,7 @@ function SessionListInner(props: SessionListProps) {
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const draggingWorktreeTargetStatus = useUIStore((s) => s.draggingWorktreeTargetStatus);
 	const bookmarksCollapsed = useSettingsStore((s) => s.bookmarksCollapsed);
+	const fontSize = useSettingsStore((s) => s.fontSize);
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const leftSidebarWidthState = useSettingsStore((s) => s.leftSidebarWidth);
 	const webInterfaceUseCustomPort = useSettingsStore((s) => s.webInterfaceUseCustomPort);
@@ -559,7 +561,7 @@ function SessionListInner(props: SessionListProps) {
 															e.stopPropagation();
 															toggleKanbanSection(session.id, status);
 														}}
-														className="w-full flex items-center gap-1.5 px-3 py-1 text-[10px] font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer"
+														className={`w-full flex items-center gap-1.5 px-3 py-1 ${fontSizeToTertiary(fontSize)} font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer`}
 														style={{ color: theme.colors.textDim }}
 														title={`${label} - click to ${collapsed ? 'expand' : 'collapse'}`}
 													>

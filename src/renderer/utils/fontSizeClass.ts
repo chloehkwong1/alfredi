@@ -30,3 +30,16 @@ export function fontSizeToSecondary(fontSize: number): string {
 			return 'text-xs';
 	}
 }
+
+/** Map fontSize preset to tertiary (micro labels, badges) Tailwind text class */
+export function fontSizeToTertiary(fontSize: number): string {
+	switch (fontSize) {
+		case 18:
+			return 'text-xs';
+		case 16:
+			return 'text-[11px]';
+		case 14:
+		default:
+			return 'text-[10px]';
+	}
+}

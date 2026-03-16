@@ -16,7 +16,7 @@ import {
 import type { Session, Theme } from '../types';
 import type { WorktreeStatus } from '../../shared/types';
 import { useSettingsStore } from '../stores/settingsStore';
-import { fontSizeToClass, fontSizeToSecondary } from '../utils/fontSizeClass';
+import { fontSizeToClass, fontSizeToSecondary, fontSizeToTertiary } from '../utils/fontSizeClass';
 
 // Map worktree status to theme color for left border accent
 const getWorktreeStatusColor = (
@@ -91,6 +91,8 @@ interface PrChipProps {
 }
 
 const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
+	const fontSize = useSettingsStore((s) => s.fontSize);
+	const chipClass = fontSizeToTertiary(fontSize);
 	const { prNumber, prReviewDecision, prCheckStatus } = session;
 	if (!prNumber) return null;
 
@@ -104,9 +106,9 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 		.join(' \u00B7 '); // · separator
 
 	return (
-		<span className="flex items-center gap-1.5 truncate text-[10px]">
+		<span className={`flex items-center gap-1.5 truncate ${chipClass}`}>
 			<span
-				className="shrink-0 px-1.5 py-[1px] rounded-full text-[10px] font-semibold"
+				className={`shrink-0 px-1.5 py-[1px] rounded-full ${chipClass} font-semibold`}
 				style={{
 					backgroundColor: color + '20',
 					color,
@@ -204,6 +206,10 @@ export const SessionItem = memo(function SessionItem({
 	const fontSize = useSettingsStore((s) => s.fontSize);
 	const primaryClass = fontSizeToClass(fontSize);
 	const secondaryClass = fontSizeToSecondary(fontSize);
+	const tertiaryClass = fontSizeToTertiary(fontSize);
+	// Scale status icons/dots with font size
+	const iconSize = fontSize >= 18 ? 'w-3.5 h-3.5' : 'w-3 h-3';
+	const dotSize = fontSize >= 18 ? 'w-3 h-3' : 'w-2.5 h-2.5';
 
 	// Track busy -> idle transition for completion pulse on status dot
 	const prevStateRef = useRef(session.state);
@@ -371,7 +377,7 @@ export const SessionItem = memo(function SessionItem({
 											style={{ color: theme.colors.textDim }}
 										/>
 										<span
-											className="text-[10px] truncate"
+											className={`${tertiaryClass} truncate`}
 											style={{ color: theme.colors.textDim }}
 											title={session.currentBranch}
 										>
@@ -403,7 +409,7 @@ export const SessionItem = memo(function SessionItem({
 						{/* SSH Indicator (standalone, extracted from former GIT/LOCAL block) */}
 						{session.sessionSshRemoteConfig?.enabled && session.toolType !== 'terminal' && (
 							<div
-								className="px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5"
+								className={`px-1.5 py-0.5 rounded ${tertiaryClass} font-bold flex items-center gap-0.5`}
 								style={{
 									backgroundColor: theme.colors.warning + '30',
 									color: theme.colors.warning,
@@ -418,7 +424,7 @@ export const SessionItem = memo(function SessionItem({
 						{/* AUTO Mode Indicator */}
 						{isInBatch && (
 							<div
-								className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase animate-pulse"
+								className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${tertiaryClass} font-bold uppercase animate-pulse`}
 								style={{
 									backgroundColor: theme.colors.warning + '30',
 									color: theme.colors.warning,
@@ -474,7 +480,7 @@ export const SessionItem = memo(function SessionItem({
 								if (noSession) {
 									return (
 										<span title="No active Claude session">
-											<Circle className="w-3 h-3" style={{ color: theme.colors.textDim }} />
+											<Circle className={iconSize} style={{ color: theme.colors.textDim }} />
 										</span>
 									);
 								}
@@ -484,7 +490,7 @@ export const SessionItem = memo(function SessionItem({
 										return (
 											<span title={session.cliActivity ? 'CLI: Running task' : 'Agent is thinking'}>
 												<Loader2
-													className="w-3 h-3 animate-spin"
+													className={`${iconSize} animate-spin`}
 													style={{ color: theme.colors.warning }}
 												/>
 											</span>
@@ -493,7 +499,7 @@ export const SessionItem = memo(function SessionItem({
 										return (
 											<span title="Waiting for input">
 												<div
-													className="w-3 h-3 rounded-full animate-accent-ring"
+													className={`${iconSize} rounded-full animate-accent-ring`}
 													style={
 														{
 															backgroundColor: theme.colors.accent,
@@ -506,7 +512,10 @@ export const SessionItem = memo(function SessionItem({
 									case 'connecting':
 										return (
 											<span title="Attempting to establish connection">
-												<RefreshCw className="w-3 h-3 animate-spin" style={{ color: '#ff8800' }} />
+												<RefreshCw
+													className={`${iconSize} animate-spin`}
+													style={{ color: '#ff8800' }}
+												/>
 											</span>
 										);
 									case 'error':
@@ -514,7 +523,7 @@ export const SessionItem = memo(function SessionItem({
 											return (
 												<span title={`Error: ${session.agentError.message}`}>
 													<AlertTriangle
-														className="w-3 h-3"
+														className={iconSize}
 														style={{ color: theme.colors.error }}
 													/>
 												</span>
@@ -522,7 +531,7 @@ export const SessionItem = memo(function SessionItem({
 										}
 										return (
 											<span title="Agent not running">
-												<Circle className="w-3 h-3" style={{ color: theme.colors.error }} />
+												<Circle className={iconSize} style={{ color: theme.colors.error }} />
 											</span>
 										);
 									case 'idle':
@@ -531,7 +540,7 @@ export const SessionItem = memo(function SessionItem({
 											return (
 												<span title="Unread messages">
 													<div
-														className="w-2.5 h-2.5 rounded-full"
+														className={`${dotSize} rounded-full`}
 														style={{ backgroundColor: theme.colors.accent }}
 													/>
 												</span>
@@ -540,7 +549,7 @@ export const SessionItem = memo(function SessionItem({
 										return (
 											<span title="Ready">
 												<div
-													className={`w-2.5 h-2.5 rounded-full${showCompletionPulse ? ' animate-highlight-pulse' : ''}`}
+													className={`${dotSize} rounded-full${showCompletionPulse ? ' animate-highlight-pulse' : ''}`}
 													style={
 														{
 															backgroundColor: theme.colors.success,
