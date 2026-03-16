@@ -470,6 +470,42 @@ export const RightPanel = memo(
 						newRef = 'Working Tree';
 						const result = await window.maestro.git.diff(cwd, filePath);
 						rawDiff = result.stdout || undefined;
+						// Untracked files (??) produce empty git diff — read file content instead
+						if (!rawDiff) {
+							const fullPath = cwd.endsWith('/') ? cwd + filePath : cwd + '/' + filePath;
+							const content = await window.maestro.fs.readFile(fullPath, sshRemoteId);
+							if (content) {
+								oldRef = '/dev/null';
+								newRef = 'New File';
+								oldContent = '';
+								newContent = content;
+								// Build git-format rawDiff so react-diff-view's parseDiff can parse it
+								// (parseDiff requires "diff --git" headers; createTwoFilesPatch uses "Index:" headers which are ignored)
+								const contentLines = content.split('\n');
+								const hasTrailingNewline = content.endsWith('\n');
+								const addedLines = contentLines
+									.filter(
+										(_, i) =>
+											!(
+												hasTrailingNewline &&
+												i === contentLines.length - 1 &&
+												contentLines[i] === ''
+											)
+									)
+									.map((l) => '+' + l)
+									.join('\n');
+								const lineCount = addedLines.split('\n').length;
+								rawDiff = [
+									`diff --git a/${filePath} b/${filePath}`,
+									'new file mode 100644',
+									'--- /dev/null',
+									`+++ b/${filePath}`,
+									`@@ -0,0 +1,${lineCount} @@`,
+									addedLines,
+									...(hasTrailingNewline ? [] : ['\\ No newline at end of file']),
+								].join('\n');
+							}
+						}
 					} else if (diffType === 'committed') {
 						// Use `git diff mergeBase...HEAD -- file` for committed changes
 						const base = changesPanel.mergeBase || changesPanel.baseBranch || 'main';

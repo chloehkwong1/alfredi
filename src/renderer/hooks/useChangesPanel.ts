@@ -262,11 +262,26 @@ export function useChangesPanel(
 						);
 					}
 				} else {
-					// On the default branch — no committed changes to show
+					// On the default branch — no branch diff, but still show commit log
 					setCommittedFiles([]);
-					setAllCommits([]);
 					setBranchCommits([]);
 					setMergeBaseRef(undefined);
+
+					const logResult = await window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId);
+					if (!mountedRef.current) return;
+					if (!logResult.error) {
+						setAllCommits(
+							logResult.entries.map((e) => ({
+								hash: e.hash,
+								shortHash: e.shortHash,
+								author: e.author,
+								date: e.date,
+								subject: e.subject,
+							}))
+						);
+					} else {
+						setAllCommits([]);
+					}
 				}
 			} catch {
 				// getDefaultBranch or mergeBase may fail for repos without remotes
