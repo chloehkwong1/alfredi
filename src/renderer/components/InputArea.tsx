@@ -53,6 +53,8 @@ interface InputAreaProps {
 	stagedImages: string[];
 	setStagedImages: React.Dispatch<React.SetStateAction<string[]>>;
 	stagedFiles?: StagedFile[];
+	stagedQuotes?: string[];
+	setStagedQuotes?: React.Dispatch<React.SetStateAction<string[]>>;
 	setStagedFiles?: (files: StagedFile[] | ((prev: StagedFile[]) => StagedFile[])) => void;
 	setLightboxImage: (
 		image: string | null,
@@ -169,6 +171,8 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		setStagedImages,
 		stagedFiles,
 		setStagedFiles,
+		stagedQuotes,
+		setStagedQuotes,
 		setLightboxImage,
 		commandHistoryOpen,
 		setCommandHistoryOpen,
@@ -258,6 +262,9 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 			el.focus();
 		}
 	}, []);
+
+	// Track which staged quotes are expanded (click-to-expand)
+	const [expandedQuotes, setExpandedQuotes] = useState<Set<number>>(new Set());
 
 	// Get agent capabilities for conditional feature rendering
 	const { hasCapability } = useAgentCapabilities(session.toolType);
@@ -624,6 +631,49 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 									setStagedFiles?.((prev) => prev.filter((_, i) => i !== idx));
 								}}
 								className="shrink-0 hover:text-red-400 transition-colors opacity-60 hover:opacity-100 outline-none"
+							>
+								<X className="w-3 h-3" />
+							</button>
+						</div>
+					))}
+				</div>
+			)}
+
+			{/* Staged quotes from selection quoting */}
+			{session.inputMode === 'ai' && stagedQuotes && stagedQuotes.length > 0 && (
+				<div className="flex flex-col gap-2 mb-2">
+					{stagedQuotes.map((quote, idx) => (
+						<div
+							key={idx}
+							className="relative border-l-[3px] pl-3 pr-6 py-1.5 text-sm font-mono animate-in slide-in-from-bottom-1"
+							style={{
+								borderLeftColor: theme.colors.accent,
+								color: theme.colors.textDim,
+							}}
+						>
+							<div
+								className={`whitespace-pre-wrap ${expandedQuotes.has(idx) ? '' : 'max-h-[4.5rem] overflow-hidden'} cursor-pointer`}
+								onClick={() =>
+									setExpandedQuotes((prev) => {
+										const next = new Set(prev);
+										if (next.has(idx)) next.delete(idx);
+										else next.add(idx);
+										return next;
+									})
+								}
+							>
+								{quote}
+							</div>
+							<button
+								onClick={() => setStagedQuotes?.((prev) => prev.filter((_, i) => i !== idx))}
+								className="absolute top-1 right-1 p-0.5 rounded opacity-40 hover:opacity-100 transition-opacity outline-none"
+								style={{
+									color: theme.colors.textDim,
+								}}
+								onMouseEnter={(e) =>
+									(e.currentTarget.style.color = theme.colors.error ?? '#ef4444')
+								}
+								onMouseLeave={(e) => (e.currentTarget.style.color = theme.colors.textDim)}
 							>
 								<X className="w-3 h-3" />
 							</button>

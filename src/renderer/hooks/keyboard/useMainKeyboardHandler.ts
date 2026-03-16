@@ -405,6 +405,16 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'instant' });
 				}
 				trackShortcut('jumpToBottom');
+			} else if (ctx.isShortcut(e, 'quoteSelection')) {
+				e.preventDefault();
+				const selection = window.getSelection();
+				if (selection && !selection.isCollapsed && ctx.activeSession?.inputMode === 'ai') {
+					window.dispatchEvent(
+						new CustomEvent('maestro:quoteSelection', { detail: selection.toString() })
+					);
+					selection.removeAllRanges();
+				}
+				trackShortcut('quoteSelection');
 			} else if (ctx.isShortcut(e, 'toggleMarkdownMode')) {
 				// Toggle markdown raw mode for AI message history
 				// Note: FilePreview handles its own Cmd+E with stopPropagation when focused,

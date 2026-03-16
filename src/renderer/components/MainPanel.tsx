@@ -166,7 +166,7 @@ interface MainPanelProps {
 	terminalOutputRef: React.RefObject<HTMLDivElement>;
 
 	// Functions
-	processInput: () => void;
+	processInput: (overrideInputValue?: string) => void;
 	handleInterrupt: () => void;
 	handleInputKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
 	handlePaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
@@ -451,6 +451,44 @@ export const MainPanel = React.memo(
 			// Inline wizard exit handler
 			onExitWizard,
 		} = props;
+
+		// Staged quotes for selection quoting into input
+		const [stagedQuotes, setStagedQuotes] = useState<string[]>([]);
+
+		// Wrap processInput to prepend staged quotes as markdown blockquotes
+		const processInputWithQuotes = useCallback(
+			(overrideInputValue?: string) => {
+				if (stagedQuotes.length > 0) {
+					const currentInput = overrideInputValue ?? inputValue;
+					const quotedText = stagedQuotes
+						.map((q) =>
+							q
+								.split('\n')
+								.map((line) => `> ${line}`)
+								.join('\n')
+						)
+						.join('\n\n');
+					const combined = currentInput.trim() ? quotedText + '\n\n' + currentInput : quotedText;
+					setStagedQuotes([]);
+					processInput(combined);
+				} else {
+					processInput(overrideInputValue);
+				}
+			},
+			[stagedQuotes, inputValue, processInput]
+		);
+
+		// Listen for keyboard shortcut quote selection events (Cmd+Shift+Q)
+		useEffect(() => {
+			const handler = (e: Event) => {
+				const text = (e as CustomEvent<string>).detail;
+				if (text) {
+					setStagedQuotes((prev) => [...prev, text]);
+				}
+			};
+			window.addEventListener('maestro:quoteSelection', handler);
+			return () => window.removeEventListener('maestro:quoteSelection', handler);
+		}, []);
 
 		// Phase 3C: Direct store subscriptions (migrated from props)
 		const fontFamily = useSettingsStore((s) => s.fontFamily);
@@ -2059,6 +2097,8 @@ export const MainPanel = React.memo(
 											setStagedImages={setStagedImages}
 											stagedFiles={stagedFiles}
 											setStagedFiles={setStagedFiles}
+											stagedQuotes={stagedQuotes}
+											setStagedQuotes={setStagedQuotes}
 											setLightboxImage={setLightboxImage}
 											commandHistoryOpen={commandHistoryOpen}
 											setCommandHistoryOpen={setCommandHistoryOpen}
@@ -2091,7 +2131,7 @@ export const MainPanel = React.memo(
 											handleInputKeyDown={handleInputKeyDown}
 											handlePaste={handlePaste}
 											handleDrop={handleDrop}
-											processInput={processInput}
+											processInput={processInputWithQuotes}
 											handleInterrupt={handleInterrupt}
 											onInputFocus={handleInputFocus}
 											onInputBlur={props.onInputBlur}
@@ -2347,6 +2387,7 @@ export const MainPanel = React.memo(
 											markdownEditMode={chatRawTextMode}
 											setMarkdownEditMode={useSettingsStore.getState().setChatRawTextMode}
 											onReplayMessage={props.onReplayMessage}
+											onQuote={(text) => setStagedQuotes((prev) => [...prev, text])}
 											fileTree={props.fileTree}
 											cwd={
 												activeSession.cwd.startsWith(activeSession.fullPath)
@@ -2382,6 +2423,8 @@ export const MainPanel = React.memo(
 											setStagedImages={setStagedImages}
 											stagedFiles={stagedFiles}
 											setStagedFiles={setStagedFiles}
+											stagedQuotes={stagedQuotes}
+											setStagedQuotes={setStagedQuotes}
 											setLightboxImage={setLightboxImage}
 											commandHistoryOpen={commandHistoryOpen}
 											setCommandHistoryOpen={setCommandHistoryOpen}

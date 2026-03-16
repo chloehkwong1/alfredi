@@ -63,6 +63,7 @@ export const DEFAULT_SHORTCUTS: Record<string, Shortcut> = {
 		keys: ['Alt', 'Meta', 's'],
 	},
 	usagePanel: { id: 'usagePanel', label: 'Usage Panel', keys: ['Alt', 'Meta', 'u'] },
+	quoteSelection: { id: 'quoteSelection', label: 'Quote Selection', keys: ['Meta', 'Shift', 'q'] },
 };
 
 // Non-editable shortcuts (displayed in help but not configurable)

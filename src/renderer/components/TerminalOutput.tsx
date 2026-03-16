@@ -42,6 +42,8 @@ import { LogFilterControls } from './LogFilterControls';
 import { SaveMarkdownModal } from './SaveMarkdownModal';
 import { generateTerminalProseStyles } from '../utils/markdownConfig';
 import { safeClipboardWrite } from '../utils/clipboard';
+import { useTextSelection } from '../hooks/ui';
+import SelectionToolbar from './SelectionToolbar';
 
 // ============================================================================
 // Tool display helpers (pure functions, hoisted out of render path)
@@ -1795,6 +1797,7 @@ interface TerminalOutputProps {
 	markdownEditMode: boolean; // Whether to show raw markdown or rendered markdown for AI responses
 	setMarkdownEditMode: (value: boolean) => void; // Toggle markdown mode
 	onReplayMessage?: (text: string, images?: string[]) => void; // Replay a user message
+	onQuote?: (text: string) => void; // Quote selected text into input
 	fileTree?: FileNode[]; // File tree for linking file references
 	cwd?: string; // Current working directory for proximity-based matching
 	projectRoot?: string; // Project root absolute path for converting absolute paths to relative
@@ -1839,6 +1842,7 @@ export const TerminalOutput = memo(
 			markdownEditMode,
 			setMarkdownEditMode,
 			onReplayMessage,
+			onQuote,
 			fileTree,
 			cwd,
 			projectRoot,
@@ -1943,6 +1947,9 @@ export const TerminalOutput = memo(
 
 		// Scroll container ref for native scrolling
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+		// Text selection tracking for quote/copy toolbar
+		const { selection, clearSelection } = useTextSelection(scrollContainerRef);
 
 		// Track which log entries have been manually collapsed (by log ID) — entries default to expanded
 		const [expandedLogs, setExpandedLogs] = useState<Set<string>>(new Set());
@@ -2776,6 +2783,22 @@ export const TerminalOutput = memo(
 					>
 						Copied to Clipboard
 					</div>
+				)}
+
+				{/* Selection toolbar for quoting / copying highlighted text */}
+				{selection && (
+					<SelectionToolbar
+						theme={theme}
+						rect={selection.rect}
+						onQuote={() => {
+							onQuote?.(selection.text);
+							clearSelection();
+						}}
+						onCopy={() => {
+							safeClipboardWrite(selection.text);
+							clearSelection();
+						}}
+					/>
 				)}
 
 				{/* Save Markdown Modal */}

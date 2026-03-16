@@ -59,3 +59,7 @@ export { useTourActions } from './useTourActions';
 
 // CSS Custom Highlight API search (zero re-render text highlighting)
 export { useHighlightSearch } from './useHighlightSearch';
+
+// Text selection tracking within a container
+export { useTextSelection } from './useTextSelection';
+export type { TextSelection } from './useTextSelection';
