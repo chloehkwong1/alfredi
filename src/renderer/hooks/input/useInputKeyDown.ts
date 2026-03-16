@@ -224,18 +224,11 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 					e.preventDefault();
 					if (filteredCommands[selectedSlashCommandIndex]) {
 						const selectedCommand = filteredCommands[selectedSlashCommandIndex].command;
-						// If Enter on an exact match, execute immediately instead of just filling input
-						if (
-							e.key === 'Enter' &&
-							inputValue.trim().toLowerCase() === selectedCommand.toLowerCase()
-						) {
-							setSlashCommandOpen(false);
-							processInput();
-						} else {
-							setInputValue(selectedCommand);
-							setSlashCommandOpen(false);
-							inputRef.current?.focus();
-						}
+						// Fill in the command with a trailing space so user can add arguments,
+						// then close autocomplete. User presses Enter again to execute.
+						setInputValue(selectedCommand + ' ');
+						setSlashCommandOpen(false);
+						inputRef.current?.focus();
 					}
 				} else if (e.key === 'Escape') {
 					e.preventDefault();

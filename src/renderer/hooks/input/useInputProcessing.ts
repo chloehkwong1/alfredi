@@ -170,6 +170,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				// rather than passing through to the agent (which may not support it or require special permissions)
 				if (commandText === '/history' && onHistoryCommand) {
 					setInputValue('');
+					setStagedImages([]);
 					setSlashCommandOpen(false);
 					syncAiInputToSession('');
 					if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -185,6 +186,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				// Clears the active tab's logs and resets the agent's conversation context
 				if (commandText === '/clear') {
 					setInputValue('');
+					setStagedImages([]);
 					setSlashCommandOpen(false);
 					syncAiInputToSession('');
 					if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -225,6 +227,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					const args = commandText.slice('/wizard'.length).trim();
 
 					setInputValue('');
+					setStagedImages([]);
 					setSlashCommandOpen(false);
 					syncAiInputToSession('');
 					if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -242,6 +245,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					activeSession.toolType === 'claude-code'
 				) {
 					setInputValue('');
+					setStagedImages([]);
 					setSlashCommandOpen(false);
 					syncAiInputToSession('');
 					if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -265,7 +269,10 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					const matchingCustomCommand = customAICommands.find((cmd) => cmd.command === baseCommand);
 					if (matchingCustomCommand) {
 						// Execute the custom AI command by sending its prompt
+						// Capture staged images before clearing (forwarded to agent via QueuedItem)
+						const capturedCommandImages = [...stagedImages];
 						setInputValue('');
+						setStagedImages([]);
 						setSlashCommandOpen(false);
 						syncAiInputToSession(''); // We're in AI mode here (isTerminalMode === false)
 						if (inputRef.current) inputRef.current.style.height = 'auto';
@@ -304,6 +311,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 								command: matchingCustomCommand.command,
 								commandArgs, // Arguments passed after the command (for $ARGUMENTS substitution)
 								commandDescription: matchingCustomCommand.description,
+								images: capturedCommandImages,
 								tabName:
 									activeTab?.name ||
 									(activeTab?.agentSessionId
