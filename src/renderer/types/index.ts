@@ -717,6 +717,7 @@ export interface Session {
 	prTitle?: string;
 	prReviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 	prCheckStatus?: { total: number; passing: number; failing: number; pending: number } | null;
+	prIsDraft?: boolean;
 	worktreeArchivedAt?: number; // Timestamp when moved to Done (for auto-archive countdown)
 	worktreeArchived?: boolean; // True when auto-archived (hidden from sidebar, worktree dir kept on disk)
 	worktreeServerProcessId?: string; // ProcessManager key (e.g., `${sessionId}-server`) when a server is running

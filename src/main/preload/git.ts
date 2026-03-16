@@ -487,6 +487,7 @@ export function createGitApi() {
 			title?: string;
 			reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 			checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
+			isDraft?: boolean;
 		} | null> => ipcRenderer.invoke('git:prStatus', repoPath, branch),
 
 		/**

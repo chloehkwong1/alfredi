@@ -110,7 +110,12 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 			async (cwd: string, sshRemoteId?: string, remoteCwd?: string) => {
 				const sshRemote = getSshRemoteById(sshRemoteId);
 				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
-				const result = await execGit(['status', '--porcelain'], cwd, sshRemote, effectiveRemoteCwd);
+				const result = await execGit(
+					['status', '--porcelain', '-uall'],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
 				return { stdout: result.stdout, stderr: result.stderr };
 			}
 		)
@@ -1851,7 +1856,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						'view',
 						branch,
 						'--json',
-						'state,url,number,headRefName,title,reviewDecision,statusCheckRollup',
+						'state,url,number,headRefName,title,reviewDecision,statusCheckRollup,isDraft',
 					],
 					repoPath
 				);
@@ -1914,6 +1919,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						reviewDecision:
 							(data.reviewDecision as 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED') || null,
 						checkStatus,
+						isDraft: !!data.isDraft,
 					};
 				} catch {
 					logger.warn(

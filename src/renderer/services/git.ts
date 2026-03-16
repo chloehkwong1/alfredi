@@ -309,6 +309,7 @@ export const gitService = {
 		title?: string;
 		reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 		checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
+		isDraft?: boolean;
 	} | null> {
 		return createIpcMethod({
 			call: () => window.maestro.git.getPrStatus(repoPath, branch),

@@ -39,6 +39,7 @@ import { CommitDiffView } from './CommitDiffView';
 import { ProjectDashboard } from './ProjectDashboard';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
+import { GitWorkflowPill } from './GitWorkflowPill';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
 import { WizardConversationView, DocumentGenerationView } from './InlineWizard';
@@ -1394,6 +1395,20 @@ export const MainPanel = React.memo(
 											)}
 										</div>
 									</div>
+
+									{/* Git Workflow Pills - shows local state + PR state as compact dot+text */}
+									{activeSession.isGitRepo && (
+										<GitWorkflowPill
+											sessionId={activeSession.id}
+											isGitRepo={activeSession.isGitRepo}
+											isDefaultBranch={isOnDefaultBranch}
+											prNumber={activeSession.prNumber}
+											prIsDraft={activeSession.prIsDraft}
+											prReviewDecision={activeSession.prReviewDecision}
+											prCheckStatus={activeSession.prCheckStatus}
+											theme={theme}
+										/>
+									)}
 
 									{/* Git Status Widget - compact mode handled via CSS container queries */}
 									<GitStatusWidget

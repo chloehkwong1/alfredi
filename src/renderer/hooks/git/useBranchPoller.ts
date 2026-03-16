@@ -84,6 +84,7 @@ export function useBranchPoller(): void {
 								prTitle: undefined,
 								prReviewDecision: undefined,
 								prCheckStatus: undefined,
+								prIsDraft: undefined,
 							});
 						}
 						return;
@@ -98,6 +99,7 @@ export function useBranchPoller(): void {
 						updates.prReviewDecision = prStatus.reviewDecision;
 					// Always update checkStatus (object comparison not worth the complexity)
 					updates.prCheckStatus = prStatus.checkStatus;
+					if (latest.prIsDraft !== prStatus.isDraft) updates.prIsDraft = prStatus.isDraft;
 
 					if (Object.keys(updates).length > 0) {
 						updateSession(session.id, updates);
