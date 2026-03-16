@@ -411,7 +411,8 @@ interface MaestroAPI {
 			cwd: string,
 			file?: string,
 			sshRemoteId?: string,
-			remoteCwd?: string
+			remoteCwd?: string,
+			contextLines?: number
 		) => Promise<{ stdout: string; stderr: string }>;
 		diffRefs: (
 			cwd: string,
@@ -419,13 +420,15 @@ interface MaestroAPI {
 			headRef?: string,
 			file?: string,
 			sshRemoteId?: string,
-			remoteCwd?: string
+			remoteCwd?: string,
+			contextLines?: number
 		) => Promise<{ stdout: string; stderr: string }>;
 		diffStaged: (
 			cwd: string,
 			file?: string,
 			sshRemoteId?: string,
-			remoteCwd?: string
+			remoteCwd?: string,
+			contextLines?: number
 		) => Promise<{ stdout: string; stderr: string }>;
 		mergeBase: (
 			cwd: string,
@@ -793,6 +796,10 @@ interface MaestroAPI {
 			sshRemoteId?: string,
 			initialCols?: number
 		) => Promise<{ success: boolean; processId?: string; error?: string }>;
+		/**
+		 * List running worktree server processIds (for reconciliation after renderer reload)
+		 */
+		getRunningServers: () => Promise<{ processIds: string[] }>;
 		/**
 		 * Stop a running worktree server process
 		 */

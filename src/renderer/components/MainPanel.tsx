@@ -40,6 +40,7 @@ import { ProjectDashboard } from './ProjectDashboard';
 import { ErrorBoundary } from './ErrorBoundary';
 import { GitStatusWidget } from './GitStatusWidget';
 import { GitWorkflowPill } from './GitWorkflowPill';
+import { derivePrStatus } from '../utils/gitWorkflowState';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
 import { WizardConversationView, DocumentGenerationView } from './InlineWizard';
@@ -1396,16 +1397,11 @@ export const MainPanel = React.memo(
 										</div>
 									</div>
 
-									{/* Git Workflow Pills - shows local state + PR state as compact dot+text */}
+									{/* Git Workflow Pill - shows local state (uncommitted/unpushed) */}
 									{activeSession.isGitRepo && (
 										<GitWorkflowPill
 											sessionId={activeSession.id}
 											isGitRepo={activeSession.isGitRepo}
-											isDefaultBranch={isOnDefaultBranch}
-											prNumber={activeSession.prNumber}
-											prIsDraft={activeSession.prIsDraft}
-											prReviewDecision={activeSession.prReviewDecision}
-											prCheckStatus={activeSession.prCheckStatus}
 											theme={theme}
 										/>
 									)}
@@ -1475,7 +1471,43 @@ export const MainPanel = React.memo(
 									className="flex items-center gap-3 justify-end shrink-0 ml-3"
 									style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
 								>
-									{/* Server Run/Stop Pill - only shown for worktrees with runScript configured */}
+									{/* PR Status Chip - only shown on feature branches with an open PR */}
+									{activeSession.isGitRepo &&
+										!isOnDefaultBranch &&
+										(() => {
+											const prStatus = derivePrStatus({
+												prNumber: activeSession.prNumber,
+												prIsDraft: activeSession.prIsDraft,
+												prReviewDecision: activeSession.prReviewDecision,
+												prCheckStatus: activeSession.prCheckStatus,
+											});
+											if (!prStatus) return null;
+											const prColor = theme.colors[prStatus.colorKey];
+											const clickable = !!activeSession.prUrl;
+											return (
+												<button
+													className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1"
+													style={{
+														backgroundColor: prColor + '20',
+														color: prColor,
+														borderColor: prColor + '30',
+														cursor: clickable ? 'pointer' : 'default',
+													}}
+													title={clickable ? `Open ${prStatus.label} in browser` : prStatus.label}
+													onClick={(e) => {
+														e.stopPropagation();
+														if (activeSession.prUrl) {
+															window.maestro.shell.openExternal(activeSession.prUrl);
+														}
+													}}
+												>
+													<GitPullRequest className="w-2.5 h-2.5" />
+													{prStatus.label}
+												</button>
+											);
+										})()}
+
+									{/* Server Run/Stop Chip - only shown for worktrees with runScript configured */}
 									{activeSessionRunScript && (
 										<button
 											className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1"
@@ -1499,12 +1531,12 @@ export const MainPanel = React.memo(
 											{isServerRunning ? (
 												<>
 													<Square className="w-2.5 h-2.5" fill="currentColor" />
-													SERVER
+													Server
 												</>
 											) : (
 												<>
 													<Play className="w-2.5 h-2.5" fill="currentColor" />
-													SERVER
+													Server
 												</>
 											)}
 										</button>
@@ -2180,6 +2212,8 @@ export const MainPanel = React.memo(
 											}
 										}, 50);
 									}}
+									cwd={activeSession?.cwd}
+									sshRemoteId={filePreviewSshRemoteId}
 								/>
 							</div>
 						) : activeSession.inputMode === 'ai' &&

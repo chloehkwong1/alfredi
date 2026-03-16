@@ -125,8 +125,20 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		'git:diff',
 		withIpcErrorLogging(
 			handlerOpts('diff'),
-			async (cwd: string, file?: string, sshRemoteId?: string, remoteCwd?: string) => {
-				const args = file ? ['diff', file] : ['diff'];
+			async (
+				cwd: string,
+				file?: string,
+				sshRemoteId?: string,
+				remoteCwd?: string,
+				contextLines?: number
+			) => {
+				const args = ['diff'];
+				if (contextLines !== undefined && contextLines > 0) {
+					args.push(`-U${contextLines}`);
+				}
+				if (file) {
+					args.push(file);
+				}
 				const sshRemote = getSshRemoteById(sshRemoteId);
 				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
 				const result = await execGit(args, cwd, sshRemote, effectiveRemoteCwd);
@@ -146,12 +158,17 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				headRef?: string,
 				file?: string,
 				sshRemoteId?: string,
-				remoteCwd?: string
+				remoteCwd?: string,
+				contextLines?: number
 			) => {
 				const sshRemote = getSshRemoteById(sshRemoteId);
 				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
 				const refSpec = headRef ? `${baseRef}...${headRef}` : baseRef;
-				const args = ['diff', refSpec];
+				const args = ['diff'];
+				if (contextLines !== undefined && contextLines > 0) {
+					args.push(`-U${contextLines}`);
+				}
+				args.push(refSpec);
 				if (file) {
 					args.push('--', file);
 				}
@@ -166,10 +183,20 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		'git:diffStaged',
 		withIpcErrorLogging(
 			handlerOpts('diffStaged'),
-			async (cwd: string, file?: string, sshRemoteId?: string, remoteCwd?: string) => {
+			async (
+				cwd: string,
+				file?: string,
+				sshRemoteId?: string,
+				remoteCwd?: string,
+				contextLines?: number
+			) => {
 				const sshRemote = getSshRemoteById(sshRemoteId);
 				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
-				const args = ['diff', '--cached'];
+				const args = ['diff'];
+				if (contextLines !== undefined && contextLines > 0) {
+					args.push(`-U${contextLines}`);
+				}
+				args.push('--cached');
 				if (file) {
 					args.push('--', file);
 				}
@@ -1877,21 +1904,36 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						pending: number;
 					} | null = null;
 					if (Array.isArray(data.statusCheckRollup) && data.statusCheckRollup.length > 0) {
-						const counts = { total: 0, passing: 0, failing: 0, pending: 0 };
+						// Deduplicate by check name — re-runs produce multiple entries
+						// and stale failures cause false "Checks failing" status.
+						const latestByName = new Map<string, (typeof data.statusCheckRollup)[number]>();
 						for (const check of data.statusCheckRollup) {
+							const name = check.name || check.context || `__unnamed_${latestByName.size}`;
+							const existing = latestByName.get(name);
+							if (
+								!existing ||
+								(check.completedAt || check.startedAt || '') >
+									(existing.completedAt || existing.startedAt || '')
+							) {
+								latestByName.set(name, check);
+							}
+						}
+
+						const counts = { total: 0, passing: 0, failing: 0, pending: 0 };
+						for (const check of latestByName.values()) {
 							counts.total++;
 							const conclusion = (check.conclusion || '').toUpperCase();
 							const status = (check.status || '').toUpperCase();
 							if (
 								conclusion === 'SUCCESS' ||
 								conclusion === 'NEUTRAL' ||
-								conclusion === 'SKIPPED'
+								conclusion === 'SKIPPED' ||
+								conclusion === 'CANCELLED'
 							) {
 								counts.passing++;
 							} else if (
 								conclusion === 'FAILURE' ||
 								conclusion === 'TIMED_OUT' ||
-								conclusion === 'CANCELLED' ||
 								conclusion === 'ACTION_REQUIRED'
 							) {
 								counts.failing++;
@@ -2095,6 +2137,20 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				}
 			}
 		)
+	);
+
+	// List running worktree server processes (for reconciliation after renderer reload)
+	ipcMain.handle(
+		'worktree:getRunningServers',
+		createIpcHandler(handlerOpts('getRunningServers'), async () => {
+			const pm = gitGetProcessManager?.();
+			if (!pm) return { processIds: [] };
+			const processIds = pm
+				.getAll()
+				.filter((p) => p.toolType === 'worktree-server')
+				.map((p) => p.sessionId); // e.g. "session-123-server"
+			return { processIds };
+		})
 	);
 
 	// Stop a running worktree server process

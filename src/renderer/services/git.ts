@@ -77,17 +77,30 @@ export const gitService = {
 	 * @param files Optional list of files to get diff for
 	 * @param sshRemoteId Optional SSH remote ID for remote execution
 	 */
-	async getDiff(cwd: string, files?: string[], sshRemoteId?: string): Promise<GitDiff> {
+	async getDiff(
+		cwd: string,
+		files?: string[],
+		sshRemoteId?: string,
+		contextLines?: number
+	): Promise<GitDiff> {
 		return createIpcMethod({
 			call: async () => {
 				// If no files specified, get full diff
 				if (!files || files.length === 0) {
-					const result = await window.maestro.git.diff(cwd, undefined, sshRemoteId);
+					const result = await window.maestro.git.diff(
+						cwd,
+						undefined,
+						sshRemoteId,
+						undefined,
+						contextLines
+					);
 					return { diff: result.stdout };
 				}
 				// Otherwise get diff for specific files
 				const results = await Promise.all(
-					files.map((file) => window.maestro.git.diff(cwd, file, sshRemoteId))
+					files.map((file) =>
+						window.maestro.git.diff(cwd, file, sshRemoteId, undefined, contextLines)
+					)
 				);
 				return { diff: results.map((result) => result.stdout).join('\n') };
 			},

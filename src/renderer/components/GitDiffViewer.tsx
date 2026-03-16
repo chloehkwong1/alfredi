@@ -1,14 +1,55 @@
 import { useState, useMemo, useEffect, useRef, useCallback, memo } from 'react';
-import { Diff, Hunk, getChangeKey } from 'react-diff-view';
+import { Diff, Hunk, Decoration, getChangeKey } from 'react-diff-view';
 import type { ChangeData, HunkData, ChangeEventArgs, EventMap } from 'react-diff-view';
-import { Plus, Minus, ImageIcon, MessageSquare } from 'lucide-react';
+import type { ReactElement } from 'react';
+import {
+	Plus,
+	Minus,
+	ImageIcon,
+	MessageSquare,
+	ChevronUp,
+	ChevronDown,
+	ChevronsUpDown,
+} from 'lucide-react';
 import type { Theme } from '../types';
 import { parseGitDiff, getFileName, getDiffStats } from '../utils/gitDiffParser';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { ImageDiffViewer } from './ImageDiffViewer';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
+import { gitService } from '../services/git';
 import 'react-diff-view/style/index.css';
+
+const CONTEXT_INCREMENT = 10;
+
+interface ExpandButtonProps {
+	direction: 'up' | 'down' | 'both';
+	onClick: () => void;
+	color: string;
+}
+
+function ExpandButton({ direction, onClick, color }: ExpandButtonProps) {
+	const Icon = direction === 'up' ? ChevronUp : direction === 'down' ? ChevronDown : ChevronsUpDown;
+	const label =
+		direction === 'up'
+			? 'Show more lines above'
+			: direction === 'down'
+				? 'Show more lines below'
+				: 'Show more lines';
+
+	return (
+		<div
+			className="diff-expand-button flex items-center justify-center py-1 cursor-pointer select-none transition-colors"
+			onClick={onClick}
+			title={label}
+		>
+			<div className="flex items-center gap-1 text-xs" style={{ color }}>
+				<Icon className="w-3 h-3" />
+				<span>Expand</span>
+			</div>
+		</div>
+	);
+}
 
 interface GitDiffViewerProps {
 	diffText: string;
@@ -16,6 +57,7 @@ interface GitDiffViewerProps {
 	theme: Theme;
 	onClose: () => void;
 	onAskAboutLines?: (context: string) => void;
+	sshRemoteId?: string;
 }
 
 export const GitDiffViewer = memo(function GitDiffViewer({
@@ -24,18 +66,32 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 	theme,
 	onClose,
 	onAskAboutLines,
+	sshRemoteId,
 }: GitDiffViewerProps) {
 	const [activeTab, setActiveTab] = useState(0);
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 	const { registerLayer, unregisterLayer, updateLayerHandler } = useLayerStack();
 	const layerIdRef = useRef<string>();
 
+	// Context expansion state
+	const [contextLines, setContextLines] = useState(0); // 0 = default git context (3 lines)
+	const [expandedDiffText, setExpandedDiffText] = useState<string | null>(null);
+	const [isExpanding, setIsExpanding] = useState(false);
+
 	// Store onClose in ref to avoid re-registering layer on every parent re-render
 	const onCloseRef = useRef(onClose);
 	onCloseRef.current = onClose;
 
+	// Reset context when diffText changes (new diff opened)
+	useEffect(() => {
+		setContextLines(0);
+		setExpandedDiffText(null);
+	}, [diffText]);
+
+	const effectiveDiffText = expandedDiffText ?? diffText;
+
 	// Parse the diff into separate files
-	const parsedFiles = useMemo(() => parseGitDiff(diffText), [diffText]);
+	const parsedFiles = useMemo(() => parseGitDiff(effectiveDiffText), [effectiveDiffText]);
 
 	// Register layer on mount
 	// Note: Using 'modal' type so App.tsx blocks all shortcuts and lets this component
@@ -221,6 +277,25 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [selectedChangeKeys, onAskAboutLines, handleAskAboutSelection]);
+
+	// Handle expanding context lines by re-fetching the diff with more context
+	const handleExpandContext = useCallback(async () => {
+		if (isExpanding) return;
+		const newContextLines =
+			contextLines === 0 ? CONTEXT_INCREMENT + 3 : contextLines + CONTEXT_INCREMENT;
+		setIsExpanding(true);
+		try {
+			const result = await gitService.getDiff(cwd, undefined, sshRemoteId, newContextLines);
+			if (result.diff) {
+				setExpandedDiffText(result.diff);
+				setContextLines(newContextLines);
+			}
+		} catch {
+			// Silently fail — keep existing diff
+		} finally {
+			setIsExpanding(false);
+		}
+	}, [cwd, sshRemoteId, contextLines, isExpanding]);
 
 	if (parsedFiles.length === 0) {
 		return (
@@ -415,7 +490,54 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 										gutterEvents={gutterEvents}
 										codeEvents={codeEvents}
 									>
-										{(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
+										{(hunks) =>
+											hunks.flatMap((hunk, hunkIndex) => {
+												const elements: ReactElement[] = [];
+
+												// Expand-up button before first hunk
+												if (hunkIndex === 0 && hunk.oldStart > 1) {
+													elements.push(
+														<Decoration key={`expand-top-${hunkIndex}`}>
+															<ExpandButton
+																direction="up"
+																onClick={handleExpandContext}
+																color={theme.colors.textDim}
+															/>
+														</Decoration>
+													);
+												}
+
+												elements.push(<Hunk key={hunk.content} hunk={hunk} />);
+
+												// Expand button between hunks (gap)
+												if (hunkIndex < hunks.length - 1) {
+													elements.push(
+														<Decoration key={`expand-between-${hunkIndex}`}>
+															<ExpandButton
+																direction="both"
+																onClick={handleExpandContext}
+																color={theme.colors.textDim}
+															/>
+														</Decoration>
+													);
+												}
+
+												// Expand-down button after last hunk
+												if (hunkIndex === hunks.length - 1) {
+													elements.push(
+														<Decoration key={`expand-bottom-${hunkIndex}`}>
+															<ExpandButton
+																direction="down"
+																onClick={handleExpandContext}
+																color={theme.colors.textDim}
+															/>
+														</Decoration>
+													);
+												}
+
+												return elements;
+											})
+										}
 									</Diff>
 								</div>
 							))}

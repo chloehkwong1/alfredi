@@ -17,6 +17,7 @@ import {
 import type { Theme, DiffViewTab } from '../types';
 import { getDiffStats } from '../utils/gitDiffParser';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
+import { gitService } from '../services/git';
 import 'react-diff-view/style/index.css';
 
 const CONTEXT_INCREMENT = 10;
@@ -81,6 +82,8 @@ interface DiffPreviewProps {
 	onViewModeChange: (mode: 'unified' | 'split') => void;
 	onScrollPositionChange?: (scrollTop: number) => void;
 	onAskAboutLines?: (context: string) => void;
+	cwd?: string;
+	sshRemoteId?: string;
 }
 
 export const DiffPreview = memo(function DiffPreview({
@@ -90,14 +93,21 @@ export const DiffPreview = memo(function DiffPreview({
 	onViewModeChange,
 	onScrollPositionChange,
 	onAskAboutLines,
+	cwd,
+	sshRemoteId,
 }: DiffPreviewProps) {
 	const contentRef = useRef<HTMLDivElement>(null);
 	const [viewMode, setViewMode] = useState<'unified' | 'split'>(diff.viewMode);
 	const [contextLines, setContextLines] = useState(DEFAULT_CONTEXT);
 
-	// Reset context lines when switching to a different diff
+	// State for git-refetched diff (when only rawDiff is available, no full content)
+	const [expandedRawDiff, setExpandedRawDiff] = useState<string | null>(null);
+	const [isExpanding, setIsExpanding] = useState(false);
+
+	// Reset context lines and expanded diff when switching to a different diff
 	useEffect(() => {
 		setContextLines(DEFAULT_CONTEXT);
+		setExpandedRawDiff(null);
 	}, [diff.id]);
 
 	// Sync local viewMode with prop changes (e.g., tab switch restoring saved mode)
@@ -133,6 +143,11 @@ export const DiffPreview = memo(function DiffPreview({
 		if (isBinary) return [];
 
 		try {
+			// If we have an expanded raw diff from git refetch, use it
+			if (expandedRawDiff) {
+				return parseDiff(expandedRawDiff);
+			}
+
 			// Use pre-computed raw diff when available, but only at default context level.
 			// When user expands context, regenerate from full content.
 			if (diff.rawDiff && contextLines <= DEFAULT_CONTEXT) {
@@ -160,6 +175,7 @@ export const DiffPreview = memo(function DiffPreview({
 		diff.oldRef,
 		diff.newRef,
 		diff.rawDiff,
+		expandedRawDiff,
 		isBinary,
 		contextLines,
 	]);
@@ -295,16 +311,71 @@ export const DiffPreview = memo(function DiffPreview({
 
 	// Skip expand UI for new files (no old content), deleted files (no new content),
 	// or binary files — there's no meaningful context to expand into
+	const hasFullContent = !!diff.oldContent && !!diff.newContent;
+	const canRefetchFromGit = !!cwd && !!diff.rawDiff && !hasFullContent;
 	const canExpand = useMemo(() => {
 		if (isBinary) return false;
-		const hasOld = !!diff.oldContent;
-		const hasNew = !!diff.newContent;
-		return hasOld && hasNew;
-	}, [isBinary, diff.oldContent, diff.newContent]);
+		return hasFullContent || canRefetchFromGit;
+	}, [isBinary, hasFullContent, canRefetchFromGit]);
 
-	const handleExpandContext = useCallback(() => {
-		setContextLines((prev) => prev + CONTEXT_INCREMENT);
-	}, []);
+	const handleExpandContext = useCallback(async () => {
+		if (hasFullContent) {
+			// Content-based expansion: regenerate diff with more context lines
+			setContextLines((prev) => prev + CONTEXT_INCREMENT);
+		} else if (canRefetchFromGit && !isExpanding) {
+			// Git-refetch expansion: re-run git diff with -U<n>
+			const newContextLines =
+				contextLines <= DEFAULT_CONTEXT
+					? CONTEXT_INCREMENT + DEFAULT_CONTEXT
+					: contextLines + CONTEXT_INCREMENT;
+			setIsExpanding(true);
+			try {
+				let result: { diff: string };
+				if (diff.diffType === 'uncommitted-staged') {
+					const r = await window.maestro.git.diffStaged(
+						cwd!,
+						diff.filePath,
+						sshRemoteId,
+						undefined,
+						newContextLines
+					);
+					result = { diff: r.stdout };
+				} else if (diff.diffType === 'committed' || diff.diffType === 'commit') {
+					const r = await window.maestro.git.diffRefs(
+						cwd!,
+						diff.oldRef,
+						'HEAD',
+						diff.filePath,
+						sshRemoteId,
+						undefined,
+						newContextLines
+					);
+					result = { diff: r.stdout };
+				} else {
+					// Default: unstaged
+					result = await gitService.getDiff(cwd!, [diff.filePath], sshRemoteId, newContextLines);
+				}
+				if (result.diff) {
+					setExpandedRawDiff(result.diff);
+					setContextLines(newContextLines);
+				}
+			} catch {
+				// Silently fail — keep existing diff
+			} finally {
+				setIsExpanding(false);
+			}
+		}
+	}, [
+		hasFullContent,
+		canRefetchFromGit,
+		isExpanding,
+		contextLines,
+		cwd,
+		sshRemoteId,
+		diff.diffType,
+		diff.filePath,
+		diff.oldRef,
+	]);
 
 	// Compute stats
 	const stats = useMemo(() => getDiffStats(parsedFiles), [parsedFiles]);
@@ -442,7 +513,9 @@ export const DiffPreview = memo(function DiffPreview({
 						<style>{generateDiffViewStyles(theme)}</style>
 						{parsedFiles.map((file, fileIndex) => {
 							// Check if all context is already shown (single hunk covering the whole file)
+							// Only possible when we have full file content to compare against
 							const allContextShown =
+								hasFullContent &&
 								file.hunks.length === 1 &&
 								file.hunks[0].oldStart === 1 &&
 								file.hunks[0].oldLines >= maxFileLines - 1;

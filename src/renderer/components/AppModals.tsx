@@ -940,6 +940,13 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 									}
 								: undefined
 						}
+						sshRemoteId={
+							activeSession?.sshRemoteId ||
+							(activeSession?.sessionSshRemoteConfig?.enabled
+								? activeSession.sessionSshRemoteConfig.remoteId
+								: undefined) ||
+							undefined
+						}
 					/>
 				</Suspense>
 			)}

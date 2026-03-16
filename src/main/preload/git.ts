@@ -82,8 +82,14 @@ export function createGitApi() {
 		/**
 		 * Get git diff for a repository or specific file
 		 */
-		diff: (cwd: string, file?: string, sshRemoteId?: string, remoteCwd?: string): Promise<string> =>
-			ipcRenderer.invoke('git:diff', cwd, file, sshRemoteId, remoteCwd),
+		diff: (
+			cwd: string,
+			file?: string,
+			sshRemoteId?: string,
+			remoteCwd?: string,
+			contextLines?: number
+		): Promise<string> =>
+			ipcRenderer.invoke('git:diff', cwd, file, sshRemoteId, remoteCwd, contextLines),
 
 		/**
 		 * Get diff between two refs (e.g., git diff baseRef...headRef -- [file])
@@ -94,9 +100,19 @@ export function createGitApi() {
 			headRef?: string,
 			file?: string,
 			sshRemoteId?: string,
-			remoteCwd?: string
+			remoteCwd?: string,
+			contextLines?: number
 		): Promise<{ stdout: string; stderr: string }> =>
-			ipcRenderer.invoke('git:diffRefs', cwd, baseRef, headRef, file, sshRemoteId, remoteCwd),
+			ipcRenderer.invoke(
+				'git:diffRefs',
+				cwd,
+				baseRef,
+				headRef,
+				file,
+				sshRemoteId,
+				remoteCwd,
+				contextLines
+			),
 
 		/**
 		 * Get diff of staged changes (git diff --cached [file])
@@ -105,9 +121,10 @@ export function createGitApi() {
 			cwd: string,
 			file?: string,
 			sshRemoteId?: string,
-			remoteCwd?: string
+			remoteCwd?: string,
+			contextLines?: number
 		): Promise<{ stdout: string; stderr: string }> =>
-			ipcRenderer.invoke('git:diffStaged', cwd, file, sshRemoteId, remoteCwd),
+			ipcRenderer.invoke('git:diffStaged', cwd, file, sshRemoteId, remoteCwd, contextLines),
 
 		/**
 		 * Find the merge base between two refs
@@ -580,6 +597,12 @@ export function createGitApi() {
 			initialCols?: number
 		): Promise<{ success: boolean; processId?: string; error?: string }> =>
 			ipcRenderer.invoke('worktree:startServer', sessionId, cwd, script, sshRemoteId, initialCols),
+
+		/**
+		 * List running worktree server processIds (for reconciliation after renderer reload)
+		 */
+		getRunningServers: (): Promise<{ processIds: string[] }> =>
+			ipcRenderer.invoke('worktree:getRunningServers'),
 
 		/**
 		 * Stop a running worktree server process

@@ -89,7 +89,7 @@ interface PrChipProps {
 }
 
 const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
-	const { prNumber, prUrl, prReviewDecision, prCheckStatus } = session;
+	const { prNumber, prReviewDecision, prCheckStatus } = session;
 	if (!prNumber) return null;
 
 	const reviewLabel = getPrReviewLabel(prReviewDecision);
@@ -101,26 +101,18 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 		.filter(Boolean)
 		.join(' \u00B7 '); // · separator
 
-	const handleClick = (e: React.MouseEvent) => {
-		e.stopPropagation();
-		if (prUrl) {
-			window.maestro.shell.openExternal(prUrl);
-		}
-	};
-
 	return (
 		<span className="flex items-center gap-1.5 truncate text-[10px]">
-			<button
-				onClick={handleClick}
-				className="shrink-0 px-1.5 py-[1px] rounded-full text-[10px] font-semibold hover:brightness-125 cursor-pointer"
+			<span
+				className="shrink-0 px-1.5 py-[1px] rounded-full text-[10px] font-semibold"
 				style={{
 					backgroundColor: color + '20',
 					color,
 				}}
-				title={prUrl ? `Open PR #${prNumber} in browser` : `PR #${prNumber}`}
+				title={`PR #${prNumber}`}
 			>
 				PR #{prNumber}
-			</button>
+			</span>
 			{metaText && (
 				<span
 					className="truncate font-medium opacity-0 group-hover:opacity-100 transition-opacity"

@@ -738,6 +738,24 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		return cleanup;
 	}, []);
 
+	// Effect 0b: Reconcile running server processes after renderer reload.
+	// worktreeServerProcessId is runtime-only (stripped during persistence), so after
+	// a hot reload or app restart the renderer loses track of still-running servers.
+	useEffect(() => {
+		window.maestro.git.getRunningServers().then(({ processIds }) => {
+			if (!processIds.length) return;
+			useSessionStore.getState().setSessions((prev) =>
+				prev.map((s) => {
+					const expectedId = `${s.id}-server`;
+					if (processIds.includes(expectedId) && !s.worktreeServerProcessId) {
+						return { ...s, worktreeServerProcessId: expectedId };
+					}
+					return s;
+				})
+			);
+		});
+	}, []);
+
 	// Effect 1: Startup worktree config scan
 	// Scans sessions with worktreeConfig.basePath to discover worktree subdirectories.
 	useEffect(() => {
