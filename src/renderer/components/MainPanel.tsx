@@ -480,6 +480,26 @@ export const MainPanel = React.memo(
 			[stagedQuotes, inputValue, processInput]
 		);
 
+		// Wrap handleInputKeyDown so Enter-to-send uses processInputWithQuotes
+		const handleInputKeyDownWithQuotes = useCallback(
+			(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+				if (e.key === 'Enter' && stagedQuotes.length > 0) {
+					const settings = useSettingsStore.getState();
+					const enterToSend = settings.enterToSendAI;
+					const shouldSubmit =
+						(enterToSend && !e.shiftKey && !e.metaKey) ||
+						(!enterToSend && (e.metaKey || e.ctrlKey));
+					if (shouldSubmit) {
+						e.preventDefault();
+						processInputWithQuotes();
+						return;
+					}
+				}
+				handleInputKeyDown(e);
+			},
+			[stagedQuotes, processInputWithQuotes, handleInputKeyDown]
+		);
+
 		// Listen for keyboard shortcut quote selection events (Cmd+Shift+Q)
 		useEffect(() => {
 			const handler = (e: Event) => {
@@ -1943,7 +1963,7 @@ export const MainPanel = React.memo(
 										return (
 											<div
 												ref={baseBranchDropdownRef}
-												className="absolute z-50 w-64 rounded-lg shadow-xl overflow-hidden"
+												className="absolute z-50 min-w-64 max-w-96 rounded-lg shadow-xl overflow-hidden"
 												style={{
 													top: `${triggerRect.bottom - (headerRect?.top ?? 0)}px`,
 													left: `${leftOffset}px`,
@@ -2011,7 +2031,9 @@ export const MainPanel = React.memo(
 																onClick={() => handleSelectBaseBranch(branch)}
 															>
 																<GitBranch className="w-3 h-3 shrink-0 opacity-50" />
-																<span className="truncate">{branch}</span>
+																<span className="break-all" title={branch}>
+																	{branch}
+																</span>
 																{branch === effectiveBaseBranch && (
 																	<span className="ml-auto text-[10px] opacity-50">current</span>
 																)}
@@ -2217,7 +2239,7 @@ export const MainPanel = React.memo(
 											selectedAtMentionIndex={selectedAtMentionIndex}
 											setSelectedAtMentionIndex={setSelectedAtMentionIndex}
 											inputRef={inputRef}
-											handleInputKeyDown={handleInputKeyDown}
+											handleInputKeyDown={handleInputKeyDownWithQuotes}
 											handlePaste={handlePaste}
 											handleDrop={handleDrop}
 											processInput={processInputWithQuotes}
@@ -2544,10 +2566,10 @@ export const MainPanel = React.memo(
 											selectedAtMentionIndex={selectedAtMentionIndex}
 											setSelectedAtMentionIndex={setSelectedAtMentionIndex}
 											inputRef={inputRef}
-											handleInputKeyDown={handleInputKeyDown}
+											handleInputKeyDown={handleInputKeyDownWithQuotes}
 											handlePaste={handlePaste}
 											handleDrop={handleDrop}
-											processInput={processInput}
+											processInput={processInputWithQuotes}
 											handleInterrupt={handleInterrupt}
 											onInputFocus={handleInputFocus}
 											onInputBlur={props.onInputBlur}
