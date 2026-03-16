@@ -198,31 +198,48 @@ export function useChangesPanel(
 
 				// Only fetch committed changes if we're on a different branch
 				if (statusResult.branch && statusResult.branch !== defaultBranch) {
-					const [mergeBaseResult, logResult] = await Promise.all([
-						gitService.getMergeBase(cwd, compareRef, 'HEAD', sshRemoteId).catch(() =>
-							// Fallback to local branch if origin ref doesn't exist
-							gitService.getMergeBase(cwd, defaultBranch, 'HEAD', sshRemoteId)
-						),
-						window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId),
-					]);
+					// Resolve the compare ref, falling back to local branch if origin doesn't exist
+					let resolvedCompareRef = compareRef;
+					try {
+						await gitService.getMergeBase(cwd, compareRef, 'HEAD', sshRemoteId);
+					} catch {
+						resolvedCompareRef = defaultBranch;
+					}
 
-					if (!mountedRef.current) return;
-
-					const base = mergeBaseResult?.trim();
-					setMergeBaseRef(base || undefined);
-
-					if (base) {
-						// Fetch committed file diff and branch-only commits in parallel
-						const [diffResult, branchLogResult] = await Promise.all([
-							gitService.getDiffRefs(cwd, base, 'HEAD', undefined, sshRemoteId),
-							window.maestro.git.log(cwd, { limit: 100, range: `${base}..HEAD` }, sshRemoteId),
+					if (sessionBaseBranch) {
+						// --- PR-style mode: two-dot diff for file list ---
+						// Still compute merge-base (needed for per-file diff viewer)
+						const [mergeBaseResult, branchLogResult, baseLogResult] = await Promise.all([
+							gitService.getMergeBase(cwd, resolvedCompareRef, 'HEAD', sshRemoteId).catch(() => ''),
+							window.maestro.git.log(
+								cwd,
+								{ limit: 100, range: `${resolvedCompareRef}..HEAD` },
+								sshRemoteId
+							),
+							window.maestro.git.log(
+								cwd,
+								{ limit: 100, range: `HEAD..${resolvedCompareRef}` },
+								sshRemoteId
+							),
 						]);
 
 						if (!mountedRef.current) return;
 
+						const base = mergeBaseResult?.trim();
+						setMergeBaseRef(base || undefined);
+
+						// Two-dot diff: pass full ref spec as baseRef, no headRef
+						const diffResult = await gitService.getDiffRefs(
+							cwd,
+							`${resolvedCompareRef}..HEAD`,
+							undefined,
+							undefined,
+							sshRemoteId
+						);
+
+						if (!mountedRef.current) return;
+
 						const parsedFiles = parseFilesFromDiff(diffResult.diff);
-						// TODO: For accurate per-file line counts on committed changes,
-						// we'd need a numstat variant for refs. For now, set to 0.
 						setCommittedFiles(
 							parsedFiles.map((f) => ({
 								path: f.path,
@@ -232,10 +249,81 @@ export function useChangesPanel(
 							}))
 						);
 
-						// Map branch-only log entries
-						if (!branchLogResult.error) {
-							setBranchCommits(
-								branchLogResult.entries.map((e) => ({
+						// Map branch-only commits (above divider)
+						const mapEntry = (e: {
+							hash: string;
+							shortHash: string;
+							author: string;
+							date: string;
+							subject: string;
+						}) => ({
+							hash: e.hash,
+							shortHash: e.shortHash,
+							author: e.author,
+							date: e.date,
+							subject: e.subject,
+						});
+
+						const branchEntries = !branchLogResult.error
+							? branchLogResult.entries.map(mapEntry)
+							: [];
+						const baseEntries = !baseLogResult.error ? baseLogResult.entries.map(mapEntry) : [];
+
+						setBranchCommits(branchEntries);
+						// Combined: branch commits above divider, base commits below
+						setAllCommits([...branchEntries, ...baseEntries]);
+					} else {
+						// --- Standard mode: three-dot (merge-base) diff ---
+						const [mergeBaseResult, logResult] = await Promise.all([
+							gitService.getMergeBase(cwd, resolvedCompareRef, 'HEAD', sshRemoteId),
+							window.maestro.git.log(cwd, { limit: 100 }, sshRemoteId),
+						]);
+
+						if (!mountedRef.current) return;
+
+						const base = mergeBaseResult?.trim();
+						setMergeBaseRef(base || undefined);
+
+						if (base) {
+							// Fetch committed file diff and branch-only commits in parallel
+							const [diffResult, branchLogResult] = await Promise.all([
+								gitService.getDiffRefs(cwd, base, 'HEAD', undefined, sshRemoteId),
+								window.maestro.git.log(cwd, { limit: 100, range: `${base}..HEAD` }, sshRemoteId),
+							]);
+
+							if (!mountedRef.current) return;
+
+							const parsedFiles = parseFilesFromDiff(diffResult.diff);
+							setCommittedFiles(
+								parsedFiles.map((f) => ({
+									path: f.path,
+									status: f.status,
+									additions: 0,
+									deletions: 0,
+								}))
+							);
+
+							// Map branch-only log entries
+							if (!branchLogResult.error) {
+								setBranchCommits(
+									branchLogResult.entries.map((e) => ({
+										hash: e.hash,
+										shortHash: e.shortHash,
+										author: e.author,
+										date: e.date,
+										subject: e.subject,
+									}))
+								);
+							}
+						} else {
+							setCommittedFiles([]);
+							setBranchCommits([]);
+						}
+
+						// Map all log entries to our commit type
+						if (!logResult.error) {
+							setAllCommits(
+								logResult.entries.map((e) => ({
 									hash: e.hash,
 									shortHash: e.shortHash,
 									author: e.author,
@@ -244,22 +332,6 @@ export function useChangesPanel(
 								}))
 							);
 						}
-					} else {
-						setCommittedFiles([]);
-						setBranchCommits([]);
-					}
-
-					// Map all log entries to our commit type
-					if (!logResult.error) {
-						setAllCommits(
-							logResult.entries.map((e) => ({
-								hash: e.hash,
-								shortHash: e.shortHash,
-								author: e.author,
-								date: e.date,
-								subject: e.subject,
-							}))
-						);
 					}
 				} else {
 					// On the default branch — no branch diff, but still show commit log
