@@ -326,6 +326,10 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 		[setDraggingSessionId]
 	);
 
+	const handleDragEnd = useCallback(() => {
+		setDraggingSessionId(null);
+	}, [setDraggingSessionId]);
+
 	const handleDragOver = useCallback((e: React.DragEvent) => {
 		e.preventDefault();
 	}, []);
@@ -338,6 +342,7 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 		finishRenamingSession,
 		toggleBookmark,
 		handleDragStart,
+		handleDragEnd,
 		handleDragOver,
 	};
 }

@@ -4,6 +4,7 @@ import type { Theme, Session, GhCliStatus } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { useSettingsStore } from '../stores/settingsStore';
+import { notifyToast } from '../stores/notificationStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useShallow } from 'zustand/react/shallow';
 import { BranchTab } from './worktree/BranchTab';
@@ -60,7 +61,7 @@ export function CreateWorktreeModal({
 
 	// Shared branch name state — all tabs write to this
 	const [selectedBranchName, setSelectedBranchName] = useState('');
-	const [isCreating, setIsCreating] = useState(false);
+	const [isCreating] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	// gh CLI status
@@ -153,7 +154,7 @@ export function CreateWorktreeModal({
 		}
 	};
 
-	const handleCreate = async () => {
+	const handleCreate = () => {
 		const trimmedName = selectedBranchName.trim();
 		if (!trimmedName) {
 			setError('Please enter a branch name');
@@ -168,17 +169,16 @@ export function CreateWorktreeModal({
 			return;
 		}
 
-		setIsCreating(true);
 		setError(null);
-
-		try {
-			await onCreateWorktree(trimmedName, baseBranch || undefined);
-			onClose();
-		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Failed to create worktree');
-		} finally {
-			setIsCreating(false);
-		}
+		// Close modal immediately — worktree creation continues in background
+		onClose();
+		onCreateWorktree(trimmedName, baseBranch || undefined).catch((err) => {
+			notifyToast({
+				type: 'error',
+				title: 'Worktree Creation Failed',
+				message: err instanceof Error ? err.message : String(err),
+			});
+		});
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent) => {

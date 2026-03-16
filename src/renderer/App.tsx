@@ -1454,6 +1454,7 @@ function MaestroConsoleInner() {
 		finishRenamingSession,
 		toggleBookmark,
 		handleDragStart,
+		handleDragEnd,
 		handleDragOver,
 	} = useSessionCrud({
 		flushSessionPersistence,
@@ -2030,6 +2031,7 @@ function MaestroConsoleInner() {
 		toggleGlobalLive,
 		restartWebServer,
 		handleDragStart,
+		handleDragEnd,
 		handleDragOver,
 		finishRenamingSession,
 		startRenamingSession,

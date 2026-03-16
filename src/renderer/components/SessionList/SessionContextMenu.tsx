@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { Session, Theme } from '../../types';
 import { useClickOutside, useContextMenuPosition } from '../../hooks';
+import { safeClipboardWrite } from '../../utils/clipboard';
 
 interface SessionContextMenuProps {
 	x: number;
@@ -213,6 +214,20 @@ export function SessionContextMenu({
 						>
 							<Play className="w-3.5 h-3.5" />
 							Run Script
+						</button>
+					)}
+					{session.worktreeBranch && (
+						<button
+							type="button"
+							onClick={() => {
+								safeClipboardWrite(session.worktreeBranch!);
+								onDismiss();
+							}}
+							className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+							style={{ color: theme.colors.textMain }}
+						>
+							<Copy className="w-3.5 h-3.5" />
+							Copy Branch Name
 						</button>
 					)}
 					{onCreatePR && (

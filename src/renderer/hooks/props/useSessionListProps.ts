@@ -32,6 +32,7 @@ export interface UseSessionListPropsDeps {
 	toggleGlobalLive: () => Promise<void>;
 	restartWebServer: () => Promise<string | null>;
 	handleDragStart: (sessionId: string) => void;
+	handleDragEnd: () => void;
 	handleDragOver: (e: React.DragEvent) => void;
 	finishRenamingSession: (sessId: string, newName: string) => void;
 	startRenamingSession: (sessId: string) => void;
@@ -71,6 +72,7 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			toggleGlobalLive: deps.toggleGlobalLive,
 			restartWebServer: deps.restartWebServer,
 			handleDragStart: deps.handleDragStart,
+			handleDragEnd: deps.handleDragEnd,
 			handleDragOver: deps.handleDragOver,
 			finishRenamingSession: deps.finishRenamingSession,
 			startRenamingSession: deps.startRenamingSession,
@@ -98,6 +100,7 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			deps.toggleGlobalLive,
 			deps.restartWebServer,
 			deps.handleDragStart,
+			deps.handleDragEnd,
 			deps.handleDragOver,
 			deps.finishRenamingSession,
 			deps.startRenamingSession,

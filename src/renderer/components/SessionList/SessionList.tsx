@@ -46,6 +46,7 @@ interface SessionListProps {
 	toggleGlobalLive: () => Promise<void>;
 	restartWebServer: () => Promise<string | null>;
 	handleDragStart: (sessionId: string) => void;
+	handleDragEnd: () => void;
 	handleDragOver: (e: React.DragEvent) => void;
 	finishRenamingSession: (sessId: string, newName: string) => void;
 	startRenamingSession: (sessId: string) => void;
@@ -120,6 +121,7 @@ function SessionListInner(props: SessionListProps) {
 		toggleGlobalLive,
 		restartWebServer,
 		handleDragStart,
+		handleDragEnd,
 		handleDragOver,
 		finishRenamingSession,
 		startRenamingSession,
@@ -447,6 +449,7 @@ function SessionListInner(props: SessionListProps) {
 						selectHandlers.get(session.id)?.();
 					}}
 					onDragStart={dragStartHandlers.get(session.id)!}
+					onDragEnd={handleDragEnd}
 					onDragOver={handleDragOver}
 					onContextMenu={contextMenuHandlers.get(session.id)!}
 					onFinishRename={finishRenameHandlers.get(session.id)!}
@@ -492,6 +495,7 @@ function SessionListInner(props: SessionListProps) {
 									jumpNumber={getSessionJumpNumber(child.id)}
 									onSelect={selectHandlers.get(child.id)!}
 									onDragStart={dragStartHandlers.get(child.id)!}
+									onDragEnd={handleDragEnd}
 									onContextMenu={contextMenuHandlers.get(child.id)!}
 									onFinishRename={finishRenameHandlers.get(child.id)!}
 									onStartRename={() => startRenamingSession(`worktree-${session.id}-${child.id}`)}

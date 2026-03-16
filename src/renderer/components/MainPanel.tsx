@@ -544,8 +544,15 @@ export const MainPanel = React.memo(
 		const isCurrentSessionAutoMode = currentSessionBatchState?.isRunning || false;
 		const isCurrentSessionStopping = currentSessionBatchState?.isStopping || false;
 
-		// Hover tooltip state using reusable hook
-		const gitTooltip = useHoverTooltip(150);
+		// Git info dropdown (click-based)
+		const [gitTooltipOpen, setGitTooltipOpen] = useState(false);
+		const gitTooltipRef = useRef<HTMLDivElement>(null);
+		const gitTooltipTriggerRef = useRef<HTMLDivElement>(null);
+		useClickOutside(
+			[gitTooltipRef, gitTooltipTriggerRef],
+			() => setGitTooltipOpen(false),
+			gitTooltipOpen
+		);
 		const contextTooltip = useHoverTooltip(150);
 		const headerRef = useRef<HTMLDivElement>(null);
 		const filePreviewContainerRef = useRef<HTMLDivElement>(null);
@@ -1286,13 +1293,14 @@ export const MainPanel = React.memo(
 											<span className="header-session-name truncate">{activeSession.name}</span>
 										)}
 										<div
+											ref={gitTooltipTriggerRef}
 											className="relative min-w-0"
-											onMouseEnter={
-												activeSession.isGitRepo
-													? gitTooltip.triggerHandlers.onMouseEnter
-													: undefined
-											}
-											onMouseLeave={gitTooltip.triggerHandlers.onMouseLeave}
+											onClick={(e) => {
+												if (activeSession.isGitRepo) {
+													e.stopPropagation();
+													setGitTooltipOpen((prev) => !prev);
+												}
+											}}
 										>
 											{/* SSH Host Pill - show SSH remote name when running remotely (replaces GIT/LOCAL badge) */}
 											{activeSession.sessionSshRemoteConfig?.enabled && sshRemoteName ? (
@@ -1365,17 +1373,12 @@ export const MainPanel = React.memo(
 													)}
 												</span>
 											)}
-											{activeSession.isGitRepo && gitTooltip.isOpen && gitInfo && (
+											{activeSession.isGitRepo && gitTooltipOpen && gitInfo && (
 												<>
-													{/* Invisible bridge to prevent hover gap */}
 													<div
-														className="absolute left-0 right-0 h-3 pointer-events-auto"
-														style={{ top: '100%' }}
-														{...gitTooltip.contentHandlers}
-													/>
-													<div
+														ref={gitTooltipRef}
 														className="absolute top-full left-0 pt-2 w-96 z-50 pointer-events-auto"
-														{...gitTooltip.contentHandlers}
+														onClick={(e) => e.stopPropagation()}
 													>
 														<div
 															className="rounded shadow-xl"
@@ -1512,7 +1515,7 @@ export const MainPanel = React.memo(
 																		onClick={(e) => {
 																			e.stopPropagation();
 																			onOpenWorktreeConfig();
-																			gitTooltip.close();
+																			setGitTooltipOpen(false);
 																		}}
 																		className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs hover:bg-white/10 transition-colors"
 																		style={{ color: theme.colors.textDim }}

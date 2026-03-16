@@ -5,6 +5,7 @@ import type { Session, Theme } from '../types';
 interface ExecutionQueueIndicatorProps {
 	session: Session;
 	theme: Theme;
+	activeTabId?: string;
 	onClick: () => void; // Opens the ExecutionQueueBrowser modal
 }
 
@@ -13,8 +14,15 @@ interface ExecutionQueueIndicatorProps {
  * Appears above the input area when items are queued.
  * Clicking opens the ExecutionQueueBrowser modal for full queue management.
  */
-export function ExecutionQueueIndicator({ session, theme, onClick }: ExecutionQueueIndicatorProps) {
-	const queue = session.executionQueue || [];
+export function ExecutionQueueIndicator({
+	session,
+	theme,
+	activeTabId,
+	onClick,
+}: ExecutionQueueIndicatorProps) {
+	const allQueue = session.executionQueue || [];
+	// Filter to only show items for the active tab (prevents leaking between tabs)
+	const queue = activeTabId ? allQueue.filter((item) => item.tabId === activeTabId) : allQueue;
 	const containerRef = useRef<HTMLButtonElement>(null);
 	const [maxVisiblePills, setMaxVisiblePills] = useState(3);
 

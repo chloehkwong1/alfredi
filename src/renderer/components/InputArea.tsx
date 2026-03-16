@@ -577,7 +577,12 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 
 			{/* ExecutionQueueIndicator - show when items are queued in AI mode */}
 			{session.inputMode === 'ai' && onOpenQueueBrowser && (
-				<ExecutionQueueIndicator session={session} theme={theme} onClick={onOpenQueueBrowser} />
+				<ExecutionQueueIndicator
+					session={session}
+					theme={theme}
+					activeTabId={session.activeTabId}
+					onClick={onOpenQueueBrowser}
+				/>
 			)}
 
 			{/* Only show staged images in AI mode */}

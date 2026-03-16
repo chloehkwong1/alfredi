@@ -162,6 +162,7 @@ export interface SessionItemProps {
 	// Handlers
 	onSelect: () => void;
 	onDragStart: () => void;
+	onDragEnd?: () => void;
 	onDragOver?: (e: React.DragEvent) => void;
 	onDrop?: () => void;
 	onContextMenu: (e: React.MouseEvent) => void;
@@ -197,6 +198,7 @@ export const SessionItem = memo(function SessionItem({
 	hasWorktrees = false,
 	onSelect,
 	onDragStart,
+	onDragEnd,
 	onDragOver,
 	onDrop,
 	onContextMenu,
@@ -257,6 +259,7 @@ export const SessionItem = memo(function SessionItem({
 			key={`${variant}-${session.id}`}
 			draggable={variant !== 'project-head'}
 			onDragStart={variant !== 'project-head' ? onDragStart : undefined}
+			onDragEnd={variant !== 'project-head' ? onDragEnd : undefined}
 			onDragOver={onDragOver}
 			onDrop={onDrop}
 			onClick={onSelect}
