@@ -168,6 +168,7 @@ export interface SessionItemProps {
 	onFinishRename: (newName: string) => void;
 	onStartRename: () => void;
 	onToggleBookmark: () => void;
+	onToggleExpand?: () => void;
 }
 
 /**
@@ -202,6 +203,7 @@ export const SessionItem = memo(function SessionItem({
 	onFinishRename,
 	onStartRename,
 	onToggleBookmark,
+	onToggleExpand,
 }: SessionItemProps) {
 	const fontSize = useSettingsStore((s) => s.fontSize);
 	const primaryClass = fontSizeToClass(fontSize);
@@ -307,18 +309,21 @@ export const SessionItem = memo(function SessionItem({
 						{/* TOP ROW: Name + inline indicators */}
 						<div className="flex items-center gap-1.5" onDoubleClick={onStartRename}>
 							{/* Worktree expand/collapse chevron (project-head with worktrees only) */}
-							{variant === 'project-head' &&
-								(isWorktreeExpanded ? (
-									<ChevronDown
-										className="w-3.5 h-3.5 shrink-0"
-										style={{ color: theme.colors.textDim }}
-									/>
-								) : (
-									<ChevronRight
-										className="w-3.5 h-3.5 shrink-0"
-										style={{ color: theme.colors.textDim }}
-									/>
-								))}
+							{variant === 'project-head' && (
+								<span
+									className="shrink-0 cursor-pointer hover:opacity-70"
+									onClick={(e) => {
+										e.stopPropagation();
+										onToggleExpand?.();
+									}}
+								>
+									{isWorktreeExpanded ? (
+										<ChevronDown className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+									) : (
+										<ChevronRight className="w-3.5 h-3.5" style={{ color: theme.colors.textDim }} />
+									)}
+								</span>
+							)}
 							{/* Bookmark icon (only in bookmark variant, always filled) */}
 							{variant === 'bookmark' && session.bookmarked && (
 								<Bookmark

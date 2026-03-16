@@ -29,6 +29,7 @@ import {
 	Search,
 	TerminalSquare,
 	Code2,
+	GitMerge,
 } from 'lucide-react';
 import { LogViewer } from './LogViewer';
 import { TerminalOutput } from './TerminalOutput';
@@ -38,6 +39,7 @@ import { DiffPreview } from './DiffPreview';
 import { CommitDiffView } from './CommitDiffView';
 import { ProjectDashboard } from './ProjectDashboard';
 import { ErrorBoundary } from './ErrorBoundary';
+import { ConfirmModal } from './ConfirmModal';
 import { GitStatusWidget } from './GitStatusWidget';
 import { GitWorkflowPill } from './GitWorkflowPill';
 import { derivePrStatus } from '../utils/gitWorkflowState';
@@ -429,7 +431,6 @@ export const MainPanel = React.memo(
 			isMobileLandscape = false,
 			showFlashNotification,
 			onOpenWorktreeConfig,
-			onOpenCreatePR,
 			isWorktreeChild,
 			onSummarizeAndContinue,
 			onMergeWith,
@@ -896,7 +897,10 @@ export const MainPanel = React.memo(
 		);
 
 		// Derived: effective base branch for display
-		const effectiveBaseBranch = activeSession?.baseBranch || detectedDefaultBranch;
+		const effectiveBaseBranch = (activeSession?.baseBranch || detectedDefaultBranch)?.replace(
+			/^origin\//,
+			''
+		);
 		const currentBranchName = gitInfo?.branch || '';
 		const isOnDefaultBranch = currentBranchName === effectiveBaseBranch;
 
@@ -914,6 +918,9 @@ export const MainPanel = React.memo(
 				activeSession?.sessionSshRemoteConfig?.remoteId,
 			]
 		);
+
+		// Rebase confirmation state
+		const [pendingRebaseBranch, setPendingRebaseBranch] = useState<string | null>(null);
 
 		// Handle selecting a base branch
 		const handleSelectBaseBranch = useCallback(
@@ -936,48 +943,50 @@ export const MainPanel = React.memo(
 						);
 						setBaseIsAncestor(result.isAncestor);
 						if (!result.isAncestor) {
-							const shouldRebase = window.confirm(
-								`"${branch}" is not an ancestor of your current branch. Rebase onto ${branch}?`
-							);
-							if (shouldRebase) {
-								setIsRebasing(true);
-								try {
-									const rebaseResult = await window.maestro.git.rebaseOnto(
-										activeSession.cwd,
-										branch,
-										filePreviewSshRemoteId
-									);
-									if (rebaseResult.success) {
-										await refreshGitStatus();
-										setBaseIsAncestor(true);
-										showFlashNotification?.(`Rebased onto ${branch}`);
-									} else {
-										showFlashNotification?.(
-											rebaseResult.conflicted
-												? 'Rebase failed: conflicts detected (auto-aborted)'
-												: `Rebase failed: ${rebaseResult.error || 'unknown error'}`
-										);
-									}
-								} catch {
-									showFlashNotification?.('Rebase failed: unexpected error');
-								} finally {
-									setIsRebasing(false);
-								}
-							}
+							setPendingRebaseBranch(branch);
 						}
 					} catch {
 						setBaseIsAncestor(null);
 					}
 				}
 			},
-			[
-				activeSession,
-				currentBranchName,
-				filePreviewSshRemoteId,
-				refreshGitStatus,
-				showFlashNotification,
-			]
+			[activeSession, currentBranchName, filePreviewSshRemoteId]
 		);
+
+		// Handle confirming the rebase from the modal
+		const handleConfirmRebase = useCallback(async () => {
+			if (!activeSession?.cwd || !pendingRebaseBranch) return;
+			setPendingRebaseBranch(null);
+			setIsRebasing(true);
+			try {
+				const rebaseResult = await window.maestro.git.rebaseOnto(
+					activeSession.cwd,
+					pendingRebaseBranch,
+					filePreviewSshRemoteId
+				);
+				if (rebaseResult.success) {
+					await refreshGitStatus();
+					setBaseIsAncestor(true);
+					showFlashNotification?.(`Rebased onto ${pendingRebaseBranch}`);
+				} else {
+					showFlashNotification?.(
+						rebaseResult.conflicted
+							? 'Rebase failed: conflicts detected (auto-aborted)'
+							: `Rebase failed: ${rebaseResult.error || 'unknown error'}`
+					);
+				}
+			} catch {
+				showFlashNotification?.('Rebase failed: unexpected error');
+			} finally {
+				setIsRebasing(false);
+			}
+		}, [
+			activeSession?.cwd,
+			pendingRebaseBranch,
+			filePreviewSshRemoteId,
+			refreshGitStatus,
+			showFlashNotification,
+		]);
 
 		// Check if base branch is an ancestor of current branch
 		useEffect(() => {
@@ -1513,24 +1522,6 @@ export const MainPanel = React.memo(
 																			style={{ color: theme.colors.textDim }}
 																		/>
 																		Configure Worktrees
-																	</button>
-																)}
-																{/* Create PR - only for worktree children */}
-																{isWorktreeChild && onOpenCreatePR && (
-																	<button
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			onOpenCreatePR();
-																			gitTooltip.close();
-																		}}
-																		className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs hover:bg-white/10 transition-colors"
-																		style={{ color: theme.colors.textDim }}
-																	>
-																		<GitPullRequest
-																			className="w-3.5 h-3.5"
-																			style={{ color: theme.colors.textDim }}
-																		/>
-																		Create Pull Request
 																	</button>
 																)}
 															</div>
@@ -2637,6 +2628,21 @@ export const MainPanel = React.memo(
 					>
 						{copyNotification}
 					</div>
+				)}
+
+				{/* Rebase confirmation modal */}
+				{pendingRebaseBranch && (
+					<ConfirmModal
+						theme={theme}
+						title="Rebase onto base branch?"
+						message={`Your current branch doesn't contain the base branch's commits. Rebase onto ${pendingRebaseBranch}?`}
+						icon={<GitMerge className="w-5 h-5" style={{ color: theme.colors.accent }} />}
+						headerIcon={<GitMerge className="w-4 h-4" style={{ color: theme.colors.accent }} />}
+						destructive={false}
+						confirmLabel="Rebase"
+						onConfirm={handleConfirmRebase}
+						onClose={() => setPendingRebaseBranch(null)}
+					/>
 				)}
 			</>
 		);

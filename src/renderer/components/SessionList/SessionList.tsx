@@ -9,7 +9,7 @@ import { useLiveOverlay, useResizablePanel } from '../../hooks';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { fontSizeToTertiary } from '../../utils/fontSizeClass';
+import { fontSizeToSecondary } from '../../utils/fontSizeClass';
 // batchStore removed (Auto Run stripped)
 const useBatchStore = (selector: any) => selector({ activeBatchSessionIds: [] });
 const selectActiveBatchSessionIds = (s: any) => s.activeBatchSessionIds ?? [];
@@ -445,9 +445,6 @@ function SessionListInner(props: SessionListProps) {
 					isWorktreeExpanded={isProject && !isCollapsed}
 					onSelect={() => {
 						selectHandlers.get(session.id)?.();
-						if (isProject && onToggleWorktreeExpanded) {
-							onToggleWorktreeExpanded(session.id);
-						}
 					}}
 					onDragStart={dragStartHandlers.get(session.id)!}
 					onDragOver={handleDragOver}
@@ -455,6 +452,11 @@ function SessionListInner(props: SessionListProps) {
 					onFinishRename={finishRenameHandlers.get(session.id)!}
 					onStartRename={() => startRenamingSession(`${options.keyPrefix}-${session.id}`)}
 					onToggleBookmark={toggleBookmarkHandlers.get(session.id)!}
+					onToggleExpand={
+						isProject && onToggleWorktreeExpanded
+							? () => onToggleWorktreeExpanded(session.id)
+							: undefined
+					}
 				/>
 
 				{/* Worktree children drawer (when expanded) */}
@@ -561,7 +563,7 @@ function SessionListInner(props: SessionListProps) {
 															e.stopPropagation();
 															toggleKanbanSection(session.id, status);
 														}}
-														className={`w-full flex items-center gap-1.5 px-3 py-1 ${fontSizeToTertiary(fontSize)} font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer`}
+														className={`w-full flex items-center gap-1.5 px-3 py-1 ${fontSizeToSecondary(fontSize)} font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer`}
 														style={{ color: theme.colors.textDim }}
 														title={`${label} - click to ${collapsed ? 'expand' : 'collapse'}`}
 													>

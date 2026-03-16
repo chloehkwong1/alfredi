@@ -1200,7 +1200,6 @@ export function setActiveTab(session: Session, tabId: string): SetActiveTabResul
 			activeFileTabId: null,
 			activeDiffTabId: null,
 			activeCommitDiffTabId: null,
-			activeDashboardTabId: null,
 		},
 	};
 }
@@ -1542,7 +1541,6 @@ export function navigateToUnifiedTabByIndex(
 				activeFileTabId: null,
 				activeDiffTabId: null,
 				activeCommitDiffTabId: null,
-				activeDashboardTabId: null,
 			},
 		};
 	} else if (targetTabRef.type === 'file') {
@@ -1568,7 +1566,6 @@ export function navigateToUnifiedTabByIndex(
 				activeFileTabId: targetTabRef.id,
 				activeDiffTabId: null,
 				activeCommitDiffTabId: null,
-				activeDashboardTabId: null,
 			},
 		};
 	} else if (targetTabRef.type === 'diff') {
@@ -1594,7 +1591,6 @@ export function navigateToUnifiedTabByIndex(
 				activeFileTabId: null,
 				activeDiffTabId: targetTabRef.id,
 				activeCommitDiffTabId: null,
-				activeDashboardTabId: null,
 			},
 		};
 	} else {

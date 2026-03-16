@@ -293,6 +293,14 @@ export function useInputKeyDown(deps: InputKeyDownDeps): InputKeyDownReturn {
 			const enterToSendAI = settings.enterToSendAI;
 			const enterToSendTerminal = settings.enterToSendTerminal;
 
+			// Cmd+Shift+Backspace: clear all input text
+			if (e.key === 'Backspace' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+				e.preventDefault();
+				setInputValue('');
+				resetHistoryBrowse();
+				return;
+			}
+
 			if (e.key === 'Enter') {
 				const currentEnterToSend = enterToSendAI;
 

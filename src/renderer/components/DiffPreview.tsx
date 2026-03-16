@@ -248,10 +248,9 @@ export const DiffPreview = memo(function DiffPreview({
 
 	const gutterEvents: EventMap = useMemo(
 		() => ({
-			onClick: handleChangeClick as EventMap['onClick'],
-			onDoubleClick: handleGutterDoubleClick as EventMap['onDoubleClick'],
+			onClick: handleGutterDoubleClick as EventMap['onClick'],
 		}),
-		[handleChangeClick, handleGutterDoubleClick]
+		[handleGutterDoubleClick]
 	);
 
 	const codeEvents: EventMap = useMemo(

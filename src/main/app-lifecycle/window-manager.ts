@@ -214,6 +214,19 @@ export function createWindowManager(deps: WindowManagerDependencies): WindowMana
 				}
 			);
 
+			// Allow clipboard-write for navigator.clipboard.write() (image copy)
+			mainWindow.webContents.session.setPermissionCheckHandler((_webContents, permission) => {
+				if (permission === 'clipboard-read' || permission === 'clipboard-sanitized-write') {
+					return true;
+				}
+				// clipboard-write is not in Electron's Permission type but Chromium
+				// sends it for navigator.clipboard.write() with ClipboardItem blobs
+				if ((permission as string) === 'clipboard-write') {
+					return true;
+				}
+				return false;
+			});
+
 			mainWindow.on('closed', () => {
 				logger.info('Browser window closed', 'Window');
 			});

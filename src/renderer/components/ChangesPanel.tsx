@@ -636,7 +636,10 @@ function ChangesPanelInner({
 				className="flex items-center justify-between px-3 py-2 border-b"
 				style={{ borderColor: theme.colors.border }}
 			>
-				<div className="flex items-center gap-1.5 text-xs" style={{ color: theme.colors.textDim }}>
+				<div
+					className="flex items-center gap-1.5 text-xs min-w-0 truncate"
+					style={{ color: theme.colors.textDim }}
+				>
 					<GitBranch className="w-3.5 h-3.5" />
 					<span style={{ color: theme.colors.textMain }}>{currentBranch || '...'}</span>
 					{baseBranch && currentBranch !== baseBranch && (

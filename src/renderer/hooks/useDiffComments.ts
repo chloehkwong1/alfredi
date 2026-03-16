@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, type ReactNode, createElement } from 'react';
+import { useState, useCallback, useEffect, useMemo, type ReactNode, createElement } from 'react';
 import { getChangeKey } from 'react-diff-view';
 import type { ChangeData, HunkData, FileData, GutterOptions } from 'react-diff-view';
 import type { Theme } from '../types';
@@ -41,6 +41,13 @@ export function useDiffComments({
 	const [commentedKeys, setCommentedKeys] = useState<Set<string>>(new Set());
 	// Track the selected range associated with each open comment anchor key
 	const [commentRanges, setCommentRanges] = useState<Map<string, string[]>>(new Map());
+
+	// Reset comment state when file changes (prevents leaking across worktrees/tabs)
+	useEffect(() => {
+		setOpenCommentKeys(new Set());
+		setCommentedKeys(new Set());
+		setCommentRanges(new Map());
+	}, [filePath]);
 
 	const openComment = useCallback((changeKey: string, rangeKeys?: string[]) => {
 		setOpenCommentKeys((prev) => new Set(prev).add(changeKey));

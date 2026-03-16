@@ -257,8 +257,8 @@ export function notifyToast(toast: Omit<Toast, 'id' | 'timestamp'>): string {
 		}
 	}
 
-	// OS desktop notification
-	if (config.osNotificationsEnabled) {
+	// OS desktop notification — only when window is not focused (avoids duplicating in-app toasts)
+	if (config.osNotificationsEnabled && !document.hasFocus()) {
 		if (typeof window !== 'undefined' && window.maestro?.notification?.show) {
 			const notifTitle = toast.agentName || toast.title;
 

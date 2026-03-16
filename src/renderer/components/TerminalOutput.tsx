@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useMemo, forwardRef, useState, useCallback, memo } from 'react';
 import {
 	ChevronDown,
+	ChevronRight,
 	ChevronUp,
 	Trash2,
 	Copy,
@@ -187,9 +188,23 @@ const InteractiveQuestionCard = memo(
 
 		const handleSelect = useCallback(
 			(index: number) => {
-				if (isAnswered || !currentQuestion.options || !onAdvanceQuestion) return;
+				if (isAnswered || !currentQuestion.options || !onAdvanceQuestion) {
+					console.warn('[InteractiveQuestionCard] handleSelect blocked:', {
+						isAnswered,
+						hasOptions: !!currentQuestion.options,
+						hasCallback: !!onAdvanceQuestion,
+					});
+					return;
+				}
 				const option = currentQuestion.options[index];
-				if (!option || !log.metadata?.processSessionId || !log.metadata?.toolUseId) return;
+				if (!option || !log.metadata?.processSessionId || !log.metadata?.toolUseId) {
+					console.warn('[InteractiveQuestionCard] handleSelect missing data:', {
+						hasOption: !!option,
+						processSessionId: log.metadata?.processSessionId,
+						toolUseId: log.metadata?.toolUseId,
+					});
+					return;
+				}
 				onAdvanceQuestion(
 					log.metadata.processSessionId,
 					log.metadata.toolUseId,
@@ -963,12 +978,9 @@ const LogItemComponent = memo(
 												className="font-mono font-bold text-sm"
 												style={{ color: theme.colors.accent }}
 											>
-												{log.aiCommand.command}:
+												{log.aiCommand.command}
 											</span>
-											<span className="text-sm flex-1" style={{ color: theme.colors.textMain }}>
-												{log.aiCommand.description}
-											</span>
-											<ChevronDown
+											<ChevronRight
 												className="w-3 h-3 opacity-60"
 												style={{ color: theme.colors.textDim }}
 											/>
@@ -1896,7 +1908,55 @@ export const TerminalOutput = memo(
 		// Handler for multi-question wizard: advance to next question or submit final answer
 		const handleAdvanceQuestion = useCallback(
 			(processSessionId: string, toolUseId: string, questionIndex: number, answer: string) => {
-				const { setSessions } = useSessionStore.getState();
+				const storeState = useSessionStore.getState();
+				const { setSessions } = storeState;
+
+				// Pre-compute whether this is the final question and build the answer
+				// OUTSIDE the state updater to avoid side effects inside pure functions.
+				const currentSession = storeState.sessions.find((s) => s.id === session.id);
+				const matchingTab = currentSession?.aiTabs.find(
+					(tab) => tab.pendingQuestion?.toolUseId === toolUseId
+				);
+
+				if (!matchingTab?.pendingQuestion) return;
+
+				const currentAnswers = matchingTab.pendingQuestion.answers ?? [];
+				const newAnswers = [...currentAnswers];
+				newAnswers[questionIndex] = answer;
+
+				const interactiveLog = matchingTab.logs.find(
+					(l) => l.metadata?.toolUseId === toolUseId && l.interactive
+				);
+				const totalQuestions = interactiveLog?.questions?.length ?? 1;
+				const nextIndex = questionIndex + 1;
+				const isComplete = nextIndex >= totalQuestions;
+
+				let combinedAnswer: string | undefined;
+				if (isComplete) {
+					combinedAnswer = (interactiveLog?.questions ?? [])
+						.map((q, i) => `${q.header ? q.header + ': ' : ''}${newAnswers[i] ?? ''}`)
+						.join('\n');
+				}
+
+				// Send the answer via IPC BEFORE updating state (matches processInput pattern)
+				if (isComplete && combinedAnswer !== undefined) {
+					console.log('[handleAdvanceQuestion] Sending answer via IPC:', {
+						processSessionId,
+						toolUseId,
+						answerLength: combinedAnswer.length,
+						combinedAnswer,
+					});
+					window.maestro.process
+						.answerQuestion(processSessionId, toolUseId, combinedAnswer)
+						.then((result) => {
+							console.log('[handleAdvanceQuestion] answerQuestion IPC result:', result);
+						})
+						.catch((err) => {
+							console.error('[handleAdvanceQuestion] answerQuestion IPC failed:', err);
+						});
+				}
+
+				// Now update state (pure — no side effects)
 				setSessions((prev) =>
 					prev.map((s) => {
 						if (s.id !== session.id) return s;
@@ -1904,25 +1964,8 @@ export const TerminalOutput = memo(
 							...s,
 							aiTabs: s.aiTabs.map((tab) => {
 								if (tab.pendingQuestion?.toolUseId !== toolUseId) return tab;
-								const newAnswers = [...(tab.pendingQuestion.answers ?? [])];
-								newAnswers[questionIndex] = answer;
-								// Find the log to check total questions
-								const interactiveLog = tab.logs.find(
-									(l) => l.metadata?.toolUseId === toolUseId && l.interactive
-								);
-								const totalQuestions = interactiveLog?.questions?.length ?? 1;
-								const nextIndex = questionIndex + 1;
 
-								if (nextIndex >= totalQuestions) {
-									// All questions answered — build combined answer string and send via IPC
-									const combinedAnswer = (interactiveLog?.questions ?? [])
-										.map((q, i) => `${q.header ? q.header + ': ' : ''}${newAnswers[i] ?? ''}`)
-										.join('\n');
-									window.maestro.process.answerQuestion(
-										processSessionId,
-										toolUseId,
-										combinedAnswer
-									);
+								if (isComplete) {
 									return {
 										...tab,
 										pendingQuestion: undefined,
@@ -2743,7 +2786,7 @@ export const TerminalOutput = memo(
 								lastUserCommand={
 									isTerminal && log.source !== 'user' ? getLastUserCommand(unitIndex) : undefined
 								}
-								isExpanded={!expandedLogs.has(log.id)}
+								isExpanded={log.aiCommand ? expandedLogs.has(log.id) : !expandedLogs.has(log.id)}
 								onToggleExpanded={toggleExpanded}
 								localFilterQuery={localFilters.get(log.id) || ''}
 								filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}

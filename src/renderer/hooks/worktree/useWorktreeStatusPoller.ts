@@ -111,7 +111,11 @@ export function useWorktreeStatusPoller(): void {
 
 				// Auto-transition kanban status unless manually overridden via drag-and-drop
 				if (!current.worktreeManualStatus) {
-					if (prStatus.state === 'OPEN' && current.worktreeStatus !== 'in_review') {
+					if (
+						prStatus.state === 'OPEN' &&
+						!prStatus.isDraft &&
+						current.worktreeStatus !== 'in_review'
+					) {
 						prUpdates.worktreeStatus = 'in_review';
 					} else if (prStatus.state === 'MERGED' && current.worktreeStatus !== 'done') {
 						prUpdates.worktreeStatus = 'done';
