@@ -551,7 +551,13 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 	return (
 		<div
 			className="relative p-4 border-t"
-			style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgSidebar }}
+			style={{
+				borderColor: session.state === 'waiting_input' ? theme.colors.accent : theme.colors.border,
+				borderTopWidth: session.state === 'waiting_input' ? '2px' : undefined,
+				boxShadow:
+					session.state === 'waiting_input' ? `0 -4px 12px ${theme.colors.accent}20` : undefined,
+				backgroundColor: theme.colors.bgSidebar,
+			}}
 		>
 			{/* ThinkingStatusPill - only show in AI mode when the current agent is thinking or AutoRun */}
 			{session.inputMode === 'ai' &&

@@ -2181,6 +2181,7 @@ export const TerminalOutput = memo(
 		// Derive busy state and thinking mode from global setting
 		const isBusy = activeTab?.state === 'busy';
 		const showThinking: ThinkingMode = useSettingsStore((s) => s.defaultShowThinking);
+		const fontSize = useSettingsStore((s) => s.fontSize);
 
 		// Track previous busy state for idle transition detection
 		const prevIsBusyRef = useRef(isBusy);
@@ -2524,6 +2525,15 @@ export const TerminalOutput = memo(
 			[theme]
 		);
 
+		// Font size scaling — override text-sm within terminal output based on user setting
+		// Maps: 14→text-sm (0.875rem), 16→text-base (1rem), 18→text-lg (1.125rem)
+		const fontSizeStyles = useMemo(() => {
+			if (fontSize <= 14) return ''; // Default text-sm, no override needed
+			const remSize = fontSize === 18 ? '1.125rem' : '1rem';
+			const lineHeight = fontSize === 18 ? '1.75rem' : '1.5rem';
+			return `.terminal-output .text-sm { font-size: ${remSize}; line-height: ${lineHeight}; }`;
+		}, [fontSize]);
+
 		// CSS Custom Highlight API styles for search match highlighting
 		const highlightStyles = useMemo(
 			() =>
@@ -2623,6 +2633,7 @@ export const TerminalOutput = memo(
 				{/* Prose styles for markdown rendering - injected once at container level for performance */}
 				<style>{proseStyles}</style>
 				<style>{highlightStyles}</style>
+				{fontSizeStyles && <style>{fontSizeStyles}</style>}
 				{/* Native scroll log list */}
 				{/* overflow-anchor: disabled in AI mode when auto-scroll is off to prevent
 				    browser from automatically keeping viewport pinned to bottom on new content */}

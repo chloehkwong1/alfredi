@@ -19,6 +19,8 @@ interface NotificationsPanelProps {
 	setOsNotificationsEnabled: (value: boolean) => void;
 	notificationSound: string;
 	setNotificationSound: (value: string) => void;
+	completionSound: string;
+	setCompletionSound: (value: string) => void;
 	audioFeedbackEnabled: boolean;
 	setAudioFeedbackEnabled: (value: boolean) => void;
 	audioFeedbackCommand: string;
@@ -35,6 +37,8 @@ export function NotificationsPanel({
 	setOsNotificationsEnabled,
 	notificationSound,
 	setNotificationSound,
+	completionSound,
+	setCompletionSound,
 	audioFeedbackEnabled,
 	setAudioFeedbackEnabled,
 	audioFeedbackCommand,
@@ -161,6 +165,57 @@ export function NotificationsPanel({
 							border: `1px solid ${theme.colors.border}`,
 							opacity: notificationSound === 'none' ? 0.5 : 1,
 							cursor: notificationSound === 'none' ? 'not-allowed' : 'pointer',
+						}}
+					>
+						<Play className="w-3 h-3" />
+						Preview
+					</button>
+				</div>
+			</div>
+
+			{/* Completion Sound */}
+			<div>
+				<SettingCheckbox
+					icon={Bell}
+					sectionLabel="Completion Sound"
+					title="Play Sound on Agent Completion"
+					description="Sound when an agent finishes a task"
+					checked={completionSound !== 'none'}
+					onChange={(enabled) => setCompletionSound(enabled ? 'Tink' : 'none')}
+					theme={theme}
+				/>
+				<div className="mt-3 flex items-center gap-2">
+					<select
+						value={completionSound}
+						onChange={(e) => setCompletionSound(e.target.value)}
+						className="flex-1 p-2 rounded border bg-transparent outline-none text-sm"
+						style={{
+							borderColor: theme.colors.border,
+							color: theme.colors.textMain,
+							backgroundColor: theme.colors.bgMain,
+						}}
+					>
+						<option value="none">None</option>
+						{systemSounds.map((sound) => (
+							<option key={sound} value={sound}>
+								{sound}
+							</option>
+						))}
+					</select>
+					<button
+						onClick={() => {
+							if (completionSound !== 'none') {
+								window.maestro.notification.playSound?.(completionSound);
+							}
+						}}
+						disabled={completionSound === 'none'}
+						className="px-3 py-2 rounded text-xs font-medium transition-all flex items-center gap-1.5"
+						style={{
+							backgroundColor: theme.colors.bgActivity,
+							color: completionSound === 'none' ? theme.colors.textDim : theme.colors.textMain,
+							border: `1px solid ${theme.colors.border}`,
+							opacity: completionSound === 'none' ? 0.5 : 1,
+							cursor: completionSound === 'none' ? 'not-allowed' : 'pointer',
 						}}
 					>
 						<Play className="w-3 h-3" />

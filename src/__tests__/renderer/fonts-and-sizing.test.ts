@@ -239,15 +239,24 @@ describe('Cross-platform Fonts and Sizing', () => {
 	});
 
 	describe('Font Size Scaling', () => {
-		it('should apply default font size (14px) to document root after settings load', async () => {
+		it('should have default font size of 14', async () => {
 			const { result } = renderHook(() => useSettings());
 			await waitForSettingsLoaded(result);
 
 			expect(result.current.fontSize).toBe(14);
-			expect(document.documentElement.style.fontSize).toBe('14px');
 		});
 
-		it('should update document root font size when fontSize changes', async () => {
+		it('should not set document root font size (uses Tailwind class mapping instead)', async () => {
+			const { result } = renderHook(() => useSettings());
+			const originalRootFontSize = document.documentElement.style.fontSize;
+			await waitForSettingsLoaded(result);
+
+			// Font size is now applied via Tailwind class mapping in components,
+			// not via global rem scaling on document root
+			expect(document.documentElement.style.fontSize).toBe(originalRootFontSize);
+		});
+
+		it('should update fontSize state when setFontSize is called', async () => {
 			const { result } = renderHook(() => useSettings());
 			await waitForSettingsLoaded(result);
 
@@ -256,7 +265,6 @@ describe('Cross-platform Fonts and Sizing', () => {
 			});
 
 			expect(result.current.fontSize).toBe(18);
-			expect(document.documentElement.style.fontSize).toBe('18px');
 		});
 
 		it('should persist font size changes to settings', async () => {
@@ -270,7 +278,7 @@ describe('Cross-platform Fonts and Sizing', () => {
 			expect(window.maestro.settings.set).toHaveBeenCalledWith('fontSize', 16);
 		});
 
-		it('should load saved font size from settings', async () => {
+		it('should load saved font size from settings (clamped to valid presets)', async () => {
 			vi.mocked(window.maestro.settings.getAll).mockResolvedValue({
 				fontSize: 20,
 			});
@@ -278,85 +286,49 @@ describe('Cross-platform Fonts and Sizing', () => {
 			const { result } = renderHook(() => useSettings());
 			await waitForSettingsLoaded(result);
 
-			expect(result.current.fontSize).toBe(20);
-			expect(document.documentElement.style.fontSize).toBe('20px');
+			// 20 is above 18 so gets clamped to 18
+			expect(result.current.fontSize).toBe(18);
 		});
 
-		it('should support font sizes in valid range (8-32px recommended)', async () => {
+		it('should clamp old font size values to nearest valid preset', async () => {
+			vi.mocked(window.maestro.settings.getAll).mockResolvedValue({
+				fontSize: 12,
+			});
+
 			const { result } = renderHook(() => useSettings());
 			await waitForSettingsLoaded(result);
 
-			// Test minimum readable size
-			act(() => {
-				result.current.setFontSize(8);
-			});
-			expect(document.documentElement.style.fontSize).toBe('8px');
-
-			// Test maximum comfortable size
-			act(() => {
-				result.current.setFontSize(32);
-			});
-			expect(document.documentElement.style.fontSize).toBe('32px');
-		});
-
-		it('should not apply font size until settings are fully loaded (prevents layout shift)', async () => {
-			const { result } = renderHook(() => useSettings());
-
-			// Before settings load, fontSize should not be applied
-			expect(result.current.settingsLoaded).toBe(false);
-
-			await waitForSettingsLoaded(result);
-
-			// After settings load, fontSize should be applied
-			expect(document.documentElement.style.fontSize).toBe('14px');
+			// 12 is below 14 so gets clamped to 14
+			expect(result.current.fontSize).toBe(14);
 		});
 	});
 
-	describe('rem-based Sizing Consistency', () => {
-		it('should scale rem units correctly with different font sizes', async () => {
+	describe('Font Size Preset Mapping', () => {
+		it('should support three font size presets: 14 (Small), 16 (Medium), 18 (Large)', async () => {
 			const { result } = renderHook(() => useSettings());
 			await waitForSettingsLoaded(result);
 
-			// With 14px base, 1rem = 14px
-			act(() => {
-				result.current.setFontSize(14);
-			});
-			expect(document.documentElement.style.fontSize).toBe('14px');
-			// In actual DOM, 1rem would equal 14px, 2rem = 28px, etc.
-
-			// With 16px base, 1rem = 16px (browser default)
-			act(() => {
-				result.current.setFontSize(16);
-			});
-			expect(document.documentElement.style.fontSize).toBe('16px');
-
-			// With 20px base, 1rem = 20px
-			act(() => {
-				result.current.setFontSize(20);
-			});
-			expect(document.documentElement.style.fontSize).toBe('20px');
+			const validPresets = [14, 16, 18];
+			for (const preset of validPresets) {
+				act(() => {
+					result.current.setFontSize(preset);
+				});
+				expect(result.current.fontSize).toBe(preset);
+			}
 		});
 
-		it('should maintain proportional sizing when base font size changes', async () => {
+		it('should update fontSize state without modifying document root', async () => {
 			const { result } = renderHook(() => useSettings());
+			const originalRootFontSize = document.documentElement.style.fontSize;
 			await waitForSettingsLoaded(result);
 
-			// Test that changing base font size maintains ratios
-			const baseSizes = [12, 14, 16, 18, 20];
+			act(() => {
+				result.current.setFontSize(18);
+			});
 
-			for (const baseSize of baseSizes) {
-				act(() => {
-					result.current.setFontSize(baseSize);
-				});
-
-				const computedBase = parseInt(document.documentElement.style.fontSize);
-				expect(computedBase).toBe(baseSize);
-
-				// In the actual DOM, all rem-based sizes would scale proportionally
-				// 0.875rem text would be 0.875 * baseSize
-				// 1.5rem text would be 1.5 * baseSize
-				// etc.
-			}
+			// Font size applies via Tailwind classes, not global rem scaling
+			expect(result.current.fontSize).toBe(18);
+			expect(document.documentElement.style.fontSize).toBe(originalRootFontSize);
 		});
 	});
 
@@ -640,54 +612,47 @@ describe('Cross-platform Sizing Units', () => {
 		});
 	});
 
-	describe('Tailwind rem-based sizing', () => {
-		it('should scale with document root font size', async () => {
+	describe('Tailwind class-based sizing', () => {
+		it('should use Tailwind class mapping instead of root font scaling', async () => {
 			const { result } = renderHook(() => useSettings());
 			await waitForSettingsLoaded(result);
 
-			// When fontSize changes, all rem-based Tailwind classes scale
-			const testSizes = [12, 14, 16, 18];
+			// Font size is now mapped to Tailwind classes in components:
+			// 14 -> text-sm, 16 -> text-base, 18 -> text-lg
+			// This keeps secondary UI (modals, settings) unaffected
+			const validPresets = [14, 16, 18];
 
-			for (const size of testSizes) {
+			for (const size of validPresets) {
 				act(() => {
 					result.current.setFontSize(size);
 				});
-
-				// Verify root font size is set
-				expect(document.documentElement.style.fontSize).toBe(`${size}px`);
-
-				// In actual rendering:
-				// text-sm (0.875rem) = 0.875 * size px
-				// text-base (1rem) = size px
-				// text-lg (1.125rem) = 1.125 * size px
+				expect(result.current.fontSize).toBe(size);
 			}
 		});
 	});
 });
 
 describe('Accessibility Font Sizing', () => {
-	it('should support font sizes that meet WCAG minimum (16px equivalent) when scaled', async () => {
+	it('should support Medium preset (16px) that meets WCAG minimum', async () => {
 		const { result } = renderHook(() => useSettings());
 		await waitForSettingsLoaded(result);
 
-		// Users who need larger text can set fontSize to 16+
 		act(() => {
 			result.current.setFontSize(16);
 		});
 
-		expect(document.documentElement.style.fontSize).toBe('16px');
+		expect(result.current.fontSize).toBe(16);
 	});
 
-	it('should allow large font sizes for users with visual impairments', async () => {
+	it('should support Large preset (18px) for users who need bigger text', async () => {
 		const { result } = renderHook(() => useSettings());
 		await waitForSettingsLoaded(result);
 
-		// Support up to 24px or more for accessibility
 		act(() => {
-			result.current.setFontSize(24);
+			result.current.setFontSize(18);
 		});
 
-		expect(document.documentElement.style.fontSize).toBe('24px');
+		expect(result.current.fontSize).toBe(18);
 	});
 
 	it('should maintain line height proportions at different font sizes', () => {

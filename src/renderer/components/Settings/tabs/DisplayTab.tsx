@@ -117,15 +117,17 @@ export function DisplayTab({ theme }: DisplayTabProps) {
 				<div className="block text-xs font-bold opacity-70 uppercase mb-2">Font Size</div>
 				<ToggleButtonGroup
 					options={[
-						{ value: 12, label: 'Small' },
-						{ value: 14, label: 'Medium' },
-						{ value: 16, label: 'Large' },
-						{ value: 18, label: 'X-Large' },
+						{ value: 14, label: 'Small' },
+						{ value: 16, label: 'Medium' },
+						{ value: 18, label: 'Large' },
 					]}
 					value={fontSize}
 					onChange={setFontSize}
 					theme={theme}
 				/>
+				<p className="text-xs opacity-50 mt-2">
+					Adjusts text size in AI terminal output and the left sidebar.
+				</p>
 			</div>
 
 			{/* Terminal Width */}

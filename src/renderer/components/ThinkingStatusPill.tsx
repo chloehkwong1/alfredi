@@ -5,10 +5,12 @@
  *
  * When AutoRun is active, shows a special AutoRun pill with total elapsed time instead.
  */
-import { memo, useState, useEffect } from 'react';
-import { GitBranch } from 'lucide-react';
+import { memo, useState, useEffect, useRef } from 'react';
+import { GitBranch, Check } from 'lucide-react';
 import type { Session, Theme, AITab, BatchRunState, ThinkingItem } from '../types';
 import { formatTokensCompact } from '../utils/formatters';
+import { useSettingsStore } from '../stores/settingsStore';
+import { fontSizeToSecondary } from '../utils/fontSizeClass';
 
 interface ThinkingStatusPillProps {
 	/** Pre-filtered flat list of (session, tab) pairs — one entry per busy tab across all agents.
@@ -313,6 +315,28 @@ AutoRunPill.displayName = 'AutoRunPill';
  *
  * When AutoRun is active for the active session, shows AutoRunPill instead.
  */
+/** Snapshot captured when all agents finish thinking (busy -> idle transition) */
+interface CompletedSnapshot {
+	elapsedTime: string;
+	tokens: number;
+}
+
+/** Format seconds into a human-readable elapsed time string */
+function formatElapsedTime(seconds: number): string {
+	const days = Math.floor(seconds / 86400);
+	const hours = Math.floor((seconds % 86400) / 3600);
+	const mins = Math.floor((seconds % 3600) / 60);
+	const secs = seconds % 60;
+
+	if (days > 0) {
+		return `${days}d ${hours}h ${mins}m ${secs}s`;
+	} else if (hours > 0) {
+		return `${hours}h ${mins}m ${secs}s`;
+	} else {
+		return `${mins}m ${secs}s`;
+	}
+}
+
 function ThinkingStatusPillInner({
 	thinkingItems,
 	theme,
@@ -324,10 +348,100 @@ function ThinkingStatusPillInner({
 	onInterrupt,
 }: ThinkingStatusPillProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
+	const fontSize = useSettingsStore((s) => s.fontSize);
+	const completionSound = useSettingsStore((s) => s.completionSound);
+	const pillTextClass = fontSizeToSecondary(fontSize);
+
+	// Track previous thinkingItems length for busy -> idle detection
+	const prevThinkingLengthRef = useRef(thinkingItems.length);
+	const lastPrimaryItemRef = useRef<ThinkingItem | null>(null);
+	const [completedItem, setCompletedItem] = useState<CompletedSnapshot | null>(null);
+
+	// Keep track of the last primary item so we can capture its data on transition
+	useEffect(() => {
+		if (thinkingItems.length > 0) {
+			const activeItem = thinkingItems.find((item) => item.session.id === activeSessionId);
+			lastPrimaryItemRef.current = activeItem || thinkingItems[0];
+		}
+	}, [thinkingItems, activeSessionId]);
+
+	// Detect busy -> idle transition
+	useEffect(() => {
+		const prevLength = prevThinkingLengthRef.current;
+		const currLength = thinkingItems.length;
+		prevThinkingLengthRef.current = currLength;
+
+		if (prevLength > 0 && currLength === 0) {
+			// Transition detected: capture snapshot from last primary item
+			const lastItem = lastPrimaryItemRef.current;
+			if (lastItem) {
+				const startTime = lastItem.tab?.thinkingStartTime || lastItem.session.thinkingStartTime;
+				const elapsed = startTime
+					? formatElapsedTime(Math.floor((Date.now() - startTime) / 1000))
+					: '0m 0s';
+				const tokens = lastItem.session.currentCycleTokens || 0;
+
+				setCompletedItem({ elapsedTime: elapsed, tokens });
+
+				// Play completion sound
+				if (completionSound !== 'none') {
+					window.maestro.notification.playSound?.(completionSound);
+				}
+			}
+		}
+	}, [thinkingItems.length, completionSound]);
+
+	// Auto-clear the completed pill after 1.5s
+	useEffect(() => {
+		if (!completedItem) return;
+		const timer = setTimeout(() => setCompletedItem(null), 1500);
+		return () => clearTimeout(timer);
+	}, [completedItem]);
 
 	// If AutoRun is active for the current session, show the AutoRun pill instead
 	if (autoRunState?.isRunning) {
 		return <AutoRunPill theme={theme} autoRunState={autoRunState} onStop={onStopAutoRun} />;
+	}
+
+	// Show completion pill when all agents just finished
+	if (thinkingItems.length === 0 && completedItem) {
+		return (
+			<div className="relative flex justify-center pb-2 -mt-2">
+				<div
+					className="flex items-center gap-2 px-4 py-1.5 rounded-full animate-completion-fade"
+					style={{
+						backgroundColor: theme.colors.success + '20',
+						border: `1px solid ${theme.colors.success}40`,
+					}}
+				>
+					<Check className="w-3.5 h-3.5" style={{ color: theme.colors.success }} />
+					<span className={`${pillTextClass} font-medium`} style={{ color: theme.colors.success }}>
+						Done
+					</span>
+					<div
+						className="w-px h-4 shrink-0"
+						style={{ backgroundColor: theme.colors.success + '40' }}
+					/>
+					<span className={`${pillTextClass} font-mono`} style={{ color: theme.colors.textDim }}>
+						{completedItem.elapsedTime}
+					</span>
+					{completedItem.tokens > 0 && (
+						<>
+							<div
+								className="w-px h-4 shrink-0"
+								style={{ backgroundColor: theme.colors.success + '40' }}
+							/>
+							<span
+								className={`${pillTextClass} font-mono`}
+								style={{ color: theme.colors.textDim }}
+							>
+								{formatTokensCompact(completedItem.tokens)}
+							</span>
+						</>
+					)}
+				</div>
+			</div>
+		);
 	}
 
 	// thinkingItems is pre-filtered by caller (PERF optimization)
@@ -357,15 +471,21 @@ function ThinkingStatusPillInner({
 			<div
 				className="flex items-center gap-2 px-4 py-1.5 rounded-full"
 				style={{
-					backgroundColor: theme.colors.warning + '20',
-					border: `1px solid ${theme.colors.border}`,
+					backgroundColor: (isWaitingInput ? theme.colors.accent : theme.colors.warning) + '20',
+					border: `1px solid ${isWaitingInput ? theme.colors.accent + '40' : theme.colors.border}`,
 				}}
 			>
-				{/* Sequential ellipsis animation (pauses when waiting for input) */}
+				{/* Sequential ellipsis animation / accent waiting indicator */}
 				{isWaitingInput ? (
-					<span className="text-xs" style={{ color: theme.colors.textDim }}>
-						Waiting for input
-					</span>
+					<div className="flex items-center gap-1.5">
+						<div
+							className="w-2 h-2 rounded-full animate-pulse"
+							style={{ backgroundColor: theme.colors.accent }}
+						/>
+						<span className={pillTextClass} style={{ color: theme.colors.accent }}>
+							Waiting for input
+						</span>
+					</div>
 				) : (
 					<ThinkingEllipsis color={theme.colors.warning} />
 				)}
@@ -374,7 +494,10 @@ function ThinkingStatusPillInner({
 				{primaryTokens > 0 && !isWaitingInput && (
 					<>
 						<div className="w-px h-4 shrink-0" style={{ backgroundColor: theme.colors.border }} />
-						<span className="text-xs font-mono shrink-0" style={{ color: theme.colors.textMain }}>
+						<span
+							className={`${pillTextClass} font-mono shrink-0`}
+							style={{ color: theme.colors.textMain }}
+						>
 							{formatTokensCompact(primaryTokens)}
 						</span>
 					</>

@@ -327,6 +327,34 @@ textarea::placeholder {
 	animation: token-update 0.4s ease-out;
 }
 
+@keyframes accent-ring-pulse {
+	0%,
+	100% {
+		box-shadow: 0 0 0 0 var(--ring-color);
+	}
+	50% {
+		box-shadow: 0 0 0 4px var(--ring-color);
+	}
+}
+
+.animate-accent-ring {
+	animation: accent-ring-pulse 2s ease-in-out infinite;
+}
+
+@keyframes completion-fade {
+	0%,
+	70% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+.animate-completion-fade {
+	animation: completion-fade 1.5s ease-out forwards;
+}
+
 /* Animated progress bar with stripes for indeterminate state */
 .progress-bar-animated {
 	background-image: linear-gradient(
@@ -713,5 +741,16 @@ svg.wand-sparkle-active path:nth-child(8) {
 	/* Disable Document Graph search highlight animations */
 	.search-highlight {
 		animation: none !important;
+	}
+
+	/* Disable accent ring pulse animation */
+	.animate-accent-ring {
+		animation: none !important;
+	}
+
+	/* Disable completion fade animation */
+	.animate-completion-fade {
+		animation: none !important;
+		opacity: 1 !important;
 	}
 }

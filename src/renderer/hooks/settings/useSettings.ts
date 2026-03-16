@@ -112,6 +112,8 @@ export interface UseSettingsReturn {
 	setAudioFeedbackCommand: (value: string) => void;
 	notificationSound: string;
 	setNotificationSound: (value: string) => void;
+	completionSound: string;
+	setCompletionSound: (value: string) => void;
 	toastDuration: number;
 	setToastDuration: (value: number) => void;
 
@@ -294,13 +296,9 @@ export function useSettings(): UseSettingsReturn {
 		return cleanup;
 	}, []);
 
-	// Apply font size to HTML root element so rem-based Tailwind classes scale
-	// Only apply after settings are loaded to prevent layout shift from default->saved font size
-	useEffect(() => {
-		if (store.settingsLoaded) {
-			document.documentElement.style.fontSize = `${store.fontSize}px`;
-		}
-	}, [store.fontSize, store.settingsLoaded]);
+	// Font size is now applied via Tailwind class mapping in individual components
+	// (fontSizeToClass/fontSizeToSecondary) rather than global rem scaling,
+	// so secondary UI (settings, modals) stays unaffected.
 
 	return {
 		...store,

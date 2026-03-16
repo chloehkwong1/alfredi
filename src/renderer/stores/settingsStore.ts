@@ -162,6 +162,7 @@ export interface SettingsStoreState {
 	audioFeedbackEnabled: boolean;
 	audioFeedbackCommand: string;
 	notificationSound: string;
+	completionSound: string;
 	toastDuration: number;
 	checkForUpdatesOnStartup: boolean;
 	enableBetaUpdates: boolean;
@@ -239,6 +240,7 @@ export interface SettingsStoreActions {
 	setAudioFeedbackEnabled: (value: boolean) => void;
 	setAudioFeedbackCommand: (value: string) => void;
 	setNotificationSound: (value: string) => void;
+	setCompletionSound: (value: string) => void;
 	setToastDuration: (value: number) => void;
 	setCheckForUpdatesOnStartup: (value: boolean) => void;
 	setEnableBetaUpdates: (value: boolean) => void;
@@ -363,6 +365,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	audioFeedbackEnabled: false,
 	audioFeedbackCommand: 'say',
 	notificationSound: 'Ping',
+	completionSound: 'Tink',
 	toastDuration: 20,
 	checkForUpdatesOnStartup: true,
 	enableBetaUpdates: false,
@@ -562,6 +565,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setNotificationSound: (value) => {
 		set({ notificationSound: value });
 		window.maestro.settings.set('notificationSound', value);
+	},
+
+	setCompletionSound: (value) => {
+		set({ completionSound: value });
+		window.maestro.settings.set('completionSound', value);
 	},
 
 	setToastDuration: (value) => {
@@ -1142,7 +1150,11 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['fontFamily'] !== undefined)
 			patch.fontFamily = allSettings['fontFamily'] as string;
 
-		if (allSettings['fontSize'] !== undefined) patch.fontSize = allSettings['fontSize'] as number;
+		if (allSettings['fontSize'] !== undefined) {
+			const raw = allSettings['fontSize'] as number;
+			// Migrate old values (e.g. 12) to nearest valid preset: 14, 16, or 18
+			patch.fontSize = raw <= 14 ? 14 : raw <= 16 ? 16 : 18;
+		}
 
 		if (allSettings['activeThemeId'] !== undefined)
 			patch.activeThemeId = allSettings['activeThemeId'] as ThemeId;
@@ -1219,6 +1231,9 @@ export async function loadAllSettings(): Promise<void> {
 
 		if (allSettings['notificationSound'] !== undefined)
 			patch.notificationSound = allSettings['notificationSound'] as string;
+
+		if (allSettings['completionSound'] !== undefined)
+			patch.completionSound = allSettings['completionSound'] as string;
 
 		if (allSettings['toastDuration'] !== undefined)
 			patch.toastDuration = allSettings['toastDuration'] as number;

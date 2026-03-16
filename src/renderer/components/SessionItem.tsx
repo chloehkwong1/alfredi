@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useRef, useState, useEffect } from 'react';
 import {
 	Activity,
 	GitBranch,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import type { Session, Theme } from '../types';
 import type { WorktreeStatus } from '../../shared/types';
+import { useSettingsStore } from '../stores/settingsStore';
+import { fontSizeToClass, fontSizeToSecondary } from '../utils/fontSizeClass';
 
 // Map worktree status to theme color for left border accent
 const getWorktreeStatusColor = (
@@ -199,6 +201,25 @@ export const SessionItem = memo(function SessionItem({
 	onStartRename,
 	onToggleBookmark,
 }: SessionItemProps) {
+	const fontSize = useSettingsStore((s) => s.fontSize);
+	const primaryClass = fontSizeToClass(fontSize);
+	const secondaryClass = fontSizeToSecondary(fontSize);
+
+	// Track busy -> idle transition for completion pulse on status dot
+	const prevStateRef = useRef(session.state);
+	const [showCompletionPulse, setShowCompletionPulse] = useState(false);
+
+	useEffect(() => {
+		const prevState = prevStateRef.current;
+		prevStateRef.current = session.state;
+
+		if (prevState === 'busy' && session.state === 'idle') {
+			setShowCompletionPulse(true);
+			const timer = setTimeout(() => setShowCompletionPulse(false), 600);
+			return () => clearTimeout(timer);
+		}
+	}, [session.state]);
+
 	// Determine container styling based on variant
 	const getContainerClassName = () => {
 		const base = `flex items-center justify-between group transition-all hover:bg-opacity-50 ${isDragging ? 'opacity-50' : ''}`;
@@ -317,7 +338,7 @@ export const SessionItem = memo(function SessionItem({
 								</div>
 							)}
 							<span
-								className={`truncate ${variant === 'worktree' ? 'text-xs' : 'text-sm'} ${!isActive && session.aiTabs?.some((tab) => tab.hasUnread) ? 'font-semibold' : 'font-medium'}`}
+								className={`truncate ${variant === 'worktree' ? secondaryClass : primaryClass} ${!isActive && session.aiTabs?.some((tab) => tab.hasUnread) ? 'font-semibold' : 'font-medium'}`}
 								style={{ color: theme.colors.textMain }}
 							>
 								{session.name}
@@ -471,9 +492,14 @@ export const SessionItem = memo(function SessionItem({
 									case 'waiting_input':
 										return (
 											<span title="Waiting for input">
-												<ChevronRight
-													className="w-3 h-3 animate-pulse"
-													style={{ color: theme.colors.warning }}
+												<div
+													className="w-3 h-3 rounded-full animate-accent-ring"
+													style={
+														{
+															backgroundColor: theme.colors.accent,
+															'--ring-color': theme.colors.accent + '40',
+														} as React.CSSProperties
+													}
 												/>
 											</span>
 										);
@@ -514,8 +540,13 @@ export const SessionItem = memo(function SessionItem({
 										return (
 											<span title="Ready">
 												<div
-													className="w-2.5 h-2.5 rounded-full"
-													style={{ backgroundColor: theme.colors.success }}
+													className={`w-2.5 h-2.5 rounded-full${showCompletionPulse ? ' animate-highlight-pulse' : ''}`}
+													style={
+														{
+															backgroundColor: theme.colors.success,
+															'--pulse-color': theme.colors.success + '60',
+														} as React.CSSProperties
+													}
 												/>
 											</span>
 										);
