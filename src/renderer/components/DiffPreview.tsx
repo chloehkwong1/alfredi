@@ -18,6 +18,7 @@ import type { Theme, DiffViewTab } from '../types';
 import { getDiffStats } from '../utils/gitDiffParser';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
 import { gitService } from '../services/git';
+import { useDiffComments } from '../hooks/useDiffComments';
 import 'react-diff-view/style/index.css';
 
 const CONTEXT_INCREMENT = 10;
@@ -82,6 +83,7 @@ interface DiffPreviewProps {
 	onViewModeChange: (mode: 'unified' | 'split') => void;
 	onScrollPositionChange?: (scrollTop: number) => void;
 	onAskAboutLines?: (context: string) => void;
+	onComment?: (formattedComment: string) => void;
 	cwd?: string;
 	sshRemoteId?: string;
 }
@@ -93,6 +95,7 @@ export const DiffPreview = memo(function DiffPreview({
 	onViewModeChange,
 	onScrollPositionChange,
 	onAskAboutLines,
+	onComment,
 	cwd,
 	sshRemoteId,
 }: DiffPreviewProps) {
@@ -194,6 +197,17 @@ export const DiffPreview = memo(function DiffPreview({
 		return keys;
 	}, [parsedFiles]);
 
+	// --- Inline diff comments ---
+	const noopComment = useCallback(() => {}, []);
+	const { commentedKeys, handleGutterCommentClick, buildWidgets, renderGutter } = useDiffComments({
+		filePath: diff.filePath,
+		parsedFiles,
+		theme,
+		onComment: onComment ?? noopComment,
+	});
+
+	const commentCount = commentedKeys.size;
+
 	const handleChangeClick = useCallback(
 		({ change }: ChangeEventArgs, event: React.MouseEvent) => {
 			if (!change) return;
@@ -223,11 +237,21 @@ export const DiffPreview = memo(function DiffPreview({
 		[allChangeKeys]
 	);
 
+	const handleGutterDoubleClick = useCallback(
+		({ change }: ChangeEventArgs) => {
+			if (!change || !onComment) return;
+			const key = getChangeKey(change);
+			handleGutterCommentClick(key, selectedChangeKeys);
+		},
+		[onComment, handleGutterCommentClick, selectedChangeKeys]
+	);
+
 	const gutterEvents: EventMap = useMemo(
 		() => ({
 			onClick: handleChangeClick as EventMap['onClick'],
+			onDoubleClick: handleGutterDoubleClick as EventMap['onDoubleClick'],
 		}),
-		[handleChangeClick]
+		[handleChangeClick, handleGutterDoubleClick]
 	);
 
 	const codeEvents: EventMap = useMemo(
@@ -283,15 +307,21 @@ export const DiffPreview = memo(function DiffPreview({
 		lastClickedKeyRef.current = null;
 	}, [onAskAboutLines, selectedChangeKeys, parsedFiles, diff.filePath]);
 
-	// Keyboard shortcut: Enter when lines are selected triggers Ask Claude
+	// Keyboard shortcuts when lines are selected
 	useEffect(() => {
-		if (selectedChangeKeys.length === 0 || !onAskAboutLines) return;
+		if (selectedChangeKeys.length === 0) return;
 
 		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === 'Enter') {
+			if (e.key === 'Enter' && onAskAboutLines) {
 				e.preventDefault();
 				e.stopPropagation();
 				handleAskAboutSelection();
+			} else if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey && onComment) {
+				// 'c' opens inline comment on the last selected line
+				e.preventDefault();
+				e.stopPropagation();
+				const anchorKey = selectedChangeKeys[selectedChangeKeys.length - 1];
+				handleGutterCommentClick(anchorKey, selectedChangeKeys);
 			} else if (e.key === 'Escape') {
 				setSelectedChangeKeys([]);
 				lastClickedKeyRef.current = null;
@@ -300,7 +330,13 @@ export const DiffPreview = memo(function DiffPreview({
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [selectedChangeKeys, onAskAboutLines, handleAskAboutSelection]);
+	}, [
+		selectedChangeKeys,
+		onAskAboutLines,
+		onComment,
+		handleAskAboutSelection,
+		handleGutterCommentClick,
+	]);
 
 	// Determine the max lines in the file (for knowing when all context is shown)
 	const maxFileLines = useMemo(() => {
@@ -434,7 +470,7 @@ export const DiffPreview = memo(function DiffPreview({
 						>
 							{diff.oldRef}
 						</span>
-						<span>→</span>
+						<span>&rarr;</span>
 						<span
 							className="px-1.5 py-0.5 rounded font-mono"
 							style={{ backgroundColor: c.bgActivity }}
@@ -456,6 +492,12 @@ export const DiffPreview = memo(function DiffPreview({
 								<span className="text-red-500 flex items-center gap-0.5">
 									<Minus className="w-3 h-3" />
 									{stats.deletions}
+								</span>
+							)}
+							{commentCount > 0 && (
+								<span className="flex items-center gap-0.5" style={{ color: c.accent }}>
+									<MessageSquare className="w-3 h-3" />
+									{commentCount}
 								</span>
 							)}
 						</span>
@@ -511,6 +553,37 @@ export const DiffPreview = memo(function DiffPreview({
 				) : parsedFiles.length > 0 ? (
 					<div className="font-mono text-sm p-4">
 						<style>{generateDiffViewStyles(theme)}</style>
+						{onComment && (
+							<style>{`
+								/* Gutter hover: show + icon for inline comment */
+								.diff-gutter:hover {
+									cursor: pointer;
+									position: relative;
+								}
+								.diff-gutter:hover::after {
+									content: '+';
+									position: absolute;
+									right: 2px;
+									top: 50%;
+									transform: translateY(-50%);
+									width: 16px;
+									height: 16px;
+									border-radius: 3px;
+									background: ${c.accent};
+									color: #fff;
+									font-size: 12px;
+									font-weight: 600;
+									line-height: 16px;
+									text-align: center;
+									opacity: 0.8;
+									pointer-events: none;
+								}
+								/* Widget rows: full width for comment input */
+								.diff-widget {
+									padding: 0;
+								}
+							`}</style>
+						)}
 						{parsedFiles.map((file, fileIndex) => {
 							// Check if all context is already shown (single hunk covering the whole file)
 							// Only possible when we have full file content to compare against
@@ -519,6 +592,8 @@ export const DiffPreview = memo(function DiffPreview({
 								file.hunks.length === 1 &&
 								file.hunks[0].oldStart === 1 &&
 								file.hunks[0].oldLines >= maxFileLines - 1;
+
+							const widgets = onComment ? buildWidgets() : undefined;
 
 							return (
 								<Diff
@@ -529,6 +604,8 @@ export const DiffPreview = memo(function DiffPreview({
 									selectedChanges={selectedChangeKeys}
 									gutterEvents={gutterEvents}
 									codeEvents={codeEvents}
+									widgets={widgets}
+									renderGutter={onComment && commentedKeys.size > 0 ? renderGutter : undefined}
 								>
 									{(hunks) =>
 										hunks.length > 0 ? (

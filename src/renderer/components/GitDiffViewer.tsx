@@ -18,6 +18,7 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { ImageDiffViewer } from './ImageDiffViewer';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
 import { gitService } from '../services/git';
+import { useDiffComments } from '../hooks/useDiffComments';
 import 'react-diff-view/style/index.css';
 
 const CONTEXT_INCREMENT = 10;
@@ -57,6 +58,7 @@ interface GitDiffViewerProps {
 	theme: Theme;
 	onClose: () => void;
 	onAskAboutLines?: (context: string) => void;
+	onComment?: (formattedComment: string) => void;
 	sshRemoteId?: string;
 }
 
@@ -66,6 +68,7 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 	theme,
 	onClose,
 	onAskAboutLines,
+	onComment,
 	sshRemoteId,
 }: GitDiffViewerProps) {
 	const [activeTab, setActiveTab] = useState(0);
@@ -177,6 +180,19 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 		return keys;
 	}, [parsedFiles, activeTab]);
 
+	// --- Inline diff comments ---
+	const activeFilePath = parsedFiles[activeTab]?.newPath || parsedFiles[activeTab]?.oldPath || '';
+	const activeFileParsedDiff = parsedFiles[activeTab]?.parsedDiff ?? [];
+	const noopComment = useCallback(() => {}, []);
+	const { commentedKeys, handleGutterCommentClick, buildWidgets, renderGutter } = useDiffComments({
+		filePath: activeFilePath,
+		parsedFiles: activeFileParsedDiff,
+		theme,
+		onComment: onComment ?? noopComment,
+	});
+
+	const commentCount = commentedKeys.size;
+
 	const handleChangeClick = useCallback(
 		({ change }: ChangeEventArgs, event: React.MouseEvent) => {
 			if (!change) return;
@@ -203,9 +219,21 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 		[allChangeKeys]
 	);
 
+	const handleGutterDoubleClick = useCallback(
+		({ change }: ChangeEventArgs) => {
+			if (!change || !onComment) return;
+			const key = getChangeKey(change);
+			handleGutterCommentClick(key, selectedChangeKeys);
+		},
+		[onComment, handleGutterCommentClick, selectedChangeKeys]
+	);
+
 	const gutterEvents: EventMap = useMemo(
-		() => ({ onClick: handleChangeClick as EventMap['onClick'] }),
-		[handleChangeClick]
+		() => ({
+			onClick: handleChangeClick as EventMap['onClick'],
+			onDoubleClick: handleGutterDoubleClick as EventMap['onDoubleClick'],
+		}),
+		[handleChangeClick, handleGutterDoubleClick]
 	);
 
 	const codeEvents: EventMap = useMemo(
@@ -259,15 +287,21 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 		lastClickedKeyRef.current = null;
 	}, [onAskAboutLines, selectedChangeKeys, parsedFiles, activeTab]);
 
-	// Keyboard shortcut: Enter triggers Ask Claude, Escape clears selection
+	// Keyboard shortcuts when lines are selected
 	useEffect(() => {
-		if (selectedChangeKeys.length === 0 || !onAskAboutLines) return;
+		if (selectedChangeKeys.length === 0) return;
 
 		const handleKeyDown = (e: KeyboardEvent) => {
-			if (e.key === 'Enter') {
+			if (e.key === 'Enter' && onAskAboutLines) {
 				e.preventDefault();
 				e.stopPropagation();
 				handleAskAboutSelection();
+			} else if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !e.altKey && onComment) {
+				// 'c' opens inline comment on the last selected line
+				e.preventDefault();
+				e.stopPropagation();
+				const anchorKey = selectedChangeKeys[selectedChangeKeys.length - 1];
+				handleGutterCommentClick(anchorKey, selectedChangeKeys);
 			} else if (e.key === 'Escape') {
 				setSelectedChangeKeys([]);
 				lastClickedKeyRef.current = null;
@@ -276,7 +310,13 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [selectedChangeKeys, onAskAboutLines, handleAskAboutSelection]);
+	}, [
+		selectedChangeKeys,
+		onAskAboutLines,
+		onComment,
+		handleAskAboutSelection,
+		handleGutterCommentClick,
+	]);
 
 	// Handle expanding context lines by re-fetching the diff with more context
 	const handleExpandContext = useCallback(async () => {
@@ -468,79 +508,116 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 					) : activeFile && activeFile.parsedDiff.length > 0 ? (
 						<div className="font-mono text-sm">
 							<style>{generateDiffViewStyles(theme)}</style>
-							{activeFile.parsedDiff.map((file, fileIndex) => (
-								<div key={fileIndex}>
-									{/* File header */}
-									<div
-										className="mb-4 p-2 rounded font-semibold text-xs"
-										style={{
-											backgroundColor: theme.colors.bgActivity,
-											color: theme.colors.textMain,
-										}}
-									>
-										{file.oldPath} → {file.newPath}
+							{onComment && (
+								<style>{`
+									/* Gutter hover: show + icon for inline comment */
+									.diff-gutter:hover {
+										cursor: pointer;
+										position: relative;
+									}
+									.diff-gutter:hover::after {
+										content: '+';
+										position: absolute;
+										right: 2px;
+										top: 50%;
+										transform: translateY(-50%);
+										width: 16px;
+										height: 16px;
+										border-radius: 3px;
+										background: ${theme.colors.accent};
+										color: #fff;
+										font-size: 12px;
+										font-weight: 600;
+										line-height: 16px;
+										text-align: center;
+										opacity: 0.8;
+										pointer-events: none;
+									}
+									/* Widget rows: full width for comment input */
+									.diff-widget {
+										padding: 0;
+									}
+								`}</style>
+							)}
+							{activeFile.parsedDiff.map((file, fileIndex) => {
+								const widgets = onComment ? buildWidgets() : undefined;
+
+								return (
+									<div key={fileIndex}>
+										{/* File header */}
+										<div
+											className="mb-4 p-2 rounded font-semibold text-xs"
+											style={{
+												backgroundColor: theme.colors.bgActivity,
+												color: theme.colors.textMain,
+											}}
+										>
+											{file.oldPath} → {file.newPath}
+										</div>
+
+										{/* Render each hunk */}
+										<Diff
+											viewType="unified"
+											diffType={file.type}
+											hunks={file.hunks}
+											selectedChanges={selectedChangeKeys}
+											gutterEvents={gutterEvents}
+											codeEvents={codeEvents}
+											widgets={widgets}
+											renderGutter={onComment && commentedKeys.size > 0 ? renderGutter : undefined}
+										>
+											{(hunks) =>
+												hunks.flatMap((hunk, hunkIndex) => {
+													const elements: ReactElement[] = [];
+
+													// Expand-up button before first hunk
+													if (hunkIndex === 0 && hunk.oldStart > 1) {
+														elements.push(
+															<Decoration key={`expand-top-${hunkIndex}`}>
+																<ExpandButton
+																	direction="up"
+																	onClick={handleExpandContext}
+																	color={theme.colors.textDim}
+																/>
+															</Decoration>
+														);
+													}
+
+													elements.push(<Hunk key={hunk.content} hunk={hunk} />);
+
+													// Expand button between hunks (gap)
+													if (hunkIndex < hunks.length - 1) {
+														elements.push(
+															<Decoration key={`expand-between-${hunkIndex}`}>
+																<ExpandButton
+																	direction="both"
+																	onClick={handleExpandContext}
+																	color={theme.colors.textDim}
+																/>
+															</Decoration>
+														);
+													}
+
+													// Expand-down button after last hunk
+													if (hunkIndex === hunks.length - 1) {
+														elements.push(
+															<Decoration key={`expand-bottom-${hunkIndex}`}>
+																<ExpandButton
+																	direction="down"
+																	onClick={handleExpandContext}
+																	color={theme.colors.textDim}
+																/>
+															</Decoration>
+														);
+													}
+
+													return elements;
+												})
+											}
+										</Diff>
 									</div>
-
-									{/* Render each hunk */}
-									<Diff
-										viewType="unified"
-										diffType={file.type}
-										hunks={file.hunks}
-										selectedChanges={selectedChangeKeys}
-										gutterEvents={gutterEvents}
-										codeEvents={codeEvents}
-									>
-										{(hunks) =>
-											hunks.flatMap((hunk, hunkIndex) => {
-												const elements: ReactElement[] = [];
-
-												// Expand-up button before first hunk
-												if (hunkIndex === 0 && hunk.oldStart > 1) {
-													elements.push(
-														<Decoration key={`expand-top-${hunkIndex}`}>
-															<ExpandButton
-																direction="up"
-																onClick={handleExpandContext}
-																color={theme.colors.textDim}
-															/>
-														</Decoration>
-													);
-												}
-
-												elements.push(<Hunk key={hunk.content} hunk={hunk} />);
-
-												// Expand button between hunks (gap)
-												if (hunkIndex < hunks.length - 1) {
-													elements.push(
-														<Decoration key={`expand-between-${hunkIndex}`}>
-															<ExpandButton
-																direction="both"
-																onClick={handleExpandContext}
-																color={theme.colors.textDim}
-															/>
-														</Decoration>
-													);
-												}
-
-												// Expand-down button after last hunk
-												if (hunkIndex === hunks.length - 1) {
-													elements.push(
-														<Decoration key={`expand-bottom-${hunkIndex}`}>
-															<ExpandButton
-																direction="down"
-																onClick={handleExpandContext}
-																color={theme.colors.textDim}
-															/>
-														</Decoration>
-													);
-												}
-
-												return elements;
-											})
-										}
-									</Diff>
-								</div>
-							))}
+								);
+							})}
 						</div>
 					) : (
 						<div className="flex items-center justify-center h-full">
@@ -593,6 +670,12 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 									<Minus className="w-3 h-3" />
 									{stats.deletions} deletions
 								</span>
+								{commentCount > 0 && (
+									<span className="flex items-center gap-1" style={{ color: theme.colors.accent }}>
+										<MessageSquare className="w-3 h-3" />
+										{commentCount} {commentCount === 1 ? 'comment' : 'comments'}
+									</span>
+								)}
 							</div>
 						)}
 					</div>

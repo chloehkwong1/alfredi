@@ -688,6 +688,7 @@ export interface AppUtilityModalsProps {
 	gitViewerCwd: string;
 	onCloseGitDiff: () => void;
 	onAskAboutDiffLines?: (context: string) => void;
+	onDiffComment?: (formattedComment: string) => void;
 
 	// GitLogViewer
 	gitLogOpen: boolean;
@@ -819,6 +820,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 	gitViewerCwd,
 	onCloseGitDiff,
 	onAskAboutDiffLines,
+	onDiffComment,
 	// GitLogViewer
 	gitLogOpen,
 	onCloseGitLog,
@@ -940,6 +942,7 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 									}
 								: undefined
 						}
+						onComment={onDiffComment}
 						sshRemoteId={
 							activeSession?.sshRemoteId ||
 							(activeSession?.sessionSshRemoteConfig?.enabled
@@ -1335,6 +1338,7 @@ export interface AppModalsProps {
 	gitViewerCwd: string;
 	onCloseGitDiff: () => void;
 	onAskAboutDiffLines?: (context: string) => void;
+	onDiffComment?: (formattedComment: string) => void;
 	onCloseGitLog: () => void;
 	onAutoRunFolderSelected: (folderPath: string) => void;
 	onStartBatchRun: (config: BatchRunConfig) => void | Promise<void>;
@@ -1595,6 +1599,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		gitViewerCwd,
 		onCloseGitDiff,
 		onAskAboutDiffLines,
+		onDiffComment,
 		onCloseGitLog,
 		onAutoRunFolderSelected,
 		onStartBatchRun,
@@ -1808,6 +1813,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				gitViewerCwd={gitViewerCwd}
 				onCloseGitDiff={onCloseGitDiff}
 				onAskAboutDiffLines={onAskAboutDiffLines}
+				onDiffComment={onDiffComment}
 				gitLogOpen={gitLogOpen}
 				onCloseGitLog={onCloseGitLog}
 				onOpenSymphony={onOpenSymphony}

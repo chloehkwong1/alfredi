@@ -2287,6 +2287,9 @@ function MaestroConsoleInner() {
 					onAskAboutDiffLines={(context) => {
 						setInputValue(context + '\n\n');
 					}}
+					onDiffComment={(comment) => {
+						mainPanelRef.current?.addStagedQuote(comment);
+					}}
 					onCloseGitLog={handleCloseGitLog}
 					onAutoRunFolderSelected={handleAutoRunFolderSelected}
 					onStartBatchRun={handleStartBatchRun}

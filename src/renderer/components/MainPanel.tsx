@@ -83,6 +83,8 @@ export interface MainPanelHandle {
 	refreshGitInfo: () => Promise<void>;
 	/** Focus the file preview container (if open) */
 	focusFilePreview: () => void;
+	/** Add a formatted comment to staged quotes */
+	addStagedQuote: (comment: string) => void;
 }
 
 interface MainPanelProps {
@@ -929,6 +931,9 @@ export const MainPanel = React.memo(
 					} else {
 						filePreviewContainerRef.current?.focus();
 					}
+				},
+				addStagedQuote: (comment: string) => {
+					setStagedQuotes((prev) => [...prev, comment]);
 				},
 			}),
 			[refreshGitStatus]
@@ -2252,6 +2257,7 @@ export const MainPanel = React.memo(
 											}
 										}, 50);
 									}}
+									onComment={(comment) => setStagedQuotes((prev) => [...prev, comment])}
 									cwd={activeSession?.cwd}
 									sshRemoteId={filePreviewSshRemoteId}
 								/>
