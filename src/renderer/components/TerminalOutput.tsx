@@ -699,6 +699,7 @@ const LogItemComponent = memo(
 					style={
 						isAIMode
 							? {
+									...(log.interrupted ? { opacity: 0.45 } : {}),
 									// AI mode: error/stderr get a left accent border on the outer container
 									...(log.source === 'stderr' || log.source === 'error'
 										? {
@@ -708,6 +709,7 @@ const LogItemComponent = memo(
 										: {}),
 								}
 							: {
+									...(log.interrupted ? { opacity: 0.45 } : {}),
 									backgroundColor: isUserMessage
 										? `color-mix(in srgb, ${theme.colors.accent} 15%, ${theme.colors.bgActivity})`
 										: log.source === 'stderr' || log.source === 'error'
@@ -910,7 +912,7 @@ const LogItemComponent = memo(
 											>
 												{log.text}
 											</span>
-											{log.metadata?.toolState?.status === 'running' && (
+											{log.metadata?.toolState?.status === 'running' && !log.interrupted && (
 												<span
 													className="animate-pulse shrink-0 pt-0.5"
 													style={{ color: theme.colors.warning }}
@@ -1557,8 +1559,16 @@ const WorkGroupComponent = memo(
 
 		const chevron = isExpanded ? '\u25BE' : '\u25B8'; // ▾ or ▸
 
+		const isGroupInterrupted = group.entries.every((e) => e.interrupted);
+
 		return (
-			<div className="px-6" style={{ maxWidth: isAIMode ? 'calc(680px + 3rem)' : undefined }}>
+			<div
+				className="px-6"
+				style={{
+					maxWidth: isAIMode ? 'calc(680px + 3rem)' : undefined,
+					...(isGroupInterrupted ? { opacity: 0.45 } : {}),
+				}}
+			>
 				{/* Header row — always visible */}
 				<div
 					className="py-1.5 text-[11px] cursor-pointer select-none flex items-center gap-2 transition-colors rounded px-2 -mx-2"

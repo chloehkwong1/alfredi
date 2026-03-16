@@ -4,7 +4,7 @@
  * Handles interrupting/stopping running AI processes:
  *   - Sends SIGINT to active process (AI or terminal mode)
  *   - Cancels pending synopsis before interrupting
- *   - Cleans up thinking/tool logs from interrupted tabs
+ *   - Marks thinking/tool logs as interrupted (preserved, rendered dimmed)
  *   - Processes execution queue after interruption
  *   - Falls back to force-kill if graceful interrupt fails
  *
@@ -16,6 +16,19 @@ import type { Session, LogEntry, QueuedItem, SessionState } from '../../types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { generateId } from '../../utils/ids';
 import { getActiveTab } from '../../utils/tabHelpers';
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Mark thinking/tool logs as interrupted instead of removing them. */
+function markLogsInterrupted(logs: LogEntry[]): LogEntry[] {
+	return logs.map((log) =>
+		(log.source === 'thinking' || log.source === 'tool') && !log.interrupted
+			? { ...log, interrupted: true }
+			: log
+	);
+}
 
 // ============================================================================
 // Dependencies interface
@@ -124,7 +137,7 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 						}
 
 						// Set the interrupted tab to idle, and the target tab for queued item to busy
-						// Also add the canceled log to the interrupted tab
+						// Mark thinking/tool logs as interrupted so they render dimmed
 						let updatedAiTabs = s.aiTabs.map((tab) => {
 							if (tab.id === targetTab.id) {
 								return {
@@ -133,15 +146,12 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 									thinkingStartTime: Date.now(),
 								};
 							}
-							// Set any other busy tabs to idle (they were interrupted) and add canceled log
-							// Also clear any thinking/tool logs since the process was interrupted
+							// Set any other busy tabs to idle (they were interrupted)
 							if (tab.state === 'busy') {
-								const logsWithoutThinkingOrTools = tab.logs.filter(
-									(log) => log.source !== 'thinking' && log.source !== 'tool'
-								);
+								const interruptedLogs = markLogsInterrupted(tab.logs);
 								const updatedLogs = canceledLog
-									? [...logsWithoutThinkingOrTools, canceledLog]
-									: logsWithoutThinkingOrTools;
+									? [...interruptedLogs, canceledLog]
+									: interruptedLogs;
 								return {
 									...tab,
 									state: 'idle' as const,
@@ -179,21 +189,19 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 					}
 
 					// No queued items, just go to idle and add canceled log to the active tab
-					// Also clear any thinking/tool logs since the process was interrupted
+					// Mark thinking/tool logs as interrupted so they render dimmed
 					const activeTabForCancel = getActiveTab(s);
 					const updatedAiTabsForIdle = s.aiTabs.map((tab) => {
 						if (tab.id === activeTabForCancel?.id || tab.state === 'busy') {
-							const logsWithoutThinkingOrTools = tab.logs.filter(
-								(log) => log.source !== 'thinking' && log.source !== 'tool'
-							);
+							const interruptedLogs = markLogsInterrupted(tab.logs);
 							return {
 								...tab,
 								state: 'idle' as const,
 								thinkingStartTime: undefined,
 								logs:
 									canceledLog && tab.id === activeTabForCancel?.id
-										? [...logsWithoutThinkingOrTools, canceledLog]
-										: logsWithoutThinkingOrTools,
+										? [...interruptedLogs, canceledLog]
+										: interruptedLogs,
 							};
 						}
 						return tab;
@@ -255,19 +263,17 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 						prev.map((s) => {
 							if (s.id !== activeSession.id) return s;
 
-							// Add kill log to the appropriate place and clear thinking/tool logs
+							// Add kill log and mark thinking/tool logs as interrupted
 							const updatedSession = { ...s };
 							if (currentMode === 'ai') {
 								const tab = getActiveTab(s);
 								if (tab) {
 									updatedSession.aiTabs = s.aiTabs.map((t) => {
 										if (t.id === tab.id) {
-											const logsWithoutThinkingOrTools = t.logs.filter(
-												(log) => log.source !== 'thinking' && log.source !== 'tool'
-											);
+											const interruptedLogs = markLogsInterrupted(t.logs);
 											return {
 												...t,
-												logs: [...logsWithoutThinkingOrTools, killLog],
+												logs: [...interruptedLogs, killLog],
 											};
 										}
 										return t;
@@ -295,7 +301,7 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 									};
 								}
 
-								// Set tabs appropriately and clear thinking/tool logs from interrupted tabs
+								// Set tabs appropriately and mark thinking/tool logs as interrupted
 								let updatedAiTabs = updatedSession.aiTabs.map((tab) => {
 									if (tab.id === targetTab.id) {
 										return {
@@ -305,14 +311,11 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 										};
 									}
 									if (tab.state === 'busy') {
-										const logsWithoutThinkingOrTools = tab.logs.filter(
-											(log) => log.source !== 'thinking' && log.source !== 'tool'
-										);
 										return {
 											...tab,
 											state: 'idle' as const,
 											thinkingStartTime: undefined,
-											logs: logsWithoutThinkingOrTools,
+											logs: markLogsInterrupted(tab.logs),
 										};
 									}
 									return tab;
@@ -344,7 +347,7 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 								};
 							}
 
-							// No queued items, just go to idle and clear thinking logs
+							// No queued items, just go to idle and mark thinking logs as interrupted
 							if (currentMode === 'ai') {
 								return {
 									...updatedSession,
@@ -353,14 +356,11 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 									thinkingStartTime: undefined,
 									aiTabs: updatedSession.aiTabs.map((t) => {
 										if (t.state === 'busy') {
-											const logsWithoutThinkingOrTools = t.logs.filter(
-												(log) => log.source !== 'thinking' && log.source !== 'tool'
-											);
 											return {
 												...t,
 												state: 'idle' as const,
 												thinkingStartTime: undefined,
-												logs: logsWithoutThinkingOrTools,
+												logs: markLogsInterrupted(t.logs),
 											};
 										}
 										return t;
@@ -410,17 +410,15 @@ export function useInterruptHandler(deps: UseInterruptHandlerDeps): UseInterrupt
 									thinkingStartTime: undefined,
 									aiTabs: s.aiTabs.map((t) => {
 										if (t.id === activeTabForError?.id || t.state === 'busy') {
-											const logsWithoutThinkingOrTools = t.logs.filter(
-												(log) => log.source !== 'thinking' && log.source !== 'tool'
-											);
+											const interruptedLogs = markLogsInterrupted(t.logs);
 											return {
 												...t,
 												state: 'idle' as const,
 												thinkingStartTime: undefined,
 												logs:
 													t.id === activeTabForError?.id
-														? [...logsWithoutThinkingOrTools, errorLog]
-														: logsWithoutThinkingOrTools,
+														? [...interruptedLogs, errorLog]
+														: interruptedLogs,
 											};
 										}
 										return t;

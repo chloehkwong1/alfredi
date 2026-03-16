@@ -236,6 +236,8 @@ export interface LogEntry {
 	readOnly?: boolean;
 	// For error entries - stores the full AgentError for "View Details" functionality
 	agentError?: AgentError;
+	// Marks logs from an interrupted/stopped turn (rendered dimmed)
+	interrupted?: boolean;
 	// For tool execution entries - stores tool state and details
 	metadata?: {
 		toolState?: {
