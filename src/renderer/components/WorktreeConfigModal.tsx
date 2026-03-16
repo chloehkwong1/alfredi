@@ -432,8 +432,9 @@ export function WorktreeConfigModal({
 									<button
 										key={branch}
 										type="button"
-										className="w-full text-left px-3 py-1.5 text-sm hover:bg-white/10 transition-colors"
+										className="w-full text-left px-3 py-1.5 text-sm hover:bg-white/10 transition-colors break-all"
 										style={{ color: theme.colors.textMain }}
+										title={branch}
 										onMouseDown={(e) => {
 											e.preventDefault();
 											handleBranchSelect(branch);

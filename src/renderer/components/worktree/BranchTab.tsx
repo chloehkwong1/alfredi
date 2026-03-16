@@ -86,7 +86,11 @@ export function BranchTab({
 		<SearchableList
 			items={branches}
 			getKey={(branch) => branch}
-			renderItem={(branch) => <span className="font-mono text-xs">{branch}</span>}
+			renderItem={(branch) => (
+				<span className="font-mono text-xs break-all" title={branch}>
+					{branch}
+				</span>
+			)}
 			filterFn={(branch, query) => branch.toLowerCase().includes(query.toLowerCase())}
 			selectedKey={selectedBranchName || null}
 			onSelect={(branch) => onSelectBranch(branch)}
