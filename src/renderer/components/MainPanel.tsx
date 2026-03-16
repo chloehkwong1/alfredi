@@ -2319,6 +2319,7 @@ export const MainPanel = React.memo(
 											onCommitDiffTabClose?.(activeCommitDiffTabId);
 										}
 									}}
+									onComment={(comment) => setStagedQuotes((prev) => [...prev, comment])}
 								/>
 							</div>
 						) : activeSession.inputMode === 'ai' && activeDiffTabId && activeDiffTab ? (

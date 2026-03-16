@@ -1,6 +1,15 @@
 import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
-import { Diff, Hunk } from 'react-diff-view';
-import { Plus, Minus, ChevronRight, ChevronDown, ImageIcon, GitCommit } from 'lucide-react';
+import { Diff, Hunk, getChangeKey } from 'react-diff-view';
+import type { ChangeData, HunkData, ChangeEventArgs, EventMap } from 'react-diff-view';
+import {
+	Plus,
+	Minus,
+	ChevronRight,
+	ChevronDown,
+	ImageIcon,
+	GitCommit,
+	MessageSquare,
+} from 'lucide-react';
 import type { Theme, CommitDiffTab } from '../types';
 import {
 	parseGitDiff,
@@ -9,6 +18,7 @@ import {
 	type ParsedFileDiff,
 } from '../utils/gitDiffParser';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
+import { useDiffComments } from '../hooks/useDiffComments';
 import 'react-diff-view/style/index.css';
 
 /**
@@ -20,11 +30,186 @@ function getFileStatus(file: ParsedFileDiff): { label: string; color: string } {
 	return { label: 'M', color: '#d29922' };
 }
 
+// --- Per-file diff section with inline comment support ---
+
+interface CommitFileDiffProps {
+	file: ParsedFileDiff;
+	theme: Theme;
+	onComment?: (formattedComment: string) => void;
+}
+
+/**
+ * Renders a single file's diff with inline comment support.
+ * Uses its own useDiffComments hook instance so comment state is per-file.
+ */
+const CommitFileDiff = memo(function CommitFileDiff({
+	file,
+	theme,
+	onComment,
+}: CommitFileDiffProps) {
+	const filePath = file.newPath || file.oldPath;
+
+	// Line selection state
+	const [selectedChangeKeys, setSelectedChangeKeys] = useState<string[]>([]);
+	const lastClickedKeyRef = useRef<string | null>(null);
+
+	// Build flat ordered list of all change keys for shift-click range selection
+	const allChangeKeys = useMemo(() => {
+		const keys: string[] = [];
+		for (const diffFile of file.parsedDiff) {
+			for (const hunk of diffFile.hunks) {
+				for (const change of (hunk as HunkData).changes) {
+					keys.push(getChangeKey(change as ChangeData));
+				}
+			}
+		}
+		return keys;
+	}, [file.parsedDiff]);
+
+	// Inline comments hook
+	const noopComment = useCallback(() => {}, []);
+	const { commentedKeys, handleGutterCommentClick, buildWidgets, renderGutter } = useDiffComments({
+		filePath: filePath || '',
+		parsedFiles: file.parsedDiff,
+		theme,
+		onComment: onComment ?? noopComment,
+	});
+
+	// Gutter click → open comment widget
+	const handleGutterClick = useCallback(
+		({ change }: ChangeEventArgs) => {
+			if (!change || !onComment) return;
+			const key = getChangeKey(change);
+			handleGutterCommentClick(key, selectedChangeKeys);
+		},
+		[onComment, handleGutterCommentClick, selectedChangeKeys]
+	);
+
+	// Code click → line selection (single, shift-range, cmd-toggle)
+	const handleChangeClick = useCallback(
+		({ change }: ChangeEventArgs, event: React.MouseEvent) => {
+			if (!change) return;
+			const key = getChangeKey(change);
+
+			if (event.shiftKey && lastClickedKeyRef.current) {
+				const lastIdx = allChangeKeys.indexOf(lastClickedKeyRef.current);
+				const curIdx = allChangeKeys.indexOf(key);
+				if (lastIdx !== -1 && curIdx !== -1) {
+					const start = Math.min(lastIdx, curIdx);
+					const end = Math.max(lastIdx, curIdx);
+					setSelectedChangeKeys(allChangeKeys.slice(start, end + 1));
+				}
+			} else if (event.metaKey || event.ctrlKey) {
+				setSelectedChangeKeys((prev) =>
+					prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+				);
+				lastClickedKeyRef.current = key;
+			} else {
+				setSelectedChangeKeys([key]);
+				lastClickedKeyRef.current = key;
+			}
+		},
+		[allChangeKeys]
+	);
+
+	// Keyboard: 'c' to open comment on selection, Escape to clear
+	const handleKeyDown = useCallback(
+		(e: React.KeyboardEvent) => {
+			if (e.key === 'c' && selectedChangeKeys.length > 0 && onComment) {
+				e.preventDefault();
+				const anchorKey = selectedChangeKeys[selectedChangeKeys.length - 1];
+				handleGutterCommentClick(anchorKey, selectedChangeKeys);
+			} else if (e.key === 'Escape') {
+				setSelectedChangeKeys([]);
+				lastClickedKeyRef.current = null;
+			}
+		},
+		[selectedChangeKeys, onComment, handleGutterCommentClick]
+	);
+
+	const gutterEvents: EventMap = useMemo(
+		() => ({ onClick: handleGutterClick as EventMap['onClick'] }),
+		[handleGutterClick]
+	);
+
+	const codeEvents: EventMap = useMemo(
+		() => ({ onClick: handleChangeClick as EventMap['onClick'] }),
+		[handleChangeClick]
+	);
+
+	const commentCount = commentedKeys.size;
+
+	if (file.isBinary && file.isImage) {
+		return (
+			<div className="flex flex-col items-center justify-center py-8 gap-2">
+				<ImageIcon className="w-6 h-6" style={{ color: theme.colors.textDim }} />
+				<p className="text-xs" style={{ color: theme.colors.textDim }}>
+					Image file changed
+				</p>
+			</div>
+		);
+	}
+
+	if (file.isBinary) {
+		return (
+			<div className="flex items-center justify-center py-8">
+				<p className="text-xs" style={{ color: theme.colors.textDim }}>
+					Binary file changed
+				</p>
+			</div>
+		);
+	}
+
+	if (file.parsedDiff.length === 0) {
+		return (
+			<div className="flex items-center justify-center py-8">
+				<p className="text-xs" style={{ color: theme.colors.textDim }}>
+					Unable to parse diff
+				</p>
+			</div>
+		);
+	}
+
+	const widgets = onComment ? buildWidgets() : undefined;
+
+	return (
+		<div tabIndex={-1} onKeyDown={handleKeyDown} className="outline-none relative">
+			{commentCount > 0 && (
+				<div
+					className="absolute top-1 right-2 flex items-center gap-1 text-[10px] z-10"
+					style={{ color: theme.colors.accent }}
+				>
+					<MessageSquare className="w-3 h-3" />
+					{commentCount}
+				</div>
+			)}
+			{file.parsedDiff.map((diffFile, diffIndex) => (
+				<Diff
+					key={diffIndex}
+					viewType="unified"
+					diffType={diffFile.type}
+					hunks={diffFile.hunks}
+					selectedChanges={selectedChangeKeys}
+					gutterEvents={onComment ? gutterEvents : undefined}
+					codeEvents={codeEvents}
+					widgets={widgets}
+					renderGutter={onComment && commentedKeys.size > 0 ? renderGutter : undefined}
+				>
+					{(hunks) => hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)}
+				</Diff>
+			))}
+		</div>
+	);
+});
+
+// --- Main CommitDiffView ---
+
 interface CommitDiffViewProps {
 	tab: CommitDiffTab;
 	theme: Theme;
 	onClose: () => void;
 	onScrollPositionChange?: (scrollTop: number) => void;
+	onComment?: (formattedComment: string) => void;
 }
 
 export const CommitDiffView = memo(function CommitDiffView({
@@ -32,6 +217,7 @@ export const CommitDiffView = memo(function CommitDiffView({
 	theme,
 	onClose,
 	onScrollPositionChange,
+	onComment,
 }: CommitDiffViewProps) {
 	const contentRef = useRef<HTMLDivElement>(null);
 	const fileRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -368,39 +554,7 @@ export const CommitDiffView = memo(function CommitDiffView({
 										{/* Diff content */}
 										{!isCollapsed && (
 											<div className="px-4 py-2">
-												{file.isBinary && file.isImage ? (
-													<div className="flex flex-col items-center justify-center py-8 gap-2">
-														<ImageIcon className="w-6 h-6" style={{ color: c.textDim }} />
-														<p className="text-xs" style={{ color: c.textDim }}>
-															Image file changed
-														</p>
-													</div>
-												) : file.isBinary ? (
-													<div className="flex items-center justify-center py-8">
-														<p className="text-xs" style={{ color: c.textDim }}>
-															Binary file changed
-														</p>
-													</div>
-												) : file.parsedDiff.length > 0 ? (
-													file.parsedDiff.map((diffFile, diffIndex) => (
-														<Diff
-															key={diffIndex}
-															viewType="unified"
-															diffType={diffFile.type}
-															hunks={diffFile.hunks}
-														>
-															{(hunks) =>
-																hunks.map((hunk) => <Hunk key={hunk.content} hunk={hunk} />)
-															}
-														</Diff>
-													))
-												) : (
-													<div className="flex items-center justify-center py-8">
-														<p className="text-xs" style={{ color: c.textDim }}>
-															Unable to parse diff
-														</p>
-													</div>
-												)}
+												<CommitFileDiff file={file} theme={theme} onComment={onComment} />
 											</div>
 										)}
 									</div>
