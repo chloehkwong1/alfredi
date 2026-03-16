@@ -312,6 +312,10 @@ export const DiffPreview = memo(function DiffPreview({
 		if (selectedChangeKeys.length === 0) return;
 
 		const handleKeyDown = (e: KeyboardEvent) => {
+			// Don't intercept keystrokes when user is typing in an input/textarea
+			const tag = (e.target as HTMLElement)?.tagName;
+			if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
 			if (e.key === 'Enter' && onAskAboutLines) {
 				e.preventDefault();
 				e.stopPropagation();
