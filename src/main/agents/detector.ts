@@ -311,6 +311,7 @@ export class AgentDetector {
 					// Hardcoded list — update when new models release
 					const claudeModels = [
 						'claude-sonnet-4-6',
+						'claude-sonnet-4-6[1m]',
 						'claude-opus-4-6',
 						'claude-opus-4-6[1m]',
 						'claude-haiku-4-5',
