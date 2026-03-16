@@ -76,6 +76,8 @@ async function getQuery(): Promise<(typeof import('@anthropic-ai/claude-agent-sd
 interface PendingQuestion {
 	resolve: (result: PermissionResult) => void;
 	toolName: string;
+	/** Original tool input — needed to reconstruct proper answers dict for AskUserQuestion */
+	originalInput?: Record<string, unknown>;
 }
 
 /**
@@ -644,6 +646,7 @@ export class ClaudeSDKAdapter {
 			this.pendingQuestionResolvers.set(toolUseID, {
 				resolve,
 				toolName: 'AskUserQuestion',
+				originalInput: input,
 			});
 
 			// If the query is aborted while waiting, resolve with deny
@@ -679,11 +682,32 @@ export class ClaudeSDKAdapter {
 
 		this.pendingQuestionResolvers.delete(toolUseId);
 
-		// Resolve with allow + the answer as updated input
-		// The SDK will pass this back to the tool as the response
+		// Build proper answers dict keyed by question text so the SDK returns
+		// a structured AskUserQuestionOutput that Claude can read reliably.
+		const originalInput = pending.originalInput;
+		const questions = (originalInput?.questions || []) as UserQuestionItem[];
+
+		const answers: Record<string, string> = {};
+		if (questions.length === 1) {
+			// Single question — answer is the raw label or freeform text
+			answers[questions[0].question] = answer;
+		} else if (questions.length > 1) {
+			// Multi-question — renderer sends "Header: Answer\nHeader2: Answer2"
+			const lines = answer.split('\n');
+			for (const q of questions) {
+				const prefix = q.header ? `${q.header}: ` : '';
+				const matchingLine = lines.find((l) => prefix && l.startsWith(prefix));
+				if (matchingLine) {
+					answers[q.question] = matchingLine.slice(prefix.length);
+				}
+			}
+		}
+
+		// Merge answers into the original input so the tool result includes
+		// both the questions array and the structured answers dict
 		pending.resolve({
 			behavior: 'allow',
-			updatedInput: { result: answer },
+			updatedInput: { ...originalInput, answers },
 			toolUseID: toolUseId,
 		});
 
