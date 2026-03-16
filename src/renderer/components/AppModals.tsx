@@ -473,7 +473,7 @@ export interface AppWorktreeModalsProps {
 	createWorktreeModalOpen: boolean;
 	createWorktreeSession: Session | null;
 	onCloseCreateWorktreeModal: () => void;
-	onCreateWorktree: (branchName: string) => Promise<void>;
+	onCreateWorktree: (branchName: string, baseBranch?: string) => Promise<void>;
 
 	// CreatePRModal
 	createPRModalOpen: boolean;
@@ -1245,7 +1245,7 @@ export interface AppModalsProps {
 	onDisableWorktreeConfig: () => void;
 	createWorktreeSession: Session | null;
 	onCloseCreateWorktreeModal: () => void;
-	onCreateWorktree: (branchName: string) => Promise<void>;
+	onCreateWorktree: (branchName: string, baseBranch?: string) => Promise<void>;
 	createPRSession: Session | null;
 	onCloseCreatePRModal: () => void;
 	onPRCreated: (prDetails: PRDetails) => void;

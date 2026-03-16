@@ -42,7 +42,7 @@ export interface WorktreeHandlersReturn {
 	handleDisableWorktreeConfig: () => void;
 	handleCreateWorktreeFromConfig: (branchName: string, basePath: string) => Promise<void>;
 	handleCloseCreateWorktreeModal: () => void;
-	handleCreateWorktree: (branchName: string) => Promise<void>;
+	handleCreateWorktree: (branchName: string, baseBranch?: string) => Promise<void>;
 	handleCloseDeleteWorktreeModal: () => void;
 	handleConfirmDeleteWorktree: () => void;
 	handleConfirmAndDeleteWorktreeOnDisk: () => Promise<void>;
@@ -403,7 +403,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 		getModalActions().setCreateWorktreeSession(null);
 	}, []);
 
-	const handleCreateWorktree = useCallback(async (branchName: string) => {
+	const handleCreateWorktree = useCallback(async (branchName: string, baseBranch?: string) => {
 		const createWtSession = useModalStore.getState().getData('createWorktree')?.session ?? null;
 		if (!createWtSession) return;
 
@@ -437,7 +437,7 @@ export function useWorktreeHandlers(): WorktreeHandlersReturn {
 				worktreePath,
 				branchName,
 				sshRemoteId,
-				worktreeConfig?.defaultBaseBranch || undefined
+				baseBranch || worktreeConfig?.defaultBaseBranch || undefined
 			);
 
 			if (!result.success) {

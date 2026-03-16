@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, GitBranch, GitPullRequest, Ticket, Loader2, AlertTriangle } from 'lucide-react';
 import type { Theme, Session, GhCliStatus } from '../types';
 import { useLayerStack } from '../contexts/LayerStackContext';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useSessionStore } from '../stores/sessionStore';
+import { useShallow } from 'zustand/react/shallow';
 import { BranchTab } from './worktree/BranchTab';
 import { PRTab } from './worktree/PRTab';
 import { TicketTab } from './worktree/TicketTab';
@@ -28,7 +30,7 @@ interface CreateWorktreeModalProps {
 	onClose: () => void;
 	theme: Theme;
 	session: Session;
-	onCreateWorktree: (branchName: string) => Promise<void>;
+	onCreateWorktree: (branchName: string, baseBranch?: string) => Promise<void>;
 }
 
 /**
@@ -64,8 +66,45 @@ export function CreateWorktreeModal({
 	// gh CLI status
 	const [ghCliStatus, setGhCliStatus] = useState<GhCliStatus | null>(null);
 
+	// Base branch state
+	const [baseBranch, setBaseBranch] = useState('');
+	const [baseBranchFilterText, setBaseBranchFilterText] = useState('');
+	const [showBaseBranchDropdown, setShowBaseBranchDropdown] = useState(false);
+	const baseBranchInputRef = useRef<HTMLInputElement>(null);
+
 	// Input ref for auto-focus
 	const inputRef = useRef<HTMLInputElement>(null);
+
+	// Get sibling worktree branches from the session store
+	const siblingBranches = useSessionStore(
+		useShallow((state) => {
+			const siblings = state.sessions.filter(
+				(s) => s.parentSessionId === session.id && s.worktreeBranch
+			);
+			return siblings.map((s) => s.worktreeBranch!);
+		})
+	);
+
+	// Filtered branches for base branch autocomplete
+	const filteredBaseBranches = useMemo(() => {
+		const allBranches = session.gitBranches || [];
+		const siblingSet = new Set(siblingBranches);
+		const lower = baseBranchFilterText.toLowerCase();
+
+		const matchSiblings: string[] = [];
+		const matchOthers: string[] = [];
+
+		for (const b of allBranches) {
+			if (baseBranchFilterText && !b.toLowerCase().includes(lower)) continue;
+			if (siblingSet.has(b)) {
+				if (matchSiblings.length < 20) matchSiblings.push(b);
+			} else {
+				if (matchOthers.length < 20) matchOthers.push(b);
+			}
+		}
+
+		return { siblings: matchSiblings, others: matchOthers };
+	}, [session.gitBranches, siblingBranches, baseBranchFilterText]);
 
 	// Register with layer stack for Escape handling
 	useEffect(() => {
@@ -89,6 +128,10 @@ export function CreateWorktreeModal({
 			setSelectedBranchName('');
 			setActiveTab('new-branch');
 			setError(null);
+			const defaultBase = session.worktreeConfig?.defaultBaseBranch || '';
+			setBaseBranch(defaultBase);
+			setBaseBranchFilterText('');
+			setShowBaseBranchDropdown(false);
 			// Auto-focus the input
 			setTimeout(() => inputRef.current?.focus(), 50);
 		}
@@ -129,7 +172,7 @@ export function CreateWorktreeModal({
 		setError(null);
 
 		try {
-			await onCreateWorktree(trimmedName);
+			await onCreateWorktree(trimmedName, baseBranch || undefined);
 			onClose();
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Failed to create worktree');
@@ -307,6 +350,108 @@ export function CreateWorktreeModal({
 					<button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
 						<X className="w-4 h-4" style={{ color: theme.colors.textDim }} />
 					</button>
+				</div>
+
+				{/* Base Branch */}
+				<div className="relative px-4 pt-3">
+					<label
+						className="text-xs font-bold uppercase mb-1.5 block"
+						style={{ color: theme.colors.textDim }}
+					>
+						Base branch
+					</label>
+					<input
+						ref={baseBranchInputRef}
+						type="text"
+						value={baseBranch}
+						onChange={(e) => {
+							setBaseBranch(e.target.value);
+							setBaseBranchFilterText(e.target.value);
+							setShowBaseBranchDropdown(true);
+						}}
+						onFocus={() => setShowBaseBranchDropdown(true)}
+						onBlur={() => {
+							setTimeout(() => setShowBaseBranchDropdown(false), 150);
+						}}
+						placeholder={session.worktreeConfig?.defaultBaseBranch || 'origin/main'}
+						className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm"
+						style={{
+							borderColor: theme.colors.border,
+							color: theme.colors.textMain,
+						}}
+						disabled={isCreating}
+					/>
+					{showBaseBranchDropdown &&
+						(filteredBaseBranches.siblings.length > 0 ||
+							filteredBaseBranches.others.length > 0) && (
+							<div
+								className="absolute left-4 right-4 mt-1 rounded border shadow-lg overflow-y-auto z-10"
+								style={{
+									backgroundColor: theme.colors.bgSidebar,
+									borderColor: theme.colors.border,
+									maxHeight: '200px',
+								}}
+							>
+								{filteredBaseBranches.siblings.length > 0 && (
+									<>
+										<div
+											className="px-3 py-1 text-[10px] font-bold uppercase sticky top-0"
+											style={{
+												color: theme.colors.textDim,
+												backgroundColor: theme.colors.bgSidebar,
+											}}
+										>
+											Worktree branches
+										</div>
+										{filteredBaseBranches.siblings.map((branch) => (
+											<button
+												key={branch}
+												type="button"
+												className="w-full text-left px-3 py-1.5 text-sm hover:bg-white/10 transition-colors"
+												style={{ color: theme.colors.textMain }}
+												onMouseDown={(e) => {
+													e.preventDefault();
+													setBaseBranch(branch);
+													setBaseBranchFilterText('');
+													setShowBaseBranchDropdown(false);
+												}}
+											>
+												{branch}
+											</button>
+										))}
+									</>
+								)}
+								{filteredBaseBranches.others.length > 0 && (
+									<>
+										<div
+											className="px-3 py-1 text-[10px] font-bold uppercase sticky top-0"
+											style={{
+												color: theme.colors.textDim,
+												backgroundColor: theme.colors.bgSidebar,
+											}}
+										>
+											All branches
+										</div>
+										{filteredBaseBranches.others.map((branch) => (
+											<button
+												key={branch}
+												type="button"
+												className="w-full text-left px-3 py-1.5 text-sm hover:bg-white/10 transition-colors"
+												style={{ color: theme.colors.textMain }}
+												onMouseDown={(e) => {
+													e.preventDefault();
+													setBaseBranch(branch);
+													setBaseBranchFilterText('');
+													setShowBaseBranchDropdown(false);
+												}}
+											>
+												{branch}
+											</button>
+										))}
+									</>
+								)}
+							</div>
+						)}
 				</div>
 
 				{/* Tab Bar */}
