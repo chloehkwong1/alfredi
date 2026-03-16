@@ -7,7 +7,7 @@
  */
 
 import type { Theme } from '../types';
-import maestroWandIcon from '../assets/icon-wand.png';
+import alfrediLogo from '../assets/alfredi-logo.png';
 
 interface WelcomeContentProps {
 	theme: Theme;
@@ -29,8 +29,8 @@ export function WelcomeContent({
 }: WelcomeContentProps): JSX.Element {
 	return (
 		<div className="flex flex-col items-center text-center max-w-xl">
-			{/* Maestro Icon */}
-			<img src={maestroWandIcon} alt="Alfredi" className="w-20 h-20 mb-6 opacity-90" />
+			{/* Alfredi Logo */}
+			<img src={alfrediLogo} alt="Alfredi" className="w-20 h-20 mb-6 opacity-90 rounded-xl" />
 
 			{/* Heading */}
 			<h1 className="text-2xl font-bold mb-4" style={{ color: theme.colors.textMain }}>

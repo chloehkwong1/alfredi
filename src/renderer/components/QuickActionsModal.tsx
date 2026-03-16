@@ -760,7 +760,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		},
 		{
 			id: 'about',
-			label: 'About Maestro',
+			label: 'About Alfredi',
 			action: () => {
 				setAboutModalOpen(true);
 				setQuickActionOpen(false);
@@ -768,8 +768,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		},
 		{
 			id: 'website',
-			label: 'Maestro Website',
-			subtext: 'Open the Maestro website',
+			label: 'Alfredi Website',
+			subtext: 'Open the Alfredi website',
 			action: () => {
 				window.maestro.shell.openExternal('https://runmaestro.ai/');
 				setQuickActionOpen(false);
@@ -778,7 +778,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		{
 			id: 'docs',
 			label: 'Documentation and User Guide',
-			subtext: 'Open the Maestro documentation',
+			subtext: 'Open the Alfredi documentation',
 			action: () => {
 				window.maestro.shell.openExternal('https://docs.runmaestro.ai/');
 				setQuickActionOpen(false);
@@ -787,7 +787,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 		{
 			id: 'discord',
 			label: 'Join Discord',
-			subtext: 'Join the Maestro community',
+			subtext: 'Join the Alfredi community',
 			action: () => {
 				window.maestro.shell.openExternal('https://runmaestro.ai/discord');
 				setQuickActionOpen(false);
@@ -834,7 +834,7 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 			? [
 					{
 						id: 'openSymphony',
-						label: 'Maestro Symphony',
+						label: 'Alfredi Symphony',
 						shortcut: shortcuts.openSymphony,
 						subtext: 'Contribute to open source projects',
 						action: () => {

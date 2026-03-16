@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
-import { Wand2, ChevronRight, ChevronDown, Radio, GitBranch, Menu, Bookmark } from 'lucide-react';
+import { ChevronRight, ChevronDown, Radio, GitBranch, Menu, Bookmark } from 'lucide-react';
+import alfrediLogo from '../../assets/alfredi-logo.png';
 import type { Session, Theme } from '../../types';
 import type { WorktreeStatus } from '../../../shared/types';
 
@@ -672,9 +673,10 @@ function SessionListInner(props: SessionListProps) {
 				{leftSidebarOpen ? (
 					<>
 						<div className="flex items-center gap-2">
-							<Wand2
-								className={`w-5 h-5${isAnyBusy ? ' wand-sparkle-active' : ''}`}
-								style={{ color: theme.colors.accent }}
+							<img
+								src={alfrediLogo}
+								alt="Alfredi"
+								className={`w-5 h-5 rounded${isAnyBusy ? ' wand-sparkle-active' : ''}`}
 							/>
 							<h1
 								className="font-bold tracking-widest text-lg"

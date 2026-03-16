@@ -728,7 +728,7 @@ export function LogViewer({
 			{showClearConfirm && (
 				<ConfirmModal
 					theme={theme}
-					message="Are you sure you want to clear all Maestro system logs? This action cannot be undone."
+					message="Are you sure you want to clear all Alfredi system logs? This action cannot be undone."
 					onConfirm={handleClearLogs}
 					onClose={() => setShowClearConfirm(false)}
 				/>

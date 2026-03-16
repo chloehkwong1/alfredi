@@ -325,7 +325,7 @@ export function WorktreeRunSection({
 							}}
 						>
 							{worktreeChildren.length > 0 && (
-								<optgroup label="Open in Maestro">
+								<optgroup label="Open in Alfredi">
 									{worktreeChildren.map((s) => {
 										const isBusy = s.state === 'busy' || s.state === 'connecting';
 										return (

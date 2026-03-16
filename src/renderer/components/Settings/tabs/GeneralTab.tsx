@@ -1008,7 +1008,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 				icon={Download}
 				sectionLabel="Updates"
 				title="Check for updates on startup"
-				description="Automatically check for new Maestro versions when the app starts"
+				description="Automatically check for new Alfredi versions when the app starts"
 				checked={checkForUpdatesOnStartup}
 				onChange={setCheckForUpdatesOnStartup}
 				theme={theme}
@@ -1030,7 +1030,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 				icon={Bug}
 				sectionLabel="Privacy"
 				title="Send anonymous crash reports"
-				description="Help improve Maestro by automatically sending crash reports. No personal data is collected. Changes take effect after restart."
+				description="Help improve Alfredi by automatically sending crash reports. No personal data is collected. Changes take effect after restart."
 				checked={crashReportingEnabled}
 				onChange={setCrashReportingEnabled}
 				theme={theme}

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-	Wand2,
 	FolderPlus,
 	Menu,
 	Settings,
@@ -11,6 +10,7 @@ import {
 	BookOpen,
 	ExternalLink,
 } from 'lucide-react';
+import alfrediLogo from '../assets/alfredi-logo.png';
 import type { Theme, Shortcut } from '../types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { useClickOutside } from '../hooks';
@@ -65,7 +65,7 @@ export function EmptyStateView({
 			>
 				{/* Left: Logo and Name */}
 				<div className="flex items-center gap-2">
-					<Wand2 className="w-5 h-5" style={{ color: theme.colors.accent }} />
+					<img src={alfrediLogo} alt="Alfredi" className="w-5 h-5 rounded" />
 					<h1
 						className="font-bold tracking-widest text-lg"
 						style={{ color: theme.colors.textMain }}

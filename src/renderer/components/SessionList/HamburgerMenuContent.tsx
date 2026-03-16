@@ -169,7 +169,7 @@ export function HamburgerMenuContent({
 				<Globe className="w-5 h-5" style={{ color: theme.colors.accent }} />
 				<div className="flex-1">
 					<div className="text-sm font-medium" style={{ color: theme.colors.textMain }}>
-						Maestro Website
+						Alfredi Website
 					</div>
 					<div className="text-xs" style={{ color: theme.colors.textDim }}>
 						Visit runmaestro.ai
