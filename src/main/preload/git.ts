@@ -566,6 +566,28 @@ export function createGitApi() {
 			ipcRenderer.invoke('git:pull', cwd, sshRemoteId, remoteCwd),
 
 		/**
+		 * Check if a base branch is an ancestor of HEAD (fetches remote first)
+		 */
+		isAncestor: (
+			cwd: string,
+			baseBranch: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ isAncestor: boolean }> =>
+			ipcRenderer.invoke('git:isAncestor', cwd, baseBranch, sshRemoteId, remoteCwd),
+
+		/**
+		 * Fetch + rebase onto a branch, auto-aborts on conflict
+		 */
+		rebaseOnto: (
+			cwd: string,
+			baseBranch: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		): Promise<{ success: boolean; error?: string; conflicted?: boolean }> =>
+			ipcRenderer.invoke('git:rebaseOnto', cwd, baseBranch, sshRemoteId, remoteCwd),
+
+		/**
 		 * Get last commit info for a given cwd
 		 */
 		lastCommitInfo: (

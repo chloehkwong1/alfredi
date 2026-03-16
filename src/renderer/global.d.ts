@@ -773,6 +773,24 @@ interface MaestroAPI {
 			remoteCwd?: string
 		) => Promise<{ success: boolean; error?: string }>;
 		/**
+		 * Check if a base branch is an ancestor of HEAD (fetches remote first)
+		 */
+		isAncestor: (
+			cwd: string,
+			baseBranch: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ isAncestor: boolean }>;
+		/**
+		 * Fetch + rebase onto a branch, auto-aborts on conflict
+		 */
+		rebaseOnto: (
+			cwd: string,
+			baseBranch: string,
+			sshRemoteId?: string,
+			remoteCwd?: string
+		) => Promise<{ success: boolean; error?: string; conflicted?: boolean }>;
+		/**
 		 * Get last commit info for a given cwd
 		 */
 		lastCommitInfo: (

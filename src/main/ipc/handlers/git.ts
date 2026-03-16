@@ -2280,6 +2280,56 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// Check if one ref is an ancestor of another (after fetching latest remote state)
+	ipcMain.handle(
+		'git:isAncestor',
+		withIpcErrorLogging(
+			handlerOpts('isAncestor'),
+			async (cwd: string, baseBranch: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				// Fetch latest remote state for the base branch
+				await execGit(['fetch', 'origin', baseBranch], cwd, sshRemote, effectiveRemoteCwd);
+				// Check if origin/<baseBranch> is an ancestor of HEAD
+				const result = await execGit(
+					['merge-base', '--is-ancestor', `origin/${baseBranch}`, 'HEAD'],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				// exit code 0 = is ancestor, 1 = is not ancestor
+				return { isAncestor: result.exitCode === 0 };
+			}
+		)
+	);
+
+	// Fetch + rebase onto a branch, auto-abort on conflict
+	ipcMain.handle(
+		'git:rebaseOnto',
+		withIpcErrorLogging(
+			handlerOpts('rebaseOnto'),
+			async (cwd: string, baseBranch: string, sshRemoteId?: string, remoteCwd?: string) => {
+				const sshRemote = getSshRemoteById(sshRemoteId);
+				const effectiveRemoteCwd = sshRemote ? remoteCwd || cwd : undefined;
+				// Fetch latest remote state for the base branch
+				await execGit(['fetch', 'origin', baseBranch], cwd, sshRemote, effectiveRemoteCwd);
+				// Attempt rebase
+				const result = await execGit(
+					['rebase', `origin/${baseBranch}`],
+					cwd,
+					sshRemote,
+					effectiveRemoteCwd
+				);
+				if (result.exitCode !== 0) {
+					// Auto-abort to avoid leaving repo in conflict state
+					await execGit(['rebase', '--abort'], cwd, sshRemote, effectiveRemoteCwd);
+					return { success: false, error: result.stderr, conflicted: true };
+				}
+				return { success: true };
+			}
+		)
+	);
+
 	// Get last commit info for a given cwd
 	ipcMain.handle(
 		'git:lastCommitInfo',
