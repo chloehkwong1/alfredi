@@ -174,6 +174,8 @@ export interface SettingsStoreState {
 	autoRunStats: AutoRunStats;
 	usageStats: MaestroUsageStats;
 	ungroupedCollapsed: boolean;
+	bookmarksCollapsed: boolean;
+	kanbanCollapsed: Record<string, boolean>;
 	tourCompleted: boolean;
 	onboardingStats: OnboardingStats;
 	webInterfaceUseCustomPort: boolean;
@@ -246,6 +248,8 @@ export interface SettingsStoreActions {
 	setTabShortcuts: (value: Record<string, Shortcut>) => void;
 	setCustomAICommands: (value: CustomAICommand[]) => void;
 	setUngroupedCollapsed: (value: boolean) => void;
+	setBookmarksCollapsed: (value: boolean) => void;
+	setKanbanCollapsed: (value: Record<string, boolean>) => void;
 	setTourCompleted: (value: boolean) => void;
 	setWebInterfaceUseCustomPort: (value: boolean) => void;
 	setWebInterfaceCustomPort: (value: number) => void;
@@ -371,6 +375,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	autoRunStats: DEFAULT_AUTO_RUN_STATS,
 	usageStats: DEFAULT_USAGE_STATS,
 	ungroupedCollapsed: false,
+	bookmarksCollapsed: false,
+	kanbanCollapsed: {},
 	tourCompleted: false,
 	onboardingStats: DEFAULT_ONBOARDING_STATS,
 	webInterfaceUseCustomPort: false,
@@ -601,6 +607,16 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setUngroupedCollapsed: (value) => {
 		set({ ungroupedCollapsed: value });
 		window.maestro.settings.set('ungroupedCollapsed', value);
+	},
+
+	setBookmarksCollapsed: (value) => {
+		set({ bookmarksCollapsed: value });
+		window.maestro.settings.set('bookmarksCollapsed', value);
+	},
+
+	setKanbanCollapsed: (value) => {
+		set({ kanbanCollapsed: value });
+		window.maestro.settings.set('kanbanCollapsed', value);
 	},
 
 	setTourCompleted: (value) => {
@@ -1360,6 +1376,12 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['ungroupedCollapsed'] !== undefined)
 			patch.ungroupedCollapsed = allSettings['ungroupedCollapsed'] as boolean;
 
+		if (allSettings['bookmarksCollapsed'] !== undefined)
+			patch.bookmarksCollapsed = allSettings['bookmarksCollapsed'] as boolean;
+
+		if (allSettings['kanbanCollapsed'] !== undefined)
+			patch.kanbanCollapsed = allSettings['kanbanCollapsed'] as Record<string, boolean>;
+
 		if (allSettings['tourCompleted'] !== undefined)
 			patch.tourCompleted = allSettings['tourCompleted'] as boolean;
 
@@ -1551,6 +1573,8 @@ export function getSettingsActions() {
 		setUsageStats: state.setUsageStats,
 		updateUsageStats: state.updateUsageStats,
 		setUngroupedCollapsed: state.setUngroupedCollapsed,
+		setBookmarksCollapsed: state.setBookmarksCollapsed,
+		setKanbanCollapsed: state.setKanbanCollapsed,
 		setTourCompleted: state.setTourCompleted,
 		setOnboardingStats: state.setOnboardingStats,
 		recordWizardStart: state.recordWizardStart,

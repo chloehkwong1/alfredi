@@ -77,7 +77,7 @@ function SessionListInner(props: SessionListProps) {
 	const editingSessionId = useUIStore((s) => s.editingSessionId);
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const draggingWorktreeTargetStatus = useUIStore((s) => s.draggingWorktreeTargetStatus);
-	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
+	const bookmarksCollapsed = useSettingsStore((s) => s.bookmarksCollapsed);
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const leftSidebarWidthState = useSettingsStore((s) => s.leftSidebarWidth);
 	const webInterfaceUseCustomPort = useSettingsStore((s) => s.webInterfaceUseCustomPort);
@@ -94,7 +94,7 @@ function SessionListInner(props: SessionListProps) {
 	// Stable store actions
 	const setActiveFocus = useUIStore.getState().setActiveFocus;
 	const setLeftSidebarOpen = useUIStore.getState().setLeftSidebarOpen;
-	const setBookmarksCollapsed = useUIStore.getState().setBookmarksCollapsed;
+	const setBookmarksCollapsed = useSettingsStore.getState().setBookmarksCollapsed;
 	const setActiveSessionId = useSessionStore.getState().setActiveSessionId;
 	const setSessions = useSessionStore.getState().setSessions;
 	const setWebInterfaceUseCustomPort = useSettingsStore.getState().setWebInterfaceUseCustomPort;
@@ -190,8 +190,8 @@ function SessionListInner(props: SessionListProps) {
 	const menuRef = useRef<HTMLDivElement>(null);
 
 	// Kanban section collapse state: keyed by `${parentId}:${status}`
-	// DONE sections auto-collapse by default
-	const [kanbanCollapsed, setKanbanCollapsed] = useState<Record<string, boolean>>({});
+	// DONE sections auto-collapse by default; persisted via settingsStore
+	const kanbanCollapsed = useSettingsStore((s) => s.kanbanCollapsed);
 	const isKanbanSectionCollapsed = useCallback(
 		(parentId: string, status: WorktreeStatus): boolean => {
 			const key = `${parentId}:${status}`;
@@ -204,12 +204,13 @@ function SessionListInner(props: SessionListProps) {
 	const toggleKanbanSection = useCallback(
 		(parentId: string, status: WorktreeStatus) => {
 			const key = `${parentId}:${status}`;
-			setKanbanCollapsed((prev) => ({
-				...prev,
+			const updated = {
+				...kanbanCollapsed,
 				[key]: !isKanbanSectionCollapsed(parentId, status),
-			}));
+			};
+			useSettingsStore.getState().setKanbanCollapsed(updated);
 		},
-		[isKanbanSectionCollapsed]
+		[kanbanCollapsed, isKanbanSectionCollapsed]
 	);
 
 	// Kanban drag-and-drop handlers

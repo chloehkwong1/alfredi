@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 
 export interface SessionFilterModeState {
 	sessionFilter: string;
@@ -24,7 +25,7 @@ export interface SessionFilterModeState {
  */
 export function useSessionFilterMode(): SessionFilterModeState {
 	const sessionFilterOpen = useUIStore((s) => s.sessionFilterOpen);
-	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
+	const bookmarksCollapsed = useSettingsStore((s) => s.bookmarksCollapsed);
 	const sessions = useSessionStore((s) => s.sessions);
 
 	const [sessionFilter, setSessionFilter] = useState('');
@@ -41,7 +42,7 @@ export function useSessionFilterMode(): SessionFilterModeState {
 	const [filterModeInitialized, setFilterModeInitialized] = useState(false);
 
 	// Stable store actions
-	const setBookmarksCollapsed = useUIStore.getState().setBookmarksCollapsed;
+	const setBookmarksCollapsed = useSettingsStore.getState().setBookmarksCollapsed;
 
 	// When filter opens, apply filter mode preferences (or defaults on first open)
 	// When filter closes, save current states as filter mode preferences and restore original states

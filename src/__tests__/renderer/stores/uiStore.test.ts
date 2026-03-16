@@ -12,7 +12,6 @@ function resetStore() {
 		rightPanelOpen: true,
 		activeFocus: 'main',
 		activeRightTab: 'files',
-		bookmarksCollapsed: false,
 		showUnreadOnly: false,
 		preFilterActiveTabId: null,
 		selectedSidebarIndex: 0,
@@ -41,7 +40,6 @@ describe('uiStore', () => {
 			expect(state.rightPanelOpen).toBe(true);
 			expect(state.activeFocus).toBe('main');
 			expect(state.activeRightTab).toBe('files');
-			expect(state.bookmarksCollapsed).toBe(false);
 			expect(state.showUnreadOnly).toBe(false);
 			expect(state.preFilterActiveTabId).toBeNull();
 			expect(state.selectedSidebarIndex).toBe(0);
@@ -112,21 +110,6 @@ describe('uiStore', () => {
 
 			useUIStore.getState().setActiveRightTab('autorun');
 			expect(useUIStore.getState().activeRightTab).toBe('autorun');
-		});
-	});
-
-	describe('sidebar collapse/expand state', () => {
-		it('sets bookmarks collapsed', () => {
-			useUIStore.getState().setBookmarksCollapsed(true);
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(true);
-		});
-
-		it('toggles bookmarks collapsed', () => {
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
-			useUIStore.getState().toggleBookmarksCollapsed();
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(true);
-			useUIStore.getState().toggleBookmarksCollapsed();
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
 		});
 	});
 

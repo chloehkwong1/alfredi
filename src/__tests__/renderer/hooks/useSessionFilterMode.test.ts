@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useSessionFilterMode } from '../../../renderer/hooks/session/useSessionFilterMode';
 import { useUIStore } from '../../../renderer/stores/uiStore';
 import { useSessionStore } from '../../../renderer/stores/sessionStore';
+import { useSettingsStore } from '../../../renderer/stores/settingsStore';
 import type { Session } from '../../../renderer/types';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,8 @@ function resetStores(sessions: Session[] = []) {
 	useSessionStore.setState({ sessions } as any);
 	useUIStore.setState({
 		sessionFilterOpen: false,
+	} as any);
+	useSettingsStore.setState({
 		bookmarksCollapsed: false,
 	} as any);
 }
@@ -83,7 +86,7 @@ describe('useSessionFilterMode', () => {
 	// -----------------------------------------------------------------------
 	describe('when filter opens', () => {
 		it('expands bookmarks on first open', () => {
-			useUIStore.setState({ bookmarksCollapsed: true } as any);
+			useSettingsStore.setState({ bookmarksCollapsed: true } as any);
 
 			renderHook(() => useSessionFilterMode());
 
@@ -91,7 +94,7 @@ describe('useSessionFilterMode', () => {
 				useUIStore.setState({ sessionFilterOpen: true });
 			});
 
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
+			expect(useSettingsStore.getState().bookmarksCollapsed).toBe(false);
 		});
 	});
 
@@ -100,7 +103,7 @@ describe('useSessionFilterMode', () => {
 	// -----------------------------------------------------------------------
 	describe('when filter closes', () => {
 		it('restores original bookmarks collapsed state', () => {
-			useUIStore.setState({ bookmarksCollapsed: true } as any);
+			useSettingsStore.setState({ bookmarksCollapsed: true } as any);
 
 			renderHook(() => useSessionFilterMode());
 
@@ -108,7 +111,7 @@ describe('useSessionFilterMode', () => {
 			act(() => {
 				useUIStore.setState({ sessionFilterOpen: true });
 			});
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
+			expect(useSettingsStore.getState().bookmarksCollapsed).toBe(false);
 
 			// Close filter
 			act(() => {
@@ -116,7 +119,7 @@ describe('useSessionFilterMode', () => {
 			});
 
 			// Original state restored
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(true);
+			expect(useSettingsStore.getState().bookmarksCollapsed).toBe(true);
 		});
 	});
 
@@ -127,7 +130,7 @@ describe('useSessionFilterMode', () => {
 		it('expands bookmarks when matching bookmarked sessions exist', () => {
 			const s1 = makeSession({ name: 'API Work', bookmarked: true });
 			resetStores([s1]);
-			useUIStore.setState({ bookmarksCollapsed: true } as any);
+			useSettingsStore.setState({ bookmarksCollapsed: true } as any);
 
 			// Open filter
 			act(() => {
@@ -140,7 +143,7 @@ describe('useSessionFilterMode', () => {
 				result.current.setSessionFilter('api');
 			});
 
-			expect(useUIStore.getState().bookmarksCollapsed).toBe(false);
+			expect(useSettingsStore.getState().bookmarksCollapsed).toBe(false);
 		});
 	});
 });

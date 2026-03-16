@@ -13,6 +13,7 @@ import { useCallback } from 'react';
 import type { Session } from '../../types';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useUIStore } from '../../stores/uiStore';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { compareNamesIgnoringEmojis } from '../session/useSortedSessions';
 
 // ============================================================================
@@ -44,7 +45,7 @@ export function useCycleSession(deps: UseCycleSessionDeps): UseCycleSessionRetur
 	const sessions = useSessionStore((s) => s.sessions);
 	const activeSessionId = useSessionStore((s) => s.activeSessionId);
 	const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen);
-	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
+	const bookmarksCollapsed = useSettingsStore((s) => s.bookmarksCollapsed);
 
 	// --- Store actions (stable via getState) ---
 	const { setActiveSessionIdInternal, setCyclePosition } = useSessionStore.getState();

@@ -26,9 +26,6 @@ export interface UIStoreState {
 	// Right panel top section tab (file explorer vs file preview tabs)
 	activeRightTopTab: RightTopTab;
 
-	// Sidebar collapse/expand
-	bookmarksCollapsed: boolean;
-
 	// Session list filter
 	showUnreadOnly: boolean;
 	preFilterActiveTabId: string | null;
@@ -72,9 +69,6 @@ export interface UIStoreActions {
 	// Right panel top section tab
 	setActiveRightTopTab: (tab: RightTopTab | ((prev: RightTopTab) => RightTopTab)) => void;
 
-	// Sidebar collapse/expand
-	setBookmarksCollapsed: (collapsed: boolean | ((prev: boolean) => boolean)) => void;
-	toggleBookmarksCollapsed: () => void;
 	// Session list filter
 	setShowUnreadOnly: (show: boolean | ((prev: boolean) => boolean)) => void;
 	toggleShowUnreadOnly: () => void;
@@ -125,7 +119,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 	activeFocus: 'main',
 	activeRightTab: 'files',
 	activeRightTopTab: 'changes',
-	bookmarksCollapsed: false,
 	showUnreadOnly: false,
 	preFilterActiveTabId: null,
 	selectedSidebarIndex: 0,
@@ -150,9 +143,6 @@ export const useUIStore = create<UIStore>()((set) => ({
 
 	setActiveRightTopTab: (v) => set((s) => ({ activeRightTopTab: resolve(v, s.activeRightTopTab) })),
 
-	setBookmarksCollapsed: (v) =>
-		set((s) => ({ bookmarksCollapsed: resolve(v, s.bookmarksCollapsed) })),
-	toggleBookmarksCollapsed: () => set((s) => ({ bookmarksCollapsed: !s.bookmarksCollapsed })),
 	setShowUnreadOnly: (v) => set((s) => ({ showUnreadOnly: resolve(v, s.showUnreadOnly) })),
 	toggleShowUnreadOnly: () => set((s) => ({ showUnreadOnly: !s.showUnreadOnly })),
 	setPreFilterActiveTabId: (id) => set({ preFilterActiveTabId: id }),

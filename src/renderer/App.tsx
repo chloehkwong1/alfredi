@@ -118,6 +118,7 @@ useBatchStore.getState = () => ({
 });
 // All session state is read directly from useSessionStore in MaestroConsoleInner.
 import { useSessionStore, selectActiveSession } from './stores/sessionStore';
+import { useSettingsStore } from './stores/settingsStore';
 // useAgentStore moved to useQueueProcessing hook
 import { InlineWizardProvider, useInlineWizardContext } from './contexts/InlineWizardContext';
 import { ToastContainer } from './components/Toast';
@@ -418,7 +419,8 @@ function MaestroConsoleInner() {
 	const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
 	const activeRightTab = useUIStore((s) => s.activeRightTab);
 	const activeFocus = useUIStore((s) => s.activeFocus);
-	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
+	const bookmarksCollapsed = useSettingsStore((s) => s.bookmarksCollapsed);
+	const setBookmarksCollapsed = useSettingsStore.getState().setBookmarksCollapsed;
 	const showUnreadOnly = useUIStore((s) => s.showUnreadOnly);
 	const fileTreeFilter = useFileExplorerStore((s) => s.fileTreeFilter);
 	const fileTreeFilterOpen = useFileExplorerStore((s) => s.fileTreeFilterOpen);
@@ -434,7 +436,6 @@ function MaestroConsoleInner() {
 		setRightPanelOpen,
 		setActiveRightTab,
 		setActiveFocus,
-		setBookmarksCollapsed,
 		setDraggingSessionId,
 		setFlashNotification,
 		setSuccessFlashNotification,
