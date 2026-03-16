@@ -200,6 +200,10 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			const resizeObserver = new ResizeObserver(() => {
 				// debounce via rAF to avoid excessive fitting
 				requestAnimationFrame(() => {
+					// Skip fitting when the container is hidden (display: none)
+					// — dimensions are 0×0 and fitting would resize the PTY to
+					// a tiny size, causing line-wrapping corruption.
+					if (!container.clientWidth || !container.clientHeight) return;
 					try {
 						if (!opened) {
 							terminal.open(container);
