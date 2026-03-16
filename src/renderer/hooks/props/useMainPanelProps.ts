@@ -162,6 +162,7 @@ export interface UseMainPanelPropsDeps {
 	setActiveSessionId: (id: string) => void;
 	handleStopBatchRun: (sessionId?: string) => void;
 	handleDeleteLog: (logId: string) => number | null;
+	handleRewindToMessage: (logId: string) => number | null;
 	handleRemoveQueuedItem: (itemId: string) => void;
 	handleOpenQueueBrowser: () => void;
 
@@ -368,6 +369,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			currentSessionBatchState: deps.currentSessionBatchState,
 			onStopBatchRun: deps.handleStopBatchRun,
 			onDeleteLog: deps.handleDeleteLog,
+			onRewindToMessage: deps.handleRewindToMessage,
 			onRemoveQueuedItem: deps.handleRemoveQueuedItem,
 			onOpenQueueBrowser: deps.handleOpenQueueBrowser,
 			// Tab management handlers
@@ -590,6 +592,7 @@ export function useMainPanelProps(deps: UseMainPanelPropsDeps) {
 			deps.setActiveSessionId,
 			deps.handleStopBatchRun,
 			deps.handleDeleteLog,
+			deps.handleRewindToMessage,
 			deps.handleRemoveQueuedItem,
 			deps.handleOpenQueueBrowser,
 			deps.handleTabSelect,

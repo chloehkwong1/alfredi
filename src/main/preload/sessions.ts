@@ -287,6 +287,22 @@ export function createAgentSessionsApi() {
 				fallbackContent
 			),
 
+		rewindToMessage: (
+			agentId: string,
+			projectPath: string,
+			sessionId: string,
+			userMessageUuid: string,
+			fallbackContent?: string
+		) =>
+			ipcRenderer.invoke(
+				'agentSessions:rewindToMessage',
+				agentId,
+				projectPath,
+				sessionId,
+				userMessageUuid,
+				fallbackContent
+			),
+
 		hasStorage: (agentId: string) => ipcRenderer.invoke('agentSessions:hasStorage', agentId),
 
 		getAvailableStorages: () => ipcRenderer.invoke('agentSessions:getAvailableStorages'),

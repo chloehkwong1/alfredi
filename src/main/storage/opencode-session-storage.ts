@@ -1239,4 +1239,14 @@ export class OpenCodeSessionStorage implements AgentSessionStorage {
 			return { success: false, error: String(error) };
 		}
 	}
+
+	async rewindToMessage(
+		_projectPath: string,
+		_sessionId: string,
+		_userMessageUuid: string,
+		_fallbackContent?: string,
+		_sshConfig?: SshRemoteConfig
+	): Promise<{ success: boolean; error?: string; linesRemoved?: number }> {
+		return { success: false, error: 'Rewind not supported for OpenCode sessions' };
+	}
 }

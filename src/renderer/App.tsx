@@ -664,6 +664,7 @@ function MaestroConsoleInner() {
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleDeleteLog,
+		handleRewindToMessage,
 		handleOpenDiffTab,
 		handleSelectDiffTab,
 		handleCloseDiffTab,
@@ -1899,6 +1900,7 @@ function MaestroConsoleInner() {
 		setActiveSessionId,
 		handleStopBatchRun,
 		handleDeleteLog,
+		handleRewindToMessage,
 		handleRemoveQueuedItem,
 		handleOpenQueueBrowser,
 

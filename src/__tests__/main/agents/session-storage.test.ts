@@ -63,6 +63,15 @@ class MockSessionStorage implements AgentSessionStorage {
 	): Promise<{ success: boolean; error?: string; linesRemoved?: number }> {
 		return { success: true, linesRemoved: 2 };
 	}
+
+	async rewindToMessage(
+		_projectPath: string,
+		_sessionId: string,
+		_userMessageUuid: string,
+		_fallbackContent?: string
+	): Promise<{ success: boolean; error?: string; linesRemoved?: number }> {
+		return { success: true, linesRemoved: 3 };
+	}
 }
 
 describe('agent-session-storage', () => {

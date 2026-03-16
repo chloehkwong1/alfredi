@@ -178,6 +178,7 @@ interface MainPanelProps {
 	getContextColor: (usage: number, theme: Theme) => string;
 	setActiveSessionId: (id: string) => void;
 	onDeleteLog?: (logId: string) => number | null;
+	onRewindToMessage?: (logId: string) => number | null;
 	onRemoveQueuedItem?: (itemId: string) => void;
 	onOpenQueueBrowser?: () => void;
 
@@ -2483,6 +2484,7 @@ export const MainPanel = React.memo(
 											logsEndRef={logsEndRef}
 											maxOutputLines={maxOutputLines}
 											onDeleteLog={props.onDeleteLog}
+											onRewindToMessage={props.onRewindToMessage}
 											onRemoveQueuedItem={onRemoveQueuedItem}
 											onInterrupt={handleInterrupt}
 											onScrollPositionChange={props.onScrollPositionChange}

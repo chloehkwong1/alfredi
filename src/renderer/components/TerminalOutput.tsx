@@ -9,6 +9,7 @@ import {
 	Eye,
 	FileText,
 	RotateCcw,
+	History,
 	AlertCircle,
 	Save,
 	MessageSquare,
@@ -436,9 +437,10 @@ interface LogItemProps {
 		}
 	) => void;
 	onClearLocalFilter: (logId: string) => void;
-	// Delete state
+	// Delete / Rewind state
 	deleteConfirmLogId: string | null;
 	onDeleteLog?: (logId: string) => number | null;
+	onRewindToMessage?: (logId: string) => number | null;
 	onSetDeleteConfirmLogId: (logId: string | null) => void;
 	scrollContainerRef: React.RefObject<HTMLDivElement>;
 	// Other callbacks
@@ -509,6 +511,7 @@ const LogItemComponent = memo(
 		onClearLocalFilter,
 		deleteConfirmLogId,
 		onDeleteLog,
+		onRewindToMessage,
 		onSetDeleteConfirmLogId,
 		scrollContainerRef,
 		setLightboxImage,
@@ -1231,6 +1234,59 @@ const LogItemComponent = memo(
 								<RotateCcw className="w-3.5 h-3.5" />
 							</button>
 						)}
+						{/* Rewind to here button for user messages in AI mode */}
+						{isUserMessage &&
+							isAIMode &&
+							onRewindToMessage &&
+							(deleteConfirmLogId === `rewind:${log.id}` ? (
+								<div
+									className="flex items-center gap-1 p-1 rounded border"
+									style={{
+										backgroundColor: theme.colors.bgSidebar,
+										borderColor: theme.colors.accent,
+									}}
+								>
+									<span className="text-xs px-1" style={{ color: theme.colors.accent }}>
+										Rewind?
+									</span>
+									<button
+										onClick={() => {
+											const nextIndex = onRewindToMessage(log.id);
+											onSetDeleteConfirmLogId(null);
+											if (nextIndex !== null && nextIndex >= 0) {
+												setTimeout(() => {
+													const container = scrollContainerRef.current;
+													const items = container?.querySelectorAll('[data-log-index]');
+													const targetItem = items?.[nextIndex] as HTMLElement;
+													if (targetItem && container) {
+														container.scrollTop = targetItem.offsetTop;
+													}
+												}, 50);
+											}
+										}}
+										className="px-2 py-0.5 rounded text-xs font-medium hover:opacity-80"
+										style={{ backgroundColor: theme.colors.accent, color: '#fff' }}
+									>
+										Yes
+									</button>
+									<button
+										onClick={() => onSetDeleteConfirmLogId(null)}
+										className="px-2 py-0.5 rounded text-xs hover:opacity-80"
+										style={{ color: theme.colors.textDim }}
+									>
+										No
+									</button>
+								</div>
+							) : (
+								<button
+									onClick={() => onSetDeleteConfirmLogId(`rewind:${log.id}`)}
+									className="p-1.5 rounded opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
+									style={{ color: theme.colors.textDim }}
+									title="Rewind to this message (remove all later messages)"
+								>
+									<History className="w-3.5 h-3.5" />
+								</button>
+							))}
 						{/* Copy to Clipboard Button */}
 						<button
 							onClick={() => copyToClipboard(log.text)}
@@ -1415,6 +1471,7 @@ interface WorkGroupComponentProps {
 	onClearLocalFilter: (logId: string) => void;
 	deleteConfirmLogId: string | null;
 	onDeleteLog?: (logId: string) => number | null;
+	onRewindToMessage?: (logId: string) => number | null;
 	onSetDeleteConfirmLogId: (logId: string | null) => void;
 	scrollContainerRef: React.RefObject<HTMLDivElement>;
 	setLightboxImage: (
@@ -1471,6 +1528,7 @@ const WorkGroupComponent = memo(
 		onClearLocalFilter,
 		deleteConfirmLogId,
 		onDeleteLog,
+		onRewindToMessage,
 		onSetDeleteConfirmLogId,
 		scrollContainerRef,
 		setLightboxImage,
@@ -1531,6 +1589,7 @@ const WorkGroupComponent = memo(
 					onClearLocalFilter={onClearLocalFilter}
 					deleteConfirmLogId={deleteConfirmLogId}
 					onDeleteLog={onDeleteLog}
+					onRewindToMessage={onRewindToMessage}
 					onSetDeleteConfirmLogId={onSetDeleteConfirmLogId}
 					scrollContainerRef={scrollContainerRef}
 					setLightboxImage={setLightboxImage}
@@ -1811,6 +1870,7 @@ interface TerminalOutputProps {
 	logsEndRef: React.RefObject<HTMLDivElement>;
 	maxOutputLines: number;
 	onDeleteLog?: (logId: string) => number | null; // Returns the index to scroll to after deletion
+	onRewindToMessage?: (logId: string) => number | null; // Rewind conversation to this message
 	onRemoveQueuedItem?: (itemId: string) => void; // Callback to remove a queued item from execution queue
 	onInterrupt?: () => void; // Callback to interrupt the current process
 	onScrollPositionChange?: (scrollTop: number) => void; // Callback to save scroll position
@@ -1856,6 +1916,7 @@ export const TerminalOutput = memo(
 			logsEndRef,
 			maxOutputLines,
 			onDeleteLog,
+			onRewindToMessage,
 			onRemoveQueuedItem,
 			onInterrupt: _onInterrupt,
 			onScrollPositionChange,
@@ -2724,6 +2785,7 @@ export const TerminalOutput = memo(
 									onClearLocalFilter={clearLocalFilter}
 									deleteConfirmLogId={deleteConfirmLogId}
 									onDeleteLog={onDeleteLog}
+									onRewindToMessage={onRewindToMessage}
 									onSetDeleteConfirmLogId={setDeleteConfirmLogId}
 									scrollContainerRef={scrollContainerRef}
 									setLightboxImage={setLightboxImage}
@@ -2797,6 +2859,7 @@ export const TerminalOutput = memo(
 								onClearLocalFilter={clearLocalFilter}
 								deleteConfirmLogId={deleteConfirmLogId}
 								onDeleteLog={onDeleteLog}
+								onRewindToMessage={onRewindToMessage}
 								onSetDeleteConfirmLogId={setDeleteConfirmLogId}
 								scrollContainerRef={scrollContainerRef}
 								setLightboxImage={setLightboxImage}

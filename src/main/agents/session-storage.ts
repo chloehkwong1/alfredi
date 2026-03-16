@@ -225,6 +225,25 @@ export interface AgentSessionStorage {
 		fallbackContent?: string,
 		sshConfig?: SshRemoteConfig
 	): Promise<{ success: boolean; error?: string; linesRemoved?: number }>;
+
+	/**
+	 * Rewind a session to a specific user message, removing all subsequent messages.
+	 * Keeps everything up to and including the target user message, discards its
+	 * response and all later messages.
+	 * @param projectPath - The project directory path
+	 * @param sessionId - The session identifier
+	 * @param userMessageUuid - UUID of the user message to rewind to
+	 * @param fallbackContent - Optional content to match if UUID not found
+	 * @param sshConfig - Optional SSH config for remote access
+	 * @returns Success status and number of lines removed
+	 */
+	rewindToMessage(
+		projectPath: string,
+		sessionId: string,
+		userMessageUuid: string,
+		fallbackContent?: string,
+		sshConfig?: SshRemoteConfig
+	): Promise<{ success: boolean; error?: string; linesRemoved?: number }>;
 }
 
 /**

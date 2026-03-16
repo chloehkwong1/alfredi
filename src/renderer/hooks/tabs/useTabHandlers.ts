@@ -151,6 +151,7 @@ export interface TabHandlersReturn {
 	handleScrollPositionChange: (scrollTop: number) => void;
 	handleAtBottomChange: (isAtBottom: boolean) => void;
 	handleDeleteLog: (logId: string) => number | null;
+	handleRewindToMessage: (logId: string) => number | null;
 }
 
 // ============================================================================
@@ -1569,6 +1570,73 @@ export function useTabHandlers(): TabHandlersReturn {
 		return nextUserCommandIndex;
 	}, []);
 
+	const handleRewindToMessage = useCallback((logId: string): number | null => {
+		const { sessions, activeSessionId, setSessions } = useSessionStore.getState();
+		const currentSession = sessions.find((s) => s.id === activeSessionId);
+		if (!currentSession) return null;
+
+		const currentActiveTab = getActiveTab(currentSession) ?? null;
+		const logs = currentActiveTab?.logs || [];
+
+		const logIndex = logs.findIndex((log) => log.id === logId);
+		if (logIndex === -1) return null;
+
+		const log = logs[logIndex];
+		if (log.source !== 'user') return null;
+
+		// Keep everything up to and including this user message, remove the rest
+		const newLogs = logs.slice(0, logIndex + 1);
+
+		if (currentActiveTab) {
+			const agentSessionId = currentActiveTab.agentSessionId;
+			if (agentSessionId && currentSession.cwd) {
+				window.maestro.agentSessions
+					.rewindToMessage(
+						currentSession.toolType,
+						currentSession.cwd,
+						agentSessionId,
+						logId,
+						log.text
+					)
+					.then((result) => {
+						if (!result.success) {
+							console.warn('[handleRewindToMessage] Failed to rewind session:', result.error);
+						}
+					})
+					.catch((err) => {
+						console.error('[handleRewindToMessage] Error rewinding session:', err);
+					});
+			}
+
+			// Remove rewound commands from history
+			const removedCommands = new Set(
+				logs
+					.slice(logIndex + 1)
+					.filter((l) => l.source === 'user')
+					.map((l) => l.text.trim())
+			);
+
+			setSessions((prev: Session[]) =>
+				prev.map((s) => {
+					if (s.id !== currentSession.id) return s;
+					const newAICommandHistory = (s.aiCommandHistory || []).filter(
+						(cmd) => !removedCommands.has(cmd)
+					);
+					return {
+						...s,
+						aiCommandHistory: newAICommandHistory,
+						aiTabs: s.aiTabs.map((tab) =>
+							tab.id === currentActiveTab.id ? { ...tab, logs: newLogs } : tab
+						),
+					};
+				})
+			);
+		}
+
+		// Scroll to the kept user message
+		return logIndex;
+	}, []);
+
 	// ========================================================================
 	// Tab Properties
 	// ========================================================================
@@ -2142,5 +2210,6 @@ export function useTabHandlers(): TabHandlersReturn {
 		handleScrollPositionChange,
 		handleAtBottomChange,
 		handleDeleteLog,
+		handleRewindToMessage,
 	};
 }

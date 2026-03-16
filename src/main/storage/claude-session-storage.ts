@@ -1108,6 +1108,105 @@ export class ClaudeSessionStorage implements AgentSessionStorage {
 		}
 	}
 
+	async rewindToMessage(
+		projectPath: string,
+		sessionId: string,
+		userMessageUuid: string,
+		fallbackContent?: string,
+		sshConfig?: SshRemoteConfig
+	): Promise<{ success: boolean; error?: string; linesRemoved?: number }> {
+		if (sshConfig) {
+			logger.warn('Rewind message not supported for SSH remote sessions', LOG_CONTEXT);
+			return { success: false, error: 'Rewind not supported for remote sessions' };
+		}
+
+		const projectDir = this.getEncodedProjectDir(projectPath);
+		const sessionFile = path.join(projectDir, `${sessionId}.jsonl`);
+
+		try {
+			const content = await fs.readFile(sessionFile, 'utf-8');
+			const lines = content.split('\n').filter((l) => l.trim());
+
+			const parsedLines: Array<{ line: string; entry: unknown }> = [];
+			let userMessageIndex = -1;
+
+			for (let i = 0; i < lines.length; i++) {
+				try {
+					const entry = JSON.parse(lines[i]);
+					parsedLines.push({ line: lines[i], entry });
+
+					if (entry.uuid === userMessageUuid && entry.type === 'user') {
+						userMessageIndex = parsedLines.length - 1;
+					}
+				} catch {
+					parsedLines.push({ line: lines[i], entry: null });
+				}
+			}
+
+			// If UUID match failed, try content match
+			if (userMessageIndex === -1 && fallbackContent) {
+				const normalizedFallback = fallbackContent.trim();
+
+				for (let i = parsedLines.length - 1; i >= 0; i--) {
+					const entry = parsedLines[i].entry as {
+						type?: string;
+						message?: { content?: unknown };
+					} | null;
+					if (entry?.type === 'user') {
+						let messageText = '';
+						if (entry.message?.content) {
+							if (typeof entry.message.content === 'string') {
+								messageText = entry.message.content;
+							} else if (Array.isArray(entry.message.content)) {
+								const textBlocks = (
+									entry.message.content as Array<{ type?: string; text?: string }>
+								).filter((b) => b.type === 'text');
+								messageText = textBlocks.map((b) => b.text).join('\n');
+							}
+						}
+
+						if (messageText.trim() === normalizedFallback) {
+							userMessageIndex = i;
+							logger.info('Found message by content match for rewind', LOG_CONTEXT, {
+								sessionId,
+								index: i,
+							});
+							break;
+						}
+					}
+				}
+			}
+
+			if (userMessageIndex === -1) {
+				logger.warn('User message not found for rewind', LOG_CONTEXT, {
+					sessionId,
+					userMessageUuid,
+					hasFallback: !!fallbackContent,
+				});
+				return { success: false, error: 'User message not found' };
+			}
+
+			// Keep everything up to and including the target user message
+			const linesToKeep = parsedLines.slice(0, userMessageIndex + 1);
+			const linesRemoved = parsedLines.length - linesToKeep.length;
+
+			const newContent = linesToKeep.map((p) => p.line).join('\n') + '\n';
+			await fs.writeFile(sessionFile, newContent, 'utf-8');
+
+			logger.info(`Rewound Claude session to message`, LOG_CONTEXT, {
+				sessionId,
+				userMessageUuid,
+				linesRemoved,
+			});
+
+			return { success: true, linesRemoved };
+		} catch (error) {
+			logger.error(`Error rewinding session: ${sessionId}`, LOG_CONTEXT, error);
+			captureException(error, { operation: 'claudeStorage:rewindToMessage', sessionId });
+			return { success: false, error: String(error) };
+		}
+	}
+
 	// ============ Origin Management Methods ============
 	// These are additional methods specific to Claude session management
 

@@ -1034,6 +1034,18 @@ interface MaestroAPI {
 			error?: string;
 			linesRemoved?: number;
 		}>;
+		// Rewind a session to a specific user message (remove all subsequent messages)
+		rewindToMessage: (
+			agentId: string,
+			projectPath: string,
+			sessionId: string,
+			userMessageUuid: string,
+			fallbackContent?: string
+		) => Promise<{
+			success: boolean;
+			error?: string;
+			linesRemoved?: number;
+		}>;
 		hasStorage: (agentId: string) => Promise<boolean>;
 		getAvailableStorages: () => Promise<string[]>;
 		getGlobalStats: () => Promise<{

@@ -553,6 +553,30 @@ export function registerAgentSessionsHandlers(deps?: AgentSessionsHandlerDepende
 		)
 	);
 
+	// ============ Rewind To Message ============
+
+	ipcMain.handle(
+		'agentSessions:rewindToMessage',
+		withIpcErrorLogging(
+			handlerOpts('rewindToMessage'),
+			async (
+				agentId: string,
+				projectPath: string,
+				sessionId: string,
+				userMessageUuid: string,
+				fallbackContent?: string
+			): Promise<{ success: boolean; error?: string; linesRemoved?: number }> => {
+				const storage = getSessionStorage(agentId);
+				if (!storage) {
+					logger.warn(`No session storage available for agent: ${agentId}`, LOG_CONTEXT);
+					return { success: false, error: `No session storage available for agent: ${agentId}` };
+				}
+
+				return storage.rewindToMessage(projectPath, sessionId, userMessageUuid, fallbackContent);
+			}
+		)
+	);
+
 	// ============ Check Storage Availability ============
 
 	ipcMain.handle(

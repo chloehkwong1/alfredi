@@ -65,6 +65,7 @@ describe('agentSessions IPC handlers', () => {
 				'agentSessions:search',
 				'agentSessions:getPath',
 				'agentSessions:deleteMessagePair',
+				'agentSessions:rewindToMessage',
 				'agentSessions:hasStorage',
 				'agentSessions:getAvailableStorages',
 			];
