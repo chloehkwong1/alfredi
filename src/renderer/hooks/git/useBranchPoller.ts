@@ -100,6 +100,13 @@ export function useBranchPoller(): void {
 					// Always update checkStatus (object comparison not worth the complexity)
 					updates.prCheckStatus = prStatus.checkStatus;
 					if (latest.prIsDraft !== prStatus.isDraft) updates.prIsDraft = prStatus.isDraft;
+					// Update reviewer and comment data from extended getPrStatus
+					if (prStatus.reviewers) {
+						updates.prReviewers = prStatus.reviewers;
+					}
+					if (prStatus.totalComments !== undefined) {
+						updates.prCommentCount = prStatus.totalComments;
+					}
 
 					if (Object.keys(updates).length > 0) {
 						updateSession(session.id, updates);

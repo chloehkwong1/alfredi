@@ -1,4 +1,12 @@
-import React, { useRef, useImperativeHandle, forwardRef, useState, useCallback, memo } from 'react';
+import React, {
+	useRef,
+	useImperativeHandle,
+	forwardRef,
+	useState,
+	useCallback,
+	useMemo,
+	memo,
+} from 'react';
 import {
 	PanelRightClose,
 	PanelRightOpen,
@@ -30,6 +38,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { getSessionSshRemoteId } from '../utils/sessionHelpers';
 import XTerminal from './XTerminal';
 import { ChecksPanel } from './ChecksPanel';
+import { getPrCommentCountsByFile } from '../hooks/usePrComments';
 import {
 	usePersistentTerminal,
 	getTerminalProcessId,
@@ -500,6 +509,12 @@ export const RightPanel = memo(
 			session?.baseBranch
 		);
 
+		// Per-file PR comment counts for Changes tab badges
+		const prCommentCountsByFile = useMemo(
+			() => getPrCommentCountsByFile(session?.prNumber),
+			[session?.prNumber, session?.prCommentCount] // re-derive when comment count changes
+		);
+
 		/** Open a stacked commit diff tab for the given commit */
 		const handleOpenCommitDiff = useCallback(
 			(commit: import('../hooks/useChangesPanel').ChangesPanelCommit, isPreview?: boolean) => {
@@ -861,6 +876,7 @@ export const RightPanel = memo(
 							onOpenDiff={handleChangesPanelOpenDiff}
 							onOpenCommitDiff={handleOpenCommitDiff}
 							fetchCommitFiles={changesPanel.fetchCommitFiles}
+							commentCountByFile={prCommentCountsByFile}
 						/>
 					) : (
 						/* File preview tab content — placeholder for now; FilePreview will be wired in a later section */

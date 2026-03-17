@@ -173,3 +173,26 @@ export function usePrComments({
 
 	return { buildPrWidgets };
 }
+
+/**
+ * Returns cached PR comments for a given PR number, or undefined if not yet fetched.
+ * Does NOT trigger a fetch — callers should ensure usePrComments has been called elsewhere.
+ */
+export function getCachedPrComments(prNumber: number): PrComment[] | undefined {
+	return prCommentsCache.get(prNumber);
+}
+
+/**
+ * Derives per-file comment counts from cached PR comments.
+ * Returns a Map<filePath, commentCount>.
+ */
+export function getPrCommentCountsByFile(prNumber: number | undefined): Map<string, number> {
+	const counts = new Map<string, number>();
+	if (!prNumber) return counts;
+	const comments = prCommentsCache.get(prNumber);
+	if (!comments) return counts;
+	for (const c of comments) {
+		counts.set(c.path, (counts.get(c.path) ?? 0) + 1);
+	}
+	return counts;
+}

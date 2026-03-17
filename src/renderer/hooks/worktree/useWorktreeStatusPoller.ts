@@ -59,18 +59,33 @@ export function useWorktreeStatusPoller(): void {
 	const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 	const pollPrStatuses = useCallback(async () => {
-		const { sessions, updateSession } = useSessionStore.getState();
+		const { sessions, updateSession, setReviewRequestedPRs } = useSessionStore.getState();
 		const worktrees = getWorktreesToPoll(sessions);
-
-		if (worktrees.length === 0) return;
 
 		// Build a map of parent session projectRoot for repo path lookup
 		const parentRoots = new Map<string, string>();
+		const parentSshRemoteIds = new Map<string, string | undefined>();
 		for (const s of sessions) {
 			if (s.worktreeConfig) {
 				parentRoots.set(s.id, s.projectRoot);
+				parentSshRemoteIds.set(s.id, s.sshRemoteId);
 			}
 		}
+
+		// Poll review-requested PRs for each worktree parent
+		for (const [parentId, repoPath] of parentRoots) {
+			try {
+				const prs = await gitService.getReviewRequestedPRs(
+					repoPath,
+					parentSshRemoteIds.get(parentId)
+				);
+				setReviewRequestedPRs(parentId, prs);
+			} catch {
+				// Silently ignore — review requests are non-critical
+			}
+		}
+
+		if (worktrees.length === 0) return;
 
 		// Poll in parallel, but don't let one failure stop others
 		await Promise.allSettled(
@@ -112,6 +127,13 @@ export function useWorktreeStatusPoller(): void {
 				}
 				// Always update checkStatus (object comparison not worth the complexity)
 				prUpdates.prCheckStatus = prStatus.checkStatus;
+				// Update reviewer and comment data from extended getPrStatus
+				if (prStatus.reviewers) {
+					prUpdates.prReviewers = prStatus.reviewers;
+				}
+				if (prStatus.totalComments !== undefined) {
+					prUpdates.prCommentCount = prStatus.totalComments;
+				}
 				// Sync base branch from GitHub (handles auto-retargeting)
 				if (prStatus.baseRefName && current.baseBranch !== prStatus.baseRefName) {
 					prUpdates.baseBranch = prStatus.baseRefName;

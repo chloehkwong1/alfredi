@@ -1883,7 +1883,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						'view',
 						branch,
 						'--json',
-						'state,url,number,headRefName,baseRefName,title,reviewDecision,statusCheckRollup,isDraft',
+						'state,url,number,headRefName,baseRefName,title,reviewDecision,statusCheckRollup,isDraft,reviews,reviewRequests,comments',
 					],
 					repoPath
 				);
@@ -1953,6 +1953,42 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						checkStatus = counts;
 					}
 
+					// Parse reviewers from reviews + reviewRequests
+					const reviewers: Array<{
+						login: string;
+						state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+					}> = [];
+					const reviewsByAuthor = new Map<string, string>();
+					if (Array.isArray(data.reviews)) {
+						for (const review of data.reviews) {
+							const login = review.author?.login;
+							if (!login) continue;
+							// Later entries are more recent
+							reviewsByAuthor.set(login, review.state);
+						}
+					}
+					for (const [login, state] of reviewsByAuthor) {
+						const normalized = state?.toUpperCase();
+						let mappedState: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+						if (normalized === 'APPROVED') mappedState = 'APPROVED';
+						else if (normalized === 'CHANGES_REQUESTED') mappedState = 'CHANGES_REQUESTED';
+						else if (normalized === 'COMMENTED') mappedState = 'COMMENTED';
+						else mappedState = 'PENDING';
+						reviewers.push({ login, state: mappedState });
+					}
+					// Add requested reviewers that haven't reviewed yet
+					if (Array.isArray(data.reviewRequests)) {
+						for (const req of data.reviewRequests) {
+							const login = req.login || req.name;
+							if (login && !reviewsByAuthor.has(login)) {
+								reviewers.push({ login, state: 'PENDING' });
+							}
+						}
+					}
+
+					// Extract total comment count
+					const totalComments = Array.isArray(data.comments) ? data.comments.length : 0;
+
 					return {
 						state: data.state as 'OPEN' | 'MERGED' | 'CLOSED',
 						url: data.url as string,
@@ -1963,6 +1999,8 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						checkStatus,
 						isDraft: !!data.isDraft,
 						baseRefName: (data.baseRefName as string) || undefined,
+						reviewers,
+						totalComments,
 					};
 				} catch {
 					logger.warn(
@@ -2136,6 +2174,72 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				} catch {
 					logger.warn(
 						`${LOG_CONTEXT} Failed to parse gh pr view output for prReviewers on branch ${branch}`,
+						LOG_CONTEXT
+					);
+					return [];
+				}
+			}
+		)
+	);
+
+	// Get PRs where the current user is requested for review
+	ipcMain.handle(
+		'git:reviewRequestedPRs',
+		withIpcErrorLogging(
+			{ context: LOG_CONTEXT, operation: 'reviewRequestedPRs' },
+			async (repoPath: string, sshRemoteId?: string) => {
+				let ghCommand: string;
+				try {
+					ghCommand = await resolveGhPath();
+				} catch {
+					return [];
+				}
+
+				const args = [
+					'pr',
+					'list',
+					'--search',
+					'review-requested:@me',
+					'--json',
+					'number,title,headRefName,author,updatedAt,url',
+					'--limit',
+					'20',
+				];
+
+				let result;
+				if (sshRemoteId) {
+					const sshRemote = getSshRemoteById(sshRemoteId);
+					if (sshRemote) {
+						const sshCmd = buildSshCommand(
+							sshRemote,
+							`cd ${repoPath} && ${ghCommand} ${args.join(' ')}`
+						);
+						result = await execFileNoThrow(sshCmd.command, sshCmd.args);
+					} else {
+						result = await execFileNoThrow(ghCommand, args, repoPath);
+					}
+				} else {
+					result = await execFileNoThrow(ghCommand, args, repoPath);
+				}
+
+				if (result.exitCode !== 0) {
+					return [];
+				}
+
+				try {
+					const data = JSON.parse(result.stdout.trim());
+					if (!Array.isArray(data)) return [];
+					return data.map((pr: any) => ({
+						number: pr.number as number,
+						title: pr.title as string,
+						branch: pr.headRefName as string,
+						author: (pr.author?.login as string) || 'unknown',
+						updatedAt: pr.updatedAt as string,
+						url: pr.url as string,
+					}));
+				} catch {
+					logger.warn(
+						`${LOG_CONTEXT} Failed to parse gh pr list output for review-requested PRs`,
 						LOG_CONTEXT
 					);
 					return [];

@@ -4,14 +4,16 @@ import {
 	ChevronDown,
 	Radio,
 	GitBranch,
+	GitPullRequest,
 	Menu,
 	Bookmark,
 	Play,
 	Square,
 	Activity,
+	ExternalLink,
 } from 'lucide-react';
 import alfrediLogo from '../../assets/alfredi-logo.png';
-import type { Session, Theme } from '../../types';
+import type { Session, Theme, ReviewRequestedPR } from '../../types';
 import type { WorktreeStatus } from '../../../shared/types';
 
 import { SessionItem } from '../SessionItem';
@@ -118,6 +120,7 @@ function SessionListInner(props: SessionListProps) {
 		(s) => s.contextManagementSettings.contextWarningRedThreshold
 	);
 	const activeBatchSessionIds = useBatchStore(useShallow(selectActiveBatchSessionIds));
+	const reviewRequestedPRs = useSessionStore((s) => s.reviewRequestedPRs);
 
 	// Stable store actions
 	const setActiveFocus = useUIStore.getState().setActiveFocus;
@@ -175,6 +178,8 @@ function SessionListInner(props: SessionListProps) {
 
 	const archiveCollapsed = useSettingsStore((s) => s.archiveCollapsed);
 	const setArchiveCollapsed = useSettingsStore.getState().setArchiveCollapsed;
+	const [needsReviewCollapsed, setNeedsReviewCollapsed] = useState(false);
+	const [dismissedReviewPRs, setDismissedReviewPRs] = useState<Set<number>>(new Set());
 
 	const { sessionFilter, setSessionFilter } = useSessionFilterMode();
 	const { onResizeStart: onSidebarResizeStart, transitionClass: sidebarTransitionClass } =
@@ -411,6 +416,17 @@ function SessionListInner(props: SessionListProps) {
 		[sessions]
 	);
 
+	// Review-requested PRs for the active worktree parent
+	const currentReviewPRs = useMemo(() => {
+		const active = sessions.find((s) => s.id === activeSessionId);
+		if (!active) return [];
+		// Find parent session ID (if active is a worktree child) or self (if worktree parent)
+		const parentId = active.parentSessionId ?? (active.worktreeConfig ? active.id : null);
+		if (!parentId) return [];
+		const prs = reviewRequestedPRs[parentId] ?? [];
+		return prs.filter((pr) => !dismissedReviewPRs.has(pr.number));
+	}, [sessions, activeSessionId, reviewRequestedPRs, dismissedReviewPRs]);
+
 	// PERF: Cached callback maps to prevent SessionItem re-renders
 	// These Maps store stable function references keyed by session/editing ID
 	// The callbacks themselves are memoized, so the Map values remain stable
@@ -620,7 +636,7 @@ function SessionListInner(props: SessionListProps) {
 															e.stopPropagation();
 															toggleKanbanSection(session.id, status);
 														}}
-														className={`w-full flex items-center gap-1.5 px-3 py-1 ${fontSizeToSecondary(fontSize)} font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer`}
+														className={`w-full flex items-center gap-1.5 px-3 py-0.5 ${fontSizeToSecondary(fontSize)} font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer`}
 														style={{ color: theme.colors.textDim }}
 														title={`${label} - click to ${collapsed ? 'expand' : 'collapse'}`}
 													>
@@ -630,7 +646,7 @@ function SessionListInner(props: SessionListProps) {
 															<ChevronDown className="w-2.5 h-2.5" />
 														)}
 														<span
-															className="w-1.5 h-1.5 rounded-full shrink-0"
+															className="w-2 h-2 rounded-full shrink-0"
 															style={{ backgroundColor: color }}
 														/>
 														<span>{label}</span>
@@ -971,6 +987,96 @@ function SessionListInner(props: SessionListProps) {
 						);
 					})()}
 
+					{/* NEEDS YOUR REVIEW — PRs assigned to user for review */}
+					{currentReviewPRs.length > 0 && (
+						<div className="mb-1" role="region" aria-label="Pull requests needing your review">
+							<button
+								type="button"
+								className="w-full px-3 py-1.5 flex items-center justify-between cursor-pointer hover:bg-opacity-50 group"
+								onClick={() => setNeedsReviewCollapsed((v) => !v)}
+								aria-expanded={!needsReviewCollapsed}
+								tabIndex={0}
+								onKeyDown={(e) => {
+									if (e.key === 'Enter' || e.key === ' ') {
+										e.preventDefault();
+										setNeedsReviewCollapsed((v) => !v);
+									}
+								}}
+							>
+								<div
+									className="flex items-center gap-2 text-xs font-semibold flex-1"
+									style={{ color: theme.colors.accent }}
+								>
+									{needsReviewCollapsed ? (
+										<ChevronRight className="w-3 h-3" />
+									) : (
+										<ChevronDown className="w-3 h-3" />
+									)}
+									<span>Needs Your Review ({currentReviewPRs.length})</span>
+								</div>
+							</button>
+
+							{!needsReviewCollapsed &&
+								currentReviewPRs.map((pr) => (
+									<div
+										key={`review-${pr.number}`}
+										className="mx-3 px-3 py-2 rounded-md cursor-pointer hover:bg-white/5 transition-colors"
+										style={{ borderLeft: `2px solid ${theme.colors.accent}` }}
+										role="listitem"
+										tabIndex={0}
+										onClick={() => {
+											window.maestro.shell.openExternal(pr.url);
+										}}
+										onKeyDown={(e) => {
+											if (e.key === 'Enter') {
+												window.maestro.shell.openExternal(pr.url);
+											}
+										}}
+										onContextMenu={(e) => {
+											e.preventDefault();
+											// Right-click copies PR link; middle-click dismisses
+											navigator.clipboard.writeText(pr.url);
+										}}
+									>
+										<div className="flex items-center gap-1.5 text-xs min-w-0">
+											<GitPullRequest
+												size={12}
+												style={{ color: theme.colors.accent }}
+												className="shrink-0"
+											/>
+											<span
+												className="truncate flex-1"
+												style={{ color: theme.colors.textMain }}
+												title={pr.title}
+											>
+												{pr.branch}
+											</span>
+											<span
+												className="shrink-0 px-1.5 py-[1px] rounded-full text-[10px] font-semibold"
+												style={{
+													backgroundColor: theme.colors.accent + '20',
+													color: theme.colors.accent,
+												}}
+											>
+												PR #{pr.number}
+											</span>
+											<ExternalLink
+												size={10}
+												className="shrink-0 opacity-0 group-hover:opacity-60 transition-opacity"
+												style={{ color: theme.colors.textDim }}
+											/>
+										</div>
+										<div
+											className="text-[10px] mt-0.5 truncate"
+											style={{ color: theme.colors.textDim }}
+										>
+											by @{pr.author} · {formatRelativeTime(new Date(pr.updatedAt).getTime())}
+										</div>
+									</div>
+								))}
+						</div>
+					)}
+
 					{/* ARCHIVE SECTION — collapsed-by-default section for worktrees moved to Done */}
 					{archivedWorktrees.length > 0 && (
 						<div className="mb-1">
@@ -1106,7 +1212,7 @@ function SessionListInner(props: SessionListProps) {
 							<span
 								className="ml-auto flex items-center gap-1.5 text-xs"
 								style={{
-									color: isRunning ? theme.colors.success : theme.colors.textDim,
+									color: isRunning ? theme.colors.accent : theme.colors.textDim,
 									opacity: isRunning ? 1 : 0.5,
 								}}
 							>
@@ -1180,6 +1286,21 @@ function SessionListInner(props: SessionListProps) {
 							return parent?.worktreeConfig?.runScript;
 						})()
 							? () => onRunWorktreeScript(contextMenuSession)
+							: undefined
+					}
+					onOpenPreview={
+						contextMenuSession.parentSessionId &&
+						(() => {
+							const parent = sessions.find((s) => s.id === contextMenuSession.parentSessionId);
+							return parent?.worktreeConfig?.previewUrl;
+						})()
+							? () => {
+									const parent = sessions.find((s) => s.id === contextMenuSession.parentSessionId);
+									const url = parent?.worktreeConfig?.previewUrl;
+									if (url) {
+										window.maestro.shell.openExternal(url);
+									}
+								}
 							: undefined
 					}
 					onClearContext={

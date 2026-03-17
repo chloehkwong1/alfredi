@@ -748,7 +748,30 @@ interface MaestroAPI {
 			title?: string;
 			reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 			checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
+			isDraft?: boolean;
+			baseRefName?: string;
+			reviewers?: Array<{
+				login: string;
+				state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+			}>;
+			totalComments?: number;
 		} | null>;
+		/**
+		 * Get PRs where the current user is requested for review
+		 */
+		getReviewRequestedPRs: (
+			repoPath: string,
+			sshRemoteId?: string
+		) => Promise<
+			Array<{
+				number: number;
+				title: string;
+				branch: string;
+				author: string;
+				updatedAt: string;
+				url: string;
+			}>
+		>;
 		/**
 		 * Discard unstaged changes for a single file
 		 */
@@ -1175,6 +1198,9 @@ interface MaestroAPI {
 	};
 	shells: {
 		detect: () => Promise<ShellInfo[]>;
+	};
+	terminals: {
+		detect: () => Promise<{ id: string; name: string; available: boolean }[]>;
 	};
 	shell: {
 		openExternal: (url: string) => Promise<void>;

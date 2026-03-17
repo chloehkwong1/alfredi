@@ -324,6 +324,11 @@ export const gitService = {
 		checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
 		isDraft?: boolean;
 		baseRefName?: string;
+		reviewers?: Array<{
+			login: string;
+			state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+		}>;
+		totalComments?: number;
 	} | null> {
 		return createIpcMethod({
 			call: () => window.maestro.git.getPrStatus(repoPath, branch),
@@ -434,6 +439,31 @@ export const gitService = {
 		return createIpcMethod({
 			call: () => window.maestro.git.getPrComments(repoPath, branch),
 			errorContext: 'Git getPrComments',
+			defaultValue: [],
+		});
+	},
+
+	/**
+	 * Get PRs where the current user is requested for review
+	 * @param repoPath Path to the git repository
+	 * @param sshRemoteId Optional SSH remote ID for remote execution
+	 */
+	async getReviewRequestedPRs(
+		repoPath: string,
+		sshRemoteId?: string
+	): Promise<
+		Array<{
+			number: number;
+			title: string;
+			branch: string;
+			author: string;
+			updatedAt: string;
+			url: string;
+		}>
+	> {
+		return createIpcMethod({
+			call: () => window.maestro.git.getReviewRequestedPRs(repoPath, sshRemoteId),
+			errorContext: 'Git getReviewRequestedPRs',
 			defaultValue: [],
 		});
 	},

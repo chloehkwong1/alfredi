@@ -58,6 +58,8 @@ export interface ChangesPanelProps {
 	onOpenCommitDiff: (commit: ChangesPanelCommit, isPreview?: boolean) => void;
 	/** Lazily fetch files for a specific commit */
 	fetchCommitFiles: (hash: string) => Promise<void>;
+	/** Per-file PR comment counts (file path -> count) */
+	commentCountByFile?: Map<string, number>;
 }
 
 // --- Helpers ---
@@ -127,6 +129,7 @@ const FileRow = memo(function FileRow({
 	onDoubleClick,
 	onContextMenu,
 	onRef,
+	commentCount,
 }: {
 	filePath: string;
 	statusLabel: string;
@@ -139,6 +142,7 @@ const FileRow = memo(function FileRow({
 	onDoubleClick?: () => void;
 	onContextMenu?: (e: React.MouseEvent) => void;
 	onRef?: (el: HTMLDivElement | null) => void;
+	commentCount?: number;
 }) {
 	return (
 		<div
@@ -170,6 +174,20 @@ const FileRow = memo(function FileRow({
 					</span>
 				)}
 			</span>
+
+			{/* PR comment count badge */}
+			{(commentCount ?? 0) > 0 && (
+				<span
+					className="shrink-0 px-1.5 py-[1px] rounded-full text-[9px] font-medium"
+					style={{
+						backgroundColor: theme.colors.accent + '33',
+						color: theme.colors.accent,
+					}}
+					title={`${commentCount} PR comment${commentCount !== 1 ? 's' : ''}`}
+				>
+					&#128172; {commentCount}
+				</span>
+			)}
 
 			{/* Line counts */}
 			{(additions > 0 || deletions > 0) && (
@@ -480,6 +498,7 @@ function ChangesPanelInner({
 	onOpenDiff,
 	onOpenCommitDiff,
 	fetchCommitFiles,
+	commentCountByFile,
 }: ChangesPanelProps) {
 	// View mode state
 	const [viewMode, setViewMode] = useState<ChangesViewMode>('all');
@@ -738,6 +757,7 @@ function ChangesPanelInner({
 											selected={selectedIndex === idx}
 											onClick={() => handleFileClick(file.path, 'uncommitted-staged')}
 											onDoubleClick={() => handleFileDoubleClick(file.path, 'uncommitted-staged')}
+											commentCount={commentCountByFile?.get(file.path)}
 										/>
 									);
 								})}
@@ -782,6 +802,7 @@ function ChangesPanelInner({
 											onClick={() => handleFileClick(file.path, 'uncommitted-unstaged')}
 											onDoubleClick={() => handleFileDoubleClick(file.path, 'uncommitted-unstaged')}
 											onContextMenu={(e) => handleUnstagedContextMenu(e, file.path)}
+											commentCount={commentCountByFile?.get(file.path)}
 										/>
 									);
 								})}
@@ -815,6 +836,7 @@ function ChangesPanelInner({
 											selected={selectedIndex === idx}
 											onClick={() => handleFileClick(file.path, 'committed')}
 											onDoubleClick={() => handleFileDoubleClick(file.path, 'committed')}
+											commentCount={commentCountByFile?.get(file.path)}
 										/>
 									);
 								})}

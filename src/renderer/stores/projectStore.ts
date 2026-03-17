@@ -14,7 +14,7 @@
  */
 
 import { create } from 'zustand';
-import type { Project, LogEntry } from '../types';
+import type { Project, LogEntry, ReviewRequestedPR } from '../types';
 import type { TerminalTab } from '../../shared/types';
 import { generateId } from '../utils/ids';
 import { getActiveTab } from '../utils/tabHelpers';
@@ -39,6 +39,9 @@ export interface ProjectStoreState {
 
 	// Navigation cycling position (for Cmd+J/K project cycling)
 	cyclePosition: number;
+
+	// Review-requested PRs keyed by parent session ID
+	reviewRequestedPRs: Record<string, ReviewRequestedPR[]>;
 
 	// --- Backward-compat aliases (read-only computed) ---
 	/** @deprecated Use projects instead */
@@ -117,6 +120,11 @@ export interface ProjectStoreActions {
 
 	/** Replace the entire removed worktree paths set. */
 	setRemovedWorktreePaths: (paths: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
+
+	// === Review Requests ===
+
+	/** Set review-requested PRs for a parent session */
+	setReviewRequestedPRs: (sessionId: string, prs: ReviewRequestedPR[]) => void;
 
 	// === Navigation ===
 
@@ -253,6 +261,7 @@ export const useProjectStore = create<ProjectStore>()((set) => {
 		initialLoadComplete: false,
 		removedWorktreePaths: new Set(),
 		cyclePosition: -1,
+		reviewRequestedPRs: {},
 
 		// --- Actions ---
 
@@ -298,6 +307,12 @@ export const useProjectStore = create<ProjectStore>()((set) => {
 		setRemovedWorktreePaths: (v: Set<string> | ((prev: Set<string>) => Set<string>)) =>
 			set((s) => ({
 				removedWorktreePaths: resolve(v, s.removedWorktreePaths),
+			})),
+
+		// Review Requests
+		setReviewRequestedPRs: (sessionId: string, prs: ReviewRequestedPR[]) =>
+			set((s) => ({
+				reviewRequestedPRs: { ...s.reviewRequestedPRs, [sessionId]: prs },
 			})),
 
 		// Navigation

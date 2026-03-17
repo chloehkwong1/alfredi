@@ -520,6 +520,23 @@ export function createGitApi() {
 		> => ipcRenderer.invoke('git:prReviewers', repoPath, branch),
 
 		/**
+		 * Get PRs where the current user is requested for review
+		 */
+		getReviewRequestedPRs: (
+			repoPath: string,
+			sshRemoteId?: string
+		): Promise<
+			Array<{
+				number: number;
+				title: string;
+				branch: string;
+				author: string;
+				updatedAt: string;
+				url: string;
+			}>
+		> => ipcRenderer.invoke('git:reviewRequestedPRs', repoPath, sshRemoteId),
+
+		/**
 		 * Get PR review comments (inline code comments) for a branch
 		 */
 		getPrComments: (
@@ -556,6 +573,11 @@ export function createGitApi() {
 			checkStatus: { total: number; passing: number; failing: number; pending: number } | null;
 			isDraft?: boolean;
 			baseRefName?: string;
+			reviewers?: Array<{
+				login: string;
+				state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+			}>;
+			totalComments?: number;
 		} | null> => ipcRenderer.invoke('git:prStatus', repoPath, branch),
 
 		/**

@@ -93,15 +93,16 @@ interface PrChipProps {
 const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 	const fontSize = useSettingsStore((s) => s.fontSize);
 	const chipClass = fontSizeToTertiary(fontSize);
-	const { prNumber, prReviewDecision, prCheckStatus } = session;
+	const { prNumber, prIsDraft, prReviewDecision, prCheckStatus, prCommentCount } = session;
 	if (!prNumber) return null;
 
-	const reviewLabel = getPrReviewLabel(prReviewDecision);
-	const color = getPrColor(prReviewDecision, prCheckStatus, theme);
+	const isDraft = !!prIsDraft;
+	const reviewLabel = isDraft ? 'Draft' : getPrReviewLabel(prReviewDecision);
+	const color = isDraft ? theme.colors.textDim : getPrColor(prReviewDecision, prCheckStatus, theme);
 	const checkIcon = prCheckStatus ? getPrCheckIcon(prCheckStatus) : '';
 	const checkSummary = prCheckStatus ? `${prCheckStatus.passing}/${prCheckStatus.total}` : '';
 
-	const metaText = [reviewLabel, checkSummary ? `${checkSummary} ${checkIcon}` : null]
+	const metaText = [reviewLabel, !isDraft && checkSummary ? `${checkSummary} ${checkIcon}` : null]
 		.filter(Boolean)
 		.join(' \u00B7 '); // · separator
 
@@ -113,10 +114,19 @@ const PrChip = memo(function PrChip({ session, theme }: PrChipProps) {
 					backgroundColor: color + '20',
 					color,
 				}}
-				title={`PR #${prNumber}`}
+				title={`PR #${prNumber}${isDraft ? ' (Draft)' : ''}`}
 			>
 				PR #{prNumber}
 			</span>
+			{(prCommentCount ?? 0) > 0 && (
+				<span
+					className="text-[9px] shrink-0"
+					style={{ color: theme.colors.accent }}
+					title={`${prCommentCount} PR comment${prCommentCount !== 1 ? 's' : ''}`}
+				>
+					&#128172;{prCommentCount}
+				</span>
+			)}
 			{metaText && (
 				<span
 					className="truncate font-medium opacity-0 group-hover:opacity-100 transition-opacity"
@@ -236,7 +246,7 @@ export const SessionItem = memo(function SessionItem({
 
 		if (variant === 'project-head') {
 			// Full-width header with left accent border, cursor pointer instead of move
-			return `px-4 py-2.5 cursor-pointer border-l-2 ${base}`;
+			return `px-4 py-2 cursor-pointer border-l-2 ${base}`;
 		}
 		if (variant === 'flat') {
 			return `mx-3 px-3 py-2 rounded mb-1 cursor-move border-l-2 ${base}`;
@@ -499,8 +509,11 @@ export const SessionItem = memo(function SessionItem({
 										return (
 											<span title="Agent is thinking">
 												<Loader2
-													className={`${iconSize} animate-spin`}
-													style={{ color: theme.colors.warning }}
+													className={`${iconSize} animate-spin-synced`}
+													style={{
+														color: theme.colors.warning,
+														animationDelay: `${-(Date.now() % 1000)}ms`,
+													}}
 												/>
 											</span>
 										);

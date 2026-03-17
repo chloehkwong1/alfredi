@@ -178,6 +178,7 @@ export interface SettingsStoreState {
 	autoScrollAiMode: boolean;
 	userMessageAlignment: 'left' | 'right';
 	encoreFeatures: EncoreFeatureFlags;
+	preferredTerminal: string;
 	outputStyle: OutputStyle;
 	defaultEffortLevel: EffortLevel;
 	useNativeTitleBar: boolean;
@@ -252,6 +253,7 @@ export interface SettingsStoreActions {
 	setAutoScrollAiMode: (value: boolean) => void;
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
 	setEncoreFeatures: (value: EncoreFeatureFlags) => void;
+	setPreferredTerminal: (value: string) => void;
 	setOutputStyle: (value: OutputStyle) => void;
 	setDefaultEffortLevel: (value: EffortLevel) => void;
 	setUseNativeTitleBar: (value: boolean) => void;
@@ -382,6 +384,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	autoScrollAiMode: false,
 	userMessageAlignment: 'right',
 	encoreFeatures: DEFAULT_ENCORE_FEATURES,
+	preferredTerminal: '',
 	outputStyle: 'default',
 	defaultEffortLevel: 'medium',
 	useNativeTitleBar: false,
@@ -717,6 +720,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setEncoreFeatures: (value) => {
 		set({ encoreFeatures: value });
 		window.maestro.settings.set('encoreFeatures', value);
+	},
+
+	setPreferredTerminal: (value) => {
+		set({ preferredTerminal: value });
+		window.maestro.settings.set('preferredTerminal', value);
 	},
 
 	setOutputStyle: (value) => {
@@ -1453,6 +1461,9 @@ export async function loadAllSettings(): Promise<void> {
 
 		if (allSettings['linearMcpAutoInject'] !== undefined)
 			patch.linearMcpAutoInject = allSettings['linearMcpAutoInject'] as boolean;
+
+		if (allSettings['preferredTerminal'] !== undefined)
+			patch.preferredTerminal = allSettings['preferredTerminal'] as string;
 
 		if (allSettings['outputStyle'] !== undefined) {
 			const validStyles = ['default', 'explanatory', 'learning'];

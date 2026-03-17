@@ -71,6 +71,47 @@ export function derivePrStatus(params: DerivePrStatusParams): WorkflowStatus | n
 	}
 }
 
+export interface DeriveMergeReadinessParams {
+	prReviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
+	prCheckStatus?: { total: number; passing: number; failing: number; pending: number } | null;
+	prIsDraft?: boolean;
+}
+
+/**
+ * Derives a merge readiness label from review decision, check status, and draft state.
+ * Returns null when there is no meaningful status to display (e.g., no PR).
+ */
+export function deriveMergeReadiness(params: DeriveMergeReadinessParams): WorkflowStatus | null {
+	const { prReviewDecision, prCheckStatus, prIsDraft } = params;
+
+	if (prIsDraft) {
+		return { label: 'Draft', colorKey: 'textDim' };
+	}
+
+	const checksPass = prCheckStatus
+		? prCheckStatus.failing === 0 && prCheckStatus.pending === 0 && prCheckStatus.total > 0
+		: true; // No checks = not blocking
+	const checksFailing = prCheckStatus ? prCheckStatus.failing > 0 : false;
+
+	if (prReviewDecision === 'CHANGES_REQUESTED') {
+		return { label: 'Blocked: changes requested', colorKey: 'error' };
+	}
+	if (checksFailing) {
+		return { label: 'Blocked: checks failing', colorKey: 'error' };
+	}
+	if (prReviewDecision === 'APPROVED' && checksPass) {
+		return { label: 'Ready to merge', colorKey: 'success' };
+	}
+	if (prReviewDecision === 'APPROVED' && prCheckStatus && prCheckStatus.pending > 0) {
+		return { label: 'Approved · checks pending', colorKey: 'warning' };
+	}
+	if (prReviewDecision === 'REVIEW_REQUIRED' || !prReviewDecision) {
+		return { label: 'Waiting for review', colorKey: 'warning' };
+	}
+
+	return null;
+}
+
 /**
  * Derives up to 2 workflow status pills from git and PR data.
  * Track 1: local state (uncommitted/unpushed) — always evaluated.
