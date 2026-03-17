@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Session, AITab, ThinkingMode } from '../../types';
+import type { Session, ThinkingMode } from '../../types';
 import { getInitialRenameValue } from '../../utils/tabHelpers';
 import { useModalStore } from '../../stores/modalStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -76,6 +76,13 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				e.preventDefault();
 			}
 
+			// Cmd+/ (or Ctrl+/): Toggle keyboard shortcuts overlay — works globally, even with modals open
+			if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === '/') {
+				e.preventDefault();
+				useModalStore.getState().toggleModal('shortcutsOverlay');
+				return;
+			}
+
 			// Read all values from ref - this allows the handler to stay attached while still
 			// accessing current state values
 			const ctx = keyboardHandlerRef.current;
@@ -101,12 +108,12 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					(e.metaKey || e.ctrlKey) &&
 					e.shiftKey &&
 					(e.key === '[' || e.key === ']' || e.key === '{' || e.key === '}');
-				// Allow sidebar toggle shortcuts (Alt+Cmd+Arrow) even when modals are open
+				// Allow sidebar toggle shortcuts (Cmd+B / Cmd+Shift+B) even when modals are open
 				const isLayoutShortcut =
-					e.altKey && (e.metaKey || e.ctrlKey) && (e.key === 'ArrowLeft' || e.key === 'ArrowRight');
-				// Allow right panel tab shortcuts (Cmd+Shift+F/H/S) even when overlays are open
+					(e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'b';
+				// Allow right panel tab shortcuts (Cmd+Shift+E/H) even when overlays are open
 				const keyLower = e.key.toLowerCase();
-				const isRightPanelShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && keyLower === 'f';
+				const isRightPanelShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && keyLower === 'e';
 				// Allow jumpToBottom (Cmd+Shift+J) from anywhere - always scroll main panel to bottom
 				const isJumpToBottomShortcut = (e.metaKey || e.ctrlKey) && e.shiftKey && keyLower === 'j';
 				// Allow markdown toggle (Cmd+E) for chat history, even when overlays are open
@@ -321,23 +328,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					ctx.setFuzzyFileSearchOpen(true);
 					trackShortcut('fuzzyFileSearch');
 				}
-			} else if (ctx.isShortcut(e, 'toggleBookmark')) {
-				e.preventDefault();
-				if (ctx.activeSession) {
-					ctx.toggleBookmark(ctx.activeSession.id);
-					trackShortcut('toggleBookmark');
-				}
-			} else if (ctx.isShortcut(e, 'openImageCarousel')) {
-				e.preventDefault();
-				const images = ctx.stagedImages;
-				if (images && images.length > 0) {
-					ctx.handleSetLightboxImage(images[0], images, 'staged');
-					trackShortcut('openImageCarousel');
-				}
-			} else if (ctx.isShortcut(e, 'toggleTabStar')) {
-				e.preventDefault();
-				ctx.toggleTabStar();
-				trackShortcut('toggleTabStar');
 			} else if (ctx.isShortcut(e, 'focusInput')) {
 				e.preventDefault();
 				// Toggle between input and main panel output for keyboard scrolling
@@ -405,16 +395,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					scrollContainer.scrollTo({ top: scrollContainer.scrollHeight, behavior: 'instant' });
 				}
 				trackShortcut('jumpToBottom');
-			} else if (ctx.isShortcut(e, 'quoteSelection')) {
-				e.preventDefault();
-				const selection = window.getSelection();
-				if (selection && !selection.isCollapsed && ctx.activeSession?.inputMode === 'ai') {
-					window.dispatchEvent(
-						new CustomEvent('maestro:quoteSelection', { detail: selection.toString() })
-					);
-					selection.removeAllRanges();
-				}
-				trackShortcut('quoteSelection');
 			} else if (ctx.isShortcut(e, 'toggleMarkdownMode')) {
 				// Toggle markdown raw mode for AI message history
 				// Note: FilePreview handles its own Cmd+E with stopPropagation when focused,
@@ -526,41 +506,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 					}
 					// 'prevented' or 'none' - do nothing (can't close last AI tab)
 				}
-				if (ctx.isTabShortcut(e, 'closeAllTabs')) {
-					e.preventDefault();
-					ctx.handleCloseAllTabs();
-					trackShortcut('closeAllTabs');
-				}
-				if (ctx.isTabShortcut(e, 'closeOtherTabs')) {
-					e.preventDefault();
-					// Only execute if there are multiple tabs
-					if (ctx.activeSession.aiTabs.length > 1) {
-						ctx.handleCloseOtherTabs();
-						trackShortcut('closeOtherTabs');
-					}
-				}
-				if (ctx.isTabShortcut(e, 'closeTabsLeft')) {
-					e.preventDefault();
-					const activeTabIndex = ctx.activeSession.aiTabs.findIndex(
-						(t: AITab) => t.id === ctx.activeSession.activeTabId
-					);
-					// Only execute if not first tab
-					if (activeTabIndex > 0) {
-						ctx.handleCloseTabsLeft();
-						trackShortcut('closeTabsLeft');
-					}
-				}
-				if (ctx.isTabShortcut(e, 'closeTabsRight')) {
-					e.preventDefault();
-					const activeTabIndex = ctx.activeSession.aiTabs.findIndex(
-						(t: AITab) => t.id === ctx.activeSession.activeTabId
-					);
-					// Only execute if not last tab
-					if (activeTabIndex < ctx.activeSession.aiTabs.length - 1) {
-						ctx.handleCloseTabsRight();
-						trackShortcut('closeTabsRight');
-					}
-				}
 				if (ctx.isTabShortcut(e, 'reopenClosedTab')) {
 					e.preventDefault();
 					// Reopen the most recently closed tab (AI or file), or switch to existing if duplicate
@@ -583,21 +528,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 						trackShortcut('renameTab');
 					}
 				}
-				if (ctx.isTabShortcut(e, 'toggleReadOnlyMode')) {
-					e.preventDefault();
-					ctx.setSessions((prev: Session[]) =>
-						prev.map((s: Session) => {
-							if (s.id !== ctx.activeSession!.id) return s;
-							return {
-								...s,
-								aiTabs: s.aiTabs.map((tab: AITab) =>
-									tab.id === s.activeTabId ? { ...tab, readOnlyMode: !tab.readOnlyMode } : tab
-								),
-							};
-						})
-					);
-					trackShortcut('toggleReadOnlyMode');
-				}
 				if (ctx.isTabShortcut(e, 'toggleShowThinking')) {
 					e.preventDefault();
 					{
@@ -612,16 +542,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 						ctx.setDefaultShowThinking(newMode);
 					}
 					trackShortcut('toggleShowThinking');
-				}
-				if (ctx.isTabShortcut(e, 'filterUnreadTabs')) {
-					e.preventDefault();
-					ctx.toggleUnreadFilter();
-					trackShortcut('filterUnreadTabs');
-				}
-				if (ctx.isTabShortcut(e, 'toggleTabUnread')) {
-					e.preventDefault();
-					ctx.toggleTabUnread();
-					trackShortcut('toggleTabUnread');
 				}
 				// Cmd+Shift+] - Navigate to next tab in unified tab order
 				// Cycles through both AI tabs and file preview tabs

@@ -80,6 +80,8 @@ export interface Shortcut {
 	id: string;
 	label: string;
 	keys: string[];
+	description?: string;
+	category?: string;
 }
 
 export interface FileArtifact {
@@ -236,6 +238,16 @@ export interface GitHubPR {
 	isDraft: boolean;
 }
 
+// PR review request from gh pr list --search "review-requested:@me"
+export interface ReviewRequestedPR {
+	number: number;
+	title: string;
+	branch: string;
+	author: string;
+	updatedAt: string;
+	url: string;
+}
+
 // Configuration for starting a batch run
 export interface BatchRunConfig {
 	documents: BatchDocumentEntry[]; // Ordered list of docs to run
@@ -305,6 +317,7 @@ export interface AITab {
 	// showThinking removed — uses global defaultShowThinking from settings store
 	awaitingSessionId?: boolean; // True when this tab sent a message and is awaiting its session ID
 	thinkingStartTime?: number; // Timestamp when tab started thinking (for elapsed time display)
+	lastResponseDurationMs?: number; // Duration of the last completed response in milliseconds
 	scrollTop?: number; // Saved scroll position for this tab's output view
 	hasUnread?: boolean; // True when tab has new messages user hasn't seen
 	isAtBottom?: boolean; // True when user is scrolled to bottom of output
@@ -534,6 +547,8 @@ export interface Project {
 	prReviewDecision?: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
 	prCheckStatus?: { total: number; passing: number; failing: number; pending: number } | null;
 	prIsDraft?: boolean;
+	prReviewers?: Array<{ login: string; state: string }>;
+	prCommentCount?: number;
 	worktreeArchivedAt?: number; // Timestamp when moved to Done (for auto-archive countdown)
 	worktreeArchived?: boolean; // True when auto-archived (hidden from sidebar, worktree dir kept on disk)
 	worktreeServerProcessId?: string; // ProcessManager key (e.g., `${sessionId}-server`) when a server is running

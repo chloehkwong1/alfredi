@@ -77,6 +77,9 @@ export const MODAL_PRIORITIES = {
 	/** Agent prompt composer modal (opens from batch runner) */
 	AGENT_PROMPT_COMPOSER: 730,
 
+	/** Keyboard shortcuts help overlay (Cmd+/) */
+	SHORTCUTS_OVERLAY: 705,
+
 	/** Quick actions command palette (Cmd+Shift+P) */
 	QUICK_ACTION: 700,
 

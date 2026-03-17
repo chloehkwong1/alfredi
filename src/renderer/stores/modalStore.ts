@@ -157,6 +157,8 @@ export type ModalId =
 	| 'processMonitor'
 	// Usage
 	| 'usagePanel'
+	// Help
+	| 'shortcutsOverlay'
 	// Confirmations
 	| 'confirm'
 	| 'quitConfirm'

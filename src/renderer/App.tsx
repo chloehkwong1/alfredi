@@ -12,6 +12,7 @@ import { MainPanel, type MainPanelHandle } from './components/MainPanel';
 // AppOverlays stripped (celebrations/gamification removed)
 import { EmptyStateView } from './components/EmptyStateView';
 import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
+import { KeyboardShortcutsOverlay } from './components/KeyboardShortcutsOverlay';
 
 // Lazy-loaded components for performance (rarely-used heavy modals)
 // These are loaded on-demand when the user first opens them
@@ -2318,6 +2319,9 @@ function MaestroConsoleInner() {
 				/>
 
 				{/* DocumentGraphView removed (stripped) */}
+
+				{/* Keyboard Shortcuts Help Overlay (Cmd+/) — self-sources state from modal store */}
+				<KeyboardShortcutsOverlay theme={theme} />
 
 				{/* NOTE: All modals are now rendered via the unified <AppModals /> component above */}
 
