@@ -77,6 +77,8 @@ export interface MaestroSettings {
 	installationId: string | null;
 	// Standalone hands-on time tracker (migrated from globalStats.totalActiveTimeMs)
 	totalActiveTimeMs: number;
+	// Preferred external terminal application (macOS app name, Windows/Linux command)
+	preferredTerminal: string;
 	// Output style for Claude Code agents
 	outputStyle: OutputStyle;
 	// MCP server configurations for injection into Claude Code SDK agents

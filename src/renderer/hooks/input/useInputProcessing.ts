@@ -962,21 +962,22 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 									(t) => t.id === freshSession.activeTabId
 								);
 								let style: OutputStyle = useSettingsStore.getState().outputStyle;
-								// Per-agent override
-								try {
-									const agentStyle = await window.maestro.agents.getConfigValue(
-										freshSession.id,
-										'outputStyle'
-									);
-									if (agentStyle && agentStyle !== 'default') {
-										style = agentStyle as OutputStyle;
-									}
-								} catch {
-									// Fall back to global setting
-								}
 								// Per-tab override takes highest precedence
-								if (activeTab?.outputStyle && activeTab.outputStyle !== 'default') {
+								if (activeTab?.outputStyle) {
 									style = activeTab.outputStyle;
+								} else {
+									// Per-agent override (only when no per-tab setting)
+									try {
+										const agentStyle = await window.maestro.agents.getConfigValue(
+											freshSession.id,
+											'outputStyle'
+										);
+										if (agentStyle && agentStyle !== 'default') {
+											style = agentStyle as OutputStyle;
+										}
+									} catch {
+										// Fall back to global setting
+									}
 								}
 
 								const stylePrompt = OUTPUT_STYLE_PROMPTS[style];

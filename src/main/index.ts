@@ -466,7 +466,7 @@ function setupIpcHandlers() {
 	registerAgentErrorHandlers();
 
 	// Register notification handlers (extracted to handlers/notifications.ts)
-	registerNotificationsHandlers();
+	registerNotificationsHandlers({ getMainWindow: () => mainWindow });
 
 	// Register attachments handlers (extracted to handlers/attachments.ts)
 	registerAttachmentsHandlers({ app });

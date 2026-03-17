@@ -17,6 +17,7 @@ import {
 	createDialogApi,
 	createFontsApi,
 	createShellsApi,
+	createTerminalsApi,
 	createShellApi,
 	createTunnelApi,
 	createSyncApi,
@@ -82,6 +83,9 @@ contextBridge.exposeInMainWorld('maestro', {
 
 	// Shells API (terminal shells)
 	shells: createShellsApi(),
+
+	// Terminals API (external terminal apps)
+	terminals: createTerminalsApi(),
 
 	// Shell API
 	shell: createShellApi(),
@@ -154,6 +158,7 @@ export {
 	createDialogApi,
 	createFontsApi,
 	createShellsApi,
+	createTerminalsApi,
 	createShellApi,
 	createTunnelApi,
 	createSyncApi,

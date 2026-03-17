@@ -588,25 +588,22 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 							const updatedAiTabs =
 								s.aiTabs?.length > 0
 									? s.aiTabs.map((tab) => {
-											if (tabIdFromSession) {
-												return tab.id === tabIdFromSession
-													? {
-															...tab,
-															state: 'idle' as const,
-															thinkingStartTime: undefined,
-															pendingQuestion: undefined,
-														}
-													: tab;
-											} else {
-												return tab.state === 'busy'
-													? {
-															...tab,
-															state: 'idle' as const,
-															thinkingStartTime: undefined,
-															pendingQuestion: undefined,
-														}
-													: tab;
+											const isCompletedTab = tabIdFromSession
+												? tab.id === tabIdFromSession
+												: tab.state === 'busy';
+											if (isCompletedTab) {
+												const tabDuration = tab.thinkingStartTime
+													? Date.now() - tab.thinkingStartTime
+													: undefined;
+												return {
+													...tab,
+													state: 'idle' as const,
+													thinkingStartTime: undefined,
+													lastResponseDurationMs: tabDuration,
+													pendingQuestion: undefined,
+												};
 											}
+											return tab;
 										})
 									: s.aiTabs;
 

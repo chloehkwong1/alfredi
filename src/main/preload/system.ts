@@ -17,6 +17,15 @@ export interface ShellInfo {
 }
 
 /**
+ * Terminal application information
+ */
+export interface TerminalAppInfo {
+	id: string;
+	name: string;
+	available: boolean;
+}
+
+/**
  * Update status from electron-updater
  */
 export interface UpdateStatus {
@@ -62,6 +71,15 @@ export function createFontsApi() {
 export function createShellsApi() {
 	return {
 		detect: (): Promise<ShellInfo[]> => ipcRenderer.invoke('shells:detect'),
+	};
+}
+
+/**
+ * Creates the terminals API object for preload exposure (external terminal apps)
+ */
+export function createTerminalsApi() {
+	return {
+		detect: (): Promise<TerminalAppInfo[]> => ipcRenderer.invoke('terminals:detect'),
 	};
 }
 
@@ -210,6 +228,7 @@ export function createAppApi() {
 export type DialogApi = ReturnType<typeof createDialogApi>;
 export type FontsApi = ReturnType<typeof createFontsApi>;
 export type ShellsApi = ReturnType<typeof createShellsApi>;
+export type TerminalsApi = ReturnType<typeof createTerminalsApi>;
 export type ShellApi = ReturnType<typeof createShellApi>;
 export type TunnelApi = ReturnType<typeof createTunnelApi>;
 export type SyncApi = ReturnType<typeof createSyncApi>;

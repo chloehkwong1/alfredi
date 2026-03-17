@@ -9,6 +9,7 @@ import {
 	Trash2,
 	Edit3,
 	Eraser,
+	Globe,
 } from 'lucide-react';
 import type { Session, Theme } from '../../types';
 import { useClickOutside, useContextMenuPosition } from '../../hooks';
@@ -31,6 +32,7 @@ interface SessionContextMenuProps {
 	onConfigureWorktrees?: () => void;
 	onDeleteWorktree?: () => void;
 	onRunWorktreeScript?: () => void;
+	onOpenPreview?: () => void;
 	onClearContext?: () => void;
 }
 
@@ -51,6 +53,7 @@ export function SessionContextMenu({
 	onConfigureWorktrees,
 	onDeleteWorktree,
 	onRunWorktreeScript,
+	onOpenPreview,
 	onClearContext,
 }: SessionContextMenuProps) {
 	const menuRef = useRef<HTMLDivElement>(null);
@@ -214,6 +217,20 @@ export function SessionContextMenu({
 						>
 							<Play className="w-3.5 h-3.5" />
 							Run Script
+						</button>
+					)}
+					{onOpenPreview && (
+						<button
+							type="button"
+							onClick={() => {
+								onOpenPreview();
+								onDismiss();
+							}}
+							className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+							style={{ color: theme.colors.accent }}
+						>
+							<Globe className="w-3.5 h-3.5" />
+							Open in Browser
 						</button>
 					)}
 					{session.worktreeBranch && (

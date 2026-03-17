@@ -75,6 +75,7 @@ export function WorktreeConfigModal({
 	const [remoteOrigin, setRemoteOrigin] = useState(projectConfig?.remoteOrigin || '');
 	const [setupScript, setSetupScript] = useState(projectConfig?.setupScript || '');
 	const [runScript, setRunScript] = useState(projectConfig?.runScript || '');
+	const [previewUrl, setPreviewUrl] = useState(projectConfig?.previewUrl || '');
 	const [archiveScript, setArchiveScript] = useState(projectConfig?.archiveScript || '');
 	const [newBranchName, setNewBranchName] = useState('');
 	const [isCreating, setIsCreating] = useState(false);
@@ -132,6 +133,7 @@ export function WorktreeConfigModal({
 			setRemoteOrigin(projectConfig?.remoteOrigin || '');
 			setSetupScript(projectConfig?.setupScript || '');
 			setRunScript(projectConfig?.runScript || '');
+			setPreviewUrl(projectConfig?.previewUrl || '');
 			setArchiveScript(projectConfig?.archiveScript || '');
 			setNewBranchName('');
 			setBranchFilterText('');
@@ -194,6 +196,7 @@ export function WorktreeConfigModal({
 				remoteOrigin: remoteOrigin || undefined,
 				setupScript: setupScript.trim() || undefined,
 				runScript: runScript.trim() || undefined,
+				previewUrl: previewUrl.trim() || undefined,
 				archiveScript: archiveScript.trim() || undefined,
 			});
 			onClose();
@@ -225,6 +228,7 @@ export function WorktreeConfigModal({
 				remoteOrigin: remoteOrigin || undefined,
 				setupScript: setupScript.trim() || undefined,
 				runScript: runScript.trim() || undefined,
+				previewUrl: previewUrl.trim() || undefined,
 				archiveScript: archiveScript.trim() || undefined,
 			});
 			await onCreateWorktree(newBranchName.trim(), basePath.trim());
@@ -551,6 +555,29 @@ export function WorktreeConfigModal({
 							/>
 							<p className="text-[10px] mt-0.5" style={{ color: theme.colors.textDim }}>
 								Runs when you click the play button
+							</p>
+						</div>
+
+						{/* Preview URL */}
+						<div>
+							<label
+								className="text-xs font-medium mb-1 block"
+								style={{ color: theme.colors.textMain }}
+							>
+								Preview URL
+							</label>
+							<input
+								value={previewUrl}
+								onChange={(e) => setPreviewUrl(e.target.value)}
+								placeholder="e.g., http://localhost:3000"
+								className="w-full px-3 py-2 rounded border bg-transparent outline-none text-sm font-mono"
+								style={{
+									borderColor: theme.colors.border,
+									color: theme.colors.textMain,
+								}}
+							/>
+							<p className="text-[10px] mt-0.5" style={{ color: theme.colors.textDim }}>
+								Opens in browser when you click the globe icon
 							</p>
 						</div>
 

@@ -22,6 +22,7 @@ import Store from 'electron-store';
 import { execFileNoThrow } from '../../utils/execFile';
 import { logger } from '../../utils/logger';
 import { detectShells } from '../../utils/shellDetector';
+import { detectTerminalApps } from '../../utils/terminalDetector';
 import { isCloudflaredInstalled } from '../../utils/cliDetection';
 import { tunnelManager as tunnelManagerInstance } from '../../tunnel-manager';
 import { checkForUpdates } from '../../update-checker';
@@ -190,6 +191,23 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 		}
 	});
 
+	// Terminal app detection (external terminal emulators)
+	ipcMain.handle('terminals:detect', async () => {
+		try {
+			logger.info('Detecting available terminal apps', 'TerminalDetector');
+			const terminals = await detectTerminalApps();
+			logger.info(
+				`Detected ${terminals.filter((t) => t.available).length} available terminal apps`,
+				'TerminalDetector',
+				{ terminals: terminals.filter((t) => t.available).map((t) => t.id) }
+			);
+			return terminals;
+		} catch (error) {
+			logger.error('Terminal app detection error', 'TerminalDetector', error);
+			return [];
+		}
+	});
+
 	// Shell operations - open external URLs
 	const ALLOWED_PROTOCOLS = ['http:', 'https:', 'mailto:'];
 	ipcMain.handle('shell:openExternal', async (_event, url: string) => {
@@ -292,7 +310,7 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 
 	// ============ Open in Terminal / Editor Handlers ============
 
-	// Open a directory in the system terminal
+	// Open a directory in the user's preferred (or auto-detected) terminal
 	ipcMain.handle('shell:openInTerminal', async (_event, cwd: string) => {
 		if (!cwd || typeof cwd !== 'string') {
 			logger.warn('shell:openInTerminal - invalid cwd', 'Shell');
@@ -304,23 +322,69 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 			return;
 		}
 
+		const preferred = (settingsStore.get('preferredTerminal') as string) || '';
+
 		try {
 			if (process.platform === 'darwin') {
-				execFile('open', ['-a', 'Terminal', absolutePath], (err) => {
-					if (err) logger.warn(`shell:openInTerminal failed: ${err.message}`, 'Shell');
-				});
-			} else if (process.platform === 'win32') {
-				// Try Windows Terminal first, fall back to cmd
-				execFile('wt', ['-d', absolutePath], (err) => {
+				// Use preferred terminal app if set, otherwise try iTerm → Terminal
+				const appName = preferred || 'Terminal';
+				execFile('open', ['-a', appName, absolutePath], (err) => {
 					if (err) {
-						execFile('cmd', ['/c', 'start', 'cmd', '/K', `cd /d "${absolutePath}"`], (err2) => {
-							if (err2) logger.warn(`shell:openInTerminal failed: ${err2.message}`, 'Shell');
-						});
+						if (preferred) {
+							// Preferred terminal failed, fall back to Terminal.app
+							logger.warn(
+								`shell:openInTerminal preferred (${appName}) failed, falling back to Terminal: ${err.message}`,
+								'Shell'
+							);
+							execFile('open', ['-a', 'Terminal', absolutePath], (err2) => {
+								if (err2)
+									logger.warn(`shell:openInTerminal fallback failed: ${err2.message}`, 'Shell');
+							});
+						} else {
+							logger.warn(`shell:openInTerminal failed: ${err.message}`, 'Shell');
+						}
 					}
 				});
+			} else if (process.platform === 'win32') {
+				if (preferred) {
+					execFile(preferred, ['-d', absolutePath], (err) => {
+						if (err) {
+							logger.warn(
+								`shell:openInTerminal preferred (${preferred}) failed, falling back: ${err.message}`,
+								'Shell'
+							);
+							// Fall back to wt → cmd
+							execFile('wt', ['-d', absolutePath], (err2) => {
+								if (err2) {
+									execFile(
+										'cmd',
+										['/c', 'start', 'cmd', '/K', `cd /d "${absolutePath}"`],
+										(err3) => {
+											if (err3)
+												logger.warn(
+													`shell:openInTerminal fallback failed: ${err3.message}`,
+													'Shell'
+												);
+										}
+									);
+								}
+							});
+						}
+					});
+				} else {
+					// Try Windows Terminal first, fall back to cmd
+					execFile('wt', ['-d', absolutePath], (err) => {
+						if (err) {
+							execFile('cmd', ['/c', 'start', 'cmd', '/K', `cd /d "${absolutePath}"`], (err2) => {
+								if (err2) logger.warn(`shell:openInTerminal failed: ${err2.message}`, 'Shell');
+							});
+						}
+					});
+				}
 			} else {
-				// Linux: try common terminal emulators
+				// Linux: try preferred first, then common terminal emulators
 				const terminals = [
+					...(preferred ? [{ cmd: preferred, args: [`--working-directory=${absolutePath}`] }] : []),
 					{ cmd: 'gnome-terminal', args: [`--working-directory=${absolutePath}`] },
 					{ cmd: 'konsole', args: [`--workdir=${absolutePath}`] },
 					{ cmd: 'xfce4-terminal', args: [`--working-directory=${absolutePath}`] },

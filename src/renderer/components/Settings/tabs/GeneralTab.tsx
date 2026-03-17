@@ -60,6 +60,9 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 		// Shell settings
 		defaultShell,
 		setDefaultShell,
+		// External terminal
+		preferredTerminal,
+		setPreferredTerminal,
 		customShellPath,
 		setCustomShellPath,
 		shellArgs,
@@ -153,6 +156,13 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 	const [shellsLoaded, setShellsLoaded] = useState(false);
 	const [shellConfigExpanded, setShellConfigExpanded] = useState(false);
 
+	// Terminal app state
+	const [terminalApps, setTerminalApps] = useState<
+		{ id: string; name: string; available: boolean }[]
+	>([]);
+	const [terminalsLoading, setTerminalsLoading] = useState(false);
+	const [terminalsLoaded, setTerminalsLoaded] = useState(false);
+
 	// Sync/storage location state
 	const [defaultStoragePath, setDefaultStoragePath] = useState<string>('');
 	const [_currentStoragePath, setCurrentStoragePath] = useState<string>('');
@@ -238,6 +248,28 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 			console.error('Failed to load shells:', error);
 		} finally {
 			setShellsLoading(false);
+		}
+	};
+
+	const loadTerminals = async () => {
+		if (terminalsLoaded) return;
+		setTerminalsLoading(true);
+		try {
+			const detected = await window.maestro.terminals.detect();
+			setTerminalApps(detected);
+			if (detected && detected.length > 0) {
+				setTerminalsLoaded(true);
+			}
+		} catch (error) {
+			console.error('Failed to detect terminal apps:', error);
+		} finally {
+			setTerminalsLoading(false);
+		}
+	};
+
+	const handleTerminalInteraction = () => {
+		if (!terminalsLoaded && !terminalsLoading) {
+			loadTerminals();
 		}
 	};
 
@@ -533,6 +565,118 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							</div>
 						</div>
 						<EnvVarsEditor envVars={shellEnvVars} setEnvVars={setShellEnvVars} theme={theme} />
+					</div>
+				)}
+			</div>
+
+			{/* Preferred External Terminal */}
+			<div>
+				<div className="block text-xs font-bold opacity-70 uppercase mb-1 flex items-center gap-2">
+					<ExternalLink className="w-3 h-3" />
+					External Terminal App
+				</div>
+				<p className="text-xs opacity-50 mb-2">
+					Terminal application to open when using "Open in Terminal".
+				</p>
+				{terminalsLoading ? (
+					<div className="text-sm opacity-50 p-2">Detecting terminals...</div>
+				) : (
+					<div className="space-y-2">
+						{terminalsLoaded && terminalApps.length > 0 ? (
+							terminalApps
+								.filter((t) => t.available)
+								.map((terminal) => {
+									const isSelected =
+										preferredTerminal === terminal.id ||
+										(!preferredTerminal && terminal === terminalApps.filter((t) => t.available)[0]);
+									return (
+										<button
+											key={terminal.id}
+											onClick={() => {
+												// If selecting the first available terminal, clear the setting (use default)
+												if (terminal === terminalApps.filter((t) => t.available)[0]) {
+													setPreferredTerminal('');
+												} else {
+													setPreferredTerminal(terminal.id);
+												}
+											}}
+											onMouseEnter={handleTerminalInteraction}
+											onFocus={handleTerminalInteraction}
+											className={`w-full text-left p-3 rounded border transition-all ${
+												isSelected ? 'ring-2' : ''
+											} hover:bg-opacity-10`}
+											style={
+												{
+													borderColor: theme.colors.border,
+													backgroundColor: isSelected
+														? theme.colors.accentDim
+														: theme.colors.bgMain,
+													'--tw-ring-color': theme.colors.accent,
+													color: theme.colors.textMain,
+												} as React.CSSProperties
+											}
+										>
+											<div className="flex items-center justify-between">
+												<div className="font-medium">{terminal.name}</div>
+												{isSelected ? (
+													<Check className="w-4 h-4" style={{ color: theme.colors.accent }} />
+												) : (
+													<span
+														className="text-xs px-2 py-0.5 rounded"
+														style={{
+															backgroundColor: theme.colors.bgMain,
+															color: theme.colors.textDim,
+														}}
+													>
+														Available
+													</span>
+												)}
+											</div>
+										</button>
+									);
+								})
+						) : (
+							/* Show detect button before detection runs */
+							<div className="space-y-2">
+								{preferredTerminal && (
+									<button
+										className="w-full text-left p-3 rounded border ring-2"
+										style={
+											{
+												borderColor: theme.colors.border,
+												backgroundColor: theme.colors.accentDim,
+												'--tw-ring-color': theme.colors.accent,
+												color: theme.colors.textMain,
+											} as React.CSSProperties
+										}
+									>
+										<div className="flex items-center justify-between">
+											<div>
+												<div className="font-medium">{preferredTerminal}</div>
+												<div className="text-xs opacity-50 font-mono mt-1">Current selection</div>
+											</div>
+											<Check className="w-4 h-4" style={{ color: theme.colors.accent }} />
+										</div>
+									</button>
+								)}
+								<button
+									onClick={loadTerminals}
+									onMouseEnter={handleTerminalInteraction}
+									onFocus={handleTerminalInteraction}
+									className="w-full text-left p-3 rounded border hover:bg-white/5 transition-colors"
+									style={{
+										borderColor: theme.colors.border,
+										backgroundColor: theme.colors.bgMain,
+										color: theme.colors.textDim,
+									}}
+								>
+									<div className="flex items-center gap-2">
+										<ExternalLink className="w-4 h-4" />
+										<span>Detect available terminal apps...</span>
+									</div>
+								</button>
+							</div>
+						)}
 					</div>
 				)}
 			</div>

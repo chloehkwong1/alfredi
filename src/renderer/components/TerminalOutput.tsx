@@ -38,6 +38,7 @@ import {
 	getCachedAnsiHtml,
 } from '../utils/textProcessing';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
+import { formatElapsedTime } from '../utils/formatters';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { QueuedItemsList } from './QueuedItemsList';
 import { LogFilterControls } from './LogFilterControls';
@@ -2892,11 +2893,46 @@ export const TerminalOutput = memo(
 						/>
 					)}
 
+					{/* Response duration — shown after agent completes a response */}
+					{!isBusy &&
+						activeTab?.lastResponseDurationMs != null &&
+						activeTab.lastResponseDurationMs > 0 && (
+							<div
+								className="flex justify-center py-2 text-xs font-mono select-none"
+								style={{ color: theme.colors.textDim, opacity: 0.6 }}
+							>
+								Brewed for {formatElapsedTime(activeTab.lastResponseDurationMs)}
+							</div>
+						)}
+
 					{/* End ref for scrolling - always rendered so Cmd+Shift+J works even when busy */}
 					<div ref={logsEndRef} />
 				</div>
 
-				{/* Auto-scroll toggle removed — was too noisy */}
+				{/* Scroll to bottom button — shown when user has scrolled up */}
+				{!isAtBottom && (
+					<button
+						onClick={() => {
+							if (!scrollContainerRef.current) return;
+							isProgrammaticScrollRef.current = true;
+							scrollContainerRef.current.scrollTo({
+								top: scrollContainerRef.current.scrollHeight,
+								behavior: 'smooth',
+							});
+							setTimeout(() => {
+								isProgrammaticScrollRef.current = false;
+							}, 32);
+						}}
+						className="absolute bottom-4 right-6 z-10 p-2 rounded-full shadow-lg hover:opacity-90 transition-opacity cursor-pointer"
+						style={{
+							backgroundColor: theme.colors.accent,
+							color: theme.colors.accentForeground,
+						}}
+						title="Scroll to bottom"
+					>
+						<ChevronDown className="w-4 h-4" />
+					</button>
+				)}
 
 				{/* Copied to Clipboard Notification */}
 				{showCopiedNotification && (

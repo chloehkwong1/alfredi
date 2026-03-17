@@ -60,6 +60,7 @@ export interface ProjectWorktreeConfig {
 	remoteOrigin?: string; // Git remote for push/pull/PRs (e.g., "origin")
 	setupScript?: string; // Runs after worktree creation (e.g., "npm install")
 	runScript?: string; // Runs on play/start action (e.g., "npm run dev")
+	previewUrl?: string; // URL to open in browser when server is running (e.g., "http://localhost:3000")
 	archiveScript?: string; // Runs before worktree removal (e.g., "rm -rf node_modules")
 	autoArchiveDays?: number; // Days after a worktree reaches 'done' before auto-archiving (default: 7)
 }

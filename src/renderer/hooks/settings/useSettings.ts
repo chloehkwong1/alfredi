@@ -248,6 +248,10 @@ export interface UseSettingsReturn {
 	userMessageAlignment: 'left' | 'right';
 	setUserMessageAlignment: (value: 'left' | 'right') => void;
 
+	// Preferred external terminal application
+	preferredTerminal: string;
+	setPreferredTerminal: (value: string) => void;
+
 	// Output Style - controls how Claude Code agents structure responses
 	outputStyle: OutputStyle;
 	setOutputStyle: (value: OutputStyle) => void;

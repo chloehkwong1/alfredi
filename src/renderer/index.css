@@ -187,6 +187,19 @@ textarea::placeholder {
 	animation: server-alive 2s ease-in-out infinite;
 }
 
+/* Synchronized spin animation — all instances stay in phase regardless of mount time */
+@keyframes synced-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+.animate-spin-synced {
+	animation: synced-spin 1s linear infinite;
+}
+
 @keyframes progress-stripe {
 	0% {
 		background-position: 0 0;

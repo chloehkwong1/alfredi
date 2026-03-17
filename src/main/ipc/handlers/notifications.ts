@@ -332,12 +332,20 @@ async function processNextNotification(): Promise<void> {
 /**
  * Register all notification-related IPC handlers
  */
-export function registerNotificationsHandlers(): void {
-	// Show OS notification
+export function registerNotificationsHandlers(deps?: {
+	getMainWindow?: () => BrowserWindow | null;
+}): void {
+	// Show OS notification — skipped when app window is focused
 	ipcMain.handle(
 		'notification:show',
 		async (_event, title: string, body: string): Promise<NotificationShowResponse> => {
 			try {
+				// Skip OS notification if the app window is focused (avoid duplicating in-app toasts)
+				const mainWindow = deps?.getMainWindow?.();
+				if (mainWindow && mainWindow.isFocused()) {
+					logger.debug('Skipping OS notification — window is focused', 'Notification', { title });
+					return { success: true };
+				}
 				if (Notification.isSupported()) {
 					const notification = new Notification({
 						title,

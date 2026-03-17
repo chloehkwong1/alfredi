@@ -67,6 +67,7 @@ export const SETTINGS_DEFAULTS: MaestroSettings = {
 	sshRemoteHonorGitignore: false,
 	installationId: null,
 	totalActiveTimeMs: 0,
+	preferredTerminal: '',
 	outputStyle: 'default',
 	mcpServers: {},
 	linearMcpAutoInject: true,
