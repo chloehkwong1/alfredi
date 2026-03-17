@@ -24,7 +24,7 @@ interface UsePrCommentsParams {
 }
 
 // Module-level cache: prNumber -> comments
-const prCommentsCache = new Map<number, PrComment[]>();
+export const prCommentsCache = new Map<number, PrComment[]>();
 
 export function usePrComments({
 	prNumber,

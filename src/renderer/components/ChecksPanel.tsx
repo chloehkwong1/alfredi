@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Theme, Session, CheckRun, ReviewerStatus } from '../types';
 import { gitService } from '../services/git';
+import { useUIStore } from '../stores/uiStore';
 
 interface ChecksPanelProps {
 	theme: Theme;
@@ -324,7 +325,7 @@ export const ChecksPanel = memo(function ChecksPanel({ theme, session }: ChecksP
 						{reviewers.map((reviewer) => (
 							<div
 								key={reviewer.login}
-								className="flex items-center gap-2 px-3 py-1.5 rounded text-xs"
+								className="group flex items-center gap-2 px-3 py-1.5 rounded text-xs"
 							>
 								{getReviewerIcon(reviewer.state, theme)}
 								<span style={{ color: c.textMain }}>@{reviewer.login}</span>
@@ -337,6 +338,15 @@ export const ChecksPanel = memo(function ChecksPanel({ theme, session }: ChecksP
 												? 'Commented'
 												: 'Pending'}
 								</span>
+								{reviewer.state === 'COMMENTED' && (
+									<button
+										className="ml-auto text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:underline bg-transparent border-none p-0 cursor-pointer"
+										style={{ color: theme.colors.accent }}
+										onClick={() => useUIStore.getState().setActiveRightTopTab('changes')}
+									>
+										View →
+									</button>
+								)}
 							</div>
 						))}
 					</div>

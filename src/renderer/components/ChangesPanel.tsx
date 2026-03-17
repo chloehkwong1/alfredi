@@ -18,10 +18,13 @@ import {
 	Loader2,
 	Undo2,
 	AlertTriangle,
+	MessageSquare,
+	MessageSquarePlus,
 } from 'lucide-react';
-import type { Theme } from '../types';
+import type { Theme, PrComment } from '../types';
 import type { ChangesFile, CommittedFile, ChangesPanelCommit } from '../hooks/useChangesPanel';
 import { gitService } from '../services/git';
+import { getCachedPrComments, prCommentsCache } from '../hooks/usePrComments';
 import { useClickOutside } from '../hooks/ui/useClickOutside';
 import { useContextMenuPosition } from '../hooks/ui/useContextMenuPosition';
 import { Modal, ModalFooter } from './ui/Modal';
@@ -60,6 +63,8 @@ export interface ChangesPanelProps {
 	fetchCommitFiles: (hash: string) => Promise<void>;
 	/** Per-file PR comment counts (file path -> count) */
 	commentCountByFile?: Map<string, number>;
+	/** PR number for fetching inline PR comments */
+	prNumber?: number;
 }
 
 // --- Helpers ---
@@ -178,14 +183,15 @@ const FileRow = memo(function FileRow({
 			{/* PR comment count badge */}
 			{(commentCount ?? 0) > 0 && (
 				<span
-					className="shrink-0 px-1.5 py-[1px] rounded-full text-[9px] font-medium"
+					className="shrink-0 flex items-center gap-0.5 px-1.5 py-[1px] rounded-full text-[9px] font-medium"
 					style={{
 						backgroundColor: theme.colors.accent + '33',
 						color: theme.colors.accent,
 					}}
 					title={`${commentCount} PR comment${commentCount !== 1 ? 's' : ''}`}
 				>
-					&#128172; {commentCount}
+					<MessageSquare size={9} className="shrink-0" />
+					{commentCount}
 				</span>
 			)}
 
@@ -480,6 +486,154 @@ const CommitListView = memo(function CommitListView({
 	);
 });
 
+// --- PrCommentsSection ---
+
+function formatRelativeTime(dateStr: string): string {
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMin = Math.floor(diffMs / 60000);
+	if (diffMin < 1) return 'just now';
+	if (diffMin < 60) return `${diffMin}m ago`;
+	const diffHr = Math.floor(diffMin / 60);
+	if (diffHr < 24) return `${diffHr}h ago`;
+	const diffDays = Math.floor(diffHr / 24);
+	if (diffDays < 30) return `${diffDays}d ago`;
+	return date.toLocaleDateString();
+}
+
+interface PrCommentsSectionProps {
+	prNumber: number | undefined;
+	repoPath: string | undefined;
+	branch: string | undefined;
+	theme: Theme;
+	onOpenDiff: ChangesPanelProps['onOpenDiff'];
+	onAddToChat?: (text: string) => void;
+}
+
+function PrCommentsSection({
+	prNumber,
+	repoPath,
+	branch,
+	theme,
+	onOpenDiff,
+	onAddToChat,
+}: PrCommentsSectionProps) {
+	const [comments, setComments] = useState<PrComment[]>([]);
+	const [isExpanded, setIsExpanded] = useState(true);
+
+	useEffect(() => {
+		if (!prNumber || !repoPath || !branch) {
+			setComments([]);
+			return;
+		}
+
+		const cached = getCachedPrComments(prNumber);
+		if (cached) {
+			setComments(cached);
+			return;
+		}
+
+		let cancelled = false;
+		gitService.getPrComments(repoPath, branch).then((result) => {
+			if (cancelled) return;
+			prCommentsCache.set(prNumber, result);
+			setComments(result);
+		});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [prNumber, repoPath, branch]);
+
+	if (!prNumber || comments.length === 0) return null;
+
+	return (
+		<div className="border-b" style={{ borderColor: theme.colors.border }}>
+			{/* Section header */}
+			<button
+				className="flex items-center gap-1.5 w-full px-3 py-2 text-xs font-bold transition-colors hover:bg-white/5 cursor-pointer bg-transparent border-none"
+				style={{ color: theme.colors.accent }}
+				onClick={() => setIsExpanded((v) => !v)}
+			>
+				{isExpanded ? (
+					<ChevronDown className="w-3.5 h-3.5 shrink-0" />
+				) : (
+					<ChevronRight className="w-3.5 h-3.5 shrink-0" />
+				)}
+				PR Comments ({comments.length})
+			</button>
+
+			{/* Comment rows */}
+			{isExpanded &&
+				comments.map((comment) => (
+					<div
+						key={comment.id}
+						className="group px-3 py-2 flex flex-col gap-1 cursor-pointer hover:bg-white/5 border-b"
+						style={{ borderColor: theme.colors.border }}
+					>
+						{/* Top line: author + timestamp */}
+						<div
+							className="flex items-center gap-1.5 text-xs"
+							style={{ color: theme.colors.textMain }}
+						>
+							<span
+								className="w-5 h-5 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0"
+								style={{
+									backgroundColor: theme.colors.accent,
+									color: theme.colors.bgMain,
+								}}
+							>
+								{comment.author.slice(0, 2).toUpperCase()}
+							</span>
+							<span>@{comment.author}</span>
+							<span style={{ color: theme.colors.textDim }}>·</span>
+							<span className="text-[10px]" style={{ color: theme.colors.textDim }}>
+								{formatRelativeTime(comment.createdAt)}
+							</span>
+						</div>
+
+						{/* Body */}
+						<div className="line-clamp-2 text-xs" style={{ color: theme.colors.textMain }}>
+							{comment.body}
+						</div>
+
+						{/* File breadcrumb */}
+						<div className="font-mono text-[10px]" style={{ color: theme.colors.textDim }}>
+							{comment.path}
+							{comment.line ? `:${comment.line}` : ''}
+						</div>
+
+						{/* Actions (visible on hover) */}
+						<div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+							<button
+								className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/10 transition-colors"
+								style={{ color: theme.colors.textDim }}
+								onClick={() => onOpenDiff(comment.path, 'committed')}
+							>
+								View diff →
+							</button>
+							{onAddToChat && (
+								<button
+									className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded hover:bg-white/10 transition-colors"
+									style={{ color: theme.colors.textDim }}
+									onClick={() => {
+										const line = comment.line ? `:L${comment.line}` : '';
+										const formatted = `> **@${comment.author}** on \`${comment.path}${line}\`:\n> ${comment.body.split('\n').join('\n> ')}`;
+										onAddToChat(formatted);
+									}}
+								>
+									<MessageSquarePlus className="w-3 h-3" />
+									Add to chat
+								</button>
+							)}
+						</div>
+					</div>
+				))}
+		</div>
+	);
+}
+
 // --- Main Component ---
 
 function ChangesPanelInner({
@@ -499,6 +653,7 @@ function ChangesPanelInner({
 	onOpenCommitDiff,
 	fetchCommitFiles,
 	commentCountByFile,
+	prNumber,
 }: ChangesPanelProps) {
 	// View mode state
 	const [viewMode, setViewMode] = useState<ChangesViewMode>('all');
@@ -679,6 +834,15 @@ function ChangesPanelInner({
 					/>
 				</button>
 			</div>
+
+			{/* PR Comments section */}
+			<PrCommentsSection
+				prNumber={prNumber}
+				repoPath={cwd}
+				branch={currentBranch}
+				theme={theme}
+				onOpenDiff={onOpenDiff}
+			/>
 
 			{/* View mode segmented control */}
 			<div

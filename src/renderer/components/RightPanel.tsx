@@ -877,6 +877,7 @@ export const RightPanel = memo(
 							onOpenCommitDiff={handleOpenCommitDiff}
 							fetchCommitFiles={changesPanel.fetchCommitFiles}
 							commentCountByFile={prCommentCountsByFile}
+							prNumber={session?.prNumber}
 						/>
 					) : (
 						/* File preview tab content — placeholder for now; FilePreview will be wired in a later section */
