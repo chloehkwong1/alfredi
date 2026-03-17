@@ -883,6 +883,7 @@ function MaestroConsoleInner() {
 
 	// Custom AI commands for input processing (slash command execution)
 	// Loaded from ~/.claude/commands/ and <cwd>/.claude/commands/ via IPC
+	// Re-fetched when session changes (e.g., /clear) so new skills are picked up
 	const [allCustomCommands, setAllCustomCommands] = useState<CustomAICommand[]>([]);
 	const activeSessionCwd = activeSession?.cwd;
 	useEffect(() => {
@@ -907,9 +908,9 @@ function MaestroConsoleInner() {
 			.catch(() => {
 				setAllCustomCommands([]);
 			});
-	}, [activeSessionCwd]);
+	}, [activeSessionCwd, activeSessionId]);
 
-	// Combine built-in slash commands with agent-specific commands for autocomplete
+	// Combine built-in slash commands with agent-specific + custom commands for autocomplete
 	const allSlashCommands = useMemo(() => {
 		// Only include agent-specific commands if the agent supports slash commands
 		const agentCommands = hasActiveSessionCapability('supportsSlashCommands')
@@ -919,20 +920,36 @@ function MaestroConsoleInner() {
 					aiOnly: true, // Agent commands are only available in AI mode
 				}))
 			: [];
+		// Custom commands from ~/.claude/commands/ and <cwd>/.claude/commands/
+		const customCommands = allCustomCommands.map((cmd) => ({
+			command: cmd.command,
+			description: cmd.description,
+			aiOnly: true as const,
+		}));
 		// Filter built-in slash commands by agent type (if specified)
 		const currentAgentType = activeSession?.toolType;
 		const filteredSlashCommands = slashCommands.filter(
 			(cmd) => !cmd.agentTypes || (currentAgentType && cmd.agentTypes.includes(currentAgentType))
 		);
-		// Deduplicate: built-in commands take precedence, and remove duplicates within agent commands
+		// Deduplicate: built-in commands take precedence, then agent, then custom
 		const seen = new Set(filteredSlashCommands.map((cmd) => cmd.command));
 		const uniqueAgentCommands = agentCommands.filter((cmd) => {
 			if (seen.has(cmd.command)) return false;
 			seen.add(cmd.command);
 			return true;
 		});
-		return [...filteredSlashCommands, ...uniqueAgentCommands];
-	}, [activeSession?.agentCommands, activeSession?.toolType, hasActiveSessionCapability]);
+		const uniqueCustomCommands = customCommands.filter((cmd) => {
+			if (seen.has(cmd.command)) return false;
+			seen.add(cmd.command);
+			return true;
+		});
+		return [...filteredSlashCommands, ...uniqueAgentCommands, ...uniqueCustomCommands];
+	}, [
+		activeSession?.agentCommands,
+		activeSession?.toolType,
+		hasActiveSessionCapability,
+		allCustomCommands,
+	]);
 
 	const canAttachImages = useMemo(() => {
 		if (!activeSession) return false;
