@@ -2210,10 +2210,11 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 				if (sshRemoteId) {
 					const sshRemote = getSshRemoteById(sshRemoteId);
 					if (sshRemote) {
-						const sshCmd = buildSshCommand(
-							sshRemote,
-							`cd ${repoPath} && ${ghCommand} ${args.join(' ')}`
-						);
+						const sshCmd = await buildSshCommand(sshRemote, {
+							command: ghCommand,
+							args,
+							cwd: repoPath,
+						});
 						result = await execFileNoThrow(sshCmd.command, sshCmd.args);
 					} else {
 						result = await execFileNoThrow(ghCommand, args, repoPath);
