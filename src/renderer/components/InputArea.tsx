@@ -521,22 +521,19 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 				backgroundColor: theme.colors.bgSidebar,
 			}}
 		>
-			{/* ThinkingStatusPill - only show in AI mode when the active tab is thinking */}
-			{session.inputMode === 'ai' &&
-				thinkingItems.some(
-					(item) => item.session.id === session.id && item.tab?.id === session.activeTabId
-				) && (
-					<ThinkingStatusPill
-						thinkingItems={thinkingItems.filter(
-							(item) => item.session.id === session.id && item.tab?.id === session.activeTabId
-						)}
-						theme={theme}
-						onSessionClick={onSessionClick}
-						namedSessions={namedSessions}
-						activeSessionId={session.id}
-						onInterrupt={handleInterrupt}
-					/>
-				)}
+			{/* ThinkingStatusPill - always mounted in AI mode so it can detect busy→idle transitions for completion sound + "Done" pill */}
+			{session.inputMode === 'ai' && (
+				<ThinkingStatusPill
+					thinkingItems={thinkingItems.filter(
+						(item) => item.session.id === session.id && item.tab?.id === session.activeTabId
+					)}
+					theme={theme}
+					onSessionClick={onSessionClick}
+					namedSessions={namedSessions}
+					activeSessionId={session.id}
+					onInterrupt={handleInterrupt}
+				/>
+			)}
 
 			{/* ExecutionQueueIndicator - show when items are queued in AI mode */}
 			{session.inputMode === 'ai' && onOpenQueueBrowser && (

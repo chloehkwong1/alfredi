@@ -115,6 +115,9 @@ export type { UseQueueHandlersReturn } from './useQueueHandlers';
 export { useQueueProcessing } from './useQueueProcessing';
 export type { UseQueueProcessingDeps, UseQueueProcessingReturn } from './useQueueProcessing';
 
+// Global completion sound (fires when any agent finishes, regardless of active session)
+export { useCompletionSound } from './useCompletionSound';
+
 // Agent configuration state management (detection, config, models, SSH)
 export { useAgentConfiguration } from './useAgentConfiguration';
 export type {

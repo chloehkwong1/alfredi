@@ -39,6 +39,7 @@ import {
 	// Agent
 	useAgentSessionManagement,
 	useAgentExecution,
+	useCompletionSound,
 	useAgentCapabilities,
 	useMergeTransferHandlers,
 	useSummarizeAndContinue,
@@ -973,6 +974,9 @@ function MaestroConsoleInner() {
 		}
 		return items;
 	}, [sessions]);
+
+	// Global completion sound — fires when ANY agent finishes, regardless of which session is active
+	useCompletionSound(thinkingItems);
 
 	// addLogToTab/addLogToActiveTab now used directly via store in useWizardHandlers
 

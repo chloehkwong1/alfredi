@@ -11,7 +11,6 @@ import type { Session, Theme, AITab, ThinkingItem } from '../types';
 import { formatTokensCompact } from '../utils/formatters';
 import { useSettingsStore } from '../stores/settingsStore';
 import { fontSizeToSecondary } from '../utils/fontSizeClass';
-import { playSound } from '../utils/sounds';
 
 interface ThinkingStatusPillProps {
 	/** Pre-filtered flat list of (session, tab) pairs — one entry per busy tab across all agents.
@@ -342,12 +341,12 @@ function ThinkingStatusPillInner({
 }: ThinkingStatusPillProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
 	const fontSize = useSettingsStore((s) => s.fontSize);
-	const completionSound = useSettingsStore((s) => s.completionSound);
 	const pillTextClass = fontSizeToSecondary(fontSize);
 
 	// Track previous thinkingItems length for busy -> idle detection
 	const prevThinkingLengthRef = useRef(thinkingItems.length);
 	const lastPrimaryItemRef = useRef<ThinkingItem | null>(null);
+	const prevActiveSessionIdRef = useRef(activeSessionId);
 	const [completedItem, setCompletedItem] = useState<CompletedSnapshot | null>(null);
 
 	// Keep track of the last primary item so we can capture its data on transition
@@ -364,6 +363,14 @@ function ThinkingStatusPillInner({
 		const currLength = thinkingItems.length;
 		prevThinkingLengthRef.current = currLength;
 
+		// When the active session changes, the filtered thinkingItems list changes too.
+		// Reset without triggering a false completion — this is a session switch, not an
+		// actual busy→idle transition.
+		if (prevActiveSessionIdRef.current !== activeSessionId) {
+			prevActiveSessionIdRef.current = activeSessionId;
+			return;
+		}
+
 		if (prevLength > 0 && currLength === 0) {
 			// Transition detected: capture snapshot from last primary item
 			const lastItem = lastPrimaryItemRef.current;
@@ -375,14 +382,9 @@ function ThinkingStatusPillInner({
 				const tokens = lastItem.session.currentCycleTokens || 0;
 
 				setCompletedItem({ elapsedTime: elapsed, tokens });
-
-				// Play completion sound
-				if (completionSound !== 'none') {
-					playSound(completionSound);
-				}
 			}
 		}
-	}, [thinkingItems.length, completionSound]);
+	}, [thinkingItems.length, activeSessionId]);
 
 	// Auto-clear the completed pill after 1.5s
 	useEffect(() => {
