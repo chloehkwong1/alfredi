@@ -310,6 +310,7 @@ export const RightPanel = memo(
 		const session = useSessionStore(
 			(s) => s.sessions.find((x) => x.id === s.activeSessionId) ?? null
 		);
+		const allSessions = useSessionStore((s) => s.sessions);
 		const setSessions = useSessionStore((s) => s.setSessions);
 		const addTerminalTab = useSessionStore((s) => s.addTerminalTab);
 		const removeTerminalTab = useSessionStore((s) => s.removeTerminalTab);
@@ -939,18 +940,26 @@ export const RightPanel = memo(
 						)}
 					</div>
 
-					{/* Terminal instances — all rendered, only active visible */}
+					{/* Terminal instances — rendered for ALL sessions to preserve scrollback across worktree switches */}
 					<div className="flex-1 overflow-hidden relative">
-						{session &&
-							terminalTabs.map((tab) => {
+						{allSessions.map((s) => {
+							const isActiveSession = s.id === session?.id;
+							const tabs =
+								s.terminalTabs && s.terminalTabs.length > 0
+									? s.terminalTabs
+									: [{ id: 'default', name: 'Terminal 1' } as TerminalTab];
+							const activeTabId = s.activeTerminalTabId ?? tabs[0]?.id ?? 'default';
+
+							return tabs.map((tab) => {
+								const isVisible = isActiveSession && tab.id === activeTabId;
 								if (tab.serverProcessId) {
 									return (
 										<ServerTerminalTabInstance
-											key={tab.id}
-											sessionId={session.id}
+											key={`${s.id}-${tab.id}`}
+											sessionId={s.id}
 											tabId={tab.id}
 											serverProcessId={tab.serverProcessId}
-											visible={tab.id === activeTerminalTabId}
+											visible={isVisible}
 											fontFamily={fontFamily}
 											fontSize={terminalFontSize}
 											themeColors={theme.colors}
@@ -959,19 +968,20 @@ export const RightPanel = memo(
 								}
 								return (
 									<TerminalTabInstance
-										key={tab.id}
-										sessionId={session.id}
+										key={`${s.id}-${tab.id}`}
+										sessionId={s.id}
 										tabId={tab.id}
-										cwd={session.fullPath ?? ''}
+										cwd={s.fullPath ?? ''}
 										enabled={rightPanelOpen}
-										visible={tab.id === activeTerminalTabId}
+										visible={isVisible}
 										fontFamily={fontFamily}
 										fontSize={terminalFontSize}
 										themeColors={theme.colors}
-										onReady={handleTabReady}
+										onReady={isActiveSession ? handleTabReady : undefined}
 									/>
 								);
-							})}
+							});
+						})}
 					</div>
 
 					{/* Batch Run Progress — overlays the terminal area */}
