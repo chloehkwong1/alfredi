@@ -14,9 +14,6 @@ import {
 	Copy,
 	Loader2,
 	GitBranch,
-	ArrowUp,
-	ArrowDown,
-	FileEdit,
 	List,
 	AlertCircle,
 	X,
@@ -41,7 +38,7 @@ import { ProjectDashboard } from './ProjectDashboard';
 import { ErrorBoundary } from './ErrorBoundary';
 import { ConfirmModal } from './ConfirmModal';
 import { GitStatusWidget } from './GitStatusWidget';
-import { GitWorkflowPill } from './GitWorkflowPill';
+// GitWorkflowPill removed — info now in sidebar ProjectHealthCard
 import { derivePrStatus } from '../utils/gitWorkflowState';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
@@ -1376,7 +1373,7 @@ export const MainPanel = React.memo(
 												<>
 													<div
 														ref={gitTooltipRef}
-														className="absolute top-full left-0 pt-2 w-96 z-50 pointer-events-auto"
+														className="absolute top-full left-0 pt-2 w-64 z-50 pointer-events-auto"
 														onClick={(e) => e.stopPropagation()}
 													>
 														<div
@@ -1386,129 +1383,61 @@ export const MainPanel = React.memo(
 																border: `1px solid ${theme.colors.border}`,
 															}}
 														>
-															{/* Branch / Origin / Status */}
-															<div
-																className="p-3 space-y-2 border-b"
-																style={{ borderColor: theme.colors.border }}
-															>
-																{/* Branch row */}
-																<div className="flex items-center gap-2">
-																	<span
-																		className="text-[10px] uppercase font-bold w-14 shrink-0"
+															{/* Git actions list */}
+															<div className="py-1">
+																<button
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		copyToClipboard(
+																			gitInfo.branch,
+																			`"${gitInfo.branch}" copied to clipboard`
+																		);
+																		setGitTooltipOpen(false);
+																	}}
+																	className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors cursor-pointer"
+																	style={{ color: theme.colors.textMain }}
+																>
+																	<Copy
+																		className="w-3.5 h-3.5"
 																		style={{ color: theme.colors.textDim }}
-																	>
-																		Branch
-																	</span>
-																	<GitBranch className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-																	<span
-																		className="text-xs font-mono font-medium truncate"
+																	/>
+																	Copy branch name
+																</button>
+																{gitInfo.remote && (
+																	<button
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			const url = remoteUrlToBrowserUrl(gitInfo.remote);
+																			if (url) window.maestro.shell.openExternal(url);
+																			setGitTooltipOpen(false);
+																		}}
+																		className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors cursor-pointer"
 																		style={{ color: theme.colors.textMain }}
 																	>
-																		{gitInfo.branch}
-																	</span>
-																	<div className="flex items-center gap-1.5 ml-auto shrink-0">
-																		{gitInfo.ahead > 0 && (
-																			<span className="flex items-center gap-0.5 text-xs text-green-500">
-																				<ArrowUp className="w-3 h-3" />
-																				{gitInfo.ahead}
-																			</span>
-																		)}
-																		{gitInfo.behind > 0 && (
-																			<span className="flex items-center gap-0.5 text-xs text-red-500">
-																				<ArrowDown className="w-3 h-3" />
-																				{gitInfo.behind}
-																			</span>
-																		)}
-																		<button
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				copyToClipboard(
-																					gitInfo.branch,
-																					`"${gitInfo.branch}" copied to clipboard`
-																				);
-																			}}
-																			className="p-1 rounded hover:bg-white/10 transition-colors"
-																			title="Copy branch name"
-																		>
-																			<Copy
-																				className="w-3 h-3"
-																				style={{ color: theme.colors.textDim }}
-																			/>
-																		</button>
-																	</div>
-																</div>
-
-																{/* Origin row */}
-																{gitInfo.remote && (
-																	<div className="flex items-center gap-2">
-																		<span
-																			className="text-[10px] uppercase font-bold w-14 shrink-0"
-																			style={{ color: theme.colors.textDim }}
-																		>
-																			Origin
-																		</span>
 																		<ExternalLink
-																			className="w-3 h-3 shrink-0"
+																			className="w-3.5 h-3.5"
 																			style={{ color: theme.colors.textDim }}
 																		/>
-																		<button
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				const url = remoteUrlToBrowserUrl(gitInfo.remote);
-																				if (url) window.maestro.shell.openExternal(url);
-																			}}
-																			className="text-xs font-mono truncate hover:underline text-left"
-																			style={{ color: theme.colors.textMain }}
-																			title={`Open ${gitInfo.remote}`}
-																		>
-																			{gitInfo.remote
-																				.replace(/^https?:\/\//, '')
-																				.replace(/\.git$/, '')}
-																		</button>
-																		<button
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				copyToClipboard(gitInfo.remote);
-																			}}
-																			className="p-1 rounded hover:bg-white/10 transition-colors ml-auto shrink-0"
-																			title="Copy remote URL"
-																		>
-																			<Copy
-																				className="w-3 h-3"
-																				style={{ color: theme.colors.textDim }}
-																			/>
-																		</button>
-																	</div>
+																		Open remote in browser
+																	</button>
 																)}
-
-																{/* Status row */}
-																<div className="flex items-center gap-2">
-																	<span
-																		className="text-[10px] uppercase font-bold w-14 shrink-0"
-																		style={{ color: theme.colors.textDim }}
+																{gitInfo.remote && (
+																	<button
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			copyToClipboard(gitInfo.remote);
+																			setGitTooltipOpen(false);
+																		}}
+																		className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors cursor-pointer"
+																		style={{ color: theme.colors.textMain }}
 																	>
-																		Status
-																	</span>
-																	{gitInfo.uncommittedChanges > 0 ? (
-																		<span
-																			className="flex items-center gap-1.5 text-xs"
-																			style={{ color: theme.colors.textMain }}
-																		>
-																			<FileEdit className="w-3 h-3 text-orange-500" />
-																			{gitInfo.uncommittedChanges} uncommitted{' '}
-																			{gitInfo.uncommittedChanges === 1 ? 'change' : 'changes'}
-																		</span>
-																	) : (
-																		<span className="flex items-center gap-1.5 text-xs text-green-500">
-																			Working tree clean
-																		</span>
-																	)}
-																</div>
-															</div>
-
-															{/* Worktree Actions */}
-															<div className="p-2 space-y-1">
-																{/* Configure Worktrees - only for parent sessions (not worktree children) */}
+																		<Copy
+																			className="w-3.5 h-3.5"
+																			style={{ color: theme.colors.textDim }}
+																		/>
+																		Copy remote URL
+																	</button>
+																)}
 																{!isWorktreeChild && onOpenWorktreeConfig && (
 																	<button
 																		onClick={(e) => {
@@ -1516,8 +1445,8 @@ export const MainPanel = React.memo(
 																			onOpenWorktreeConfig();
 																			setGitTooltipOpen(false);
 																		}}
-																		className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded text-xs hover:bg-white/10 transition-colors"
-																		style={{ color: theme.colors.textDim }}
+																		className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-white/10 transition-colors cursor-pointer"
+																		style={{ color: theme.colors.textMain }}
 																	>
 																		<Settings2
 																			className="w-3.5 h-3.5"
@@ -1533,15 +1462,6 @@ export const MainPanel = React.memo(
 											)}
 										</div>
 									</div>
-
-									{/* Git Workflow Pill - shows local state (uncommitted/unpushed) */}
-									{activeSession.isGitRepo && (
-										<GitWorkflowPill
-											sessionId={activeSession.id}
-											isGitRepo={activeSession.isGitRepo}
-											theme={theme}
-										/>
-									)}
 
 									{/* Git Status Widget - compact mode handled via CSS container queries */}
 									<GitStatusWidget
@@ -1620,7 +1540,6 @@ export const MainPanel = React.memo(
 											});
 											if (!prStatus) return null;
 											const prColor = theme.colors[prStatus.colorKey];
-											const clickable = !!activeSession.prUrl;
 											return (
 												<button
 													className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1"
@@ -1628,14 +1547,13 @@ export const MainPanel = React.memo(
 														backgroundColor: prColor + '20',
 														color: prColor,
 														borderColor: prColor + '30',
-														cursor: clickable ? 'pointer' : 'default',
+														cursor: 'pointer',
 													}}
-													title={clickable ? `Open ${prStatus.label} in browser` : prStatus.label}
+													title="Open Checks tab"
 													onClick={(e) => {
 														e.stopPropagation();
-														if (activeSession.prUrl) {
-															window.maestro.shell.openExternal(activeSession.prUrl);
-														}
+														useUIStore.getState().setActiveRightTopTab('checks');
+														useUIStore.getState().setRightPanelOpen(true);
 													}}
 												>
 													<GitPullRequest className="w-2.5 h-2.5" />
@@ -2351,6 +2269,8 @@ export const MainPanel = React.memo(
 											}
 										}, 50);
 									}}
+									prNumber={activeSession?.prNumber}
+									branch={activeSession?.currentBranch}
 									onComment={(comment) => setStagedQuotes((prev) => [...prev, comment])}
 									cwd={activeSession?.cwd}
 									sshRemoteId={filePreviewSshRemoteId}

@@ -53,8 +53,8 @@ export type ProjectState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'e
 export type SessionState = ProjectState;
 export type FileChangeType = 'modified' | 'added' | 'deleted';
 export type RightPanelTab = 'files';
-/** Active tab in the top section of the right panel (file explorer, changes, or a file preview tab) */
-export type RightTopTab = 'explorer' | 'changes' | string;
+/** Active tab in the top section of the right panel (file explorer, changes, checks, or a file preview tab) */
+export type RightTopTab = 'explorer' | 'changes' | 'checks' | string;
 export type SettingsTab =
 	| 'general'
 	| 'shortcuts'
@@ -456,6 +456,32 @@ export type ClosedTabEntry =
 	| { type: 'file'; tab: FilePreviewTab; unifiedIndex: number; closedAt: number }
 	| { type: 'diff'; tab: DiffViewTab; unifiedIndex: number; closedAt: number }
 	| { type: 'commit-diff'; tab: CommitDiffTab; unifiedIndex: number; closedAt: number };
+
+export interface CheckRun {
+	name: string;
+	status: 'success' | 'failure' | 'pending' | 'running' | 'skipped' | 'cancelled';
+	startedAt: string | null;
+	completedAt: string | null;
+	detailsUrl: string | null;
+}
+
+export interface ReviewerStatus {
+	login: string;
+	state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+}
+
+export interface PrComment {
+	id: number;
+	path: string;
+	line: number | null;
+	originalLine: number | null;
+	body: string;
+	author: string;
+	createdAt: string;
+	htmlUrl: string;
+	inReplyToId: number | null;
+	isResolved: boolean;
+}
 
 export interface Project {
 	id: string;

@@ -1976,6 +1976,244 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 		)
 	);
 
+	// Get detailed individual check runs for a PR branch
+	ipcMain.handle(
+		'git:prChecks',
+		withIpcErrorLogging(
+			{ context: LOG_CONTEXT, operation: 'prChecks' },
+			async (repoPath: string, branch: string) => {
+				let ghCommand: string;
+				try {
+					ghCommand = await resolveGhPath();
+				} catch {
+					return [];
+				}
+
+				const result = await execFileNoThrow(
+					ghCommand,
+					['pr', 'view', branch, '--json', 'statusCheckRollup,number,url'],
+					repoPath
+				);
+
+				if (result.exitCode !== 0) {
+					return [];
+				}
+
+				try {
+					const data = JSON.parse(result.stdout.trim());
+					if (!Array.isArray(data.statusCheckRollup) || data.statusCheckRollup.length === 0) {
+						return [];
+					}
+
+					// Deduplicate by check name (same logic as prStatus)
+					const latestByName = new Map<string, (typeof data.statusCheckRollup)[number]>();
+					for (const check of data.statusCheckRollup) {
+						const name = check.name || check.context || `__unnamed_${latestByName.size}`;
+						const existing = latestByName.get(name);
+						if (
+							!existing ||
+							(check.completedAt || check.startedAt || '') >
+								(existing.completedAt || existing.startedAt || '')
+						) {
+							latestByName.set(name, check);
+						}
+					}
+
+					const checks: Array<{
+						name: string;
+						status: 'success' | 'failure' | 'pending' | 'running' | 'skipped' | 'cancelled';
+						startedAt: string | null;
+						completedAt: string | null;
+						detailsUrl: string | null;
+					}> = [];
+
+					for (const check of latestByName.values()) {
+						const conclusion = (check.conclusion || '').toUpperCase();
+						const rawStatus = (check.status || '').toUpperCase();
+
+						let status: 'success' | 'failure' | 'pending' | 'running' | 'skipped' | 'cancelled';
+						if (conclusion === 'SUCCESS' || conclusion === 'NEUTRAL') {
+							status = 'success';
+						} else if (conclusion === 'SKIPPED') {
+							status = 'skipped';
+						} else if (conclusion === 'CANCELLED') {
+							status = 'cancelled';
+						} else if (
+							conclusion === 'FAILURE' ||
+							conclusion === 'TIMED_OUT' ||
+							conclusion === 'ACTION_REQUIRED'
+						) {
+							status = 'failure';
+						} else if (rawStatus === 'IN_PROGRESS') {
+							status = 'running';
+						} else {
+							status = 'pending';
+						}
+
+						checks.push({
+							name: check.name || check.context || 'Unknown',
+							status,
+							startedAt: check.startedAt || null,
+							completedAt: check.completedAt || null,
+							detailsUrl: check.detailsUrl || check.targetUrl || null,
+						});
+					}
+
+					return checks;
+				} catch {
+					logger.warn(
+						`${LOG_CONTEXT} Failed to parse gh pr view output for prChecks on branch ${branch}`,
+						LOG_CONTEXT
+					);
+					return [];
+				}
+			}
+		)
+	);
+
+	// Get reviewer statuses for a PR branch
+	ipcMain.handle(
+		'git:prReviewers',
+		withIpcErrorLogging(
+			{ context: LOG_CONTEXT, operation: 'prReviewers' },
+			async (repoPath: string, branch: string) => {
+				let ghCommand: string;
+				try {
+					ghCommand = await resolveGhPath();
+				} catch {
+					return [];
+				}
+
+				const result = await execFileNoThrow(
+					ghCommand,
+					['pr', 'view', branch, '--json', 'reviews,reviewRequests'],
+					repoPath
+				);
+
+				if (result.exitCode !== 0) {
+					return [];
+				}
+
+				try {
+					const data = JSON.parse(result.stdout.trim());
+					const reviewers: Array<{
+						login: string;
+						state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+					}> = [];
+
+					// Process actual reviews — deduplicate per author (take latest)
+					const reviewsByAuthor = new Map<string, string>();
+					if (Array.isArray(data.reviews)) {
+						for (const review of data.reviews) {
+							const login = review.author?.login;
+							if (!login) continue;
+							// Later entries are more recent
+							reviewsByAuthor.set(login, review.state);
+						}
+					}
+
+					for (const [login, state] of reviewsByAuthor) {
+						const normalized = state?.toUpperCase();
+						let mappedState: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+						if (normalized === 'APPROVED') mappedState = 'APPROVED';
+						else if (normalized === 'CHANGES_REQUESTED') mappedState = 'CHANGES_REQUESTED';
+						else if (normalized === 'COMMENTED') mappedState = 'COMMENTED';
+						else mappedState = 'PENDING';
+						reviewers.push({ login, state: mappedState });
+					}
+
+					// Add requested reviewers that haven't reviewed yet
+					if (Array.isArray(data.reviewRequests)) {
+						for (const req of data.reviewRequests) {
+							const login = req.login || req.name;
+							if (login && !reviewsByAuthor.has(login)) {
+								reviewers.push({ login, state: 'PENDING' });
+							}
+						}
+					}
+
+					return reviewers;
+				} catch {
+					logger.warn(
+						`${LOG_CONTEXT} Failed to parse gh pr view output for prReviewers on branch ${branch}`,
+						LOG_CONTEXT
+					);
+					return [];
+				}
+			}
+		)
+	);
+
+	// Get PR review comments (inline code comments) for a branch
+	ipcMain.handle(
+		'git:prComments',
+		withIpcErrorLogging(
+			{ context: LOG_CONTEXT, operation: 'prComments' },
+			async (repoPath: string, branch: string) => {
+				let ghCommand: string;
+				try {
+					ghCommand = await resolveGhPath();
+				} catch {
+					return [];
+				}
+
+				// First get the PR number
+				const prResult = await execFileNoThrow(
+					ghCommand,
+					['pr', 'view', branch, '--json', 'number'],
+					repoPath
+				);
+
+				if (prResult.exitCode !== 0) {
+					return [];
+				}
+
+				let prNumber: number;
+				try {
+					const prData = JSON.parse(prResult.stdout.trim());
+					prNumber = prData.number;
+				} catch {
+					return [];
+				}
+
+				// Use gh api to get review comments (inline code comments)
+				const apiResult = await execFileNoThrow(
+					ghCommand,
+					['api', `repos/{owner}/{repo}/pulls/${prNumber}/comments`, '--paginate'],
+					repoPath
+				);
+
+				if (apiResult.exitCode !== 0) {
+					return [];
+				}
+
+				try {
+					const comments = JSON.parse(apiResult.stdout.trim());
+					if (!Array.isArray(comments)) return [];
+
+					return comments.map((c: Record<string, unknown>) => ({
+						id: c.id as number,
+						path: (c.path as string) || '',
+						line: (c.line as number) ?? (c.original_line as number) ?? null,
+						originalLine: (c.original_line as number) ?? null,
+						body: (c.body as string) || '',
+						author: ((c.user as Record<string, unknown>)?.login as string) || 'unknown',
+						createdAt: (c.created_at as string) || '',
+						htmlUrl: (c.html_url as string) || '',
+						inReplyToId: (c.in_reply_to_id as number) ?? null,
+						isResolved: false, // GitHub API doesn't directly expose this on individual comments
+					}));
+				} catch {
+					logger.warn(
+						`${LOG_CONTEXT} Failed to parse PR comments for branch ${branch}`,
+						LOG_CONTEXT
+					);
+					return [];
+				}
+			}
+		)
+	);
+
 	// List open PRs for a repository using gh CLI
 	// Returns an array of PR objects with number, title, branch, author, etc.
 	// Supports SSH remote execution via optional sshRemoteId parameter

@@ -689,6 +689,53 @@ interface MaestroAPI {
 			error?: string;
 		}>;
 		/**
+		 * Get detailed individual check runs for a PR branch
+		 */
+		getPrChecks: (
+			repoPath: string,
+			branch: string
+		) => Promise<
+			Array<{
+				name: string;
+				status: 'success' | 'failure' | 'pending' | 'running' | 'skipped' | 'cancelled';
+				startedAt: string | null;
+				completedAt: string | null;
+				detailsUrl: string | null;
+			}>
+		>;
+		/**
+		 * Get reviewer statuses for a PR branch
+		 */
+		getPrReviewers: (
+			repoPath: string,
+			branch: string
+		) => Promise<
+			Array<{
+				login: string;
+				state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+			}>
+		>;
+		/**
+		 * Get PR review comments (inline code comments) for a branch
+		 */
+		getPrComments: (
+			repoPath: string,
+			branch: string
+		) => Promise<
+			Array<{
+				id: number;
+				path: string;
+				line: number | null;
+				originalLine: number | null;
+				body: string;
+				author: string;
+				createdAt: string;
+				htmlUrl: string;
+				inReplyToId: number | null;
+				isResolved: boolean;
+			}>
+		>;
+		/**
 		 * Get PR status for a branch using GitHub CLI
 		 */
 		getPrStatus: (

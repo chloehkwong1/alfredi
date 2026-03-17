@@ -945,6 +945,8 @@ export const AppUtilityModals = memo(function AppUtilityModals({
 								: undefined) ||
 							undefined
 						}
+						prNumber={activeSession?.prNumber}
+						branch={activeSession?.currentBranch}
 					/>
 				</Suspense>
 			)}

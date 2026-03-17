@@ -371,6 +371,74 @@ export const gitService = {
 	},
 
 	/**
+	 * Get detailed individual check runs for a PR branch
+	 */
+	async getPrChecks(
+		repoPath: string,
+		branch: string
+	): Promise<
+		Array<{
+			name: string;
+			status: 'success' | 'failure' | 'pending' | 'running' | 'skipped' | 'cancelled';
+			startedAt: string | null;
+			completedAt: string | null;
+			detailsUrl: string | null;
+		}>
+	> {
+		return createIpcMethod({
+			call: () => window.maestro.git.getPrChecks(repoPath, branch),
+			errorContext: 'Git getPrChecks',
+			defaultValue: [],
+		});
+	},
+
+	/**
+	 * Get reviewer statuses for a PR branch
+	 */
+	async getPrReviewers(
+		repoPath: string,
+		branch: string
+	): Promise<
+		Array<{
+			login: string;
+			state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+		}>
+	> {
+		return createIpcMethod({
+			call: () => window.maestro.git.getPrReviewers(repoPath, branch),
+			errorContext: 'Git getPrReviewers',
+			defaultValue: [],
+		});
+	},
+
+	/**
+	 * Get PR review comments (inline code comments) for a branch
+	 */
+	async getPrComments(
+		repoPath: string,
+		branch: string
+	): Promise<
+		Array<{
+			id: number;
+			path: string;
+			line: number | null;
+			originalLine: number | null;
+			body: string;
+			author: string;
+			createdAt: string;
+			htmlUrl: string;
+			inReplyToId: number | null;
+			isResolved: boolean;
+		}>
+	> {
+		return createIpcMethod({
+			call: () => window.maestro.git.getPrComments(repoPath, branch),
+			errorContext: 'Git getPrComments',
+			defaultValue: [],
+		});
+	},
+
+	/**
 	 * List git remotes for a repository
 	 * @param cwd Working directory path
 	 * @param sshRemoteId Optional SSH remote ID for remote execution

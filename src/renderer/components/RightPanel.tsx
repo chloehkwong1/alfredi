@@ -6,6 +6,7 @@ import {
 	Loader2,
 	GitBranch,
 	GitCommitHorizontal,
+	GitPullRequest,
 	Skull,
 	AlertTriangle,
 	Terminal,
@@ -28,6 +29,7 @@ import { useFileExplorerStore } from '../stores/fileExplorerStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { getSessionSshRemoteId } from '../utils/sessionHelpers';
 import XTerminal from './XTerminal';
+import { ChecksPanel } from './ChecksPanel';
 import {
 	usePersistentTerminal,
 	getTerminalProcessId,
@@ -720,6 +722,32 @@ export const RightPanel = memo(
 						Explorer
 					</button>
 
+					{/* Checks tab */}
+					<button
+						onClick={() => setActiveRightTopTab('checks')}
+						className="flex items-center gap-1.5 px-3 text-xs font-bold border-b-2 transition-colors"
+						style={{
+							borderColor: activeRightTopTab === 'checks' ? theme.colors.accent : 'transparent',
+							color: activeRightTopTab === 'checks' ? theme.colors.accent : theme.colors.textMain,
+						}}
+					>
+						<GitPullRequest className="w-3.5 h-3.5" />
+						Checks
+						{session?.prNumber && session.prCheckStatus && (
+							<span
+								className="w-2 h-2 rounded-full shrink-0"
+								style={{
+									backgroundColor:
+										session.prCheckStatus.failing > 0
+											? theme.colors.error
+											: session.prCheckStatus.pending > 0
+												? theme.colors.warning
+												: theme.colors.success,
+								}}
+							/>
+						)}
+					</button>
+
 					{/* File preview tabs from the session */}
 					{session.filePreviewTabs?.map((tab) => (
 						<button
@@ -814,6 +842,8 @@ export const RightPanel = memo(
 								/>
 							</div>
 						</div>
+					) : activeRightTopTab === 'checks' ? (
+						<ChecksPanel theme={theme} session={session} />
 					) : activeRightTopTab === 'changes' ? (
 						<ChangesPanel
 							theme={theme}
@@ -881,7 +911,7 @@ export const RightPanel = memo(
 						{terminalTabs.map((tab) => (
 							<button
 								key={tab.id}
-								className={`flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors select-none ${draggingTermTabId === tab.id ? 'opacity-50' : ''}`}
+								className={`flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors select-none ${draggingTermTabId === tab.id ? 'opacity-50 pointer-events-none' : ''}`}
 								style={{
 									color:
 										tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,

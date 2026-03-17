@@ -19,6 +19,7 @@ import { ImageDiffViewer } from './ImageDiffViewer';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
 import { gitService } from '../services/git';
 import { useDiffComments } from '../hooks/useDiffComments';
+import { usePrComments } from '../hooks/usePrComments';
 import 'react-diff-view/style/index.css';
 
 const CONTEXT_INCREMENT = 10;
@@ -60,6 +61,8 @@ interface GitDiffViewerProps {
 	onAskAboutLines?: (context: string) => void;
 	onComment?: (formattedComment: string) => void;
 	sshRemoteId?: string;
+	prNumber?: number;
+	branch?: string;
 }
 
 export const GitDiffViewer = memo(function GitDiffViewer({
@@ -70,6 +73,8 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 	onAskAboutLines,
 	onComment,
 	sshRemoteId,
+	prNumber,
+	branch,
 }: GitDiffViewerProps) {
 	const [activeTab, setActiveTab] = useState(0);
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -189,6 +194,16 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 		parsedFiles: activeFileParsedDiff,
 		theme,
 		onComment: onComment ?? noopComment,
+	});
+
+	const { buildPrWidgets } = usePrComments({
+		prNumber,
+		repoPath: cwd,
+		branch,
+		filePath: activeFilePath,
+		parsedFiles: activeFileParsedDiff,
+		theme,
+		onAddToChat: onComment,
 	});
 
 	const commentCount = commentedKeys.size;
@@ -544,7 +559,11 @@ export const GitDiffViewer = memo(function GitDiffViewer({
 								`}</style>
 							)}
 							{activeFile.parsedDiff.map((file, fileIndex) => {
-								const widgets = onComment ? buildWidgets() : undefined;
+								const prWidgets = buildPrWidgets();
+								const userWidgets = onComment ? buildWidgets() : {};
+								const hasPrWidgets = Object.keys(prWidgets).length > 0;
+								const widgets =
+									onComment || hasPrWidgets ? { ...prWidgets, ...userWidgets } : undefined;
 
 								return (
 									<div key={fileIndex}>

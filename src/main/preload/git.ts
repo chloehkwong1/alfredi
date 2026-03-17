@@ -491,6 +491,56 @@ export function createGitApi() {
 		}> => ipcRenderer.invoke('git:listPRs', cwd, sshRemoteId, ghPath),
 
 		/**
+		 * Get detailed individual check runs for a PR branch
+		 */
+		getPrChecks: (
+			repoPath: string,
+			branch: string
+		): Promise<
+			Array<{
+				name: string;
+				status: 'success' | 'failure' | 'pending' | 'running' | 'skipped' | 'cancelled';
+				startedAt: string | null;
+				completedAt: string | null;
+				detailsUrl: string | null;
+			}>
+		> => ipcRenderer.invoke('git:prChecks', repoPath, branch),
+
+		/**
+		 * Get reviewer statuses for a PR branch
+		 */
+		getPrReviewers: (
+			repoPath: string,
+			branch: string
+		): Promise<
+			Array<{
+				login: string;
+				state: 'APPROVED' | 'CHANGES_REQUESTED' | 'COMMENTED' | 'PENDING';
+			}>
+		> => ipcRenderer.invoke('git:prReviewers', repoPath, branch),
+
+		/**
+		 * Get PR review comments (inline code comments) for a branch
+		 */
+		getPrComments: (
+			repoPath: string,
+			branch: string
+		): Promise<
+			Array<{
+				id: number;
+				path: string;
+				line: number | null;
+				originalLine: number | null;
+				body: string;
+				author: string;
+				createdAt: string;
+				htmlUrl: string;
+				inReplyToId: number | null;
+				isResolved: boolean;
+			}>
+		> => ipcRenderer.invoke('git:prComments', repoPath, branch),
+
+		/**
 		 * Get PR status for a branch using GitHub CLI
 		 * Returns PR state, URL, and number, or null if no PR exists
 		 */

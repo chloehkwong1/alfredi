@@ -19,6 +19,7 @@ import { getDiffStats } from '../utils/gitDiffParser';
 import { generateDiffViewStyles } from '../utils/markdownConfig';
 import { gitService } from '../services/git';
 import { useDiffComments } from '../hooks/useDiffComments';
+import { usePrComments } from '../hooks/usePrComments';
 import 'react-diff-view/style/index.css';
 
 const CONTEXT_INCREMENT = 10;
@@ -86,6 +87,8 @@ interface DiffPreviewProps {
 	onComment?: (formattedComment: string) => void;
 	cwd?: string;
 	sshRemoteId?: string;
+	prNumber?: number;
+	branch?: string;
 }
 
 export const DiffPreview = memo(function DiffPreview({
@@ -98,6 +101,8 @@ export const DiffPreview = memo(function DiffPreview({
 	onComment,
 	cwd,
 	sshRemoteId,
+	prNumber,
+	branch,
 }: DiffPreviewProps) {
 	const contentRef = useRef<HTMLDivElement>(null);
 	const [viewMode, setViewMode] = useState<'unified' | 'split'>(diff.viewMode);
@@ -204,6 +209,16 @@ export const DiffPreview = memo(function DiffPreview({
 		parsedFiles,
 		theme,
 		onComment: onComment ?? noopComment,
+	});
+
+	const { buildPrWidgets } = usePrComments({
+		prNumber,
+		repoPath: cwd,
+		branch,
+		filePath: diff.filePath,
+		parsedFiles,
+		theme,
+		onAddToChat: onComment,
 	});
 
 	const commentCount = commentedKeys.size;
@@ -596,7 +611,11 @@ export const DiffPreview = memo(function DiffPreview({
 								file.hunks[0].oldStart === 1 &&
 								file.hunks[0].oldLines >= maxFileLines - 1;
 
-							const widgets = onComment ? buildWidgets() : undefined;
+							const prWidgets = buildPrWidgets();
+							const userWidgets = onComment ? buildWidgets() : {};
+							const hasPrWidgets = Object.keys(prWidgets).length > 0;
+							const widgets =
+								onComment || hasPrWidgets ? { ...prWidgets, ...userWidgets } : undefined;
 
 							return (
 								<Diff
