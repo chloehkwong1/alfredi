@@ -53,8 +53,8 @@
 		"productName": "Alfredi",
 		"publish": {
 			"provider": "github",
-			"owner": "RunMaestro",
-			"repo": "Maestro"
+			"owner": "chloehkwong1",
+			"repo": "alfredi"
 		},
 		"directories": {
 			"output": "release",
