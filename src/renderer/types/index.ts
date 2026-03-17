@@ -48,7 +48,9 @@ export interface StagedFile {
 	size: number;
 }
 
-export type SessionState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'error';
+export type ProjectState = 'idle' | 'busy' | 'waiting_input' | 'connecting' | 'error';
+/** @deprecated Use ProjectState instead */
+export type SessionState = ProjectState;
 export type FileChangeType = 'modified' | 'added' | 'deleted';
 export type RightPanelTab = 'files';
 /** Active tab in the top section of the right panel (file explorer, changes, or a file preview tab) */
@@ -61,7 +63,6 @@ export type SettingsTab =
 	| 'display'
 	| 'llm'
 	| 'encore';
-// Note: ScratchPadMode was removed as part of the Scratchpad → Auto Run migration
 export type FocusArea = 'sidebar' | 'main' | 'right';
 export type LLMProvider = 'openrouter' | 'anthropic' | 'ollama';
 
@@ -73,108 +74,6 @@ export interface SendToAgentOptions {
 	targetSessionId: string;
 	/** Whether to create a new session (default: true) */
 	createNewSession?: boolean;
-}
-
-// Inline wizard types for per-session/per-tab wizard state
-export type WizardMode = 'new' | 'iterate' | null;
-
-/**
- * Message in an inline wizard conversation.
- * Stores conversation history for the /wizard command.
- */
-export interface WizardMessage {
-	id: string;
-	role: 'user' | 'assistant' | 'system';
-	content: string;
-	timestamp: number;
-	/** Parsed confidence from assistant responses */
-	confidence?: number;
-	/** Parsed ready flag from assistant responses */
-	ready?: boolean;
-	/** Base64-encoded image data URLs attached to this message */
-	images?: string[];
-}
-
-/**
- * Previous UI state to restore when wizard ends.
- * These settings are temporarily overridden during wizard mode.
- */
-export interface WizardPreviousUIState {
-	readOnlyMode: boolean;
-}
-
-/**
- * Generated document from wizard.
- * Stores document content and metadata for display and editing.
- */
-export interface WizardGeneratedDocument {
-	/** Filename (e.g., "phase-01.md") */
-	filename: string;
-	/** Document content (markdown) */
-	content: string;
-	/** Number of tasks in the document */
-	taskCount: number;
-	/** Absolute path after saving */
-	savedPath?: string;
-}
-
-/**
- * Per-session/per-tab wizard state.
- * Keeps track of inline wizard state for the /wizard command.
- */
-export interface SessionWizardState {
-	/** Whether wizard is currently active */
-	isActive: boolean;
-	/** Whether waiting for AI response */
-	isWaiting?: boolean;
-	/** Current wizard mode: 'new' for creating documents, 'iterate' for modifying existing */
-	mode: WizardMode;
-	/** Goal for iterate mode (what the user wants to add/change) */
-	goal?: string;
-	/** Confidence level from agent responses (0-100) */
-	confidence: number;
-	/** Whether the AI is ready to proceed with document generation */
-	ready?: boolean;
-	/** Conversation history for this wizard session */
-	conversationHistory: WizardMessage[];
-	/** Previous UI state to restore when wizard ends */
-	previousUIState: WizardPreviousUIState;
-
-	// Error handling state
-	/** Error message if an error occurred during wizard conversation */
-	error?: string | null;
-
-	// Document generation state
-	/** Whether documents are currently being generated (triggers takeover view) */
-	isGeneratingDocs?: boolean;
-	/** Generated documents */
-	generatedDocuments?: WizardGeneratedDocument[];
-	/** Currently selected document index */
-	currentDocumentIndex?: number;
-	/** Streaming content for document being generated */
-	streamingContent?: string;
-	/** Progress message during generation */
-	progressMessage?: string;
-	/** Index of document currently being generated (for progress indicator) */
-	currentGeneratingIndex?: number;
-	/** Total number of documents to generate (for progress indicator) */
-	totalDocuments?: number;
-	/** Folder path for Auto Run docs (base folder, e.g., "/path/Auto Run Docs") */
-	autoRunFolderPath?: string;
-	/** Full path to the subfolder where documents are saved (e.g., "/path/Auto Run Docs/Maestro-Marketing") */
-	subfolderPath?: string;
-	/** The Claude agent session ID (from session_id in output) - used to switch tab after wizard completes */
-	agentSessionId?: string;
-	/** Subfolder name where documents were saved (e.g., "Maestro-Marketing") - used for tab naming */
-	subfolderName?: string;
-
-	// Thinking display state
-	/** Whether to show AI thinking content instead of filler phrases */
-	showWizardThinking?: boolean;
-	/** Accumulated thinking content from the AI during conversation */
-	thinkingContent?: string;
-	/** Tool execution events during conversation (shows what agent is doing) */
-	toolExecutions?: Array<{ toolName: string; state?: unknown; timestamp: number }>;
 }
 
 export interface Shortcut {
@@ -266,7 +165,7 @@ export interface QueuedItem {
 	images?: string[]; // Attached images (base64)
 	// For commands
 	command?: string; // Slash command (e.g., '/commit')
-	commandArgs?: string; // Arguments passed after the command (e.g., 'Blah blah' from '/speckit.plan Blah blah')
+	commandArgs?: string; // Arguments passed after the command
 	commandDescription?: string; // Command description for display
 	// Display metadata
 	tabName?: string; // Tab name at time of queuing (for display)
@@ -347,124 +246,13 @@ export interface BatchRunConfig {
 	worktreeTarget?: WorktreeRunTarget; // Optional target for dispatching to a worktree agent
 }
 
-// Batch processing state (inline after stripping batch module)
-type BatchProcessingState =
-	| 'idle'
-	| 'initializing'
-	| 'processing'
-	| 'waiting'
-	| 'looping'
-	| 'completing'
-	| 'error'
-	| 'stopped';
-
-// Batch processing state
-export interface BatchRunState {
-	isRunning: boolean;
-	isStopping: boolean; // Waiting for current task to finish before stopping
-
-	// State machine integration (Phase 11)
-	// Tracks explicit processing state for invariant checking and debugging
-	processingState?: BatchProcessingState;
-
-	// Document-level progress (multi-document support)
-	documents: string[]; // Ordered list of document filenames to process
-	lockedDocuments: string[]; // Documents that should be read-only during this run (subset of documents)
-	currentDocumentIndex: number; // Which document we're on (0-based)
-
-	// Task-level progress within current document
-	currentDocTasksTotal: number; // Total tasks in current document
-	currentDocTasksCompleted: number; // Completed tasks in current document
-
-	// Overall progress (grows as reset docs add tasks back)
-	totalTasksAcrossAllDocs: number;
-	completedTasksAcrossAllDocs: number;
-
-	// Loop mode
-	loopEnabled: boolean;
-	loopIteration: number; // How many times we've looped (0 = first pass)
-	maxLoops?: number | null; // Max loop iterations (null/undefined = infinite)
-
-	// Folder path for file operations
-	folderPath: string;
-
-	// Worktree tracking
-	worktreeActive: boolean; // Currently running in a worktree
-	worktreePath?: string; // Path to the active worktree
-	worktreeBranch?: string; // Branch name in the worktree
-
-	// Legacy fields (kept for backwards compatibility during migration)
-	totalTasks: number;
-	completedTasks: number;
-	currentTaskIndex: number;
-	scratchpadPath?: string; // Path to temp file
-	originalContent: string; // Original scratchpad content for sync back
-
-	// Prompt configuration
-	customPrompt?: string; // User's custom prompt if modified
-	sessionIds: string[]; // Claude session IDs from each iteration
-	startTime?: number; // Timestamp when batch run started
-	cumulativeTaskTimeMs?: number; // Sum of actual task durations (most accurate work time measure)
-	accumulatedElapsedMs?: number; // Accumulated active elapsed time (excludes sleep/suspend time)
-	lastActiveTimestamp?: number; // Last timestamp when actively tracking (for pause/resume calculation)
-
-	// Error handling state (Phase 5.10)
-	error?: AgentError; // Current error if batch is paused due to agent error
-	errorPaused?: boolean; // True if batch is paused waiting for error resolution
-	errorDocumentIndex?: number; // Which document had the error (for skip functionality)
-	errorTaskDescription?: string; // Description of the task that failed (for UI display)
-}
-
-// Badge unlock record for history tracking
-export interface BadgeUnlockRecord {
-	level: number;
-	unlockedAt: number; // Timestamp when badge was unlocked
-}
-
-// Auto-run statistics (survives app restarts)
-export interface AutoRunStats {
-	cumulativeTimeMs: number; // Total cumulative AutoRun time across all sessions
-	longestRunMs: number; // Longest single AutoRun session
-	longestRunTimestamp: number; // When the longest run occurred
-	totalRuns: number; // Total number of AutoRun sessions completed
-	currentBadgeLevel: number; // Current badge level (1-11)
-	lastBadgeUnlockLevel: number; // Last badge level that triggered unlock notification
-	lastAcknowledgedBadgeLevel: number; // Last badge level user clicked "Take a Bow" on
-	badgeHistory: BadgeUnlockRecord[]; // History of badge unlocks with timestamps
-}
-
 // Maestro usage peak statistics (survives app restarts)
 // These track maximum usage peaks
 export interface MaestroUsageStats {
 	maxAgents: number; // Maximum number of agents active at once
 	maxDefinedAgents: number; // Maximum number of defined agents (ever configured)
-	maxSimultaneousAutoRuns: number; // Maximum concurrent Auto Run sessions
 	maxSimultaneousQueries: number; // Maximum concurrent AI queries
 	maxQueueDepth: number; // Maximum number of queued queries at once
-}
-
-// Leaderboard registration data (persisted in settings store)
-export interface LeaderboardRegistration {
-	email: string;
-	displayName: string;
-	twitterHandle?: string;
-	githubUsername?: string;
-	linkedinHandle?: string;
-	discordUsername?: string;
-	blueskyHandle?: string;
-	registeredAt: number;
-	emailConfirmed: boolean;
-	lastSubmissionAt?: number;
-	clientToken?: string;
-	authToken?: string;
-}
-
-// Keyboard mastery stats (persisted in settings store)
-export interface KeyboardMasteryStats {
-	usedShortcuts: string[];
-	currentLevel: number;
-	lastLevelUpTimestamp: number;
-	lastAcknowledgedLevel: number;
 }
 
 // Onboarding analytics statistics (survives app restarts)
@@ -525,7 +313,6 @@ export interface AITab {
 	modelId?: string; // Per-tab model override (falls back to global modelSlug if not set)
 	outputStyle?: import('../../shared/types').OutputStyle; // Per-tab output style override (falls back to global outputStyle if not set)
 	effortLevel?: import('../../shared/types').EffortLevel; // Per-tab effort level override (Claude Code only, defaults to 'medium')
-	wizardState?: SessionWizardState; // Per-tab inline wizard state for /wizard command
 	isGeneratingName?: boolean; // True while automatic tab naming is in progress
 	pendingQuestion?: {
 		processSessionId: string;
@@ -535,11 +322,12 @@ export interface AITab {
 	}; // Set when a freeform AskUserQuestion arrives (no options), cleared on answer or exit
 }
 
-// A single "thinking item" — one busy tab within a session.
+// A single "thinking item" — one busy tab within a project.
 // Used by ThinkingStatusPill to show all active work across all agents.
 export interface ThinkingItem {
-	session: Session;
-	tab: AITab | null; // null for legacy sessions without tab-level tracking
+	/** The project this thinking item belongs to. Alias: `session` (deprecated) */
+	session: Project;
+	tab: AITab | null; // null for legacy projects without tab-level tracking
 }
 
 // Closed tab entry for undo functionality (Cmd+Shift+T)
@@ -669,11 +457,11 @@ export type ClosedTabEntry =
 	| { type: 'diff'; tab: DiffViewTab; unifiedIndex: number; closedAt: number }
 	| { type: 'commit-diff'; tab: CommitDiffTab; unifiedIndex: number; closedAt: number };
 
-export interface Session {
+export interface Project {
 	id: string;
 	name: string;
 	toolType: ToolType;
-	state: SessionState;
+	state: ProjectState;
 	cwd: string;
 	fullPath: string;
 	projectRoot: string; // The initial working directory (never changes, used for Claude session storage)
@@ -779,17 +567,6 @@ export interface Session {
 	bookmarked?: boolean;
 	// Pending AI command that will trigger a synopsis on completion (e.g., '/commit')
 	pendingAICommandForSynopsis?: string;
-	// Custom batch runner prompt (persisted per session)
-	batchRunnerPrompt?: string;
-	// Timestamp when the batch runner prompt was last modified
-	batchRunnerPromptModifiedAt?: number;
-	// CLI activity - present when CLI is running a playbook on this session
-	cliActivity?: {
-		playbookId: string;
-		playbookName: string;
-		startedAt: number;
-	};
-
 	// Tab management for AI mode (multi-tab Claude Code sessions)
 	// Each tab represents a separate Claude Code conversation
 	aiTabs: AITab[];
@@ -827,16 +604,6 @@ export interface Session {
 	// Used by Cmd+Shift+T to restore any recently closed tab
 	unifiedClosedTabHistory: ClosedTabEntry[];
 
-	// Auto Run panel state (file-based document runner)
-	autoRunFolderPath?: string; // Persisted folder path for Runner Docs
-	autoRunSelectedFile?: string; // Currently selected markdown filename
-	autoRunContent?: string; // Document content (per-session to prevent cross-contamination)
-	autoRunContentVersion?: number; // Incremented on external file changes to force-sync
-	autoRunMode?: 'edit' | 'preview'; // Current editing mode
-	autoRunEditScrollPos?: number; // Scroll position in edit mode
-	autoRunPreviewScrollPos?: number; // Scroll position in preview mode
-	autoRunCursorPosition?: number; // Cursor position in edit mode
-
 	// File tree auto-refresh interval in seconds (0 = disabled)
 	fileTreeAutoRefreshInterval?: number;
 
@@ -870,10 +637,6 @@ export interface Session {
 	sshRemoteId?: string; // ID of SSH remote config being used (flattened from sshRemote.id)
 	remoteCwd?: string; // Current working directory on remote host
 
-	// Inline wizard state for /wizard command
-	// Keeps per-session/per-tab wizard state for creating or iterating on Auto Run documents
-	wizardState?: SessionWizardState;
-
 	// Per-session agent configuration overrides
 	// These override the global agent-level settings for this specific session
 	customPath?: string; // Custom path to agent binary (overrides agent-level)
@@ -901,6 +664,9 @@ export interface Session {
 	// Currently active terminal tab ID (defaults to first tab)
 	activeTerminalTabId?: string;
 }
+
+/** @deprecated Use Project instead */
+export type Session = Project;
 
 export interface AgentConfigOption {
 	key: string;
@@ -1010,42 +776,6 @@ export interface CustomAICommand {
 	description: string; // Short description shown in autocomplete
 	prompt: string; // The actual prompt sent to the AI agent
 	isBuiltIn?: boolean; // If true, cannot be deleted (only edited)
-}
-
-// Spec Kit command definition (bundled from github/spec-kit)
-export interface SpecKitCommand {
-	id: string; // e.g., 'constitution'
-	command: string; // e.g., '/speckit.constitution'
-	description: string;
-	prompt: string;
-	isCustom: boolean; // true only for 'implement' (our Maestro-specific version)
-	isModified: boolean; // true if user has edited
-}
-
-// Spec Kit metadata for tracking version and refresh status
-export interface SpecKitMetadata {
-	lastRefreshed: string; // ISO date
-	commitSha: string; // Git commit SHA or version tag
-	sourceVersion: string; // Semantic version (e.g., '0.0.90')
-	sourceUrl: string; // GitHub repo URL
-}
-
-// OpenSpec command definition (bundled from Fission-AI/OpenSpec)
-export interface OpenSpecCommand {
-	id: string; // e.g., 'proposal'
-	command: string; // e.g., '/openspec.proposal'
-	description: string;
-	prompt: string;
-	isCustom: boolean; // true for 'help' and 'implement' (Maestro-specific)
-	isModified: boolean; // true if user has edited
-}
-
-// OpenSpec metadata for tracking version and refresh status
-export interface OpenSpecMetadata {
-	lastRefreshed: string; // ISO date
-	commitSha: string; // Git commit SHA or version tag
-	sourceVersion: string; // Semantic version
-	sourceUrl: string; // GitHub repo URL
 }
 
 // Encore Features - optional features that are disabled by default

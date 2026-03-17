@@ -62,12 +62,7 @@ import { checkWslEnvironment } from './utils/wslDetector';
 import { createSafeSend, isWebContentsAvailable } from './utils/safe-send';
 import { createWebServerFactory } from './web-server/web-server-factory';
 // Phase 4 refactoring - app lifecycle
-import {
-	setupGlobalErrorHandlers,
-	createCliWatcher,
-	createWindowManager,
-	createQuitHandler,
-} from './app-lifecycle';
+import { setupGlobalErrorHandlers, createWindowManager, createQuitHandler } from './app-lifecycle';
 // Phase 3 refactoring - process listeners
 import { setupProcessListeners as setupProcessListenersModule } from './process-listeners';
 
@@ -186,12 +181,6 @@ let agentDetector: AgentDetector | null = null;
 
 // Create safeSend with dependency injection (Phase 2 refactoring)
 const safeSend = createSafeSend(() => mainWindow);
-
-// Create CLI activity watcher with dependency injection (Phase 4 refactoring)
-const cliWatcher = createCliWatcher({
-	getMainWindow: () => mainWindow,
-	getUserDataPath: () => app.getPath('userData'),
-});
 
 const devServerPort = process.env.VITE_PORT ? parseInt(process.env.VITE_PORT, 10) : 5173;
 const devServerUrl = `http://localhost:${devServerPort}`;
@@ -337,9 +326,6 @@ app.whenReady().then(async () => {
 	// Note: History file watching is handled by HistoryManager.startWatching() above
 	// which uses the new per-session file format in the history/ directory
 
-	// Start CLI activity watcher (Phase 4 refactoring)
-	cliWatcher.start();
-
 	// Note: Web server is not auto-started - it starts when user enables web interface
 	// via live:startServer IPC call from the renderer
 
@@ -375,11 +361,8 @@ const quitHandler = createQuitHandler({
 	getActiveGroomingSessionCount,
 	cleanupAllGroomingSessions,
 	closeStatsDB,
-	stopCliWatcher: () => cliWatcher.stop(),
 });
 quitHandler.setup();
-
-// startCliActivityWatcher is now handled by cliWatcher (Phase 4 refactoring)
 
 function setupIpcHandlers() {
 	// Settings, sessions, and groups persistence - extracted to src/main/ipc/handlers/persistence.ts

@@ -3,7 +3,7 @@
  *
  * This module contains all broadcast methods extracted from web-server.ts.
  * It handles outgoing messages to web clients including session state changes,
- * theme updates, tab changes, and Auto Run state.
+ * theme updates, and tab changes.
  *
  * Broadcast Types:
  * - session_live/session_offline: Session live status changes
@@ -14,34 +14,15 @@
  * - tabs_changed: Tab array or active tab changes
  * - theme: Theme updates
  * - custom_commands: Custom AI commands updates
- * - autorun_state: Auto Run batch processing state
  * - user_input: User input from desktop (for web client sync)
  * - session_output: Session output data
  */
 
 import { WebSocket } from 'ws';
-import { logger } from '../../utils/logger';
-import type {
-	Theme,
-	WebClient,
-	CustomAICommand,
-	AITabData,
-	SessionBroadcastData,
-	AutoRunState,
-	CliActivity,
-} from '../types';
+import type { Theme, WebClient, CustomAICommand, AITabData, SessionBroadcastData } from '../types';
 
 // Re-export types for backwards compatibility
-export type {
-	CustomAICommand,
-	AITabData,
-	SessionBroadcastData,
-	AutoRunState,
-	CliActivity,
-} from '../types';
-
-// Logger context for broadcast service logs
-const LOG_CONTEXT = 'BroadcastService';
+export type { CustomAICommand, AITabData, SessionBroadcastData } from '../types';
 
 /**
  * Web client connection info (alias for backwards compatibility)
@@ -112,7 +93,6 @@ export class BroadcastService {
 			toolType?: string;
 			inputMode?: string;
 			cwd?: string;
-			cliActivity?: CliActivity;
 		}
 	): void {
 		this.broadcastToAll({
@@ -204,23 +184,6 @@ export class BroadcastService {
 		this.broadcastToAll({
 			type: 'custom_commands',
 			commands,
-			timestamp: Date.now(),
-		});
-	}
-
-	/**
-	 * Broadcast AutoRun state to all connected web clients
-	 * Called when batch processing starts, progresses, or stops
-	 */
-	broadcastAutoRunState(sessionId: string, state: AutoRunState | null): void {
-		logger.info(
-			`[AutoRun Broadcast] sessionId=${sessionId}, isRunning=${state?.isRunning}, tasks=${state?.completedTasks}/${state?.totalTasks}`,
-			LOG_CONTEXT
-		);
-		this.broadcastToAll({
-			type: 'autorun_state',
-			sessionId,
-			state,
 			timestamp: Date.now(),
 		});
 	}

@@ -9,7 +9,7 @@ import {
 	Globe,
 	BookOpen,
 } from 'lucide-react';
-import type { Theme, AutoRunStats, MaestroUsageStats } from '../types';
+import type { Theme, MaestroUsageStats } from '../types';
 import type { GlobalAgentStats } from '../../shared/types';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import pedramAvatar from '../assets/pedram-avatar.png';
@@ -19,20 +19,13 @@ import { Modal } from './ui/Modal';
 
 interface AboutModalProps {
 	theme: Theme;
-	autoRunStats: AutoRunStats;
 	usageStats?: MaestroUsageStats | null;
 	/** Global hands-on time in milliseconds (from settings, persists across sessions) */
 	handsOnTimeMs: number;
 	onClose: () => void;
 }
 
-export function AboutModal({
-	theme,
-	autoRunStats,
-	usageStats,
-	handsOnTimeMs,
-	onClose,
-}: AboutModalProps) {
+export function AboutModal({ theme, usageStats, handsOnTimeMs, onClose }: AboutModalProps) {
 	const [globalStats, setGlobalStats] = useState<GlobalAgentStats | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [isStatsComplete, setIsStatsComplete] = useState(false);

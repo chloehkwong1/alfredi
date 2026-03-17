@@ -13,7 +13,6 @@ import { useMemo } from 'react';
 import type {
 	Session,
 	Theme,
-	BatchRunState,
 	LogEntry,
 	UsageStats,
 	AITab,
@@ -35,7 +34,6 @@ import type {
 	MergeResult,
 } from '../../types/contextMerge';
 import type { FileNode } from '../../types/fileTree';
-import type { DocumentGenerationCallbacks } from '../../services/inlineWizardDocumentGeneration';
 
 /**
  * Dependencies for computing MainPanel props.
@@ -80,7 +78,7 @@ export interface UseMainPanelPropsDeps {
 	selectedAtMentionIndex: number;
 
 	// Batch run state (undefined matches component prop type)
-	currentSessionBatchState: BatchRunState | undefined;
+	currentSessionBatchState: undefined;
 
 	// File tree
 	fileTree: FileNode[];
@@ -267,7 +265,7 @@ export interface UseMainPanelPropsDeps {
 
 	// Wizard callbacks
 	generateInlineWizardDocuments: (
-		callbacks?: DocumentGenerationCallbacks,
+		callbacks?: any /* DocumentGenerationCallbacks removed */,
 		tabId?: string
 	) => Promise<void>;
 	retryInlineWizardMessage: () => void;

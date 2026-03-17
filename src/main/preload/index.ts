@@ -27,7 +27,7 @@ import {
 } from './system';
 import { createLoggerApi } from './logger';
 import { createClaudeApi, createAgentSessionsApi } from './sessions';
-import { createTempfileApi, createHistoryApi, createCliApi } from './files';
+import { createTempfileApi, createHistoryApi } from './files';
 import { createStatsApi } from './stats';
 import { createNotificationApi } from './notifications';
 
@@ -116,9 +116,6 @@ contextBridge.exposeInMainWorld('maestro', {
 	// History API
 	history: createHistoryApi(),
 
-	// CLI activity API
-	cli: createCliApi(),
-
 	// Notification API
 	notification: createNotificationApi(),
 
@@ -172,7 +169,6 @@ export {
 	// Files
 	createTempfileApi,
 	createHistoryApi,
-	createCliApi,
 	// Stats
 	createStatsApi,
 	// Notifications
@@ -211,7 +207,6 @@ export type {
 	WebApi,
 	WebserverApi,
 	LiveApi,
-	AutoRunState,
 	AiTabState,
 } from './web';
 export type {
@@ -245,7 +240,6 @@ export type {
 	// From files
 	TempfileApi,
 	HistoryApi,
-	CliApi,
 	HistoryEntry,
 } from './files';
 export type {

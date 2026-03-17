@@ -497,7 +497,7 @@ export const SessionItem = memo(function SessionItem({
 								switch (session.state) {
 									case 'busy':
 										return (
-											<span title={session.cliActivity ? 'CLI: Running task' : 'Agent is thinking'}>
+											<span title="Agent is thinking">
 												<Loader2
 													className={`${iconSize} animate-spin`}
 													style={{ color: theme.colors.warning }}

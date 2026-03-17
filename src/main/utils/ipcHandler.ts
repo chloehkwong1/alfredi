@@ -63,7 +63,7 @@ export type IpcCustomResponse<T extends Record<string, unknown>> =
  * Options for the IPC handler wrapper
  */
 export interface CreateHandlerOptions {
-	/** Log context prefix (e.g., '[AutoRun]') */
+	/** Log context prefix (e.g., '[Git]') */
 	context: string;
 	/** Operation name for logging (e.g., 'listDocs') */
 	operation: string;
@@ -78,8 +78,8 @@ export interface CreateHandlerOptions {
  *
  * Usage:
  * ```typescript
- * ipcMain.handle('autorun:listDocs', createHandler(
- *   { context: '[AutoRun]', operation: 'listDocs' },
+ * ipcMain.handle('git:listFiles', createHandler(
+ *   { context: '[Git]', operation: 'listFiles' },
  *   async (folderPath: string) => {
  *     const files = await scanDirectory(folderPath);
  *     return { files, tree: files }; // Returned as { success: true, files, tree }
@@ -235,8 +235,8 @@ export function withIpcErrorLogging<TArgs extends unknown[], TResult>(
  *
  * Usage:
  * ```typescript
- * ipcMain.handle('autorun:listDocs', createIpcHandler(
- *   { context: '[AutoRun]', operation: 'listDocs' },
+ * ipcMain.handle('git:listFiles', createIpcHandler(
+ *   { context: '[Git]', operation: 'listFiles' },
  *   async (folderPath: string) => {
  *     const files = await scanDirectory(folderPath);
  *     return { files, tree: files };

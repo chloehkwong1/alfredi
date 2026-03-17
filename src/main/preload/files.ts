@@ -89,20 +89,5 @@ export function createHistoryApi() {
 	};
 }
 
-/**
- * Creates the CLI activity API object for preload exposure
- */
-export function createCliApi() {
-	return {
-		getActivity: () => ipcRenderer.invoke('cli:getActivity'),
-		onActivityChange: (handler: () => void) => {
-			const wrappedHandler = () => handler();
-			ipcRenderer.on('cli:activityChange', wrappedHandler);
-			return () => ipcRenderer.removeListener('cli:activityChange', wrappedHandler);
-		},
-	};
-}
-
 export type TempfileApi = ReturnType<typeof createTempfileApi>;
 export type HistoryApi = ReturnType<typeof createHistoryApi>;
-export type CliApi = ReturnType<typeof createCliApi>;

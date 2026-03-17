@@ -148,38 +148,6 @@ export interface SessionBroadcastData {
 }
 
 // =============================================================================
-// AutoRun Types
-// =============================================================================
-
-/**
- * Auto Run state for broadcast messages.
- */
-export interface AutoRunState {
-	isRunning: boolean;
-	totalTasks: number;
-	completedTasks: number;
-	currentTaskIndex: number;
-	isStopping?: boolean;
-	/** Total number of documents in the run (multi-document progress) */
-	totalDocuments?: number;
-	/** Current document being processed (0-based, multi-document progress) */
-	currentDocumentIndex?: number;
-	/** Total tasks across all documents (multi-document progress) */
-	totalTasksAcrossAllDocs?: number;
-	/** Completed tasks across all documents (multi-document progress) */
-	completedTasksAcrossAllDocs?: number;
-}
-
-/**
- * CLI activity data for session state broadcasts.
- */
-export interface CliActivity {
-	playbookId: string;
-	playbookName: string;
-	startedAt: number;
-}
-
-// =============================================================================
 // WebSocket Client Types
 // =============================================================================
 

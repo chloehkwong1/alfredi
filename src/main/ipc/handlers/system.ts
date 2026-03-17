@@ -495,7 +495,7 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 	ipcMain.handle(
 		'logger:log',
 		async (_event, level: string, message: string, context?: string, data?: unknown) => {
-			const logLevel = level as 'debug' | 'info' | 'warn' | 'error' | 'toast' | 'autorun';
+			const logLevel = level as 'debug' | 'info' | 'warn' | 'error' | 'toast';
 			switch (logLevel) {
 				case 'debug':
 					logger.debug(message, context, data);
@@ -737,7 +737,7 @@ export function registerSystemHandlers(deps: SystemHandlerDependencies): void {
 		return powerManager.getStatus();
 	});
 
-	// Add a reason to block sleep (for renderer to signal auto-run, etc.)
+	// Add a reason to block sleep
 	ipcMain.handle('power:addReason', async (_event, reason: string) => {
 		powerManager.addBlockReason(reason);
 	});

@@ -21,18 +21,15 @@ import type {
 	ThemeColors,
 	Shortcut,
 	CustomAICommand,
-	AutoRunStats,
 	MaestroUsageStats,
 	OnboardingStats,
 	ContextManagementSettings,
-	KeyboardMasteryStats,
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../types';
 import type { OutputStyle, EffortLevel } from '../../shared/types';
 import { DEFAULT_CUSTOM_THEME_COLORS } from '../constants/themes';
 import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS } from '../constants/shortcuts';
-// keyboardMastery constants removed (gamification stripped)
 import { commitCommandPrompt } from '../../prompts';
 
 // ============================================================================
@@ -60,30 +57,11 @@ export const DEFAULT_CONTEXT_MANAGEMENT_SETTINGS: ContextManagementSettings = {
 	contextWarningRedThreshold: 90,
 };
 
-export const DEFAULT_AUTO_RUN_STATS: AutoRunStats = {
-	cumulativeTimeMs: 0,
-	longestRunMs: 0,
-	longestRunTimestamp: 0,
-	totalRuns: 0,
-	currentBadgeLevel: 0,
-	lastBadgeUnlockLevel: 0,
-	lastAcknowledgedBadgeLevel: 0,
-	badgeHistory: [],
-};
-
 export const DEFAULT_USAGE_STATS: MaestroUsageStats = {
 	maxAgents: 0,
 	maxDefinedAgents: 0,
-	maxSimultaneousAutoRuns: 0,
 	maxSimultaneousQueries: 0,
 	maxQueueDepth: 0,
-};
-
-export const DEFAULT_KEYBOARD_MASTERY_STATS: KeyboardMasteryStats = {
-	usedShortcuts: [],
-	currentLevel: 0,
-	lastLevelUpTimestamp: 0,
-	lastAcknowledgedLevel: 0,
 };
 
 export const DEFAULT_ONBOARDING_STATS: OnboardingStats = {
@@ -173,7 +151,6 @@ export interface SettingsStoreState {
 	tabShortcuts: Record<string, Shortcut>;
 	customAICommands: CustomAICommand[];
 	totalActiveTimeMs: number;
-	autoRunStats: AutoRunStats;
 	usageStats: MaestroUsageStats;
 	ungroupedCollapsed: boolean;
 	bookmarksCollapsed: boolean;
@@ -183,7 +160,6 @@ export interface SettingsStoreState {
 	webInterfaceUseCustomPort: boolean;
 	webInterfaceCustomPort: number;
 	contextManagementSettings: ContextManagementSettings;
-	keyboardMasteryStats: KeyboardMasteryStats;
 	colorBlindMode: boolean;
 	documentGraphShowExternalLinks: boolean;
 	documentGraphMaxNodes: number;
@@ -317,10 +293,6 @@ export interface SettingsStoreActions {
 	// Context management
 	setContextManagementSettings: (value: ContextManagementSettings) => void;
 	updateContextManagementSettings: (partial: Partial<ContextManagementSettings>) => void;
-
-	// Keyboard mastery
-	setKeyboardMasteryStats: (value: KeyboardMasteryStats) => void;
-	recordShortcutUsage: (shortcutId: string) => { newLevel: number | null };
 }
 
 export type SettingsStore = SettingsStoreState & SettingsStoreActions;
@@ -378,7 +350,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	tabShortcuts: TAB_SHORTCUTS,
 	customAICommands: DEFAULT_AI_COMMANDS,
 	totalActiveTimeMs: 0,
-	autoRunStats: DEFAULT_AUTO_RUN_STATS,
 	usageStats: DEFAULT_USAGE_STATS,
 	ungroupedCollapsed: false,
 	bookmarksCollapsed: false,
@@ -388,7 +359,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	webInterfaceUseCustomPort: false,
 	webInterfaceCustomPort: 8080,
 	contextManagementSettings: DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
-	keyboardMasteryStats: DEFAULT_KEYBOARD_MASTERY_STATS,
 	colorBlindMode: false,
 	documentGraphShowExternalLinks: false,
 	documentGraphMaxNodes: 50,
@@ -819,10 +789,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		const updated: MaestroUsageStats = {
 			maxAgents: Math.max(prev.maxAgents, value.maxAgents ?? 0),
 			maxDefinedAgents: Math.max(prev.maxDefinedAgents, value.maxDefinedAgents ?? 0),
-			maxSimultaneousAutoRuns: Math.max(
-				prev.maxSimultaneousAutoRuns,
-				value.maxSimultaneousAutoRuns ?? 0
-			),
 			maxSimultaneousQueries: Math.max(
 				prev.maxSimultaneousQueries,
 				value.maxSimultaneousQueries ?? 0
@@ -838,10 +804,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		const updated: MaestroUsageStats = {
 			maxAgents: Math.max(prev.maxAgents, currentValues.maxAgents ?? 0),
 			maxDefinedAgents: Math.max(prev.maxDefinedAgents, currentValues.maxDefinedAgents ?? 0),
-			maxSimultaneousAutoRuns: Math.max(
-				prev.maxSimultaneousAutoRuns,
-				currentValues.maxSimultaneousAutoRuns ?? 0
-			),
 			maxSimultaneousQueries: Math.max(
 				prev.maxSimultaneousQueries,
 				currentValues.maxSimultaneousQueries ?? 0
@@ -852,7 +814,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 		if (
 			updated.maxAgents !== prev.maxAgents ||
 			updated.maxDefinedAgents !== prev.maxDefinedAgents ||
-			updated.maxSimultaneousAutoRuns !== prev.maxSimultaneousAutoRuns ||
 			updated.maxSimultaneousQueries !== prev.maxSimultaneousQueries ||
 			updated.maxQueueDepth !== prev.maxQueueDepth
 		) {
@@ -1015,33 +976,6 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	// ============================================================================
 	// Keyboard Mastery Actions
 	// ============================================================================
-
-	setKeyboardMasteryStats: (value) => {
-		set({ keyboardMasteryStats: value });
-		window.maestro.settings.set('keyboardMasteryStats', value);
-	},
-
-	recordShortcutUsage: (shortcutId) => {
-		const currentStats = get().keyboardMasteryStats;
-
-		// Skip if already tracked
-		if (currentStats.usedShortcuts.includes(shortcutId)) {
-			return { newLevel: null };
-		}
-
-		// Track which shortcuts have been used (gamification/level-ups stripped)
-		const updatedShortcuts = [...currentStats.usedShortcuts, shortcutId];
-
-		const updated: KeyboardMasteryStats = {
-			...currentStats,
-			usedShortcuts: updatedShortcuts,
-		};
-
-		set({ keyboardMasteryStats: updated });
-		window.maestro.settings.set('keyboardMasteryStats', updated);
-
-		return { newLevel: null };
-	},
 }));
 
 // ============================================================================
@@ -1346,31 +1280,6 @@ export async function loadAllSettings(): Promise<void> {
 			}
 		}
 
-		if (allSettings['autoRunStats'] !== undefined) {
-			let stats = {
-				...DEFAULT_AUTO_RUN_STATS,
-				...(allSettings['autoRunStats'] as Partial<AutoRunStats>),
-			};
-
-			// One-time migration: Add 3 hours to compensate for concurrent Auto Run tallying bug
-			const concurrentAutoRunTimeMigrationApplied =
-				allSettings['concurrentAutoRunTimeMigrationApplied'];
-			if (!concurrentAutoRunTimeMigrationApplied && stats.cumulativeTimeMs > 0) {
-				const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-				stats = {
-					...stats,
-					cumulativeTimeMs: stats.cumulativeTimeMs + THREE_HOURS_MS,
-				};
-				window.maestro.settings.set('autoRunStats', stats);
-				window.maestro.settings.set('concurrentAutoRunTimeMigrationApplied', true);
-				console.log(
-					'[Settings] Applied concurrent Auto Run time migration: added 3 hours to cumulative time'
-				);
-			}
-
-			patch.autoRunStats = stats;
-		}
-
 		if (allSettings['usageStats'] !== undefined) {
 			patch.usageStats = {
 				...DEFAULT_USAGE_STATS,
@@ -1389,13 +1298,6 @@ export async function loadAllSettings(): Promise<void> {
 			patch.contextManagementSettings = {
 				...DEFAULT_CONTEXT_MANAGEMENT_SETTINGS,
 				...(allSettings['contextManagementSettings'] as Partial<ContextManagementSettings>),
-			};
-		}
-
-		if (allSettings['keyboardMasteryStats'] !== undefined) {
-			patch.keyboardMasteryStats = {
-				...DEFAULT_KEYBOARD_MASTERY_STATS,
-				...(allSettings['keyboardMasteryStats'] as Partial<KeyboardMasteryStats>),
 			};
 		}
 
@@ -1619,8 +1521,6 @@ export function getSettingsActions() {
 		setWebInterfaceCustomPort: state.setWebInterfaceCustomPort,
 		setContextManagementSettings: state.setContextManagementSettings,
 		updateContextManagementSettings: state.updateContextManagementSettings,
-		setKeyboardMasteryStats: state.setKeyboardMasteryStats,
-		recordShortcutUsage: state.recordShortcutUsage,
 		setColorBlindMode: state.setColorBlindMode,
 		setDocumentGraphShowExternalLinks: state.setDocumentGraphShowExternalLinks,
 		setDocumentGraphMaxNodes: state.setDocumentGraphMaxNodes,

@@ -10,7 +10,5 @@ export {
 	CustomAICommand,
 	AITabData,
 	SessionBroadcastData,
-	AutoRunState,
-	CliActivity,
 	GetWebClientsCallback,
 } from './broadcastService';

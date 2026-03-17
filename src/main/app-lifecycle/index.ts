@@ -1,10 +1,9 @@
 /**
  * App lifecycle module exports.
- * Provides window management, error handling, CLI watching, and quit handling.
+ * Provides window management, error handling, and quit handling.
  */
 
 export { setupGlobalErrorHandlers } from './error-handlers';
-export { createCliWatcher, type CliWatcher, type CliWatcherDependencies } from './cli-watcher';
 export {
 	createWindowManager,
 	type WindowManager,

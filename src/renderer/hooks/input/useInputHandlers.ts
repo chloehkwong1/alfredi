@@ -14,7 +14,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef, useMemo, useDeferredValue } from 'react';
-import type { Session, BatchRunState, QueuedItem, CustomAICommand, StagedFile } from '../../types';
+import type { Session, QueuedItem, CustomAICommand, StagedFile } from '../../types';
 import { useSessionStore, selectActiveSession } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -47,9 +47,8 @@ export interface UseInputHandlersDeps {
 
 	// From useBatchHandlers
 	/** Get batch state for a specific session */
-	getBatchState: (sessionId: string) => BatchRunState | null;
+	getBatchState: (sessionId: string) => any | null;
 	/** Active batch run state (prioritizes running batch session) */
-	activeBatchRunState: BatchRunState | null;
 
 	// From other hooks/App.tsx
 	/** Ref to processQueuedItem function */
@@ -142,7 +141,6 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 		dragCounterRef,
 		setIsDraggingImage,
 		getBatchState,
-		activeBatchRunState,
 		processQueuedItemRef,
 		flushBatchedUpdates,
 		handleHistoryCommand,
@@ -413,6 +411,7 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 	const { processInput, processInputRef: _hookProcessInputRef } = useInputProcessing({
 		activeSession,
 		activeSessionId,
+		activeBatchRunState: null,
 		setSessions,
 		inputValue,
 		setInputValue,
@@ -424,7 +423,6 @@ export function useInputHandlers(deps: UseInputHandlersDeps): UseInputHandlersRe
 		syncAiInputToSession,
 		sessionsRef,
 		getBatchState,
-		activeBatchRunState,
 		processQueuedItemRef,
 		flushBatchedUpdates,
 		onHistoryCommand: handleHistoryCommand,

@@ -1,49 +1,34 @@
 /**
- * Session State Management Module
- *
- * Hooks for session navigation, sorting, filtering, grouping,
- * activity tracking, and batched updates.
+ * @deprecated Import from '../project' instead.
+ * This file re-exports everything from the project hooks for backward compatibility.
  */
-
-// Navigation history (back/forward)
-export { useNavigationHistory } from './useNavigationHistory';
-export type { NavHistoryEntry } from './useNavigationHistory';
-
-// Session navigation handlers
-export { useSessionNavigation } from './useSessionNavigation';
-export type { UseSessionNavigationReturn, UseSessionNavigationDeps } from './useSessionNavigation';
-
-// Session sorting utilities
 export {
+	useNavigationHistory,
+	type NavHistoryEntry,
+	useSessionNavigation,
+	type UseSessionNavigationReturn,
+	type UseSessionNavigationDeps,
 	useSortedSessions,
 	stripLeadingEmojis,
 	compareNamesIgnoringEmojis,
-} from './useSortedSessions';
-export type { UseSortedSessionsDeps, UseSortedSessionsReturn } from './useSortedSessions';
-
-// Batched session updates for performance
-export { useBatchedSessionUpdates, DEFAULT_BATCH_FLUSH_INTERVAL } from './useBatchedSessionUpdates';
-export type { UseBatchedSessionUpdatesReturn, BatchedUpdater } from './useBatchedSessionUpdates';
-
-// Activity time tracking (per-session)
-export { useActivityTracker } from './useActivityTracker';
-export type { UseActivityTrackerReturn } from './useActivityTracker';
-
-// Global hands-on time tracking (persists to settings)
-export { useHandsOnTimeTracker } from './useHandsOnTimeTracker';
-
-// Session restoration, migration, and corruption recovery
-export { useSessionRestoration } from './useSessionRestoration';
-export type { SessionRestorationReturn } from './useSessionRestoration';
-
-// Session lifecycle operations (rename, delete, star, unread)
-export { useSessionLifecycle } from './useSessionLifecycle';
-export type { SessionLifecycleDeps, SessionLifecycleReturn } from './useSessionLifecycle';
-
-// Session CRUD (create, delete, rename, bookmark, drag-drop)
-export { useSessionCrud } from './useSessionCrud';
-export type { UseSessionCrudDeps, UseSessionCrudReturn } from './useSessionCrud';
-
-// Session cycling (Cmd+Shift+[/])
-export { useCycleSession } from './useCycleSession';
-export type { UseCycleSessionDeps, UseCycleSessionReturn } from './useCycleSession';
+	type UseSortedSessionsDeps,
+	type UseSortedSessionsReturn,
+	useBatchedSessionUpdates,
+	DEFAULT_BATCH_FLUSH_INTERVAL,
+	type UseBatchedSessionUpdatesReturn,
+	type BatchedUpdater,
+	useActivityTracker,
+	type UseActivityTrackerReturn,
+	useHandsOnTimeTracker,
+	useSessionRestoration,
+	type SessionRestorationReturn,
+	useSessionLifecycle,
+	type SessionLifecycleDeps,
+	type SessionLifecycleReturn,
+	useSessionCrud,
+	type UseSessionCrudDeps,
+	type UseSessionCrudReturn,
+	useCycleSession,
+	type UseCycleSessionDeps,
+	type UseCycleSessionReturn,
+} from '../project';

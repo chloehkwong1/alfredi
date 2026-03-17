@@ -41,15 +41,10 @@ const prepareSessionForPersistence = (session: Session): Session => {
 		return session;
 	}
 
-	// Filter out tabs with active wizard state - incomplete wizards should not persist
-	// When a wizard completes, wizardState is cleared (set to undefined) and the tab
-	// becomes a regular session that should persist.
-	const nonWizardTabs = session.aiTabs.filter((tab) => !tab.wizardState?.isActive);
-
-	// If all tabs were wizard tabs, create a fresh empty tab to avoid empty session
+	// All tabs persist (wizard filtering removed)
 	const tabsToProcess =
-		nonWizardTabs.length > 0
-			? nonWizardTabs
+		session.aiTabs.length > 0
+			? session.aiTabs
 			: [
 					{
 						id: session.aiTabs[0].id, // Keep the first tab's ID for consistency

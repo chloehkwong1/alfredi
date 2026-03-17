@@ -1,12 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type {
-	Session,
-	SessionState,
-	LogEntry,
-	QueuedItem,
-	CustomAICommand,
-	BatchRunState,
-} from '../../types';
+import type { Session, SessionState, LogEntry, QueuedItem, CustomAICommand } from '../../types';
 import { getActiveTab, extractQuickTabName } from '../../utils/tabHelpers';
 import { getStdinFlags } from '../../utils/spawnHelpers';
 import { generateId } from '../../utils/ids';
@@ -63,9 +56,9 @@ export interface UseInputProcessingDeps {
 	/** Reference to sessions array (for avoiding stale closures) */
 	sessionsRef: React.MutableRefObject<Session[]>;
 	/** Get batch state for a session */
-	getBatchState: (sessionId: string) => BatchState | null;
+	getBatchState: (sessionId: string) => any | null;
 	/** Active batch run state (may differ from session's batch state) */
-	activeBatchRunState: BatchState | null;
+	activeBatchRunState: any | null;
 	/** Ref to processQueuedItem function (defined later in component, accessed via ref to avoid stale closure) */
 	processQueuedItemRef: React.MutableRefObject<
 		((sessionId: string, item: QueuedItem) => Promise<void>) | null
@@ -87,11 +80,6 @@ export interface UseInputProcessingDeps {
 	/** Conductor profile (user's About Me from settings) */
 	conductorProfile?: string;
 }
-
-/**
- * @deprecated Use BatchRunState from '../types' directly. This alias is kept for backwards compatibility.
- */
-export type BatchState = BatchRunState;
 
 /**
  * Return type for useInputProcessing hook.
@@ -131,7 +119,7 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 		syncAiInputToSession,
 		sessionsRef,
 		getBatchState,
-		// Note: activeBatchRunState is in deps interface but not used - kept for API compatibility
+		// Note: activeis in deps interface but not used - kept for API compatibility
 		processQueuedItemRef,
 		flushBatchedUpdates,
 		onHistoryCommand,
@@ -528,32 +516,10 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			}
 
 			// Queue messages when AI is busy (only in AI mode)
-			// For read-only mode tabs: only queue if THIS TAB is busy (allows parallel execution)
-			// For write mode tabs: queue if ANY tab in session is busy (prevents conflicts)
-			// EXCEPTION: Write commands can bypass the queue and run in parallel if ALL busy tabs
-			// and ALL queued items are read-only
+			// Each tab runs independently - only queue if THIS specific tab is busy
 			{
 				const activeTab = getActiveTab(activeSession);
 				const isReadOnlyMode = activeTab?.readOnlyMode === true;
-
-				// Check if write command can bypass queue (all running/queued items are read-only)
-				const canWriteBypassQueue = (): boolean => {
-					if (isReadOnlyMode) return false; // Only applies to write commands
-					if (activeSession.state !== 'busy') return false; // Nothing to bypass
-
-					// Check all busy tabs are in read-only mode
-					const busyTabs = activeSession.aiTabs.filter((tab) => tab.state === 'busy');
-					const allBusyTabsReadOnly = busyTabs.every((tab) => tab.readOnlyMode === true);
-					if (!allBusyTabsReadOnly) return false;
-
-					// Check all queued items are from read-only tabs
-					const allQueuedReadOnly = activeSession.executionQueue.every(
-						(item) => item.readOnlyMode === true
-					);
-					if (!allQueuedReadOnly) return false;
-
-					return true;
-				};
 
 				// Check if AutoRun is active for this session
 				// AutoRun runs batch operations in isolation (doesn't set session to busy),
@@ -561,13 +527,9 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				const isAutoRunActive = getBatchState(activeSession.id)?.isRunning ?? false;
 
 				// Determine if we should queue this message
-				// Read-only tabs can run in parallel - only queue if this specific tab is busy
-				// Write mode tabs must wait for any busy tab to finish
-				// EXCEPTION: Write commands bypass queue when all running/queued items are read-only
+				// Each tab runs independently - only queue if THIS specific tab is busy
 				// ALSO: Always queue write commands when AutoRun is active (to prevent file conflicts)
-				const shouldQueue = isReadOnlyMode
-					? activeTab?.state === 'busy' // Read-only: only queue if THIS tab is busy
-					: (activeSession.state === 'busy' && !canWriteBypassQueue()) || isAutoRunActive; // Write mode: queue if busy OR AutoRun active
+				const shouldQueue = activeTab?.state === 'busy' || (!isReadOnlyMode && isAutoRunActive);
 
 				// Debug logging to diagnose queue issues
 				console.log('[processInput] Queue decision:', {
@@ -974,7 +936,6 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							console.log('[useInputProcessing] Template substitution context:', {
 								sessionId: freshSession.id,
 								sessionName: freshSession.name,
-								autoRunFolderPath: freshSession.autoRunFolderPath,
 								fullPath: freshSession.fullPath,
 								cwd: freshSession.cwd,
 								parentSessionId: freshSession.parentSessionId,

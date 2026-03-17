@@ -3,7 +3,6 @@
  *
  * This module handles IPC calls for web interface and live session operations:
  * - web:broadcastUserInput: Broadcast user input to web clients
- * - web:broadcastAutoRunState: Broadcast AutoRun state to web clients
  * - web:broadcastTabsChange: Broadcast tab changes to web clients
  * - web:broadcastSessionState: Broadcast session state changes to web clients
  * - live:toggle: Toggle live mode for a session
@@ -63,37 +62,6 @@ export function registerWebHandlers(deps: WebHandlerDependencies): void {
 			);
 			if (webServer && clientCount > 0) {
 				webServer.broadcastUserInput(sessionId, command, inputMode);
-				return true;
-			}
-			return false;
-		}
-	);
-
-	// Broadcast AutoRun state to web clients (called when batch processing state changes)
-	// Always store state even if no clients are connected, so new clients get initial state
-	ipcMain.handle(
-		'web:broadcastAutoRunState',
-		async (
-			_,
-			sessionId: string,
-			state: {
-				isRunning: boolean;
-				totalTasks: number;
-				completedTasks: number;
-				currentTaskIndex: number;
-				isStopping?: boolean;
-				// Multi-document progress fields
-				totalDocuments?: number;
-				currentDocumentIndex?: number;
-				totalTasksAcrossAllDocs?: number;
-				completedTasksAcrossAllDocs?: number;
-			} | null
-		) => {
-			const webServer = getWebServer();
-			if (webServer) {
-				// Always call broadcastAutoRunState - it stores the state for new clients
-				// and broadcasts to any currently connected clients
-				webServer.broadcastAutoRunState(sessionId, state);
 				return true;
 			}
 			return false;

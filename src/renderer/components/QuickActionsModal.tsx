@@ -7,7 +7,6 @@ import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { gitService } from '../services/git';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
 import { safeClipboardWrite } from '../utils/clipboard';
-import type { WizardStep } from './Wizard/WizardContext';
 import { useListNavigation } from '../hooks';
 import { useUIStore } from '../stores/uiStore';
 import { useFileExplorerStore } from '../stores/fileExplorerStore';
@@ -61,7 +60,7 @@ interface QuickActionsModalProps {
 	onToggleMarkdownEditMode?: () => void;
 	setUpdateCheckModalOpen?: (open: boolean) => void;
 	openWizard?: () => void;
-	wizardGoToStep?: (step: WizardStep) => void;
+	wizardGoToStep?: (step: any) => void;
 	startTour?: () => void;
 	setFuzzyFileSearchOpen?: (open: boolean) => void;
 	onEditAgent?: (session: Session) => void;

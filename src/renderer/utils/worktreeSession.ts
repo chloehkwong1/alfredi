@@ -13,11 +13,9 @@ import { generateId } from './ids';
  *
  * Two modes determined by the presence of `worktreeParentPath`:
  * - New model: sets `parentSessionId`, `worktreeBranch`, `customContextWindow`,
- *   `nudgeMessage`, `autoRunFolderPath`. Shell log says "Worktree Session Ready."
  *   `inputMode` derived from `toolType`.
  * - Legacy model: sets `worktreeParentPath` (no `parentSessionId`). Shell log says
  *   "Shell Session Ready." `inputMode` copied directly from parent. Does NOT set
- *   `customContextWindow`, `nudgeMessage`, `autoRunFolderPath`.
  */
 export interface BuildWorktreeSessionParams {
 	parentSession: Session;
@@ -114,6 +112,5 @@ export function buildWorktreeSession(params: BuildWorktreeSessionParams): Sessio
 		// New model inherits these; legacy does not
 		customContextWindow: isLegacy ? undefined : params.parentSession.customContextWindow,
 		nudgeMessage: isLegacy ? undefined : params.parentSession.nudgeMessage,
-		autoRunFolderPath: isLegacy ? undefined : params.parentSession.autoRunFolderPath,
 	} as Session;
 }

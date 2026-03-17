@@ -4,12 +4,11 @@
  * This module handles IPC calls for:
  * - Settings: get/set/getAll
  * - Sessions: getAll/setAll
- * - CLI activity: getActivity
  *
  * Extracted from main/index.ts to improve code organization.
  */
 
-import { ipcMain, app } from 'electron';
+import { ipcMain } from 'electron';
 import Store from 'electron-store';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -184,15 +183,13 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 						prevSession.state !== session.state ||
 						prevSession.inputMode !== session.inputMode ||
 						prevSession.name !== session.name ||
-						prevSession.cwd !== session.cwd ||
-						JSON.stringify(prevSession.cliActivity) !== JSON.stringify(session.cliActivity)
+						prevSession.cwd !== session.cwd
 					) {
 						webServer.broadcastSessionStateChange(session.id, session.state, {
 							name: session.name,
 							toolType: session.toolType,
 							inputMode: session.inputMode,
 							cwd: session.cwd,
-							cliActivity: session.cliActivity,
 						});
 					}
 				} else {
@@ -241,18 +238,5 @@ export function registerPersistenceHandlers(deps: PersistenceHandlerDependencies
 		}
 
 		return true;
-	});
-
-	// CLI activity (for detecting when CLI is running playbooks)
-	ipcMain.handle('cli:getActivity', async () => {
-		try {
-			const cliActivityPath = path.join(app.getPath('userData'), 'cli-activity.json');
-			const content = await fs.readFile(cliActivityPath, 'utf-8');
-			const data = JSON.parse(content);
-			return data.activities || [];
-		} catch {
-			// File doesn't exist or is invalid - return empty array
-			return [];
-		}
 	});
 }

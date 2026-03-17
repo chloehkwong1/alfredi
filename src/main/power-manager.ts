@@ -2,7 +2,7 @@
  * Power Manager - System Sleep Prevention
  *
  * Manages system sleep prevention using Electron's powerSaveBlocker API.
- * Uses reference counting to handle multiple concurrent activities (busy sessions, Auto Run).
+ * Uses reference counting to handle multiple concurrent activities.
  *
  * Platform Support:
  * - macOS: Full support via IOPMAssertionCreateWithName (like `caffeinate`)
@@ -23,7 +23,7 @@ export interface PowerStatus {
 	enabled: boolean;
 	/** Whether we are currently blocking sleep (enabled AND have active reasons) */
 	blocking: boolean;
-	/** List of active reasons for blocking (e.g., "session:abc123", "autorun:batch1") */
+	/** List of active reasons for blocking (e.g., "session:abc123") */
 	reasons: string[];
 	/** Current platform */
 	platform: 'darwin' | 'win32' | 'linux';
@@ -34,11 +34,10 @@ export interface PowerStatus {
  *
  * Sleep prevention is only active when:
  * 1. The user has enabled the feature (setEnabled(true))
- * 2. There are active reasons to block sleep (busy sessions, Auto Run)
+ * 2. There are active reasons to block sleep (busy sessions)
  *
  * Reasons follow a naming convention:
  * - "session:{sessionId}" - AI session is busy
- * - "autorun:{identifier}" - Auto Run is active
  */
 class PowerManager {
 	/** ID of the active powerSaveBlocker, or null if not blocking */

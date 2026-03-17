@@ -21,7 +21,6 @@ import type {
 	SessionState,
 	LogEntry,
 	QueuedItem,
-	BatchRunState,
 	AgentError,
 	UsageStats,
 } from '../../types';
@@ -101,7 +100,7 @@ export interface UseAgentListenersDeps {
 		| null
 	>;
 	/** Batch state lookup for Auto Run integration */
-	getBatchStateRef: React.RefObject<((sessionId: string) => BatchRunState) | null>;
+	getBatchStateRef: React.RefObject<((sessionId: string) => any) | null>;
 	/** Pause batch on error for Auto Run integration */
 	pauseBatchOnErrorRef: React.RefObject<
 		((sessionId: string, error: AgentError, docIndex: number, context?: string) => void) | null

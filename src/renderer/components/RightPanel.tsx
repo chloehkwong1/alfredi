@@ -13,7 +13,7 @@ import {
 	Plus,
 	X,
 } from 'lucide-react';
-import type { Session, Theme, RightPanelTab, BatchRunState, DiffViewTab } from '../types';
+import type { Session, Theme, RightPanelTab, DiffViewTab } from '../types';
 import type { FileTreeChanges } from '../utils/fileExplorer';
 import { FileExplorerPanel } from './FileExplorerPanel';
 import { ChangesPanel } from './ChangesPanel';
@@ -87,7 +87,7 @@ interface RightPanelProps {
 	onAutoRunOpenSetup: () => void;
 
 	// Batch processing
-	currentSessionBatchState?: BatchRunState | null;
+	currentSessionBatchState?: any | null;
 	onOpenBatchRunner?: () => void;
 	onStopBatchRun?: (sessionId?: string) => void;
 	onKillBatchRun?: (sessionId: string) => void;
@@ -938,7 +938,7 @@ function BatchRunProgress({
 	setShowKillConfirm,
 }: {
 	theme: Theme;
-	currentSessionBatchState: BatchRunState;
+	currentSessionBatchState: any;
 	setShowKillConfirm: (v: boolean) => void;
 }) {
 	// Elapsed time for Auto Run display - tracks wall clock time from startTime

@@ -92,28 +92,11 @@ describe('TEMPLATE_VARIABLES constant', () => {
 		expect(variables).toContain('{{GIT_BRANCH}}');
 		expect(variables).toContain('{{IS_GIT_REPO}}');
 	});
-
-	it('should mark Auto Run-only variables with autoRunOnly flag', () => {
-		const autoRunOnlyVars = TEMPLATE_VARIABLES.filter((v) => v.autoRunOnly);
-		const autoRunOnlyNames = autoRunOnlyVars.map((v) => v.variable);
-		expect(autoRunOnlyNames).toContain('{{AUTORUN_FOLDER}}');
-		expect(autoRunOnlyNames).toContain('{{DOCUMENT_NAME}}');
-		expect(autoRunOnlyNames).toContain('{{DOCUMENT_PATH}}');
-		expect(autoRunOnlyNames).toContain('{{LOOP_NUMBER}}');
-	});
 });
 
 describe('TEMPLATE_VARIABLES_GENERAL constant', () => {
 	it('should export an array', () => {
 		expect(Array.isArray(TEMPLATE_VARIABLES_GENERAL)).toBe(true);
-	});
-
-	it('should exclude Auto Run-only variables', () => {
-		const variables = TEMPLATE_VARIABLES_GENERAL.map((v) => v.variable);
-		expect(variables).not.toContain('{{AUTORUN_FOLDER}}');
-		expect(variables).not.toContain('{{DOCUMENT_NAME}}');
-		expect(variables).not.toContain('{{DOCUMENT_PATH}}');
-		expect(variables).not.toContain('{{LOOP_NUMBER}}');
 	});
 
 	it('should include general variables', () => {
@@ -308,33 +291,6 @@ describe('substituteTemplateVariables', () => {
 			});
 			const result = substituteTemplateVariables('CWD: {{CWD}}', context);
 			expect(result).toBe('CWD: /Users/test/workspace');
-		});
-
-		it('should replace {{AUTORUN_FOLDER}} with autoRunFolder from context', () => {
-			const context = createTestContext({
-				session: createTestSession(),
-				autoRunFolder: '/path/to/autorun/docs',
-			});
-			const result = substituteTemplateVariables('Folder: {{AUTORUN_FOLDER}}', context);
-			expect(result).toBe('Folder: /path/to/autorun/docs');
-		});
-
-		it('should replace {{AUTORUN_FOLDER}} with session.autoRunFolderPath when autoRunFolder not provided', () => {
-			const context = createTestContext({
-				session: createTestSession({ autoRunFolderPath: '/session/autorun/path' }),
-				autoRunFolder: undefined,
-			});
-			const result = substituteTemplateVariables('Folder: {{AUTORUN_FOLDER}}', context);
-			expect(result).toBe('Folder: /session/autorun/path');
-		});
-
-		it('should replace {{AUTORUN_FOLDER}} with empty string when neither available', () => {
-			const context = createTestContext({
-				session: createTestSession({ autoRunFolderPath: undefined }),
-				autoRunFolder: undefined,
-			});
-			const result = substituteTemplateVariables('Folder: {{AUTORUN_FOLDER}}', context);
-			expect(result).toBe('Folder: ');
 		});
 	});
 

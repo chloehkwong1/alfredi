@@ -96,7 +96,6 @@ function SessionListInner(props: SessionListProps) {
 	const leftSidebarWidthState = useSettingsStore((s) => s.leftSidebarWidth);
 	const webInterfaceUseCustomPort = useSettingsStore((s) => s.webInterfaceUseCustomPort);
 	const webInterfaceCustomPort = useSettingsStore((s) => s.webInterfaceCustomPort);
-	const autoRunStats = useSettingsStore((s) => s.autoRunStats);
 	const contextWarningYellowThreshold = useSettingsStore(
 		(s) => s.contextManagementSettings.contextWarningYellowThreshold
 	);
@@ -737,9 +736,7 @@ function SessionListInner(props: SessionListProps) {
 									}
 								>
 									<Radio className={`w-3 h-3 ${isLiveMode ? 'animate-pulse' : ''}`} />
-									{leftSidebarWidthState >=
-										(autoRunStats && autoRunStats.currentBadgeLevel > 0 ? 295 : 256) &&
-										(isLiveMode ? 'LIVE' : 'OFFLINE')}
+									{leftSidebarWidthState >= 256 && (isLiveMode ? 'LIVE' : 'OFFLINE')}
 								</button>
 
 								{/* LIVE Overlay with URL and QR Code */}

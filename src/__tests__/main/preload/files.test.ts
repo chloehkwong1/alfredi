@@ -23,7 +23,7 @@ vi.mock('electron', () => ({
 	},
 }));
 
-import { createTempfileApi, createHistoryApi, createCliApi } from '../../../main/preload/files';
+import { createTempfileApi, createHistoryApi } from '../../../main/preload/files';
 
 describe('Files Preload API', () => {
 	beforeEach(() => {
@@ -301,7 +301,8 @@ describe('Files Preload API', () => {
 		});
 	});
 
-	describe('createCliApi', () => {
+	// createCliApi tests removed (CLI activity feature deleted)
+	describe.skip('createCliApi (removed)', () => {
 		let api: ReturnType<typeof createCliApi>;
 
 		beforeEach(() => {

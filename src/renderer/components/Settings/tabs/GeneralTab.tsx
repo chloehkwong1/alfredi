@@ -169,8 +169,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 	const [statsClearResult, setStatsClearResult] = useState<{
 		success: boolean;
 		deletedQueryEvents: number;
-		deletedAutoRunSessions: number;
-		deletedAutoRunTasks: number;
+		deletedSessionLifecycle: number;
 		error?: string;
 	} | null>(null);
 
@@ -1169,8 +1168,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 										setStatsClearResult({
 											success: false,
 											deletedQueryEvents: 0,
-											deletedAutoRunSessions: 0,
-											deletedAutoRunTasks: 0,
+											deletedSessionLifecycle: 0,
 											error: err instanceof Error ? err.message : 'Unknown error',
 										});
 									} finally {
@@ -1208,15 +1206,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							{statsClearResult.success ? (
 								<>
 									<Check className="w-3 h-3 flex-shrink-0 mt-0.5" />
-									<span>
-										Cleared{' '}
-										{statsClearResult.deletedQueryEvents +
-											statsClearResult.deletedAutoRunSessions +
-											statsClearResult.deletedAutoRunTasks}{' '}
-										records ({statsClearResult.deletedQueryEvents} queries,{' '}
-										{statsClearResult.deletedAutoRunSessions} sessions,{' '}
-										{statsClearResult.deletedAutoRunTasks} tasks)
-									</span>
+									<span>Cleared {statsClearResult.deletedQueryEvents} records</span>
 								</>
 							) : (
 								<>

@@ -45,7 +45,6 @@ import { GitWorkflowPill } from './GitWorkflowPill';
 import { derivePrStatus } from '../utils/gitWorkflowState';
 import { AgentSessionsBrowser } from './AgentSessionsBrowser';
 import { TabBar } from './TabBar';
-import { WizardConversationView, DocumentGenerationView } from './InlineWizard';
 import { gitService } from '../services/git';
 import { remoteUrlToBrowserUrl } from '../../shared/gitUtils';
 import { useGitBranch, useGitDetail, useGitFileStatus } from '../contexts/GitStatusContext';
@@ -61,7 +60,6 @@ import { useSettingsStore } from '../stores/settingsStore';
 import type {
 	Session,
 	Theme,
-	BatchRunState,
 	CommitDiffTab,
 	DiffViewTab,
 	UnifiedTab,
@@ -183,7 +181,7 @@ interface MainPanelProps {
 	onOpenQueueBrowser?: () => void;
 
 	// Auto mode props
-	currentSessionBatchState?: BatchRunState | null; // For current session only (input highlighting)
+	currentSessionBatchState?: any | null; // For current session only (input highlighting)
 	onStopBatchRun?: (sessionId?: string) => void;
 
 	// Tab management for AI sessions
@@ -2241,8 +2239,6 @@ export const MainPanel = React.memo(
 											isAutoModeActive={isCurrentSessionAutoMode}
 											thinkingItems={thinkingItems}
 											onSessionClick={handleSessionClick}
-											autoRunState={currentSessionBatchState || undefined}
-											onStopAutoRun={() => onStopBatchRun?.(activeSession.id)}
 											onOpenQueueBrowser={onOpenQueueBrowser}
 											tabReadOnlyMode={activeTab?.readOnlyMode ?? false}
 											onToggleTabReadOnlyMode={props.onToggleTabReadOnlyMode}
@@ -2279,8 +2275,7 @@ export const MainPanel = React.memo(
 											onCancelMerge={onCancelMerge}
 											// Inline wizard mode
 											onExitWizard={onExitWizard}
-											wizardShowThinking={activeTab?.wizardState?.showWizardThinking ?? false}
-											onToggleWizardShowThinking={props.onToggleWizardShowThinking}
+											wizardShowThinking={false}
 										/>
 									</div>
 								)}
@@ -2417,106 +2412,57 @@ export const MainPanel = React.memo(
 							</div>
 						) : (
 							<>
-								{/* Logs Area - Show DocumentGenerationView while generating OR when docs exist (waiting for user to click Exit Wizard), WizardConversationView when wizard is active, otherwise show TerminalOutput */}
-								{/* Note: wizardState is per-tab (stored on activeTab), not per-session */}
-								{/* User clicks "Exit Wizard" button in DocumentGenerationView which calls onWizardComplete to convert tab to normal session */}
 								<div className="flex-1 overflow-hidden flex flex-col" data-tour="main-terminal">
-									{activeSession.inputMode === 'ai' &&
-									(activeTab?.wizardState?.isGeneratingDocs ||
-										(activeTab?.wizardState?.generatedDocuments?.length ?? 0) > 0) ? (
-										<DocumentGenerationView
-											key={`wizard-gen-${activeSession.id}-${activeSession.activeTabId}`}
-											theme={theme}
-											documents={activeTab?.wizardState?.generatedDocuments ?? []}
-											currentDocumentIndex={activeTab?.wizardState?.currentDocumentIndex ?? 0}
-											isGenerating={activeTab?.wizardState?.isGeneratingDocs ?? false}
-											streamingContent={activeTab?.wizardState?.streamingContent}
-											onComplete={props.onWizardComplete || (() => {})}
-											onDocumentSelect={props.onWizardDocumentSelect || (() => {})}
-											folderPath={
-												activeTab?.wizardState?.subfolderPath ??
-												activeTab?.wizardState?.autoRunFolderPath
-											}
-											onContentChange={props.onWizardContentChange}
-											progressMessage={activeTab?.wizardState?.progressMessage}
-											currentGeneratingIndex={activeTab?.wizardState?.currentGeneratingIndex}
-											totalDocuments={activeTab?.wizardState?.totalDocuments}
-											onCancel={props.onWizardCancelGeneration}
-											subfolderName={activeTab?.wizardState?.subfolderName}
-										/>
-									) : activeSession.inputMode === 'ai' && activeTab?.wizardState?.isActive ? (
-										<WizardConversationView
-											key={`wizard-${activeSession.id}-${activeSession.activeTabId}`}
-											theme={theme}
-											conversationHistory={activeTab.wizardState.conversationHistory}
-											isLoading={activeTab.wizardState.isWaiting ?? false}
-											agentName={activeSession.name}
-											confidence={activeTab.wizardState.confidence}
-											ready={activeTab.wizardState.ready}
-											onLetsGo={props.onWizardLetsGo}
-											error={activeTab.wizardState.error}
-											onRetry={props.onWizardRetry}
-											onClearError={props.onWizardClearError}
-											showThinking={activeTab.wizardState.showWizardThinking ?? false}
-											thinkingContent={activeTab.wizardState.thinkingContent ?? ''}
-											toolExecutions={activeTab.wizardState.toolExecutions ?? []}
-											hasStartedGenerating={
-												activeTab.wizardState.isGeneratingDocs ||
-												(activeTab.wizardState.generatedDocuments?.length ?? 0) > 0
-											}
-											setLightboxImage={setLightboxImage}
-										/>
-									) : (
-										<TerminalOutput
-											key={`${activeSession.id}-${activeSession.activeTabId}`}
-											ref={terminalOutputRef}
-											session={activeSession}
-											theme={theme}
-											fontFamily={fontFamily}
-											activeFocus={activeFocus}
-											outputSearchOpen={outputSearchOpen}
-											outputSearchQuery={outputSearchQuery}
-											setOutputSearchOpen={useUIStore.getState().setOutputSearchOpen}
-											setOutputSearchQuery={useUIStore.getState().setOutputSearchQuery}
-											setActiveFocus={useUIStore.getState().setActiveFocus}
-											setLightboxImage={setLightboxImage}
-											inputRef={inputRef}
-											logsEndRef={logsEndRef}
-											maxOutputLines={maxOutputLines}
-											onDeleteLog={props.onDeleteLog}
-											onRewindToMessage={props.onRewindToMessage}
-											onRemoveQueuedItem={onRemoveQueuedItem}
-											onInterrupt={handleInterrupt}
-											onScrollPositionChange={props.onScrollPositionChange}
-											onAtBottomChange={props.onAtBottomChange}
-											initialScrollTop={activeTab?.scrollTop}
-											markdownEditMode={chatRawTextMode}
-											setMarkdownEditMode={useSettingsStore.getState().setChatRawTextMode}
-											onReplayMessage={props.onReplayMessage}
-											onQuote={(text) => setStagedQuotes((prev) => [...prev, text])}
-											fileTree={props.fileTree}
-											cwd={
-												activeSession.cwd.startsWith(activeSession.fullPath)
-													? activeSession.cwd.slice(activeSession.fullPath.length + 1)
-													: ''
-											}
-											projectRoot={activeSession.fullPath}
-											onFileClick={props.onFileClick}
-											onShowErrorDetails={props.onShowAgentErrorModal}
-											onFileSaved={
-												props.refreshFileTree
-													? () => props.refreshFileTree?.(activeSession.id)
-													: undefined
-											}
-											autoScrollAiMode={autoScrollAiMode}
-											userMessageAlignment={userMessageAlignment}
-											onOpenInTab={props.onOpenSavedFileInTab}
-										/>
-									)}
+									{/* Terminal output area */}
+									<TerminalOutput
+										key={`${activeSession.id}-${activeSession.activeTabId}`}
+										ref={terminalOutputRef}
+										session={activeSession}
+										theme={theme}
+										fontFamily={fontFamily}
+										activeFocus={activeFocus}
+										outputSearchOpen={outputSearchOpen}
+										outputSearchQuery={outputSearchQuery}
+										setOutputSearchOpen={useUIStore.getState().setOutputSearchOpen}
+										setOutputSearchQuery={useUIStore.getState().setOutputSearchQuery}
+										setActiveFocus={useUIStore.getState().setActiveFocus}
+										setLightboxImage={setLightboxImage}
+										inputRef={inputRef}
+										logsEndRef={logsEndRef}
+										maxOutputLines={maxOutputLines}
+										onDeleteLog={props.onDeleteLog}
+										onRewindToMessage={props.onRewindToMessage}
+										onRemoveQueuedItem={onRemoveQueuedItem}
+										onInterrupt={handleInterrupt}
+										onScrollPositionChange={props.onScrollPositionChange}
+										onAtBottomChange={props.onAtBottomChange}
+										initialScrollTop={activeTab?.scrollTop}
+										markdownEditMode={chatRawTextMode}
+										setMarkdownEditMode={useSettingsStore.getState().setChatRawTextMode}
+										onReplayMessage={props.onReplayMessage}
+										onQuote={(text) => setStagedQuotes((prev) => [...prev, text])}
+										fileTree={props.fileTree}
+										cwd={
+											activeSession.cwd.startsWith(activeSession.fullPath)
+												? activeSession.cwd.slice(activeSession.fullPath.length + 1)
+												: ''
+										}
+										projectRoot={activeSession.fullPath}
+										onFileClick={props.onFileClick}
+										onShowErrorDetails={props.onShowAgentErrorModal}
+										onFileSaved={
+											props.refreshFileTree
+												? () => props.refreshFileTree?.(activeSession.id)
+												: undefined
+										}
+										autoScrollAiMode={autoScrollAiMode}
+										userMessageAlignment={userMessageAlignment}
+										onOpenInTab={props.onOpenSavedFileInTab}
+									/>
 								</div>
 
 								{/* Input Area (hidden in mobile landscape for focused reading, and during wizard doc generation) */}
-								{!isMobileLandscape && !activeTab?.wizardState?.isGeneratingDocs && (
+								{!isMobileLandscape && (
 									<div data-tour="input-area">
 										<InputArea
 											session={activeSession}
@@ -2570,8 +2516,6 @@ export const MainPanel = React.memo(
 											isAutoModeActive={isCurrentSessionAutoMode}
 											thinkingItems={thinkingItems}
 											onSessionClick={handleSessionClick}
-											autoRunState={currentSessionBatchState || undefined}
-											onStopAutoRun={() => onStopBatchRun?.(activeSession.id)}
 											onOpenQueueBrowser={onOpenQueueBrowser}
 											tabReadOnlyMode={activeTab?.readOnlyMode ?? false}
 											onToggleTabReadOnlyMode={props.onToggleTabReadOnlyMode}
@@ -2612,8 +2556,7 @@ export const MainPanel = React.memo(
 											onCancelMerge={onCancelMerge}
 											// Inline wizard mode
 											onExitWizard={onExitWizard}
-											wizardShowThinking={activeTab?.wizardState?.showWizardThinking ?? false}
-											onToggleWizardShowThinking={props.onToggleWizardShowThinking}
+											wizardShowThinking={false}
 										/>
 									</div>
 								)}

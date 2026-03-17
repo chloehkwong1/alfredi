@@ -23,7 +23,6 @@ import { useLayerStack } from '../contexts/LayerStackContext';
 import { useListNavigation } from '../hooks';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { formatTokensCompact } from '../utils/formatters';
-import { ScreenReaderAnnouncement, useAnnouncement } from './Wizard/ScreenReaderAnnouncement';
 
 /**
  * View modes for the modal
@@ -187,8 +186,9 @@ export function MergeSessionModal({
 	// Merge state
 	const [isMerging, setIsMerging] = useState(false);
 
-	// Screen reader announcements
-	const { announce, announcementProps } = useAnnouncement();
+	// Screen reader announcements (wizard feature removed — stub)
+	const announce = (_msg: string, _priority?: string) => {};
+	const announcementProps = {} as any;
 
 	// Refs
 	const inputRef = useRef<HTMLInputElement>(null);
@@ -588,7 +588,7 @@ export function MergeSessionModal({
 			onKeyDown={handleKeyDown}
 		>
 			{/* Screen reader announcements */}
-			<ScreenReaderAnnouncement {...announcementProps} />
+			{/* ScreenReaderAnnouncement removed with wizard feature */}
 
 			<div
 				className="w-[600px] rounded-xl shadow-2xl border outline-none flex flex-col animate-slide-up"

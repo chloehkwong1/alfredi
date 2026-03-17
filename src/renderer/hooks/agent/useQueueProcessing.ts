@@ -64,8 +64,6 @@ export function useQueueProcessing(deps: UseQueueProcessingDeps): UseQueueProces
 			await useAgentStore.getState().processQueuedItem(sessionId, item, {
 				conductorProfile,
 				customAICommands,
-				speckitCommands: [],
-				openspecCommands: [],
 			});
 		},
 		[conductorProfile, customAICommands]

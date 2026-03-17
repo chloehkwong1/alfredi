@@ -3,12 +3,11 @@
  *
  * Handles:
  * - Tracking which sessions are marked as "live" (visible in web interface)
- * - AutoRun state management for batch processing
  * - Providing session info for connected web clients
  */
 
 import { logger } from '../../utils/logger';
-import type { LiveSessionInfo, AutoRunState } from '../types';
+import type { LiveSessionInfo } from '../types';
 
 const LOG_CONTEXT = 'LiveSessionManager';
 
@@ -18,15 +17,11 @@ const LOG_CONTEXT = 'LiveSessionManager';
 export interface LiveSessionBroadcastCallbacks {
 	broadcastSessionLive: (sessionId: string, agentSessionId?: string) => void;
 	broadcastSessionOffline: (sessionId: string) => void;
-	broadcastAutoRunState: (sessionId: string, state: AutoRunState | null) => void;
 }
 
 export class LiveSessionManager {
 	// Live sessions - only these appear in the web interface
 	private liveSessions: Map<string, LiveSessionInfo> = new Map();
-
-	// AutoRun states per session - tracks which sessions have active batch processing
-	private autoRunStates: Map<string, AutoRunState> = new Map();
 
 	// Broadcast callbacks (set by WebServer)
 	private broadcastCallbacks: LiveSessionBroadcastCallbacks | null = null;
@@ -66,12 +61,6 @@ export class LiveSessionManager {
 				`Session ${sessionId} marked as offline (remaining: ${this.liveSessions.size})`,
 				LOG_CONTEXT
 			);
-
-			// Clean up any associated AutoRun state to prevent memory leaks
-			if (this.autoRunStates.has(sessionId)) {
-				this.autoRunStates.delete(sessionId);
-				logger.debug(`Cleaned up AutoRun state for offline session ${sessionId}`, LOG_CONTEXT);
-			}
 
 			// Broadcast to all connected clients
 			this.broadcastCallbacks?.broadcastSessionOffline(sessionId);
@@ -113,49 +102,6 @@ export class LiveSessionManager {
 		return this.liveSessions.size;
 	}
 
-	// ============ AutoRun State Management ============
-
-	/**
-	 * Update AutoRun state for a session
-	 * Also stores state locally so new clients can receive it on connect
-	 */
-	setAutoRunState(sessionId: string, state: AutoRunState | null): void {
-		// Store state locally for new clients connecting later
-		if (state && state.isRunning) {
-			this.autoRunStates.set(sessionId, state);
-			logger.info(
-				`AutoRun state stored for session ${sessionId}: tasks=${state.completedTasks}/${state.totalTasks} (total stored: ${this.autoRunStates.size})`,
-				LOG_CONTEXT
-			);
-		} else {
-			const wasStored = this.autoRunStates.has(sessionId);
-			this.autoRunStates.delete(sessionId);
-			if (wasStored) {
-				logger.info(
-					`AutoRun state removed for session ${sessionId} (total stored: ${this.autoRunStates.size})`,
-					LOG_CONTEXT
-				);
-			}
-		}
-
-		// Broadcast to all connected clients
-		this.broadcastCallbacks?.broadcastAutoRunState(sessionId, state);
-	}
-
-	/**
-	 * Get AutoRun state for a specific session
-	 */
-	getAutoRunState(sessionId: string): AutoRunState | undefined {
-		return this.autoRunStates.get(sessionId);
-	}
-
-	/**
-	 * Get all AutoRun states (for new client connections)
-	 */
-	getAutoRunStates(): Map<string, AutoRunState> {
-		return this.autoRunStates;
-	}
-
 	/**
 	 * Clear all state (called during server shutdown)
 	 */
@@ -163,15 +109,6 @@ export class LiveSessionManager {
 		// Mark all live sessions as offline
 		for (const sessionId of this.liveSessions.keys()) {
 			this.setSessionOffline(sessionId);
-		}
-
-		// Clear any remaining autoRunStates as a safety measure
-		if (this.autoRunStates.size > 0) {
-			logger.debug(
-				`Clearing ${this.autoRunStates.size} remaining AutoRun states on cleanup`,
-				LOG_CONTEXT
-			);
-			this.autoRunStates.clear();
 		}
 	}
 }

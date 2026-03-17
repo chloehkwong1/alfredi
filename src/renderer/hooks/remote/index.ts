@@ -19,13 +19,6 @@ export type { UseWebBroadcastingDeps, UseWebBroadcastingReturn } from './useWebB
 // Mobile landscape detection
 export { useMobileLandscape } from './useMobileLandscape';
 
-// CLI activity detection
-export { useCliActivityMonitoring } from './useCliActivityMonitoring';
-export type {
-	UseCliActivityMonitoringDeps,
-	UseCliActivityMonitoringReturn,
-} from './useCliActivityMonitoring';
-
 // SSH remote configuration management
 export { useSshRemotes } from './useSshRemotes';
 export type { UseSshRemotesReturn } from './useSshRemotes';

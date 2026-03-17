@@ -17,7 +17,6 @@ import type {
 	ThemeColors,
 	Shortcut,
 	CustomAICommand,
-	AutoRunStats,
 	MaestroUsageStats,
 	OnboardingStats,
 	ContextManagementSettings,
@@ -148,9 +147,6 @@ export interface UseSettingsReturn {
 	setTotalActiveTimeMs: (value: number) => void;
 	addTotalActiveTimeMs: (delta: number) => void;
 
-	// Auto-run Stats (persistent across restarts)
-	autoRunStats: AutoRunStats;
-
 	// Usage Stats (peak tracking)
 	usageStats: MaestroUsageStats;
 	setUsageStats: (value: MaestroUsageStats) => void;
@@ -198,7 +194,6 @@ export interface UseSettingsReturn {
 	updateContextManagementSettings: (partial: Partial<ContextManagementSettings>) => void;
 
 	// Shortcut tracking
-	recordShortcutUsage: (shortcutId: string) => { newLevel: number | null };
 
 	// Accessibility settings
 	colorBlindMode: boolean;

@@ -5,7 +5,7 @@
  * Hooks are organized into domain-focused modules for better discoverability.
  *
  * Module Structure:
- * - session/    - Session state and navigation
+ * - project/    - Project state and navigation
  * - batch/      - Batch processing and Auto Run
  * - agent/      - AI agent communication
  * - keyboard/   - Keyboard handling and shortcuts
@@ -18,9 +18,9 @@
  */
 
 // ============================================================================
-// Session Module - Session state and navigation
+// Project Module - Project state and navigation (formerly session/)
 // ============================================================================
-export * from './session';
+export * from './project';
 
 // ============================================================================
 // Agent Module - AI agent communication
@@ -86,11 +86,6 @@ export * from './stats';
 // Worktree Module - Worktree management handlers
 // ============================================================================
 export * from './worktree';
-
-// ============================================================================
-// Wizard Module - Wizard lifecycle and command handlers
-// ============================================================================
-export * from './wizard';
 
 // ============================================================================
 // Re-export TransferError types from component for convenience

@@ -1,1 +1,4 @@
-export { SessionList } from './SessionList';
+/**
+ * @deprecated Import from '../ProjectList' instead.
+ */
+export { SessionList } from '../ProjectList';

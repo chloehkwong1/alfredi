@@ -8,7 +8,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { LayerStackProvider } from './contexts/LayerStackContext';
 // ToastProvider removed - notification state now managed by notificationStore (Zustand)
 // ModalProvider removed - modal state now managed by modalStore (Zustand)
-import { WizardProvider } from './components/Wizard';
 import { logger } from './utils/logger';
 import './index.css';
 
@@ -88,9 +87,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 	<React.StrictMode>
 		<ErrorBoundary>
 			<LayerStackProvider>
-				<WizardProvider>
-					<MaestroConsole />
-				</WizardProvider>
+				<MaestroConsole />
 			</LayerStackProvider>
 		</ErrorBoundary>
 	</React.StrictMode>

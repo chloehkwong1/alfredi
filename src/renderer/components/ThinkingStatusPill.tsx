@@ -7,7 +7,7 @@
  */
 import { memo, useState, useEffect, useRef } from 'react';
 import { GitBranch, Check } from 'lucide-react';
-import type { Session, Theme, AITab, BatchRunState, ThinkingItem } from '../types';
+import type { Session, Theme, AITab, ThinkingItem } from '../types';
 import { formatTokensCompact } from '../utils/formatters';
 import { useSettingsStore } from '../stores/settingsStore';
 import { fontSizeToSecondary } from '../utils/fontSizeClass';
@@ -20,7 +20,7 @@ interface ThinkingStatusPillProps {
 	onSessionClick?: (sessionId: string, tabId?: string) => void;
 	namedSessions?: Record<string, string>; // Claude session ID -> custom name
 	// AutoRun state for the active session - when provided and running, shows AutoRun pill instead
-	autoRunState?: BatchRunState;
+	autoRunState?: any;
 	activeSessionId?: string;
 	// Callback to stop auto-run (shows stop button in AutoRunPill when provided)
 	onStopAutoRun?: () => void;
@@ -194,15 +194,7 @@ ThinkingItemRow.displayName = 'ThinkingItemRow';
  * Includes a stop button when onStop callback is provided.
  */
 const AutoRunPill = memo(
-	({
-		theme,
-		autoRunState,
-		onStop,
-	}: {
-		theme: Theme;
-		autoRunState: BatchRunState;
-		onStop?: () => void;
-	}) => {
+	({ theme, autoRunState, onStop }: { theme: Theme; autoRunState: any; onStop?: () => void }) => {
 		const startTime = autoRunState.startTime || Date.now();
 		const { completedTasks, totalTasks, isStopping } = autoRunState;
 

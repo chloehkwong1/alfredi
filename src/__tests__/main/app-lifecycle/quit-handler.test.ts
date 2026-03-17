@@ -85,7 +85,6 @@ describe('app-lifecycle/quit-handler', () => {
 		getActiveGroomingSessionCount: ReturnType<typeof vi.fn>;
 		cleanupAllGroomingSessions: ReturnType<typeof vi.fn>;
 		closeStatsDB: ReturnType<typeof vi.fn>;
-		stopCliWatcher: ReturnType<typeof vi.fn>;
 	};
 
 	beforeEach(() => {
@@ -119,7 +118,6 @@ describe('app-lifecycle/quit-handler', () => {
 			getActiveGroomingSessionCount: vi.fn().mockReturnValue(0),
 			cleanupAllGroomingSessions: vi.fn().mockResolvedValue(undefined),
 			closeStatsDB: vi.fn(),
-			stopCliWatcher: vi.fn(),
 		};
 	});
 
@@ -279,7 +277,6 @@ describe('app-lifecycle/quit-handler', () => {
 
 			// Should perform cleanup
 			expect(mockHistoryManager.stopWatching).toHaveBeenCalled();
-			expect(deps.stopCliWatcher).toHaveBeenCalled();
 			expect(mockProcessManager.killAll).toHaveBeenCalled();
 			expect(mockTunnelManager.stop).toHaveBeenCalled();
 			expect(mockWebServer.stop).toHaveBeenCalled();
@@ -337,24 +334,6 @@ describe('app-lifecycle/quit-handler', () => {
 			const { createQuitHandler } = await import('../../../main/app-lifecycle/quit-handler');
 
 			const quitHandler = createQuitHandler(deps as Parameters<typeof createQuitHandler>[0]);
-			quitHandler.setup();
-			quitHandler.confirmQuit();
-
-			const mockEvent = { preventDefault: vi.fn() };
-
-			// Should not throw
-			expect(() => beforeQuitHandler!(mockEvent)).not.toThrow();
-		});
-
-		it('should work without stopCliWatcher dependency', async () => {
-			const depsWithoutCliWatcher = { ...deps };
-			delete depsWithoutCliWatcher.stopCliWatcher;
-
-			const { createQuitHandler } = await import('../../../main/app-lifecycle/quit-handler');
-
-			const quitHandler = createQuitHandler(
-				depsWithoutCliWatcher as Parameters<typeof createQuitHandler>[0]
-			);
 			quitHandler.setup();
 			quitHandler.confirmQuit();
 

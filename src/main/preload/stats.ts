@@ -76,40 +76,6 @@ export function createStatsApi() {
 			}>
 		> => ipcRenderer.invoke('stats:get-stats', range, filters),
 
-		// Get Auto Run sessions within a time range
-		getAutoRunSessions: (
-			range: 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all'
-		): Promise<
-			Array<{
-				id: string;
-				sessionId: string;
-				agentType: string;
-				documentPath?: string;
-				startTime: number;
-				duration: number;
-				tasksTotal?: number;
-				tasksCompleted?: number;
-				projectPath?: string;
-			}>
-		> => ipcRenderer.invoke('stats:get-autorun-sessions', range),
-
-		// Get tasks for a specific Auto Run session
-		getAutoRunTasks: (
-			autoRunSessionId: string
-		): Promise<
-			Array<{
-				id: string;
-				autoRunSessionId: string;
-				sessionId: string;
-				agentType: string;
-				taskIndex: number;
-				taskContent?: string;
-				startTime: number;
-				duration: number;
-				success: boolean;
-			}>
-		> => ipcRenderer.invoke('stats:get-autorun-tasks', autoRunSessionId),
-
 		// Get aggregated stats for dashboard display
 		getAggregation: (
 			range: 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all'

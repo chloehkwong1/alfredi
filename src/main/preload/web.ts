@@ -10,21 +10,6 @@
 import { ipcRenderer } from 'electron';
 
 /**
- * Auto Run state for broadcasting
- */
-export interface AutoRunState {
-	isRunning: boolean;
-	totalTasks: number;
-	completedTasks: number;
-	currentTaskIndex: number;
-	isStopping?: boolean;
-	totalDocuments?: number;
-	currentDocumentIndex?: number;
-	totalTasksAcrossAllDocs?: number;
-	completedTasksAcrossAllDocs?: number;
-}
-
-/**
  * AI Tab state for broadcasting
  */
 export interface AiTabState {
@@ -47,10 +32,6 @@ export function createWebApi() {
 		// Broadcast user input to web clients (for keeping web interface in sync)
 		broadcastUserInput: (sessionId: string, command: string, inputMode: 'ai' | 'terminal') =>
 			ipcRenderer.invoke('web:broadcastUserInput', sessionId, command, inputMode),
-
-		// Broadcast AutoRun state to web clients (for showing task progress on mobile)
-		broadcastAutoRunState: (sessionId: string, state: AutoRunState | null) =>
-			ipcRenderer.invoke('web:broadcastAutoRunState', sessionId, state),
 
 		// Broadcast tab changes to web clients (for tab sync)
 		broadcastTabsChange: (sessionId: string, aiTabs: AiTabState[], activeTabId: string) =>

@@ -233,9 +233,7 @@ export function useModalHandlers(
 		window.maestro.app.cancelQuit();
 	}, []);
 
-	const handleLogViewerShortcutUsed = useCallback((shortcutId: string) => {
-		useSettingsStore.getState().recordShortcutUsage(shortcutId);
-	}, []);
+	const handleLogViewerShortcutUsed = useCallback((shortcutId: string) => {}, []);
 
 	// ====================================================================
 	// Group F: Agent Error Handlers

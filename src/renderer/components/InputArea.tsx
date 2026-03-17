@@ -14,7 +14,7 @@ import {
 	Check,
 	Gauge,
 } from 'lucide-react';
-import type { Session, Theme, BatchRunState, Shortcut, ThinkingItem, StagedFile } from '../types';
+import type { Session, Theme, Shortcut, ThinkingItem, StagedFile } from '../types';
 import type { OutputStyle, EffortLevel } from '../../shared/types';
 import { OUTPUT_STYLE_OPTIONS, EFFORT_LEVEL_OPTIONS } from '../../shared/types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
@@ -30,7 +30,6 @@ import { MergeProgressOverlay } from './MergeProgressOverlay';
 import { ExecutionQueueIndicator } from './ExecutionQueueIndicator';
 import { ContextWarningSash } from './ContextWarningSash';
 import { SummarizeProgressOverlay } from './SummarizeProgressOverlay';
-import { WizardInputPanel } from './InlineWizard';
 import { SmartReplyChips } from './SmartReplyChips';
 import { useAgentCapabilities, useScrollIntoView } from '../hooks';
 import { getProviderDisplayName } from '../utils/sessionValidation';
@@ -111,8 +110,6 @@ interface InputAreaProps {
 	thinkingItems?: ThinkingItem[];
 	namedSessions?: Record<string, string>;
 	onSessionClick?: (sessionId: string, tabId?: string) => void;
-	autoRunState?: BatchRunState;
-	onStopAutoRun?: () => void;
 	// ExecutionQueueIndicator props
 	onOpenQueueBrowser?: () => void;
 	// Read-only mode toggle (per-tab)
@@ -213,8 +210,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		thinkingItems = [],
 		namedSessions,
 		onSessionClick,
-		autoRunState,
-		onStopAutoRun,
 		onOpenQueueBrowser,
 		tabReadOnlyMode = false,
 		onToggleTabReadOnlyMode,
@@ -376,9 +371,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		[session.aiTabs, session.activeTabId]
 	);
 
-	// Get wizardState from active tab (not session level - wizard state is per-tab)
-	const wizardState = activeTab?.wizardState;
-
 	// Smart reply chips: parse the last AI log entry for actionable options
 	// Only shown when the tab is idle and the user hasn't started typing
 	const smartReplies = useMemo(() => {
@@ -518,36 +510,6 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 	}
 
 	// Show WizardInputPanel when wizard is active AND in AI mode (wizardState is per-tab)
-	// When in terminal mode, show the normal terminal input even if wizard is active
-	if (wizardState?.isActive && onExitWizard && session.inputMode === 'ai') {
-		return (
-			<WizardInputPanel
-				session={session}
-				theme={theme}
-				inputValue={inputValue}
-				setInputValue={setInputValue}
-				inputRef={inputRef}
-				handleInputKeyDown={handleInputKeyDown}
-				handlePaste={handlePaste}
-				processInput={processInput}
-				stagedImages={stagedImages}
-				setStagedImages={setStagedImages}
-				confidence={wizardState.confidence}
-				canAttachImages={canAttachImages}
-				isBusy={wizardState.isWaiting || session.state === 'busy'}
-				onExitWizard={onExitWizard}
-				enterToSend={enterToSend}
-				setEnterToSend={setEnterToSend}
-				onInputFocus={onInputFocus}
-				onInputBlur={onInputBlur}
-				showFlashNotification={showFlashNotification}
-				setLightboxImage={setLightboxImage}
-				showThinking={wizardShowThinking}
-				onToggleShowThinking={onToggleWizardShowThinking}
-			/>
-		);
-	}
-
 	return (
 		<div
 			className="relative p-4 border-t"
@@ -559,18 +521,19 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 				backgroundColor: theme.colors.bgSidebar,
 			}}
 		>
-			{/* ThinkingStatusPill - only show in AI mode when the current agent is thinking or AutoRun */}
+			{/* ThinkingStatusPill - only show in AI mode when the active tab is thinking */}
 			{session.inputMode === 'ai' &&
-				(thinkingItems.some((item) => item.session.id === session.id) ||
-					autoRunState?.isRunning) && (
+				thinkingItems.some(
+					(item) => item.session.id === session.id && item.tab?.id === session.activeTabId
+				) && (
 					<ThinkingStatusPill
-						thinkingItems={thinkingItems.filter((item) => item.session.id === session.id)}
+						thinkingItems={thinkingItems.filter(
+							(item) => item.session.id === session.id && item.tab?.id === session.activeTabId
+						)}
 						theme={theme}
 						onSessionClick={onSessionClick}
 						namedSessions={namedSessions}
-						autoRunState={autoRunState}
 						activeSessionId={session.id}
-						onStopAutoRun={onStopAutoRun}
 						onInterrupt={handleInterrupt}
 					/>
 				)}

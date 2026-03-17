@@ -29,8 +29,6 @@ export interface QuitHandlerDependencies {
 	cleanupAllGroomingSessions: (pm: ProcessManager) => Promise<void>;
 	/** Function to close the stats database */
 	closeStatsDB: () => void;
-	/** Function to stop CLI watcher (optional, may not be started yet) */
-	stopCliWatcher?: () => void;
 }
 
 /** Quit handler state */
@@ -74,7 +72,6 @@ export function createQuitHandler(deps: QuitHandlerDependencies): QuitHandler {
 		getActiveGroomingSessionCount,
 		cleanupAllGroomingSessions,
 		closeStatsDB,
-		stopCliWatcher,
 	} = deps;
 
 	const state: QuitHandlerState = {
@@ -151,11 +148,6 @@ export function createQuitHandler(deps: QuitHandlerDependencies): QuitHandler {
 
 		// Stop history manager watcher
 		getHistoryManager().stopWatching();
-
-		// Stop CLI activity watcher
-		if (stopCliWatcher) {
-			stopCliWatcher();
-		}
 
 		// Clean up active grooming sessions (context merge/transfer operations)
 		const processManager = getProcessManager();

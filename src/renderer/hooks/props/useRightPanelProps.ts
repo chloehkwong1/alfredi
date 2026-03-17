@@ -8,7 +8,7 @@
  */
 
 import { useMemo } from 'react';
-import type { Session, Theme, RightPanelTab, BatchRunState, DiffViewTab } from '../../types';
+import type { Session, Theme, RightPanelTab, DiffViewTab } from '../../types';
 import type { FileTreeChanges } from '../../utils/fileExplorer';
 
 /**
@@ -66,7 +66,7 @@ export interface UseRightPanelPropsDeps {
 	handleAutoRunOpenSetup: () => void;
 
 	// Batch processing (currentSessionBatchState is computed by useBatchHandlers, not a raw store field)
-	currentSessionBatchState: BatchRunState | undefined;
+	currentSessionBatchState: undefined;
 	handleStopBatchRun: (sessionId?: string) => void;
 	handleKillBatchRun: (sessionId: string) => void;
 	handleSkipCurrentDocument: () => void;

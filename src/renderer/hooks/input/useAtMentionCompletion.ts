@@ -52,75 +52,8 @@ const EARLY_EXIT_EXACT_MATCH_THRESHOLD = 50;
  * Uses fuzzy matching to find files in the project tree and Auto Run folder.
  */
 export function useAtMentionCompletion(session: Session | null): UseAtMentionCompletionReturn {
-	// State for Auto Run folder files (fetched asynchronously)
-	const [autoRunFiles, setAutoRunFiles] = useState<
-		{ name: string; type: 'file' | 'folder'; path: string }[]
-	>([]);
-
-	// Fetch Auto Run folder files when the path changes
-	const autoRunFolderPath = session?.autoRunFolderPath;
-	const sessionCwd = session?.cwd;
-
-	useEffect(() => {
-		// Clear if no Auto Run folder configured
-		if (!autoRunFolderPath) {
-			setAutoRunFiles([]);
-			return;
-		}
-
-		// Check if Auto Run folder is already within the project tree
-		// If so, skip fetching since those files are already in fileTree
-		if (sessionCwd && autoRunFolderPath.startsWith(sessionCwd + '/')) {
-			setAutoRunFiles([]);
-			return;
-		}
-
-		// Fetch the Auto Run folder contents
-		let cancelled = false;
-
-		const fetchAutoRunFiles = async () => {
-			try {
-				const result = await window.maestro.autorun.listDocs(autoRunFolderPath);
-				if (cancelled) return;
-
-				if (result.success && result.tree) {
-					const files: { name: string; type: 'file' | 'folder'; path: string }[] = [];
-
-					// Traverse the Auto Run tree (similar to fileTree traversal)
-					const traverse = (nodes: AutoRunTreeNode[], _currentPath = '') => {
-						for (const node of nodes) {
-							// Auto Run tree already has the path property, but we need to add .md extension for files
-							const displayPath = node.type === 'file' ? `${node.path}.md` : node.path;
-							files.push({
-								name: node.type === 'file' ? `${node.name}.md` : node.name,
-								type: node.type,
-								path: displayPath,
-							});
-							if (node.type === 'folder' && node.children) {
-								traverse(node.children, displayPath);
-							}
-						}
-					};
-
-					traverse(result.tree);
-					setAutoRunFiles(files);
-				} else {
-					setAutoRunFiles([]);
-				}
-			} catch {
-				// Silently fail - folder might not exist yet
-				if (!cancelled) {
-					setAutoRunFiles([]);
-				}
-			}
-		};
-
-		fetchAutoRunFiles();
-
-		return () => {
-			cancelled = true;
-		};
-	}, [autoRunFolderPath, sessionCwd]);
+	// Auto Run folder files (feature removed - always empty)
+	const autoRunFiles: { name: string; type: 'file' | 'folder'; path: string }[] = [];
 
 	// Build a flat list of all files/folders from the file tree
 	// PERF: Capped at MAX_FILE_TREE_ENTRIES to avoid blocking the main thread on huge repos

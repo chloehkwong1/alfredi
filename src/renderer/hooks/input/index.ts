@@ -6,12 +6,7 @@
 
 // Main input processing
 export { useInputProcessing, DEFAULT_IMAGE_ONLY_PROMPT } from './useInputProcessing';
-export type {
-	UseInputProcessingDeps,
-	UseInputProcessingReturn,
-	/** @deprecated Use BatchRunState from '../../types' directly */
-	BatchState as InputBatchState,
-} from './useInputProcessing';
+export type { UseInputProcessingDeps, UseInputProcessingReturn } from './useInputProcessing';
 
 // Input state synchronization
 export { useInputSync } from './useInputSync';

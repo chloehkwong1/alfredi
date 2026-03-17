@@ -22,7 +22,6 @@ import { notifyToast } from '../../stores/notificationStore';
 import { generateId } from '../../utils/ids';
 import { validateNewSession } from '../../utils/sessionValidation';
 import { gitService } from '../../services/git';
-import { AUTO_RUN_FOLDER_NAME } from '../../components/Wizard';
 
 // ============================================================================
 // Dependencies interface
@@ -228,7 +227,6 @@ export function useSessionCrud(deps: UseSessionCrudDeps): UseSessionCrudReturn {
 					customContextWindow,
 					customProviderPath,
 					sessionSshRemoteConfig,
-					autoRunFolderPath: `${workingDir}/${AUTO_RUN_FOLDER_NAME}`,
 				};
 
 				setSessions((prev) => [...prev, newSession]);

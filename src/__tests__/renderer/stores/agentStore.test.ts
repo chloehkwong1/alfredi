@@ -1232,8 +1232,6 @@ describe('agentStore', () => {
 		const defaultDeps: ProcessQueuedItemDeps = {
 			conductorProfile: 'Test conductor profile',
 			customAICommands: [],
-			speckitCommands: [],
-			openspecCommands: [],
 		};
 
 		function createQueuedItem(overrides: Partial<QueuedItem> = {}): QueuedItem {
@@ -1441,54 +1439,6 @@ describe('agentStore', () => {
 			expect(updated.aiTabs[0].logs).toHaveLength(1);
 			expect(updated.aiTabs[0].logs[0].source).toBe('user');
 			expect(updated.aiTabs[0].logs[0].aiCommand?.command).toBe('/commit');
-		});
-
-		it('substitutes $ARGUMENTS in command prompt', async () => {
-			const session = createMockSession({
-				id: 'session-1',
-				aiTabs: [
-					{
-						id: 'tab-1',
-						agentSessionId: 'conv-1',
-						name: null,
-						starred: false,
-						logs: [],
-						inputValue: '',
-						stagedImages: [],
-						createdAt: Date.now(),
-						state: 'idle',
-					},
-				],
-				activeTabId: 'tab-1',
-			});
-			useSessionStore.getState().setSessions([session]);
-
-			const deps: ProcessQueuedItemDeps = {
-				...defaultDeps,
-				speckitCommands: [
-					{
-						id: 'sk-1',
-						command: '/speckit.plan',
-						description: 'Plan feature',
-						prompt: 'Create a plan for: $ARGUMENTS',
-						isCustom: false,
-						isModified: false,
-					},
-				],
-			};
-
-			const item = createQueuedItem({
-				tabId: 'tab-1',
-				type: 'command',
-				command: '/speckit.plan',
-				commandArgs: 'user authentication flow',
-				text: undefined,
-			});
-
-			await useAgentStore.getState().processQueuedItem('session-1', item, deps);
-
-			const spawnCall = mockSpawn.mock.calls[0][0];
-			expect(spawnCall.prompt).toContain('Create a plan for: user authentication flow');
 		});
 
 		it('appends arguments to prompt when no $ARGUMENTS placeholder exists', async () => {

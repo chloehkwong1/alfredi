@@ -16,7 +16,6 @@
 
 import { create } from 'zustand';
 import type { Session, SettingsTab, AgentError } from '../types';
-import type { SerializableWizardState } from '../components/Wizard';
 
 // ============================================================================
 // Modal Data Types
@@ -77,7 +76,7 @@ export interface AgentSessionsModalData {
 
 /** Wizard resume modal data */
 export interface WizardResumeModalData {
-	state: SerializableWizardState;
+	state: any /* WizardState removed */;
 }
 
 /** Agent error modal data */
@@ -538,7 +537,7 @@ function _buildModalActions() {
 		// Wizard Resume Modal
 		setWizardResumeModalOpen: (open: boolean) =>
 			open ? openModal('wizardResume') : closeModal('wizardResume'),
-		setWizardResumeState: (state: SerializableWizardState | null) =>
+		setWizardResumeState: (state: any /* WizardState removed */ | null) =>
 			state ? openModal('wizardResume', { state }) : closeModal('wizardResume'),
 
 		// Agent Error Modal

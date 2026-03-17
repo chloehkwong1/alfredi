@@ -307,7 +307,7 @@ export interface PowerStatus {
 	enabled: boolean;
 	/** Whether we are currently blocking sleep (enabled AND have active reasons) */
 	blocking: boolean;
-	/** List of active reasons for blocking (e.g., "session:abc123", "autorun:batch1") */
+	/** List of active reasons for blocking (e.g., "session:abc123") */
 	reasons: string[];
 	/** Current platform */
 	platform: 'darwin' | 'win32' | 'linux';

@@ -27,7 +27,6 @@ import type {
 	Session,
 	ProjectWorktreeConfig,
 	Shortcut,
-	AutoRunStats,
 	MaestroUsageStats,
 	RightPanelTab,
 	SettingsTab,
@@ -37,7 +36,6 @@ import type {
 	ThinkingMode,
 } from '../types';
 import type { FileNode } from '../types/fileTree';
-import type { WizardStep } from './Wizard/WizardContext';
 import type { GroomingProgress, MergeResult } from '../types/contextMerge';
 
 // Info/Display Modal Components
@@ -101,7 +99,6 @@ export interface AppInfoModalsProps {
 	// About Modal
 	aboutModalOpen: boolean;
 	onCloseAboutModal: () => void;
-	autoRunStats: AutoRunStats;
 	usageStats?: MaestroUsageStats | null;
 	/** Global hands-on time in milliseconds (from settings) */
 	handsOnTimeMs: number;
@@ -137,7 +134,6 @@ export const AppInfoModals = memo(function AppInfoModals({
 	// About Modal
 	aboutModalOpen,
 	onCloseAboutModal,
-	autoRunStats,
 	usageStats,
 	handsOnTimeMs,
 	// Update Check Modal
@@ -158,7 +154,6 @@ export const AppInfoModals = memo(function AppInfoModals({
 			{aboutModalOpen && (
 				<AboutModal
 					theme={theme}
-					autoRunStats={autoRunStats}
 					usageStats={usageStats}
 					handsOnTimeMs={handsOnTimeMs}
 					onClose={onCloseAboutModal}
@@ -638,7 +633,7 @@ export interface AppUtilityModalsProps {
 	onToggleMarkdownEditMode: () => void;
 	setUpdateCheckModalOpen?: (open: boolean) => void;
 	openWizard: () => void;
-	wizardGoToStep: (step: WizardStep) => void;
+	wizardGoToStep: (step: any) => void;
 	startTour: () => void;
 	setFuzzyFileSearchOpen: (open: boolean) => void;
 	onEditAgent: (session: Session) => void;
@@ -1031,7 +1026,6 @@ export interface AppAgentModalsProps {
 	sessions: Session[];
 	activeSession: Session | null;
 
-	autoRunStats: AutoRunStats;
 	onSyncAutoRunStats?: (stats: {
 		cumulativeTimeMs: number;
 		totalRuns: number;
@@ -1083,7 +1077,6 @@ export const AppAgentModals = memo(function AppAgentModals({
 	theme,
 	sessions,
 	activeSession,
-	autoRunStats,
 	onSyncAutoRunStats,
 	// AgentErrorModal (for individual agents)
 	errorSession,
@@ -1179,7 +1172,6 @@ export interface AppModalsProps {
 	// --- AppInfoModals props ---
 	hasNoAgents: boolean;
 	onCloseAboutModal: () => void;
-	autoRunStats: AutoRunStats;
 	usageStats?: MaestroUsageStats | null;
 	/** Global hands-on time in milliseconds (from settings) */
 	handsOnTimeMs: number;
@@ -1301,7 +1293,7 @@ export interface AppModalsProps {
 	onQuickActionsToggleMarkdownEditMode: () => void;
 	setUpdateCheckModalOpenForQuickActions?: (open: boolean) => void;
 	openWizard: () => void;
-	wizardGoToStep: (step: WizardStep) => void;
+	wizardGoToStep: (step: any) => void;
 	startTour: () => void;
 	setFuzzyFileSearchOpen: (open: boolean) => void;
 	onEditAgent: (session: Session) => void;
@@ -1483,7 +1475,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		// Info modals
 		hasNoAgents,
 		onCloseAboutModal,
-		autoRunStats,
 		usageStats,
 		handsOnTimeMs,
 		onCloseUpdateCheckModal,
@@ -1657,7 +1648,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				theme={theme}
 				aboutModalOpen={aboutModalOpen}
 				onCloseAboutModal={onCloseAboutModal}
-				autoRunStats={autoRunStats}
 				usageStats={usageStats}
 				handsOnTimeMs={handsOnTimeMs}
 				updateCheckModalOpen={updateCheckModalOpen}
@@ -1841,7 +1831,6 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				theme={theme}
 				sessions={sessions}
 				activeSession={activeSession}
-				autoRunStats={autoRunStats}
 				onSyncAutoRunStats={onSyncAutoRunStats}
 				errorSession={errorSession}
 				effectiveAgentError={effectiveAgentError}

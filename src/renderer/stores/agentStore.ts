@@ -22,8 +22,6 @@ import type {
 	LogEntry,
 	QueuedItem,
 	CustomAICommand,
-	SpecKitCommand,
-	OpenSpecCommand,
 } from '../types';
 import { createTab, getActiveTab } from '../utils/tabHelpers';
 import { generateId } from '../utils/ids';
@@ -112,8 +110,6 @@ export interface AgentStoreActions {
 export interface ProcessQueuedItemDeps {
 	conductorProfile: string;
 	customAICommands: CustomAICommand[];
-	speckitCommands: SpecKitCommand[];
-	openspecCommands: OpenSpecCommand[];
 }
 
 export type AgentStore = AgentStoreState & AgentStoreActions;
@@ -344,10 +340,7 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 				});
 			} else if (item.type === 'command' && item.command) {
 				// Process a slash command - find matching command
-				const matchingCommand =
-					deps.customAICommands.find((cmd) => cmd.command === item.command) ||
-					deps.speckitCommands.find((cmd) => cmd.command === item.command) ||
-					deps.openspecCommands.find((cmd) => cmd.command === item.command);
+				const matchingCommand = deps.customAICommands.find((cmd) => cmd.command === item.command);
 
 				if (matchingCommand) {
 					let gitBranch: string | undefined;

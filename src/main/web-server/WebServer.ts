@@ -43,8 +43,6 @@ import type {
 	RateLimitConfig,
 	AITabData,
 	CustomAICommand,
-	AutoRunState,
-	CliActivity,
 	SessionBroadcastData,
 	WebClient,
 	WebClientMessage,
@@ -140,8 +138,6 @@ export class WebServer {
 				this.broadcastService.broadcastSessionLive(sessionId, agentSessionId),
 			broadcastSessionOffline: (sessionId) =>
 				this.broadcastService.broadcastSessionOffline(sessionId),
-			broadcastAutoRunState: (sessionId, state) =>
-				this.broadcastService.broadcastAutoRunState(sessionId, state),
 		});
 
 		// Initialize route handlers
@@ -400,7 +396,6 @@ export class WebServer {
 			getSessions: () => this.callbackRegistry.getSessions(),
 			getTheme: () => this.callbackRegistry.getTheme(),
 			getCustomCommands: () => this.callbackRegistry.getCustomCommands(),
-			getAutoRunStates: () => this.liveSessionManager.getAutoRunStates(),
 			getLiveSessionInfo: (sessionId) => this.liveSessionManager.getLiveSessionInfo(sessionId),
 			isSessionLive: (sessionId) => this.liveSessionManager.isSessionLive(sessionId),
 			onClientConnect: (client) => {
@@ -476,7 +471,6 @@ export class WebServer {
 			toolType?: string;
 			inputMode?: string;
 			cwd?: string;
-			cliActivity?: CliActivity;
 		}
 	): void {
 		this.broadcastService.broadcastSessionStateChange(sessionId, state, additionalData);
@@ -508,10 +502,6 @@ export class WebServer {
 
 	broadcastCustomCommands(commands: CustomAICommand[]): void {
 		this.broadcastService.broadcastCustomCommands(commands);
-	}
-
-	broadcastAutoRunState(sessionId: string, state: AutoRunState | null): void {
-		this.liveSessionManager.setAutoRunState(sessionId, state);
 	}
 
 	broadcastUserInput(sessionId: string, command: string, inputMode: 'ai' | 'terminal'): void {
@@ -571,7 +561,7 @@ export class WebServer {
 			return;
 		}
 
-		// Clear all session state (handles live sessions and autorun states)
+		// Clear all session state
 		this.liveSessionManager.clearAll();
 
 		try {

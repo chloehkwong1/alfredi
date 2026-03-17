@@ -35,10 +35,6 @@ export function createLoggerApi() {
 		toast: (title: string, data?: unknown) =>
 			ipcRenderer.invoke('logger:log', 'toast', title, 'Toast', data),
 
-		// Convenience method for Auto Run workflow logging (cannot be turned off)
-		autorun: (message: string, context?: string, data?: unknown) =>
-			ipcRenderer.invoke('logger:log', 'autorun', message, context || 'AutoRun', data),
-
 		// Subscribe to new log entries in real-time
 		onNewLog: (callback: (log: SystemLogEntry) => void) => {
 			const handler = (_: Electron.IpcRendererEvent, log: SystemLogEntry) => callback(log);

@@ -17,7 +17,6 @@ import {
 	ToolType,
 } from '../types';
 import { generateId } from './ids';
-import { getAutoRunFolderPath } from './existingDocsDetector';
 
 /**
  * Build the unified tab list from a session's tab data.
@@ -268,8 +267,8 @@ export function hasDraft(tab: AITab): boolean {
  * @param tab - The AI tab to check
  * @returns True if the tab has an active wizard that hasn't completed
  */
-export function hasActiveWizard(tab: AITab): boolean {
-	return tab.wizardState?.isActive === true;
+export function hasActiveWizard(_tab: AITab): boolean {
+	return false;
 }
 
 /**
@@ -1982,7 +1981,6 @@ export function createMergedSession(
 		unifiedTabOrder: [{ type: 'ai' as const, id: tabId }],
 		unifiedClosedTabHistory: [],
 		// Default Auto Run folder path (user can change later)
-		autoRunFolderPath: getAutoRunFolderPath(projectRoot),
 	};
 
 	return { session, tabId };

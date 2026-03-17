@@ -10,8 +10,6 @@ import { AppModals, type PRDetails, type FlatFileItem } from './components/AppMo
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { MainPanel, type MainPanelHandle } from './components/MainPanel';
 // AppOverlays stripped (celebrations/gamification removed)
-import { MaestroWizard, useWizard, WizardResumeModal } from './components/Wizard';
-import { TourOverlay } from './components/Wizard/tour';
 import { EmptyStateView } from './components/EmptyStateView';
 import { DeleteAgentConfirmModal } from './components/DeleteAgentConfirmModal';
 
@@ -51,7 +49,6 @@ import {
 	useRemoteIntegration,
 	useRemoteHandlers,
 	useWebBroadcasting,
-	useCliActivityMonitoring,
 	useMobileLandscape,
 	// UI
 	useThemeStyles,
@@ -73,8 +70,6 @@ import {
 	// Session lifecycle operations
 	useSessionLifecycle,
 	useSessionCrud,
-	// Wizard handlers
-	useWizardHandlers,
 	// Interrupt handler
 	useInterruptHandler,
 	// Tour actions (right panel control from tour overlay)
@@ -120,7 +115,6 @@ useBatchStore.getState = () => ({
 import { useSessionStore, selectActiveSession } from './stores/sessionStore';
 import { useSettingsStore } from './stores/settingsStore';
 // useAgentStore moved to useQueueProcessing hook
-import { InlineWizardProvider, useInlineWizardContext } from './contexts/InlineWizardContext';
 import { ToastContainer } from './components/Toast';
 
 // Import services
@@ -261,17 +255,15 @@ function MaestroConsoleInner() {
 	// --- NAVIGATION HISTORY (back/forward through sessions and tabs) ---
 	const { pushNavigation, navigateBack, navigateForward } = useNavigationHistory();
 
-	// --- WIZARD (onboarding wizard for new users) ---
-	const {
-		state: wizardState,
-		openWizard: openWizardModal,
-		restoreState: restoreWizardState,
-		loadResumeState: _loadResumeState,
-		clearResumeState,
-		completeWizard,
-		closeWizard: _closeWizardModal,
-		goToStep: wizardGoToStep,
-	} = useWizard();
+	// Wizard feature removed — stubs for downstream references
+	const wizardState = null as any;
+	const openWizardModal = () => {};
+	const restoreWizardState = () => {};
+	const _loadResumeState = () => {};
+	const clearResumeState = () => {};
+	const completeWizard = () => {};
+	const _closeWizardModal = () => {};
+	const wizardGoToStep = (_step: any) => {};
 
 	// --- SETTINGS (from useSettings hook) ---
 	const settings = useSettings();
@@ -305,7 +297,6 @@ function MaestroConsoleInner() {
 		tabShortcuts,
 		totalActiveTimeMs,
 		addTotalActiveTimeMs,
-		autoRunStats,
 		usageStats,
 		tourCompleted: _tourCompleted,
 		setTourCompleted,
@@ -318,7 +309,6 @@ function MaestroConsoleInner() {
 		recordTourSkip,
 		contextManagementSettings,
 		updateContextManagementSettings: _updateContextManagementSettings,
-		recordShortcutUsage,
 		colorBlindMode,
 		defaultStatsTimeRange,
 		documentGraphShowExternalLinks,
@@ -841,11 +831,6 @@ function MaestroConsoleInner() {
 		rightPanelRef,
 	});
 
-	// CLI activity monitoring hook - tracks CLI playbook runs and updates session states
-	useCliActivityMonitoring({
-		setSessions,
-	});
-
 	// Note: Quit confirmation effect moved into useBatchHandlers hook
 
 	// Theme styles hook - manages CSS variables and scrollbar fade animations
@@ -1110,49 +1095,26 @@ function MaestroConsoleInner() {
 	// Note: spawnBackgroundSynopsisRef and spawnAgentWithPromptRef are now updated in useAgentExecution hook
 
 	// Inline wizard context — hook needs the full context, App.tsx retains pass-through refs
-	const inlineWizardContext = useInlineWizardContext();
-	const {
-		clearError: clearInlineWizardError,
-		retryLastMessage: retryInlineWizardMessage,
-		generateDocuments: generateInlineWizardDocuments,
-		endWizard: endInlineWizard,
-	} = inlineWizardContext;
-
-	// --- WIZARD HANDLERS (extracted hook) ---
-	// Refs for circular deps — set after useInputHandlers/useAutoRunHandlers
+	// Wizard feature removed — stubs for downstream references
+	const clearInlineWizardError = () => {};
+	const retryInlineWizardMessage = () => {};
+	const generateInlineWizardDocuments = (() => {}) as any;
+	const endInlineWizard = () => {};
 	const handleAutoRunRefreshRef = useRef<(() => void) | null>(null);
 	const setInputValueRef = useRef<((value: string) => void) | null>(null);
-
-	const {
-		sendWizardMessageWithThinking,
-		handleHistoryCommand,
-		handleSkillsCommand,
-		handleWizardCommand,
-		handleLaunchWizardTab,
-		isWizardActiveForCurrentTab,
-		handleWizardComplete,
-		handleWizardLetsGo,
-		handleToggleWizardShowThinking,
-		handleWizardLaunchSession,
-		handleWizardResume,
-		handleWizardStartFresh,
-		handleWizardResumeClose,
-	} = useWizardHandlers({
-		inlineWizardContext,
-		wizardContext: {
-			state: wizardState,
-			completeWizard,
-			clearResumeState,
-			openWizard: openWizardModal,
-			restoreState: restoreWizardState,
-		},
-		spawnBackgroundSynopsis,
-		addHistoryEntry,
-		startBatchRun,
-		handleAutoRunRefreshRef,
-		setInputValueRef,
-		inputRef,
-	});
+	const sendWizardMessageWithThinking = (() => {}) as any;
+	const handleHistoryCommand = useCallback(async () => {}, []);
+	const handleSkillsCommand = useCallback(async () => {}, []);
+	const handleWizardCommand = (() => {}) as any;
+	const handleLaunchWizardTab = (() => {}) as any;
+	const isWizardActiveForCurrentTab = false as any;
+	const handleWizardComplete = (() => {}) as any;
+	const handleWizardLetsGo = (() => {}) as any;
+	const handleToggleWizardShowThinking = (() => {}) as any;
+	const handleWizardLaunchSession = (() => {}) as any;
+	const handleWizardResume = (() => {}) as any;
+	const handleWizardStartFresh = (() => {}) as any;
+	const handleWizardResumeClose = (() => {}) as any;
 
 	// --- INPUT HANDLERS (state, completion, processing, keyboard, paste/drop) ---
 	const {
@@ -1178,7 +1140,6 @@ function MaestroConsoleInner() {
 		dragCounterRef,
 		setIsDraggingImage,
 		getBatchState,
-		activeBatchRunState,
 		processQueuedItemRef,
 		flushBatchedUpdates: batchedUpdater.flushNow,
 		handleHistoryCommand,
@@ -1737,7 +1698,7 @@ function MaestroConsoleInner() {
 		summarizeAndContinue: handleSummarizeAndContinue,
 
 		// Shortcut usage tracking (kept for analytics, gamification stripped)
-		recordShortcutUsage,
+		recordShortcutUsage: () => ({ newLevel: null }),
 
 		// Edit agent modal
 		setEditAgentSession,
@@ -1984,7 +1945,7 @@ function MaestroConsoleInner() {
 		handleExportHtml,
 		cancelTab,
 		cancelMergeTab,
-		recordShortcutUsage,
+		recordShortcutUsage: () => ({ newLevel: null }),
 		handleSetLightboxImage,
 
 		// Document Graph (from fileExplorerStore)
@@ -2171,7 +2132,6 @@ function MaestroConsoleInner() {
 					// AppInfoModals props
 					hasNoAgents={hasNoAgents}
 					onCloseAboutModal={handleCloseAboutModal}
-					autoRunStats={autoRunStats}
 					usageStats={usageStats}
 					handsOnTimeMs={totalActiveTimeMs}
 					onCloseUpdateCheckModal={handleCloseUpdateCheckModal}
@@ -2273,7 +2233,7 @@ function MaestroConsoleInner() {
 							: false
 					}
 					onToggleRemoteControl={handleQuickActionsToggleRemoteControl}
-					autoRunSelectedDocument={activeSession?.autoRunSelectedFile ?? null}
+					autoRunSelectedDocument={null}
 					autoRunCompletedTaskCount={0}
 					onAutoRunResetTasks={handleQuickActionsAutoRunResetTasks}
 					isFilePreviewOpen={!!activeSession?.activeFileTabId}
@@ -2469,14 +2429,11 @@ function MaestroConsoleInner() {
  *
  * Wraps MaestroConsoleInner with context providers for centralized state management.
  * InputProvider - centralized input state management
- * InlineWizardProvider - inline /wizard command state management
  */
 export default function MaestroConsole() {
 	return (
-		<InlineWizardProvider>
-			<InputProvider>
-				<MaestroConsoleInner />
-			</InputProvider>
-		</InlineWizardProvider>
+		<InputProvider>
+			<MaestroConsoleInner />
+		</InputProvider>
 	);
 }

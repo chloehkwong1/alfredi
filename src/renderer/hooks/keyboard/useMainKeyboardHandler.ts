@@ -600,33 +600,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				}
 				if (ctx.isTabShortcut(e, 'toggleShowThinking')) {
 					e.preventDefault();
-					// Check if wizard is active on the current tab - toggle wizard thinking
-					const activeTab = ctx.activeSession?.aiTabs.find(
-						(t: AITab) => t.id === ctx.activeSession!.activeTabId
-					);
-					if (activeTab?.wizardState?.isActive) {
-						ctx.setSessions((prev: Session[]) =>
-							prev.map((s: Session) => {
-								if (s.id !== ctx.activeSession!.id) return s;
-								return {
-									...s,
-									aiTabs: s.aiTabs.map((tab: AITab) => {
-										if (tab.id !== s.activeTabId) return tab;
-										return {
-											...tab,
-											wizardState: {
-												...tab.wizardState!,
-												showWizardThinking: !tab.wizardState!.showWizardThinking,
-												thinkingContent: !tab.wizardState!.showWizardThinking
-													? ''
-													: tab.wizardState!.thinkingContent,
-											},
-										};
-									}),
-								};
-							})
-						);
-					} else {
+					{
 						// Cycle global thinking mode: off -> on -> sticky -> off
 						const cycleThinkingMode = (current: ThinkingMode | undefined): ThinkingMode => {
 							if (!current || current === 'off') return 'on';

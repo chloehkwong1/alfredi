@@ -25,8 +25,6 @@ export type {
 	AITabData,
 	SessionDetail,
 	CustomAICommand,
-	AutoRunState,
-	CliActivity,
 	SessionBroadcastData,
 	SessionData,
 	WebClient,

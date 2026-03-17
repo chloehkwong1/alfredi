@@ -8,17 +8,6 @@
  */
 
 export {
-	// Wizard
-	wizardSystemPrompt,
-	wizardSystemContinuationPrompt,
-	wizardDocumentGenerationPrompt,
-
-	// Inline Wizard
-	wizardInlineSystemPrompt,
-	wizardInlineIteratePrompt,
-	wizardInlineNewPrompt,
-	wizardInlineIterateGenerationPrompt,
-
 	// Input processing
 	imageOnlyDefaultPrompt,
 
