@@ -484,7 +484,7 @@ export const SessionItem = memo(function SessionItem({
 							<span title="Server running" className="ml-auto">
 								<Activity
 									className="w-3 h-3 shrink-0 animate-server-alive"
-									style={{ color: theme.colors.accent }}
+									style={{ color: theme.colors.success }}
 								/>
 							</span>
 						)}

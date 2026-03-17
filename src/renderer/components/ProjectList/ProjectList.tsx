@@ -922,23 +922,6 @@ function SessionListInner(props: SessionListProps) {
 						)}
 					</div>
 
-					{/* Project Health Card — git status summary for active worktree */}
-					{(() => {
-						const activeSession = sessions.find((s) => s.id === activeSessionId);
-						if (!activeSession?.isGitRepo) return null;
-						return (
-							<ProjectHealthCard
-								theme={theme}
-								sessionId={activeSessionId!}
-								session={activeSession}
-								isGitRepo={activeSession.isGitRepo}
-								onViewDiff={() => {
-									useUIStore.getState().setActiveRightTopTab('changes');
-								}}
-							/>
-						);
-					})()}
-
 					{/* Flexible spacer */}
 					<div className="flex-grow min-h-4" />
 				</div>
@@ -955,6 +938,24 @@ function SessionListInner(props: SessionListProps) {
 					handleContextMenu={handleContextMenu}
 				/>
 			)}
+
+			{/* Project Health Card — git status summary for active worktree */}
+			{leftSidebarOpen &&
+				(() => {
+					const activeSession = sessions.find((s) => s.id === activeSessionId);
+					if (!activeSession?.isGitRepo) return null;
+					return (
+						<ProjectHealthCard
+							theme={theme}
+							sessionId={activeSessionId!}
+							session={activeSession}
+							isGitRepo={activeSession.isGitRepo}
+							onViewDiff={() => {
+								useUIStore.getState().setActiveRightTopTab('changes');
+							}}
+						/>
+					);
+				})()}
 
 			{/* SERVER STATUS BAR — shows when active worktree has a runScript */}
 			{leftSidebarOpen &&
@@ -981,14 +982,14 @@ function SessionListInner(props: SessionListProps) {
 								{isRunning ? (
 									<Square
 										className="w-3 h-3"
-										style={{ color: theme.colors.accent }}
-										fill={theme.colors.accent}
+										style={{ color: theme.colors.success }}
+										fill={theme.colors.success}
 									/>
 								) : (
 									<Play
 										className="w-3 h-3"
-										style={{ color: theme.colors.accent }}
-										fill={theme.colors.accent}
+										style={{ color: theme.colors.success }}
+										fill={theme.colors.success}
 									/>
 								)}
 							</button>

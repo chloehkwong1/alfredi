@@ -48,6 +48,7 @@ export const SidebarActions = memo(function SidebarActions({
 	const isWorktreeProject = !!(projectHead?.worktreeConfig && !projectHead?.parentSessionId);
 
 	const [dropdownOpen, setDropdownOpen] = useState(false);
+	const [hovered, setHovered] = useState(false);
 	const splitButtonRef = useRef<HTMLDivElement>(null);
 
 	// Dismiss dropdown on click outside or Escape
@@ -129,13 +130,30 @@ export const SidebarActions = memo(function SidebarActions({
 							/>
 						)}
 					</button>
-					<div className="flex-1 flex relative" ref={splitButtonRef}>
+					<div
+						className="flex-1 flex relative"
+						ref={splitButtonRef}
+						onMouseEnter={() => setHovered(true)}
+						onMouseLeave={() => setHovered(false)}
+					>
 						{/* Main action button */}
 						<button
 							type="button"
 							onClick={handlePrimaryAction}
-							className="flex-1 flex items-center justify-center gap-2 py-2 rounded-l text-xs font-bold transition-colors hover:opacity-90"
-							style={{ backgroundColor: theme.colors.accent, color: theme.colors.accentForeground }}
+							className="flex-1 flex items-center justify-center gap-2 py-2 rounded-l text-xs font-bold transition-all"
+							style={
+								hovered
+									? {
+											backgroundColor: theme.colors.accent,
+											color: theme.colors.accentForeground,
+											border: `1px solid ${theme.colors.accent}`,
+										}
+									: {
+											backgroundColor: 'transparent',
+											color: theme.colors.accent,
+											border: `1px solid ${theme.colors.accent}60`,
+										}
+							}
 						>
 							{isWorktreeProject ? (
 								<>
@@ -152,12 +170,22 @@ export const SidebarActions = memo(function SidebarActions({
 						<button
 							type="button"
 							onClick={() => setDropdownOpen(!dropdownOpen)}
-							className="flex items-center justify-center px-1.5 rounded-r text-xs transition-colors hover:opacity-80"
-							style={{
-								backgroundColor: theme.colors.accent,
-								color: theme.colors.accentForeground,
-								borderLeft: `1px solid ${theme.colors.accentForeground}33`,
-							}}
+							className="flex items-center justify-center px-1.5 rounded-r text-xs transition-all"
+							style={
+								hovered
+									? {
+											backgroundColor: theme.colors.accent,
+											color: theme.colors.accentForeground,
+											border: `1px solid ${theme.colors.accent}`,
+											borderLeft: `1px solid ${theme.colors.accentForeground}40`,
+										}
+									: {
+											backgroundColor: 'transparent',
+											color: theme.colors.accent,
+											border: `1px solid ${theme.colors.accent}60`,
+											borderLeft: `1px solid ${theme.colors.accent}40`,
+										}
+							}
 						>
 							<ChevronDown className="w-3 h-3" />
 						</button>

@@ -620,6 +620,7 @@ function SessionListInner(props: SessionListProps) {
 											return (
 												<div
 													key={`kanban-${session.id}-${status}`}
+													className="group"
 													onDragOver={(e) => handleKanbanDragOver(e, status)}
 													onDragLeave={handleKanbanDragLeave}
 													onDrop={(e) => handleKanbanDrop(e, status)}
@@ -636,22 +637,22 @@ function SessionListInner(props: SessionListProps) {
 															e.stopPropagation();
 															toggleKanbanSection(session.id, status);
 														}}
-														className={`w-full flex items-center gap-1.5 px-3 py-0.5 ${fontSizeToSecondary(fontSize)} font-medium tracking-normal hover:opacity-80 transition-opacity cursor-pointer`}
-														style={{ color: theme.colors.textDim }}
+														className={`w-full flex items-center gap-1.5 px-3 pt-3 pb-0.5 text-[9px] uppercase tracking-widest font-semibold hover:opacity-80 transition-opacity cursor-pointer`}
+														style={{ color: theme.colors.textDim, opacity: 0.45 }}
 														title={`${label} - click to ${collapsed ? 'expand' : 'collapse'}`}
 													>
 														{collapsed ? (
-															<ChevronRight className="w-2.5 h-2.5" />
+															<span className="opacity-0 group-hover:opacity-60 transition-opacity">
+																<ChevronRight className="w-2.5 h-2.5" />
+															</span>
 														) : (
-															<ChevronDown className="w-2.5 h-2.5" />
+															<span className="opacity-0 group-hover:opacity-60 transition-opacity">
+																<ChevronDown className="w-2.5 h-2.5" />
+															</span>
 														)}
-														<span
-															className="w-2 h-2 rounded-full shrink-0"
-															style={{ backgroundColor: color }}
-														/>
 														<span>{label}</span>
 														{statusChildren.length > 0 && (
-															<span style={{ opacity: 0.5 }}>({statusChildren.length})</span>
+															<span style={{ opacity: 0.4 }}>{statusChildren.length}</span>
 														)}
 													</button>
 													{!collapsed && statusChildren.length > 0 && (
@@ -1169,6 +1170,24 @@ function SessionListInner(props: SessionListProps) {
 					handleContextMenu={handleContextMenu}
 				/>
 			)}
+
+			{/* Project Health Card — git status summary for active worktree */}
+			{leftSidebarOpen &&
+				(() => {
+					const activeSession = sessions.find((s) => s.id === activeSessionId);
+					if (!activeSession?.isGitRepo) return null;
+					return (
+						<ProjectHealthCard
+							theme={theme}
+							sessionId={activeSessionId!}
+							session={activeSession}
+							isGitRepo={activeSession.isGitRepo}
+							onViewDiff={() => {
+								useUIStore.getState().setActiveRightTopTab('changes');
+							}}
+						/>
+					);
+				})()}
 
 			{/* SERVER STATUS BAR — shows when active worktree has a runScript */}
 			{leftSidebarOpen &&

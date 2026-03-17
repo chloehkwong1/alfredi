@@ -45,7 +45,8 @@
 		"test:e2e:headed": "npm run build:main && npm run build:renderer && playwright test --headed",
 		"test:integration": "vitest run --config vitest.integration.config.ts",
 		"test:integration:watch": "vitest --config vitest.integration.config.ts",
-		"test:performance": "vitest run --config vitest.performance.config.mts"
+		"test:performance": "vitest run --config vitest.performance.config.mts",
+		"design-review": "node scripts/design-review.mjs"
 	},
 	"build": {
 		"npmRebuild": false,
