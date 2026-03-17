@@ -181,12 +181,19 @@ function TerminalTabInstance({
 		setTermDims({ cols, rows });
 	}, []);
 
-	// Bridge XTerminal imperative handle to the hook's terminalRef
+	// Bridge XTerminal imperative handle to the hook's terminalRef.
+	// Expose write + dimensions so the hook can sync PTY size after spawn.
 	React.useEffect(() => {
 		if (xtermRef.current) {
 			const handle = xtermRef.current;
 			persistentTerminal.terminalRef.current = {
 				write: (data: string) => handle.write(data),
+				get cols() {
+					return handle.cols;
+				},
+				get rows() {
+					return handle.rows;
+				},
 			} as any;
 		}
 		return () => {
@@ -322,6 +329,7 @@ export const RightPanel = memo(
 		const showHiddenFiles = useSettingsStore((s) => s.showHiddenFiles);
 		const fontFamily = useSettingsStore((s) => s.fontFamily);
 		const fontSize = useSettingsStore((s) => s.fontSize);
+		const terminalFontSize = useSettingsStore((s) => s.terminalFontSize);
 		const setRightPanelWidth = useSettingsStore((s) => s.setRightPanelWidth);
 		const setRightPanelSplitRatio = useSettingsStore((s) => s.setRightPanelSplitRatio);
 		const setShowHiddenFiles = useSettingsStore((s) => s.setShowHiddenFiles);
@@ -863,7 +871,7 @@ export const RightPanel = memo(
 											serverProcessId={tab.serverProcessId}
 											visible={tab.id === activeTerminalTabId}
 											fontFamily={fontFamily}
-											fontSize={fontSize}
+											fontSize={terminalFontSize}
 											themeColors={theme.colors}
 										/>
 									);
@@ -877,7 +885,7 @@ export const RightPanel = memo(
 										enabled={rightPanelOpen}
 										visible={tab.id === activeTerminalTabId}
 										fontFamily={fontFamily}
-										fontSize={fontSize}
+										fontSize={terminalFontSize}
 										themeColors={theme.colors}
 										onReady={handleTabReady}
 									/>

@@ -357,15 +357,6 @@ export const SessionItem = memo(function SessionItem({
 							>
 								{session.name}
 							</span>
-							{/* Server running indicator (activity wave) */}
-							{session.worktreeServerProcessId && (
-								<span title="Server running">
-									<Activity
-										className="w-3 h-3 shrink-0 animate-server-alive"
-										style={{ color: theme.colors.success }}
-									/>
-								</span>
-							)}
 						</div>
 
 						{/* PR chip for worktree children */}
@@ -478,8 +469,18 @@ export const SessionItem = memo(function SessionItem({
 								</button>
 							))}
 
+						{/* Server running indicator */}
+						{session.worktreeServerProcessId && (
+							<span title="Server running" className="ml-auto">
+								<Activity
+									className="w-3 h-3 shrink-0 animate-server-alive"
+									style={{ color: theme.colors.accent }}
+								/>
+							</span>
+						)}
+
 						{/* AI Status Indicator - ml-auto ensures it aligns to right edge */}
-						<div className="ml-auto">
+						<div className={session.worktreeServerProcessId ? '' : 'ml-auto'}>
 							{(() => {
 								const noSession =
 									session.toolType === 'claude-code' && !session.agentSessionId && !isInBatch;

@@ -27,6 +27,9 @@ export interface XTerminalHandle {
 	write(data: string): void;
 	/** Force a re-fit to the container dimensions */
 	fit(): void;
+	/** Current terminal dimensions (cols × rows) */
+	cols: number;
+	rows: number;
 }
 
 const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
@@ -104,7 +107,7 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 			}
 		}, [searchQuery]);
 
-		// Expose write/fit to parent via ref
+		// Expose write/fit/dimensions to parent via ref
 		useImperativeHandle(
 			ref,
 			() => ({
@@ -113,6 +116,12 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 				},
 				fit() {
 					fitAddonRef.current?.fit();
+				},
+				get cols() {
+					return terminalRef.current?.cols ?? 80;
+				},
+				get rows() {
+					return terminalRef.current?.rows ?? 24;
 				},
 			}),
 			[]
@@ -196,20 +205,37 @@ const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(
 				}
 			});
 
+			// Track whether the container was hidden (display: none → 0×0) so we
+			// can force a full re-render when it becomes visible again. Without
+			// this, xterm.js's renderer can show garbled output, invisible typing,
+			// or raw escape codes after a tab switch.
+			let wasHidden = !container.clientWidth || !container.clientHeight;
+
 			// Auto-fit when the container resizes
 			const resizeObserver = new ResizeObserver(() => {
 				// debounce via rAF to avoid excessive fitting
 				requestAnimationFrame(() => {
-					// Skip fitting when the container is hidden (display: none)
-					// — dimensions are 0×0 and fitting would resize the PTY to
-					// a tiny size, causing line-wrapping corruption.
-					if (!container.clientWidth || !container.clientHeight) return;
+					const isHidden = !container.clientWidth || !container.clientHeight;
+
+					if (isHidden) {
+						wasHidden = true;
+						return;
+					}
+
 					try {
 						if (!opened) {
 							terminal.open(container);
 							opened = true;
 						}
 						fitAddon.fit();
+
+						// Force a full re-render when transitioning from hidden → visible.
+						// xterm.js's renderer gets stale when the container has display: none;
+						// fit() alone doesn't fix it if the dimensions haven't changed.
+						if (wasHidden) {
+							wasHidden = false;
+							terminal.refresh(0, terminal.rows - 1);
+						}
 					} catch {
 						// Terminal renderer may not be ready yet
 					}

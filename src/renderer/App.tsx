@@ -2046,6 +2046,7 @@ function MaestroConsoleInner() {
 		handleOpenWorktreeConfigSession,
 		handleDeleteWorktreeSession,
 		handleRunWorktreeScript,
+		handleToggleWorktreeServer,
 		handleToggleWorktreeExpanded,
 	});
 

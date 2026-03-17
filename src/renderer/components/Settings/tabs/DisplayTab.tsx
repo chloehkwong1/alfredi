@@ -25,6 +25,8 @@ export function DisplayTab({ theme }: DisplayTabProps) {
 		setFontFamily,
 		fontSize,
 		setFontSize,
+		terminalFontSize,
+		setTerminalFontSize,
 		terminalWidth,
 		setTerminalWidth,
 		maxLogBuffer,
@@ -127,6 +129,24 @@ export function DisplayTab({ theme }: DisplayTabProps) {
 				/>
 				<p className="text-xs opacity-50 mt-2">
 					Adjusts text size in AI terminal output and the left sidebar.
+				</p>
+			</div>
+
+			{/* Terminal Font Size */}
+			<div>
+				<div className="block text-xs font-bold opacity-70 uppercase mb-2">Terminal Font Size</div>
+				<ToggleButtonGroup
+					options={[
+						{ value: 14, label: 'Small' },
+						{ value: 16, label: 'Medium' },
+						{ value: 18, label: 'Large' },
+					]}
+					value={terminalFontSize}
+					onChange={setTerminalFontSize}
+					theme={theme}
+				/>
+				<p className="text-xs opacity-50 mt-2">
+					Independent font size for the command terminal in the right panel.
 				</p>
 			</div>
 

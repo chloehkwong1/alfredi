@@ -45,6 +45,7 @@ export interface UseSessionListPropsDeps {
 	handleOpenWorktreeConfigSession: (session: Session) => void;
 	handleDeleteWorktreeSession: (session: Session) => void;
 	handleRunWorktreeScript: (session: Session) => Promise<void>;
+	handleToggleWorktreeServer: (session: Session) => void;
 	handleToggleWorktreeExpanded: (sessionId: string) => void;
 }
 
@@ -87,6 +88,7 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			onOpenWorktreeConfig: deps.handleOpenWorktreeConfigSession,
 			onDeleteWorktree: deps.handleDeleteWorktreeSession,
 			onRunWorktreeScript: deps.handleRunWorktreeScript,
+			onToggleWorktreeServer: deps.handleToggleWorktreeServer,
 		}),
 		[
 			deps.theme,
@@ -113,6 +115,7 @@ export function useSessionListProps(deps: UseSessionListPropsDeps) {
 			deps.handleOpenWorktreeConfigSession,
 			deps.handleDeleteWorktreeSession,
 			deps.handleRunWorktreeScript,
+			deps.handleToggleWorktreeServer,
 			deps.handleToggleWorktreeExpanded,
 		]
 	);

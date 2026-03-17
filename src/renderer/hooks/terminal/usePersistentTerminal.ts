@@ -125,6 +125,17 @@ export function usePersistentTerminal(
 
 			if (!unmountedRef.current) {
 				setIsReady(true);
+
+				// Sync PTY dimensions with the actual terminal size.
+				// A resize event may have been missed between onInitialFit and
+				// spawn completion (e.g., the panel was resized during the async
+				// spawn IPC). This ensures the PTY always matches the terminal.
+				if (terminalRef.current) {
+					const term = terminalRef.current as { cols?: number; rows?: number };
+					if (term.cols && term.rows) {
+						window.maestro.process.resize(processId, term.cols, term.rows);
+					}
+				}
 			}
 		} catch (error) {
 			console.error('[usePersistentTerminal] Failed to spawn shell:', error);

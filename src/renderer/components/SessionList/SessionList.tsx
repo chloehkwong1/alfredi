@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo, memo, useCallback } from 'react';
-import { ChevronRight, ChevronDown, Radio, GitBranch, Menu, Bookmark } from 'lucide-react';
+import {
+	ChevronRight,
+	ChevronDown,
+	Radio,
+	GitBranch,
+	Menu,
+	Bookmark,
+	Play,
+	Square,
+	Activity,
+} from 'lucide-react';
 import alfrediLogo from '../../assets/alfredi-logo.png';
 import type { Session, Theme } from '../../types';
 import type { WorktreeStatus } from '../../../shared/types';
@@ -67,6 +77,7 @@ interface SessionListProps {
 	onOpenWorktreeConfig?: (session: Session) => void;
 	onDeleteWorktree?: (session: Session) => void;
 	onRunWorktreeScript?: (session: Session) => void;
+	onToggleWorktreeServer?: (session: Session) => void;
 }
 
 function SessionListInner(props: SessionListProps) {
@@ -136,6 +147,7 @@ function SessionListInner(props: SessionListProps) {
 		onOpenWorktreeConfig,
 		onDeleteWorktree,
 		onRunWorktreeScript,
+		onToggleWorktreeServer,
 		showSessionJumpNumbers = false,
 		visibleSessions = [],
 		sidebarContainerRef,
@@ -237,6 +249,10 @@ function SessionListInner(props: SessionListProps) {
 			e.stopPropagation();
 			const sessionId = draggingSessionId;
 			useUIStore.getState().setDraggingWorktreeTargetStatus(null);
+			// Clear dragging state immediately — the source element may unmount
+			// before dragend fires (it moves to a different DOM section), which
+			// would leave the item stuck at opacity-50.
+			handleDragEnd();
 			if (!sessionId) return;
 
 			setSessions((prev) =>
@@ -258,7 +274,7 @@ function SessionListInner(props: SessionListProps) {
 				})
 			);
 		},
-		[draggingSessionId, setSessions]
+		[draggingSessionId, setSessions, handleDragEnd]
 	);
 
 	// Toggle bookmark for a session - memoized to prevent SessionItem re-renders
@@ -924,6 +940,59 @@ function SessionListInner(props: SessionListProps) {
 					handleContextMenu={handleContextMenu}
 				/>
 			)}
+
+			{/* SERVER STATUS BAR — shows when active worktree has a runScript */}
+			{leftSidebarOpen &&
+				(() => {
+					const active = sessions.find((s) => s.id === activeSessionId);
+					if (!active?.parentSessionId) return null;
+					const parent = sessions.find((s) => s.id === active.parentSessionId);
+					const hasRunScript = !!(
+						parent?.worktreeConfig?.runScript || active.worktreeConfig?.runScript
+					);
+					if (!hasRunScript || !onToggleWorktreeServer) return null;
+					const isRunning = !!active.worktreeServerProcessId;
+					return (
+						<div
+							className="px-3 py-2 border-t flex items-center gap-2"
+							style={{ borderColor: theme.colors.border }}
+						>
+							<button
+								type="button"
+								onClick={() => onToggleWorktreeServer(active)}
+								className="w-6 h-6 rounded flex items-center justify-center hover:bg-white/5 transition-colors shrink-0"
+								title={isRunning ? 'Stop server' : 'Start server'}
+							>
+								{isRunning ? (
+									<Square
+										className="w-3 h-3"
+										style={{ color: theme.colors.accent }}
+										fill={theme.colors.accent}
+									/>
+								) : (
+									<Play
+										className="w-3 h-3"
+										style={{ color: theme.colors.accent }}
+										fill={theme.colors.accent}
+									/>
+								)}
+							</button>
+							<span className="text-xs font-medium" style={{ color: theme.colors.textMain }}>
+								Server
+							</span>
+							<span
+								className="ml-auto flex items-center gap-1.5 text-xs"
+								style={{
+									color: isRunning ? theme.colors.success : theme.colors.textDim,
+									opacity: isRunning ? 1 : 0.5,
+								}}
+							>
+								{isRunning && <Activity className="w-3 h-3 animate-server-alive" />}
+								{isRunning ? 'Live' : 'Stopped'}
+							</span>
+						</div>
+					);
+				})()}
 
 			{/* SIDEBAR BOTTOM ACTIONS */}
 			<SidebarActions

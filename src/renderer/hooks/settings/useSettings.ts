@@ -61,8 +61,10 @@ export interface UseSettingsReturn {
 	// Font settings
 	fontFamily: string;
 	fontSize: number;
+	terminalFontSize: number;
 	setFontFamily: (value: string) => void;
 	setFontSize: (value: number) => void;
+	setTerminalFontSize: (value: number) => void;
 
 	// UI settings
 	activeThemeId: ThemeId;

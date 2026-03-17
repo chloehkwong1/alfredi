@@ -141,6 +141,7 @@ export interface SettingsStoreState {
 	ghPath: string;
 	fontFamily: string;
 	fontSize: number;
+	terminalFontSize: number;
 	activeThemeId: ThemeId;
 	customThemeColors: ThemeColors;
 	customThemeBaseId: ThemeId;
@@ -221,6 +222,7 @@ export interface SettingsStoreActions {
 	setGhPath: (value: string) => void;
 	setFontFamily: (value: string) => void;
 	setFontSize: (value: number) => void;
+	setTerminalFontSize: (value: number) => void;
 	setActiveThemeId: (value: ThemeId) => void;
 	setCustomThemeColors: (value: ThemeColors) => void;
 	setCustomThemeBaseId: (value: ThemeId) => void;
@@ -344,6 +346,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	ghPath: '',
 	fontFamily: 'Roboto Mono, Menlo, "Courier New", monospace',
 	fontSize: 14,
+	terminalFontSize: 14,
 	activeThemeId: 'dracula',
 	customThemeColors: DEFAULT_CUSTOM_THEME_COLORS,
 	customThemeBaseId: 'dracula',
@@ -468,6 +471,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setFontSize: (value) => {
 		set({ fontSize: value });
 		window.maestro.settings.set('fontSize', value);
+	},
+
+	setTerminalFontSize: (value) => {
+		set({ terminalFontSize: value });
+		window.maestro.settings.set('terminalFontSize', value);
 	},
 
 	setActiveThemeId: (value) => {
@@ -1156,6 +1164,11 @@ export async function loadAllSettings(): Promise<void> {
 			patch.fontSize = raw <= 14 ? 14 : raw <= 16 ? 16 : 18;
 		}
 
+		if (allSettings['terminalFontSize'] !== undefined) {
+			const raw = allSettings['terminalFontSize'] as number;
+			patch.terminalFontSize = raw <= 14 ? 14 : raw <= 16 ? 16 : 18;
+		}
+
 		if (allSettings['activeThemeId'] !== undefined)
 			patch.activeThemeId = allSettings['activeThemeId'] as ThemeId;
 
@@ -1555,6 +1568,8 @@ export function getSettingsActions() {
 		setGhPath: state.setGhPath,
 		setFontFamily: state.setFontFamily,
 		setFontSize: state.setFontSize,
+		terminalFontSize: state.terminalFontSize,
+		setTerminalFontSize: state.setTerminalFontSize,
 		setActiveThemeId: state.setActiveThemeId,
 		setCustomThemeColors: state.setCustomThemeColors,
 		setCustomThemeBaseId: state.setCustomThemeBaseId,
