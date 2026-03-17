@@ -144,6 +144,9 @@ export interface ProjectStoreActions {
 	/** Remove the server terminal tab for a given serverProcessId. */
 	removeServerTerminalTab: (projectId: string, serverProcessId: string) => void;
 
+	/** Reorder terminal tabs by moving a tab from one index to another. */
+	reorderTerminalTabs: (projectId: string, fromIndex: number, toIndex: number) => void;
+
 	// === Log management ===
 
 	/**
@@ -388,9 +391,14 @@ export const useProjectStore = create<ProjectStore>()((set) => {
 				if (existing.length >= MAX_TERMINAL_TABS) return s;
 
 				resultTab = { id: generateId(), name, serverProcessId };
+				// Insert after the last existing server tab (cluster at front)
+				const lastServerIdx = existing.reduce((acc, t, i) => (t.serverProcessId ? i : acc), -1);
+				const insertIdx = lastServerIdx + 1;
+				const newTabs = [...existing];
+				newTabs.splice(insertIdx, 0, resultTab!);
 				const newProjects = s.projects.map((p) =>
 					p.id === projectId
-						? { ...p, terminalTabs: [...existing, resultTab!], activeTerminalTabId: resultTab!.id }
+						? { ...p, terminalTabs: newTabs, activeTerminalTabId: resultTab!.id }
 						: p
 				);
 				return { projects: newProjects, sessions: newProjects } as any;
@@ -423,6 +431,26 @@ export const useProjectStore = create<ProjectStore>()((set) => {
 					p.id === projectId
 						? { ...p, terminalTabs: finalTabs, activeTerminalTabId: finalActive }
 						: p
+				);
+				return { projects: newProjects, sessions: newProjects } as any;
+			}),
+
+		// Terminal tab reordering
+		reorderTerminalTabs: (projectId: string, fromIndex: number, toIndex: number) =>
+			set((s) => {
+				const project = s.projects.find((p) => p.id === projectId);
+				if (!project) return s;
+
+				const tabs = [...(project.terminalTabs ?? [])];
+				if (fromIndex < 0 || fromIndex >= tabs.length) return s;
+				if (toIndex < 0 || toIndex >= tabs.length) return s;
+				if (fromIndex === toIndex) return s;
+
+				const [moved] = tabs.splice(fromIndex, 1);
+				tabs.splice(toIndex, 0, moved);
+
+				const newProjects = s.projects.map((p) =>
+					p.id === projectId ? { ...p, terminalTabs: tabs } : p
 				);
 				return { projects: newProjects, sessions: newProjects } as any;
 			}),
@@ -685,6 +713,7 @@ export function getProjectActions() {
 		setActiveTerminalTab: state.setActiveTerminalTab,
 		addServerTerminalTab: state.addServerTerminalTab,
 		removeServerTerminalTab: state.removeServerTerminalTab,
+		reorderTerminalTabs: state.reorderTerminalTabs,
 		addLogToTab: state.addLogToTab,
 		clearActiveTabLogs: state.clearActiveTabLogs,
 		// Backward-compat aliases

@@ -314,6 +314,7 @@ export const RightPanel = memo(
 		const addTerminalTab = useSessionStore((s) => s.addTerminalTab);
 		const removeTerminalTab = useSessionStore((s) => s.removeTerminalTab);
 		const setActiveTerminalTab = useSessionStore((s) => s.setActiveTerminalTab);
+		const reorderTerminalTabs = useSessionStore((s) => s.reorderTerminalTabs);
 
 		const rightPanelOpen = useUIStore((s) => s.rightPanelOpen);
 		const activeRightTab = useUIStore((s) => s.activeRightTab);
@@ -419,6 +420,72 @@ export const RightPanel = memo(
 		}, []);
 
 		const MAX_TERMINAL_TABS = 5;
+
+		// ---- Terminal tab drag-to-reorder ----
+		const [draggingTermTabId, setDraggingTermTabId] = useState<string | null>(null);
+		const [dragOverTermTabId, setDragOverTermTabId] = useState<string | null>(null);
+
+		const handleTerminalDragStart = useCallback((tabId: string, e: React.DragEvent) => {
+			e.dataTransfer.effectAllowed = 'move';
+			e.dataTransfer.setData('text/plain', tabId);
+			setDraggingTermTabId(tabId);
+		}, []);
+
+		const handleTerminalDragOver = useCallback(
+			(tabId: string, e: React.DragEvent) => {
+				e.preventDefault();
+				e.dataTransfer.dropEffect = 'move';
+				if (tabId !== draggingTermTabId) {
+					setDragOverTermTabId(tabId);
+				}
+			},
+			[draggingTermTabId]
+		);
+
+		const handleTerminalDragEnd = useCallback(() => {
+			setDraggingTermTabId(null);
+			setDragOverTermTabId(null);
+		}, []);
+
+		const handleTerminalDrop = useCallback(
+			(tabId: string, e: React.DragEvent) => {
+				e.preventDefault();
+				const sourceTabId = e.dataTransfer.getData('text/plain');
+				if (!session || !sourceTabId || sourceTabId === tabId) {
+					setDraggingTermTabId(null);
+					setDragOverTermTabId(null);
+					return;
+				}
+				const fromIndex = terminalTabs.findIndex((t) => t.id === sourceTabId);
+				const toIndex = terminalTabs.findIndex((t) => t.id === tabId);
+				if (fromIndex >= 0 && toIndex >= 0) {
+					reorderTerminalTabs(session.id, fromIndex, toIndex);
+				}
+				setDraggingTermTabId(null);
+				setDragOverTermTabId(null);
+			},
+			[session, terminalTabs, reorderTerminalTabs]
+		);
+
+		const handleTerminalTabKeyDown = useCallback(
+			(e: React.KeyboardEvent) => {
+				// Ctrl+Shift+Arrow to move active tab left/right
+				if (e.ctrlKey && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+					e.preventDefault();
+					if (!session || terminalTabs.length <= 1) return;
+					const activeIdx = terminalTabs.findIndex((t) => t.id === activeTerminalTabId);
+					if (activeIdx < 0) return;
+					const targetIdx =
+						e.key === 'ArrowLeft'
+							? Math.max(0, activeIdx - 1)
+							: Math.min(terminalTabs.length - 1, activeIdx + 1);
+					if (targetIdx !== activeIdx) {
+						reorderTerminalTabs(session.id, activeIdx, targetIdx);
+					}
+				}
+			},
+			[session, terminalTabs, activeTerminalTabId, reorderTerminalTabs]
+		);
 
 		// ------------------------------------------------------------------
 		// Changes Panel — git changes data + bridge callback
@@ -805,20 +872,34 @@ export const RightPanel = memo(
 				>
 					{/* Terminal tab bar */}
 					<div
-						className="flex items-center h-8 shrink-0 border-b overflow-x-auto"
+						className="flex items-center h-8 shrink-0 border-b overflow-x-auto outline-none"
 						style={{ borderColor: theme.colors.border }}
+						tabIndex={0}
+						onKeyDown={handleTerminalTabKeyDown}
 					>
 						{terminalTabs.map((tab) => (
 							<button
 								key={tab.id}
-								className="flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors"
+								className={`flex items-center gap-1 px-2.5 h-full text-xs font-bold shrink-0 border-b-2 transition-colors select-none ${draggingTermTabId === tab.id ? 'opacity-50' : ''}`}
 								style={{
 									color:
 										tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
 									borderColor: tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
 									backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
+									borderLeftColor:
+										dragOverTermTabId === tab.id && draggingTermTabId !== tab.id
+											? theme.colors.accent
+											: undefined,
+									borderLeftWidth:
+										dragOverTermTabId === tab.id && draggingTermTabId !== tab.id ? 2 : undefined,
+									cursor: terminalTabs.length > 1 ? 'grab' : undefined,
 								}}
 								onClick={() => session && setActiveTerminalTab(session.id, tab.id)}
+								draggable={terminalTabs.length > 1}
+								onDragStart={(e) => handleTerminalDragStart(tab.id, e)}
+								onDragOver={(e) => handleTerminalDragOver(tab.id, e)}
+								onDragEnd={handleTerminalDragEnd}
+								onDrop={(e) => handleTerminalDrop(tab.id, e)}
 							>
 								{tab.serverProcessId ? (
 									<Server className="w-3 h-3" />
