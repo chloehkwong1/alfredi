@@ -27,7 +27,7 @@ import type {
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../types';
-import type { OutputStyle, EffortLevel } from '../../shared/types';
+import type { OutputStyle, EffortLevel, McpServerConfigStored } from '../../shared/types';
 import { DEFAULT_CUSTOM_THEME_COLORS } from '../constants/themes';
 import { DEFAULT_SHORTCUTS, TAB_SHORTCUTS } from '../constants/shortcuts';
 import { commitCommandPrompt } from '../../prompts';
@@ -183,6 +183,8 @@ export interface SettingsStoreState {
 	useNativeTitleBar: boolean;
 	autoHideMenuBar: boolean;
 	linearApiKey: string;
+	mcpServers: Record<string, McpServerConfigStored>;
+	linearMcpAutoInject: boolean;
 }
 
 export interface SettingsStoreActions {
@@ -255,6 +257,9 @@ export interface SettingsStoreActions {
 	setUseNativeTitleBar: (value: boolean) => void;
 	setAutoHideMenuBar: (value: boolean) => void;
 	setLinearApiKey: (value: string) => void;
+	setMcpServer: (id: string, config: McpServerConfigStored) => void;
+	removeMcpServer: (id: string) => void;
+	setLinearMcpAutoInject: (value: boolean) => void;
 
 	// Async setters
 	setLogLevel: (value: string) => Promise<void>;
@@ -382,6 +387,8 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	useNativeTitleBar: false,
 	autoHideMenuBar: false,
 	linearApiKey: '',
+	mcpServers: {},
+	linearMcpAutoInject: true,
 
 	// ============================================================================
 	// Simple Setters
@@ -735,6 +742,23 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setLinearApiKey: (value) => {
 		set({ linearApiKey: value });
 		window.maestro.settings.set('linearApiKey', value);
+	},
+
+	setMcpServer: (id, config) => {
+		const updated = { ...get().mcpServers, [id]: config };
+		set({ mcpServers: updated });
+		window.maestro.settings.set('mcpServers', updated);
+	},
+
+	removeMcpServer: (id) => {
+		const { [id]: _, ...rest } = get().mcpServers;
+		set({ mcpServers: rest });
+		window.maestro.settings.set('mcpServers', rest);
+	},
+
+	setLinearMcpAutoInject: (value) => {
+		set({ linearMcpAutoInject: value });
+		window.maestro.settings.set('linearMcpAutoInject', value);
 	},
 
 	// ============================================================================
@@ -1423,6 +1447,12 @@ export async function loadAllSettings(): Promise<void> {
 
 		if (allSettings['linearApiKey'] !== undefined)
 			patch.linearApiKey = allSettings['linearApiKey'] as string;
+
+		if (allSettings['mcpServers'] !== undefined)
+			patch.mcpServers = allSettings['mcpServers'] as Record<string, McpServerConfigStored>;
+
+		if (allSettings['linearMcpAutoInject'] !== undefined)
+			patch.linearMcpAutoInject = allSettings['linearMcpAutoInject'] as boolean;
 
 		if (allSettings['outputStyle'] !== undefined) {
 			const validStyles = ['default', 'explanatory', 'learning'];

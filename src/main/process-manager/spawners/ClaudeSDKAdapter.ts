@@ -815,26 +815,60 @@ export class ClaudeSDKAdapter {
 
 	/**
 	 * Build MCP server configs to inject into the SDK options.
-	 * Currently auto-injects Linear when linearApiKey is configured.
+	 * Includes:
+	 * 1. Auto-injected Linear MCP when linearApiKey is set and linearMcpAutoInject is true
+	 * 2. User-configured custom MCP servers from settings
 	 */
 	private buildMcpServers(): Options['mcpServers'] {
 		try {
 			const settingsStore = getSettingsStore();
+			const servers: NonNullable<Options['mcpServers']> = {};
+
+			// 1. Auto-inject Linear MCP server if configured
 			const linearApiKey = settingsStore.get(
 				'linearApiKey' as keyof import('../../stores/types').MaestroSettings,
 				''
 			) as string;
+			const linearMcpAutoInject = settingsStore.get(
+				'linearMcpAutoInject' as keyof import('../../stores/types').MaestroSettings,
+				true
+			) as boolean;
 
-			if (!linearApiKey) return undefined;
-
-			const servers: NonNullable<Options['mcpServers']> = {
-				linear: {
+			if (linearApiKey && linearMcpAutoInject) {
+				servers['linear'] = {
 					type: 'stdio',
 					command: 'npx',
 					args: ['-y', '@anthropic-ai/linear-mcp-server'],
 					env: { LINEAR_API_KEY: linearApiKey },
-				},
-			};
+				};
+			}
+
+			// 2. Add user-configured custom MCP servers
+			const mcpServers = settingsStore.get(
+				'mcpServers' as keyof import('../../stores/types').MaestroSettings,
+				{}
+			) as Record<string, import('../../../shared/types').McpServerConfigStored>;
+
+			for (const [id, config] of Object.entries(mcpServers)) {
+				if (!config.enabled) continue;
+
+				if (config.type === 'stdio' && config.command) {
+					servers[id] = {
+						type: 'stdio',
+						command: config.command,
+						args: config.args || [],
+						env: config.env || {},
+					};
+				} else if ((config.type === 'sse' || config.type === 'http') && config.url) {
+					servers[id] = {
+						type: config.type,
+						url: config.url,
+						headers: config.headers || {},
+					} as any; // SDK types may not fully cover sse/http yet
+				}
+			}
+
+			if (Object.keys(servers).length === 0) return undefined;
 
 			logger.debug('[ClaudeSDKAdapter] Injecting MCP servers', 'ClaudeSDKAdapter', {
 				serverNames: Object.keys(servers),

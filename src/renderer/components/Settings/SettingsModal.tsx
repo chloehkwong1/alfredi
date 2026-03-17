@@ -1,5 +1,15 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { X, Key, Keyboard, Bell, Settings, Palette, FlaskConical, Monitor } from 'lucide-react';
+import {
+	X,
+	Key,
+	Keyboard,
+	Bell,
+	Settings,
+	Palette,
+	FlaskConical,
+	Monitor,
+	Plug,
+} from 'lucide-react';
 import { useSettings } from '../../hooks';
 import type { Theme, LLMProvider } from '../../types';
 import { useLayerStack } from '../../contexts/LayerStackContext';
@@ -10,6 +20,7 @@ import { DisplayTab } from './tabs/DisplayTab';
 import { EncoreTab } from './tabs/EncoreTab';
 import { ShortcutsTab } from './tabs/ShortcutsTab';
 import { ThemeTab } from './tabs/ThemeTab';
+import { McpServersTab } from './tabs/McpServersTab';
 
 // Feature flags - set to true to enable dormant features
 const FEATURE_FLAGS = {
@@ -21,7 +32,15 @@ interface SettingsModalProps {
 	onClose: () => void;
 	theme: Theme;
 	themes: Record<string, Theme>;
-	initialTab?: 'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'encore';
+	initialTab?:
+		| 'general'
+		| 'display'
+		| 'llm'
+		| 'shortcuts'
+		| 'theme'
+		| 'notifications'
+		| 'mcp'
+		| 'encore';
 	hasNoAgents?: boolean;
 	onThemeImportError?: (message: string) => void;
 	onThemeImportSuccess?: (message: string) => void;
@@ -66,7 +85,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 	} = useSettings();
 
 	const [activeTab, setActiveTab] = useState<
-		'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'encore'
+		'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'mcp' | 'encore'
 	>('general');
 	const [testingLLM, setTestingLLM] = useState(false);
 	const [testResult, setTestResult] = useState<{
@@ -122,10 +141,10 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
 		const handleTabNavigation = (e: KeyboardEvent) => {
 			const tabs: Array<
-				'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'encore'
+				'general' | 'display' | 'llm' | 'shortcuts' | 'theme' | 'notifications' | 'mcp' | 'encore'
 			> = FEATURE_FLAGS.LLM_SETTINGS
-				? ['general', 'display', 'llm', 'shortcuts', 'theme', 'notifications', 'encore']
-				: ['general', 'display', 'shortcuts', 'theme', 'notifications', 'encore'];
+				? ['general', 'display', 'llm', 'shortcuts', 'theme', 'notifications', 'mcp', 'encore']
+				: ['general', 'display', 'shortcuts', 'theme', 'notifications', 'mcp', 'encore'];
 			const currentIndex = tabs.indexOf(activeTab);
 
 			if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === '[') {
@@ -320,6 +339,14 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 						{activeTab === 'notifications' && <span>Notify</span>}
 					</button>
 					<button
+						onClick={() => setActiveTab('mcp')}
+						className={`px-4 py-4 text-sm font-bold border-b-2 cursor-pointer ${activeTab === 'mcp' ? 'border-indigo-500' : 'border-transparent'} flex items-center gap-2`}
+						title="MCP Servers"
+					>
+						<Plug className="w-4 h-4" />
+						{activeTab === 'mcp' && <span>MCP Servers</span>}
+					</button>
+					<button
 						onClick={() => setActiveTab('encore')}
 						className={`px-4 py-4 text-sm font-bold border-b-2 cursor-pointer ${activeTab === 'encore' ? 'border-indigo-500' : 'border-transparent'} flex items-center gap-2`}
 						style={{
@@ -472,6 +499,8 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 							theme={theme}
 						/>
 					)}
+
+					{activeTab === 'mcp' && <McpServersTab theme={theme} />}
 
 					{activeTab === 'encore' && <EncoreTab theme={theme} isOpen={isOpen} />}
 				</div>

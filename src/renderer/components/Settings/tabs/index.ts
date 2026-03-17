@@ -18,3 +18,6 @@ export type { ShortcutsTabProps } from './ShortcutsTab';
 
 export { ThemeTab } from './ThemeTab';
 export type { ThemeTabProps } from './ThemeTab';
+
+export { McpServersTab } from './McpServersTab';
+export type { McpServersTabProps } from './McpServersTab';

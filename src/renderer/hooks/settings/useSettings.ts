@@ -23,7 +23,7 @@ import type {
 	ThinkingMode,
 	EncoreFeatureFlags,
 } from '../../types';
-import type { OutputStyle, EffortLevel } from '../../../shared/types';
+import type { OutputStyle, EffortLevel, McpServerConfigStored } from '../../../shared/types';
 import { useSettingsStore, loadAllSettings } from '../../stores/settingsStore';
 import type { DocumentGraphLayoutType } from '../../stores/settingsStore';
 
@@ -271,6 +271,13 @@ export interface UseSettingsReturn {
 	// Linear integration
 	linearApiKey: string;
 	setLinearApiKey: (value: string) => void;
+
+	// MCP Servers
+	mcpServers: Record<string, McpServerConfigStored>;
+	setMcpServer: (id: string, config: McpServerConfigStored) => void;
+	removeMcpServer: (id: string) => void;
+	linearMcpAutoInject: boolean;
+	setLinearMcpAutoInject: (value: boolean) => void;
 }
 
 export function useSettings(): UseSettingsReturn {

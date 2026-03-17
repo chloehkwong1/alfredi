@@ -5,7 +5,12 @@
  * These types are used across the main process for type-safe store access.
  */
 
-import type { SshRemoteConfig, ProjectWorktreeConfig, OutputStyle } from '../../shared/types';
+import type {
+	SshRemoteConfig,
+	ProjectWorktreeConfig,
+	OutputStyle,
+	McpServerConfigStored,
+} from '../../shared/types';
 
 // ============================================================================
 // Stored Session Type (minimal interface for main process storage)
@@ -74,6 +79,10 @@ export interface MaestroSettings {
 	totalActiveTimeMs: number;
 	// Output style for Claude Code agents
 	outputStyle: OutputStyle;
+	// MCP server configurations for injection into Claude Code SDK agents
+	mcpServers: Record<string, McpServerConfigStored>;
+	// Whether to auto-inject Linear MCP server when linearApiKey is set
+	linearMcpAutoInject: boolean;
 	// Allow dynamic settings keys (electron-store is a key-value store
 	// with many settings not explicitly declared above)
 	[key: string]: any;

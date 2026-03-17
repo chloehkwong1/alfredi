@@ -221,6 +221,27 @@ export interface TerminalTab {
 }
 
 // ============================================================================
+// MCP Server Configuration Types
+// ============================================================================
+
+/**
+ * Stored configuration for an MCP server.
+ * Can be stdio (local command), SSE, or HTTP type.
+ */
+export interface McpServerConfigStored {
+	name: string;
+	type: 'stdio' | 'sse' | 'http';
+	enabled: boolean;
+	// stdio fields
+	command?: string;
+	args?: string[];
+	env?: Record<string, string>;
+	// sse/http fields
+	url?: string;
+	headers?: Record<string, string>;
+}
+
+// ============================================================================
 // Agent Error Handling Types
 // ============================================================================
 
