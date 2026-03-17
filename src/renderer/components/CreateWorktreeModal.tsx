@@ -170,9 +170,12 @@ export function CreateWorktreeModal({
 		}
 
 		setError(null);
-		// Close modal immediately — worktree creation continues in background
+		// Start creation first (synchronously captures session from modal store),
+		// then close modal — reversed order fixes race where onClose() clears the
+		// modal store session before handleCreateWorktree reads it.
+		const createPromise = onCreateWorktree(trimmedName, baseBranch || undefined);
 		onClose();
-		onCreateWorktree(trimmedName, baseBranch || undefined).catch((err) => {
+		createPromise.catch((err) => {
 			notifyToast({
 				type: 'error',
 				title: 'Worktree Creation Failed',

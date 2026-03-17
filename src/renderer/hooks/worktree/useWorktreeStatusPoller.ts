@@ -87,6 +87,10 @@ export function useWorktreeStatusPoller(): void {
 
 				// Store PR info regardless of status transition
 				const prUpdates: Partial<Session> = {};
+				// Sync currentBranch from worktreeBranch so ChecksPanel and other consumers can use it
+				if (current.currentBranch !== worktree.worktreeBranch) {
+					prUpdates.currentBranch = worktree.worktreeBranch;
+				}
 				if (current.worktreePrNumber !== prStatus.number) {
 					prUpdates.worktreePrNumber = prStatus.number;
 				}
