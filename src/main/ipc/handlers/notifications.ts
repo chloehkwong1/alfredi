@@ -11,10 +11,7 @@
  */
 
 import { ipcMain, Notification, BrowserWindow } from 'electron';
-import { spawn, execFile, type ChildProcess } from 'child_process';
-import { existsSync } from 'fs';
-import { readdirSync } from 'fs';
-import path from 'path';
+import { spawn, type ChildProcess } from 'child_process';
 import { logger } from '../../utils/logger';
 import { isWebContentsAvailable } from '../../utils/safe-send';
 
@@ -329,114 +326,6 @@ async function processNextNotification(): Promise<void> {
 }
 
 // ==========================================================================
-// System Sound Support
-// ==========================================================================
-
-/**
- * Platform-specific system sound directories and playback commands
- */
-interface SystemSoundConfig {
-	dir: string;
-	extension: string;
-	command: string;
-	buildArgs: (filePath: string) => string[];
-}
-
-const PLATFORM_SOUND_CONFIGS: Record<string, SystemSoundConfig> = {
-	darwin: {
-		dir: '/System/Library/Sounds',
-		extension: '.aiff',
-		command: 'afplay',
-		buildArgs: (filePath: string) => [filePath],
-	},
-	linux: {
-		dir: '/usr/share/sounds/freedesktop/stereo',
-		extension: '.oga',
-		command: 'paplay',
-		buildArgs: (filePath: string) => [filePath],
-	},
-	win32: {
-		dir: 'C:\\Windows\\Media',
-		extension: '.wav',
-		command: 'powershell',
-		buildArgs: (filePath: string) => [
-			'-c',
-			`(New-Object Media.SoundPlayer '${filePath}').PlaySync()`,
-		],
-	},
-};
-
-/**
- * Get available system sounds for the current platform.
- * Returns sound names (without extension) that exist on disk.
- */
-function getSystemSounds(): string[] {
-	const config = PLATFORM_SOUND_CONFIGS[process.platform];
-	if (!config) return [];
-
-	try {
-		if (!existsSync(config.dir)) return [];
-
-		const files = readdirSync(config.dir);
-		return files
-			.filter((f) => f.endsWith(config.extension))
-			.map((f) => path.basename(f, config.extension))
-			.sort();
-	} catch (error) {
-		logger.error('Failed to list system sounds', 'Notification', { error: String(error) });
-		return [];
-	}
-}
-
-/**
- * Play a system sound by name. Fire-and-forget — resolves immediately after spawn.
- */
-function playSystemSound(soundName: string): Promise<NotificationCommandResponse> {
-	const config = PLATFORM_SOUND_CONFIGS[process.platform];
-	if (!config) {
-		return Promise.resolve({ success: false, error: 'Unsupported platform for system sounds' });
-	}
-
-	if (soundName === 'none') {
-		return Promise.resolve({ success: true });
-	}
-
-	const filePath = path.join(config.dir, `${soundName}${config.extension}`);
-	if (!existsSync(filePath)) {
-		return Promise.resolve({ success: false, error: `Sound file not found: ${filePath}` });
-	}
-
-	return new Promise((resolve) => {
-		try {
-			const child = execFile(config.command, config.buildArgs(filePath), (error) => {
-				if (error) {
-					logger.debug('System sound playback error', 'Notification', {
-						sound: soundName,
-						error: String(error),
-					});
-				}
-			});
-
-			// Fire-and-forget: resolve immediately after spawning
-			resolve({ success: true });
-
-			child.on('error', (err) => {
-				logger.error('System sound spawn error', 'Notification', {
-					sound: soundName,
-					error: String(err),
-				});
-			});
-		} catch (error) {
-			logger.error('Failed to play system sound', 'Notification', {
-				sound: soundName,
-				error: String(error),
-			});
-			resolve({ success: false, error: String(error) });
-		}
-	});
-}
-
-// ==========================================================================
 // Handler Registration
 // ==========================================================================
 
@@ -503,19 +392,6 @@ export function registerNotificationsHandlers(): void {
 				);
 				processNextNotification();
 			});
-		}
-	);
-
-	// Get available system sounds for the current platform
-	ipcMain.handle('notification:getSystemSounds', async (): Promise<string[]> => {
-		return getSystemSounds();
-	});
-
-	// Play a system sound by name (fire-and-forget, for preview and notifications)
-	ipcMain.handle(
-		'notification:playSound',
-		async (_event, soundName: string): Promise<NotificationCommandResponse> => {
-			return playSystemSound(soundName);
 		}
 	);
 

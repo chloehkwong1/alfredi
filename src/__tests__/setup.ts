@@ -439,25 +439,6 @@ const mockMaestro = {
 		onCommandCompleted: vi.fn().mockReturnValue(() => {}),
 		onTtsCompleted: vi.fn().mockReturnValue(() => {}), // Legacy alias
 		show: vi.fn().mockResolvedValue(undefined),
-		getSystemSounds: vi
-			.fn()
-			.mockResolvedValue([
-				'Basso',
-				'Blow',
-				'Bottle',
-				'Frog',
-				'Funk',
-				'Glass',
-				'Hero',
-				'Morse',
-				'Ping',
-				'Pop',
-				'Purr',
-				'Sosumi',
-				'Submarine',
-				'Tink',
-			]),
-		playSound: vi.fn().mockResolvedValue({ success: true }),
 	},
 	dialog: {
 		selectFolder: vi.fn().mockResolvedValue(null),

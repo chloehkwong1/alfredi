@@ -114,37 +114,6 @@ describe('Notification Preload API', () => {
 		});
 	});
 
-	describe('getSystemSounds', () => {
-		it('should invoke notification:getSystemSounds', async () => {
-			mockInvoke.mockResolvedValue(['Basso', 'Ping', 'Pop']);
-
-			const result = await api.getSystemSounds();
-
-			expect(mockInvoke).toHaveBeenCalledWith('notification:getSystemSounds');
-			expect(result).toEqual(['Basso', 'Ping', 'Pop']);
-		});
-	});
-
-	describe('playSound', () => {
-		it('should invoke notification:playSound with sound name', async () => {
-			mockInvoke.mockResolvedValue({ success: true });
-
-			const result = await api.playSound('Ping');
-
-			expect(mockInvoke).toHaveBeenCalledWith('notification:playSound', 'Ping');
-			expect(result.success).toBe(true);
-		});
-
-		it('should handle error response', async () => {
-			mockInvoke.mockResolvedValue({ success: false, error: 'Sound file not found' });
-
-			const result = await api.playSound('NonExistent');
-
-			expect(result.success).toBe(false);
-			expect(result.error).toBe('Sound file not found');
-		});
-	});
-
 	describe('stopSpeak', () => {
 		it('should invoke notification:stopSpeak with notificationId', async () => {
 			mockInvoke.mockResolvedValue({ success: true });

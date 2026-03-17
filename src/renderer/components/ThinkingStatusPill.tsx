@@ -11,6 +11,7 @@ import type { Session, Theme, AITab, ThinkingItem } from '../types';
 import { formatTokensCompact } from '../utils/formatters';
 import { useSettingsStore } from '../stores/settingsStore';
 import { fontSizeToSecondary } from '../utils/fontSizeClass';
+import { playSound } from '../utils/sounds';
 
 interface ThinkingStatusPillProps {
 	/** Pre-filtered flat list of (session, tab) pairs — one entry per busy tab across all agents.
@@ -377,7 +378,7 @@ function ThinkingStatusPillInner({
 
 				// Play completion sound
 				if (completionSound !== 'none') {
-					window.maestro.notification.playSound?.(completionSound);
+					playSound(completionSound);
 				}
 			}
 		}

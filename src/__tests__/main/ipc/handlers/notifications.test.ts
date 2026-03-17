@@ -55,41 +55,6 @@ vi.mock('../../../../main/utils/logger', () => ({
 	},
 }));
 
-// Mock fs for system sounds listing
-const mockExistsSync = vi.fn().mockReturnValue(true);
-const mockReaddirSync = vi
-	.fn()
-	.mockReturnValue([
-		'Basso.aiff',
-		'Blow.aiff',
-		'Bottle.aiff',
-		'Frog.aiff',
-		'Funk.aiff',
-		'Glass.aiff',
-		'Hero.aiff',
-		'Morse.aiff',
-		'Ping.aiff',
-		'Pop.aiff',
-		'Purr.aiff',
-		'Sosumi.aiff',
-		'Submarine.aiff',
-		'Tink.aiff',
-	]);
-
-vi.mock('fs', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('fs')>();
-	return {
-		...actual,
-		default: {
-			...actual,
-			existsSync: (...args: unknown[]) => mockExistsSync(...args),
-			readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
-		},
-		existsSync: (...args: unknown[]) => mockExistsSync(...args),
-		readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
-	};
-});
-
 // Mock child_process - must include default export
 vi.mock('child_process', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('child_process')>();
@@ -170,8 +135,6 @@ describe('Notification IPC Handlers', () => {
 			expect(handlers.has('notification:show')).toBe(true);
 			expect(handlers.has('notification:speak')).toBe(true);
 			expect(handlers.has('notification:stopSpeak')).toBe(true);
-			expect(handlers.has('notification:getSystemSounds')).toBe(true);
-			expect(handlers.has('notification:playSound')).toBe(true);
 		});
 	});
 
@@ -437,72 +400,6 @@ describe('Notification IPC Handlers', () => {
 
 			// Clean up - reset all notification state including clearing the queue
 			resetNotificationState();
-		});
-	});
-
-	describe('notification:getSystemSounds', () => {
-		it('should return array of sound names from system directory', async () => {
-			const handler = handlers.get('notification:getSystemSounds')!;
-			const result = await handler({});
-
-			expect(Array.isArray(result)).toBe(true);
-			expect(result.length).toBeGreaterThan(0);
-			// Sound names should not have file extensions
-			for (const name of result) {
-				expect(name).not.toContain('.aiff');
-			}
-		});
-
-		it('should return sorted results', async () => {
-			const handler = handlers.get('notification:getSystemSounds')!;
-			const result = await handler({});
-
-			const sorted = [...result].sort();
-			expect(result).toEqual(sorted);
-		});
-
-		it('should return empty array when directory does not exist', async () => {
-			mockExistsSync.mockReturnValueOnce(false);
-			const handler = handlers.get('notification:getSystemSounds')!;
-			const result = await handler({});
-
-			expect(result).toEqual([]);
-		});
-
-		it('should return empty array when readdirSync throws', async () => {
-			mockReaddirSync.mockImplementationOnce(() => {
-				throw new Error('Permission denied');
-			});
-			const handler = handlers.get('notification:getSystemSounds')!;
-			const result = await handler({});
-
-			expect(result).toEqual([]);
-		});
-	});
-
-	describe('notification:playSound', () => {
-		it('should return success for a valid sound name', async () => {
-			const handler = handlers.get('notification:playSound')!;
-			const result = await handler({}, 'Ping');
-
-			expect(result.success).toBe(true);
-		});
-
-		it('should return success for "none" without playing', async () => {
-			const handler = handlers.get('notification:playSound')!;
-			const result = await handler({}, 'none');
-
-			expect(result.success).toBe(true);
-		});
-
-		it('should return error when sound file does not exist', async () => {
-			// existsSync is called once for the file path — return false
-			mockExistsSync.mockReturnValueOnce(false);
-			const handler = handlers.get('notification:playSound')!;
-			const result = await handler({}, 'NonExistentSound');
-
-			expect(result.success).toBe(false);
-			expect(result.error).toContain('Sound file not found');
 		});
 	});
 

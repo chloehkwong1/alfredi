@@ -55,19 +55,6 @@ export function createNotificationApi() {
 			ipcRenderer.invoke('notification:stopSpeak', notificationId),
 
 		/**
-		 * Get available system sounds for the current platform
-		 * @returns Array of sound names (e.g., "Ping", "Glass")
-		 */
-		getSystemSounds: (): Promise<string[]> => ipcRenderer.invoke('notification:getSystemSounds'),
-
-		/**
-		 * Play a system sound by name (for preview and notifications)
-		 * @param soundName - Name of the system sound to play
-		 */
-		playSound: (soundName: string): Promise<NotificationCommandResponse> =>
-			ipcRenderer.invoke('notification:playSound', soundName),
-
-		/**
 		 * Subscribe to notification command completion events
 		 * @param handler - Callback when a notification command completes
 		 * @returns Cleanup function to unsubscribe
