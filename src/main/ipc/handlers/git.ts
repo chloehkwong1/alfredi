@@ -1883,7 +1883,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 						'view',
 						branch,
 						'--json',
-						'state,url,number,headRefName,title,reviewDecision,statusCheckRollup,isDraft',
+						'state,url,number,headRefName,baseRefName,title,reviewDecision,statusCheckRollup,isDraft',
 					],
 					repoPath
 				);
@@ -1962,6 +1962,7 @@ export function registerGitHandlers(deps: GitHandlerDependencies): void {
 							(data.reviewDecision as 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED') || null,
 						checkStatus,
 						isDraft: !!data.isDraft,
+						baseRefName: (data.baseRefName as string) || undefined,
 					};
 				} catch {
 					logger.warn(

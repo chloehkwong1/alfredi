@@ -108,6 +108,10 @@ export function useWorktreeStatusPoller(): void {
 				}
 				// Always update checkStatus (object comparison not worth the complexity)
 				prUpdates.prCheckStatus = prStatus.checkStatus;
+				// Sync base branch from GitHub (handles auto-retargeting)
+				if (prStatus.baseRefName && current.baseBranch !== prStatus.baseRefName) {
+					prUpdates.baseBranch = prStatus.baseRefName;
+				}
 
 				// Auto-transition kanban status unless manually overridden via drag-and-drop
 				if (!current.worktreeManualStatus) {
