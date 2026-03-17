@@ -246,7 +246,10 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 				}
 
 				// Check for custom AI commands
-				{
+				// Skip interception for Claude Code agents — they handle skills natively
+				// via the Skill tool, which works regardless of position in the input.
+				// Intercepting here prevents mid-sentence skill references from working.
+				if (activeSession.toolType !== 'claude-code') {
 					// Parse command and arguments: "/speckit.plan Blah blah" -> baseCommand="/speckit.plan", args="Blah blah"
 					const firstSpaceIndex = commandText.indexOf(' ');
 					const baseCommand =
@@ -484,12 +487,13 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							.catch((err) => {
 								console.error('[processInput] answerQuestion IPC failed:', err);
 							});
-						// Clear pending question and mark log entries as answered
+						// Clear pending question, reset session state, and mark log entries as answered
 						setSessions((prev) =>
 							prev.map((s) => {
 								if (s.id !== activeSessionId) return s;
 								return {
 									...s,
+									state: 'busy' as import('../../types').SessionState,
 									aiTabs: s.aiTabs.map((tab) => {
 										if (tab.id !== activeTab!.id) return tab;
 										return {
