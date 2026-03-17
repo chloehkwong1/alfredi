@@ -1585,10 +1585,6 @@ interface MaestroAPI {
 			command?: string
 		) => Promise<{ success: boolean; notificationId?: number; error?: string }>;
 		stopSpeak: (notificationId: number) => Promise<{ success: boolean; error?: string }>;
-		getSystemSounds: () => Promise<string[]>;
-		playSound: (
-			soundName: string
-		) => Promise<{ success: boolean; notificationId?: number; error?: string }>;
 		onCommandCompleted: (handler: (notificationId: number) => void) => () => void;
 		/** @deprecated Use onCommandCompleted instead */
 		onTtsCompleted: (handler: (notificationId: number) => void) => () => void;

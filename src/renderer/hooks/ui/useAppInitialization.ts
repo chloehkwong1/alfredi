@@ -43,7 +43,6 @@ export function useAppInitialization(): AppInitializationReturn {
 	const audioFeedbackEnabled = useSettingsStore((s) => s.audioFeedbackEnabled);
 	const audioFeedbackCommand = useSettingsStore((s) => s.audioFeedbackCommand);
 	const osNotificationsEnabled = useSettingsStore((s) => s.osNotificationsEnabled);
-	const notificationSound = useSettingsStore((s) => s.notificationSound);
 
 	// --- Local state ---
 	const [ghCliAvailable, setGhCliAvailable] = useState(false);
@@ -123,10 +122,6 @@ export function useAppInitialization(): AppInitializationReturn {
 	useEffect(() => {
 		useNotificationStore.getState().setOsNotifications(osNotificationsEnabled);
 	}, [osNotificationsEnabled]);
-
-	useEffect(() => {
-		useNotificationStore.getState().setNotificationSound(notificationSound);
-	}, [notificationSound]);
 
 	// --- Playground debug function ---
 	useEffect(() => {

@@ -190,8 +190,6 @@ vi.mock('../../../renderer/hooks/settings/useSettings', () => ({
 		// Notification settings
 		osNotificationsEnabled: true,
 		setOsNotificationsEnabled: mockSetOsNotificationsEnabled,
-		notificationSound: 'Ping',
-		setNotificationSound: vi.fn(),
 		audioFeedbackEnabled: false,
 		setAudioFeedbackEnabled: mockSetAudioFeedbackEnabled,
 		audioFeedbackCommand: 'say',
