@@ -35,6 +35,7 @@ import { LiveOverlayPanel } from './LiveOverlayPanel';
 import { useSessionCategories } from '../../hooks/session/useSessionCategories';
 import { useSessionFilterMode } from '../../hooks/session/useSessionFilterMode';
 import { useAgentCapabilities } from '../../hooks/agent/useAgentCapabilities';
+import { ProjectHealthCard } from '../SessionList/ProjectHealthCard';
 
 // ============================================================================
 // SessionContextMenu - Right-click context menu for session items
@@ -920,6 +921,23 @@ function SessionListInner(props: SessionListProps) {
 							renderSessionWithWorktrees(session, 'flat', { keyPrefix: 'flat' })
 						)}
 					</div>
+
+					{/* Project Health Card — git status summary for active worktree */}
+					{(() => {
+						const activeSession = sessions.find((s) => s.id === activeSessionId);
+						if (!activeSession?.isGitRepo) return null;
+						return (
+							<ProjectHealthCard
+								theme={theme}
+								sessionId={activeSessionId!}
+								session={activeSession}
+								isGitRepo={activeSession.isGitRepo}
+								onViewDiff={() => {
+									useUIStore.getState().setActiveRightTopTab('changes');
+								}}
+							/>
+						);
+					})()}
 
 					{/* Flexible spacer */}
 					<div className="flex-grow min-h-4" />
