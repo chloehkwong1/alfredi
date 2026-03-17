@@ -1568,11 +1568,11 @@ export const MainPanel = React.memo(
 											className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors hover:opacity-80 flex items-center gap-1"
 											style={{
 												backgroundColor: isServerRunning
-													? theme.colors.success + '20'
+													? theme.colors.accent + '20'
 													: theme.colors.textDim + '20',
-												color: isServerRunning ? theme.colors.success : theme.colors.textDim,
+												color: isServerRunning ? theme.colors.accent : theme.colors.textDim,
 												borderColor: isServerRunning
-													? theme.colors.success + '30'
+													? theme.colors.accent + '30'
 													: theme.colors.textDim + '30',
 											}}
 											title={
