@@ -249,5 +249,20 @@ export function useGitStatus(): GitStatusContextValue {
 	return context;
 }
 
+/**
+ * useOptionalGitBranch - Returns GitBranchContextValue or null if outside provider.
+ * Safe to use in components that may render without GitStatusProvider (e.g. skinny sidebar in tests).
+ */
+export function useOptionalGitBranch(): GitBranchContextValue | null {
+	return useContext(GitBranchContext);
+}
+
+/**
+ * useOptionalGitFileStatus - Returns GitFileStatusContextValue or null if outside provider.
+ */
+export function useOptionalGitFileStatus(): GitFileStatusContextValue | null {
+	return useContext(GitFileStatusContext);
+}
+
 // Re-export types for convenience
 export type { GitStatusData, GitFileChange };

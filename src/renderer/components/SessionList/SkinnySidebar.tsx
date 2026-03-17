@@ -2,6 +2,8 @@ import { memo } from 'react';
 import type { Session, Theme } from '../../types';
 import { getStatusColor } from '../../utils/theme';
 import { SessionTooltipContent } from './SessionTooltipContent';
+import { useOptionalGitBranch, useOptionalGitFileStatus } from '../../contexts/GitStatusContext';
+import { deriveLocalState } from '../../utils/gitWorkflowState';
 
 interface SkinnySidebarProps {
 	theme: Theme;
@@ -24,6 +26,25 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 	setActiveSessionId,
 	handleContextMenu,
 }: SkinnySidebarProps) {
+	const gitBranchCtx = useOptionalGitBranch();
+	const gitFileCtx = useOptionalGitFileStatus();
+
+	// Derive git health for the active session
+	const activeSession = sortedSessions.find((s) => s.id === activeSessionId);
+	const hasGitContext = !!(gitBranchCtx && gitFileCtx);
+	const isActiveGitRepo = !!(activeSession?.isGitRepo && hasGitContext);
+	const branchInfo = isActiveGitRepo ? gitBranchCtx!.getBranchInfo(activeSessionId) : undefined;
+	const uncommittedCount = isActiveGitRepo ? gitFileCtx!.getFileCount(activeSessionId) : 0;
+	const ahead = branchInfo?.ahead ?? 0;
+	const localState = isActiveGitRepo ? deriveLocalState({ uncommittedCount, ahead }) : null;
+	const branchName = branchInfo?.branch ?? '';
+	const healthColor = localState ? theme.colors.warning : theme.colors.success;
+	const healthLabel = localState
+		? `${branchName}: ${localState.label}`
+		: branchName
+			? `${branchName}: Clean`
+			: '';
+
 	return (
 		<div className="flex-1 flex flex-col items-center py-4 gap-2 overflow-y-auto overflow-x-visible no-scrollbar">
 			{sortedSessions.map((session) => {
@@ -104,6 +125,18 @@ export const SkinnySidebar = memo(function SkinnySidebar({
 					</div>
 				);
 			})}
+
+			{/* Git health indicator dot */}
+			{isActiveGitRepo && (
+				<>
+					<div className="w-6 border-t my-1" style={{ borderColor: theme.colors.border }} />
+					<div
+						className="w-2 h-2 rounded-full shrink-0"
+						style={{ backgroundColor: healthColor }}
+						title={healthLabel}
+					/>
+				</>
+			)}
 		</div>
 	);
 });

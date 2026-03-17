@@ -154,6 +154,7 @@ export interface SettingsStoreState {
 	usageStats: MaestroUsageStats;
 	ungroupedCollapsed: boolean;
 	bookmarksCollapsed: boolean;
+	archiveCollapsed: boolean;
 	kanbanCollapsed: Record<string, boolean>;
 	tourCompleted: boolean;
 	onboardingStats: OnboardingStats;
@@ -231,6 +232,7 @@ export interface SettingsStoreActions {
 	setCustomAICommands: (value: CustomAICommand[]) => void;
 	setUngroupedCollapsed: (value: boolean) => void;
 	setBookmarksCollapsed: (value: boolean) => void;
+	setArchiveCollapsed: (value: boolean) => void;
 	setKanbanCollapsed: (value: Record<string, boolean>) => void;
 	setTourCompleted: (value: boolean) => void;
 	setWebInterfaceUseCustomPort: (value: boolean) => void;
@@ -358,6 +360,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	usageStats: DEFAULT_USAGE_STATS,
 	ungroupedCollapsed: false,
 	bookmarksCollapsed: false,
+	archiveCollapsed: true,
 	kanbanCollapsed: {},
 	tourCompleted: false,
 	onboardingStats: DEFAULT_ONBOARDING_STATS,
@@ -605,6 +608,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => ({
 	setBookmarksCollapsed: (value) => {
 		set({ bookmarksCollapsed: value });
 		window.maestro.settings.set('bookmarksCollapsed', value);
+	},
+
+	setArchiveCollapsed: (value) => {
+		set({ archiveCollapsed: value });
+		window.maestro.settings.set('archiveCollapsed', value);
 	},
 
 	setKanbanCollapsed: (value) => {
@@ -1333,6 +1341,9 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['bookmarksCollapsed'] !== undefined)
 			patch.bookmarksCollapsed = allSettings['bookmarksCollapsed'] as boolean;
 
+		if (allSettings['archiveCollapsed'] !== undefined)
+			patch.archiveCollapsed = allSettings['archiveCollapsed'] as boolean;
+
 		if (allSettings['kanbanCollapsed'] !== undefined)
 			patch.kanbanCollapsed = allSettings['kanbanCollapsed'] as Record<string, boolean>;
 
@@ -1536,6 +1547,7 @@ export function getSettingsActions() {
 		updateUsageStats: state.updateUsageStats,
 		setUngroupedCollapsed: state.setUngroupedCollapsed,
 		setBookmarksCollapsed: state.setBookmarksCollapsed,
+		setArchiveCollapsed: state.setArchiveCollapsed,
 		setKanbanCollapsed: state.setKanbanCollapsed,
 		setTourCompleted: state.setTourCompleted,
 		setOnboardingStats: state.setOnboardingStats,

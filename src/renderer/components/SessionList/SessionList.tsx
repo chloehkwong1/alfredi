@@ -32,6 +32,7 @@ import { CollapsedSessionPill } from './CollapsedSessionPill';
 import { SidebarActions } from './SidebarActions';
 import { SkinnySidebar } from './SkinnySidebar';
 import { LiveOverlayPanel } from './LiveOverlayPanel';
+import { ProjectHealthCard } from './ProjectHealthCard';
 import { useSessionCategories } from '../../hooks/session/useSessionCategories';
 import { useSessionFilterMode } from '../../hooks/session/useSessionFilterMode';
 import { useAgentCapabilities } from '../../hooks/agent/useAgentCapabilities';
@@ -39,6 +40,20 @@ import { useAgentCapabilities } from '../../hooks/agent/useAgentCapabilities';
 // ============================================================================
 // SessionContextMenu - Right-click context menu for session items
 // ============================================================================
+
+/** Format a timestamp as a human-readable relative time string. */
+function formatRelativeTime(timestamp: number): string {
+	const delta = Date.now() - timestamp;
+	const seconds = Math.floor(delta / 1000);
+	if (seconds < 60) return 'just now';
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return `${minutes}m ago`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ago`;
+	const days = Math.floor(hours / 24);
+	if (days < 30) return `${days}d ago`;
+	return `${Math.floor(days / 30)}mo ago`;
+}
 
 interface SessionListProps {
 	// Computed values (not in stores — remain as props)
@@ -158,6 +173,9 @@ function SessionListInner(props: SessionListProps) {
 		[sessions, activeBatchSessionIds]
 	);
 
+	const archiveCollapsed = useSettingsStore((s) => s.archiveCollapsed);
+	const setArchiveCollapsed = useSettingsStore.getState().setArchiveCollapsed;
+
 	const { sessionFilter, setSessionFilter } = useSessionFilterMode();
 	const { onResizeStart: onSidebarResizeStart, transitionClass: sidebarTransitionClass } =
 		useResizablePanel({
@@ -172,6 +190,7 @@ function SessionListInner(props: SessionListProps) {
 	const sessionFilterOpen = useUIStore((s) => s.sessionFilterOpen);
 	const setSessionFilterOpen = useUIStore((s) => s.setSessionFilterOpen);
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [showAllArchived, setShowAllArchived] = useState(false);
 
 	// Live overlay state (extracted hook)
 	const {
@@ -383,6 +402,15 @@ function SessionListInner(props: SessionListProps) {
 		sortedFilteredSessions,
 	} = useSessionCategories(sessionFilter, sortedSessions);
 
+	// Archived worktrees: those with worktreeArchivedAt set, sorted most-recent-first
+	const archivedWorktrees = useMemo(
+		() =>
+			sessions
+				.filter((s) => s.worktreeArchivedAt != null)
+				.sort((a, b) => (b.worktreeArchivedAt ?? 0) - (a.worktreeArchivedAt ?? 0)),
+		[sessions]
+	);
+
 	// PERF: Cached callback maps to prevent SessionItem re-renders
 	// These Maps store stable function references keyed by session/editing ID
 	// The callbacks themselves are memoized, so the Map values remain stable
@@ -566,7 +594,12 @@ function SessionListInner(props: SessionListProps) {
 											const statusChildren = worktreeChildrenByStatus(session.id)[status];
 											const isDragTarget =
 												draggingSessionId && draggingWorktreeTargetStatus === status;
-											// Always show all status headers
+											// Auto-collapse: hide empty sections when not dragging
+											// "Done" section is always hidden when not dragging (items live in Archive)
+											if (!draggingSessionId) {
+												if (status === 'done') return null;
+												if (statusChildren.length === 0) return null;
+											}
 											const collapsed = isKanbanSectionCollapsed(session.id, status);
 											return (
 												<div
@@ -920,6 +953,99 @@ function SessionListInner(props: SessionListProps) {
 							renderSessionWithWorktrees(session, 'flat', { keyPrefix: 'flat' })
 						)}
 					</div>
+
+					{/* Project Health Card — git status summary for active worktree */}
+					{(() => {
+						const activeSession = sessions.find((s) => s.id === activeSessionId);
+						if (!activeSession?.isGitRepo) return null;
+						return (
+							<ProjectHealthCard
+								theme={theme}
+								sessionId={activeSessionId!}
+								session={activeSession}
+								isGitRepo={activeSession.isGitRepo}
+								onViewDiff={() => {
+									useUIStore.getState().setActiveRightTopTab('changes');
+								}}
+							/>
+						);
+					})()}
+
+					{/* ARCHIVE SECTION — collapsed-by-default section for worktrees moved to Done */}
+					{archivedWorktrees.length > 0 && (
+						<div className="mb-1">
+							<button
+								type="button"
+								className="w-full px-3 py-1.5 flex items-center justify-between cursor-pointer hover:bg-opacity-50 group"
+								onClick={() => setArchiveCollapsed(!archiveCollapsed)}
+								aria-expanded={!archiveCollapsed}
+							>
+								<div
+									className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider flex-1"
+									style={{ color: theme.colors.textDim }}
+								>
+									{archiveCollapsed ? (
+										<ChevronRight className="w-3 h-3" />
+									) : (
+										<ChevronDown className="w-3 h-3" />
+									)}
+									<span>Archive ({archivedWorktrees.length})</span>
+								</div>
+							</button>
+
+							{!archiveCollapsed && (
+								<div className="flex flex-col">
+									{(showAllArchived ? archivedWorktrees : archivedWorktrees.slice(0, 10)).map(
+										(s) => (
+											<button
+												key={`archive-${s.id}`}
+												type="button"
+												className="w-full flex items-center gap-2 px-3 py-1.5 text-xs opacity-50 hover:opacity-80 transition-opacity cursor-pointer bg-transparent border-none text-left"
+												style={{ color: theme.colors.textMain }}
+												onClick={() => {
+													setSessions((prev) =>
+														prev.map((sess) =>
+															sess.id === s.id
+																? {
+																		...sess,
+																		worktreeStatus: 'todo' as WorktreeStatus,
+																		worktreeArchivedAt: undefined,
+																	}
+																: sess
+														)
+													);
+												}}
+												title="Click to reactivate"
+											>
+												<GitBranch
+													size={10}
+													style={{ color: theme.colors.textDim }}
+													className="shrink-0"
+												/>
+												<span className="truncate flex-1">{s.name}</span>
+												<span
+													className="shrink-0 text-[10px]"
+													style={{ color: theme.colors.textDim }}
+												>
+													{s.worktreeArchivedAt ? formatRelativeTime(s.worktreeArchivedAt) : ''}
+												</span>
+											</button>
+										)
+									)}
+									{!showAllArchived && archivedWorktrees.length > 10 && (
+										<button
+											type="button"
+											className="px-3 py-1 text-xs bg-transparent border-none cursor-pointer text-left"
+											style={{ color: theme.colors.accent }}
+											onClick={() => setShowAllArchived(true)}
+										>
+											Show all ({archivedWorktrees.length})
+										</button>
+									)}
+								</div>
+							)}
+						</div>
+					)}
 
 					{/* Flexible spacer */}
 					<div className="flex-grow min-h-4" />
