@@ -481,6 +481,18 @@ export const InputArea = React.memo(function InputArea(props: InputAreaProps) {
 		}
 	}, [session.activeTabId, inputValue, inputRef]);
 
+	// Re-focus textarea when a pending question changes (new question OR next step in multi-step).
+	// Without this, DOM reflows during rapid pendingQuestion transitions can drop focus,
+	// leaving the textarea visible but unclickable.
+	const pendingQuestionKey = activeTab?.pendingQuestion
+		? `${activeTab.pendingQuestion.toolUseId}:${activeTab.pendingQuestion.currentQuestionIndex}`
+		: null;
+	useEffect(() => {
+		if (pendingQuestionKey && inputRef.current) {
+			setTimeout(() => inputRef.current?.focus(), 50);
+		}
+	}, [pendingQuestionKey, inputRef]);
+
 	// Show summarization progress overlay when active for this tab
 	if (isSummarizing && session.inputMode === 'ai' && onCancelSummarize) {
 		return (
