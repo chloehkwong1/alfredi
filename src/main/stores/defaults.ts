@@ -68,6 +68,8 @@ export const SETTINGS_DEFAULTS: MaestroSettings = {
 	installationId: null,
 	totalActiveTimeMs: 0,
 	outputStyle: 'default',
+	mcpServers: {},
+	linearMcpAutoInject: true,
 };
 
 export const SESSIONS_DEFAULTS: SessionsData = {
