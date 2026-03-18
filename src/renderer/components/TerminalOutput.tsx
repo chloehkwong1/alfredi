@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useMemo, forwardRef, useState, useCallback, memo } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -1564,6 +1565,25 @@ const WorkGroupComponent = memo(
 			onToggleExpanded(group.id, true);
 		}, [onToggleExpanded, group.id]);
 
+		// PERF: Stable hover handlers to avoid inline arrow functions breaking memoization
+		const hoverBgColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}80`;
+		const hoverBgColorDim = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
+		const handleMouseEnter = useCallback(
+			(e: React.MouseEvent<HTMLDivElement>) => {
+				e.currentTarget.style.backgroundColor = hoverBgColor;
+			},
+			[hoverBgColor]
+		);
+		const handleMouseLeave = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+			e.currentTarget.style.backgroundColor = 'transparent';
+		}, []);
+		const handleMouseEnterDim = useCallback(
+			(e: React.MouseEvent<HTMLDivElement>) => {
+				e.currentTarget.style.backgroundColor = hoverBgColorDim;
+			},
+			[hoverBgColorDim]
+		);
+
 		// If filtering out thinking entries leaves <2 entries, render standalone (no group wrapper)
 		if (visibleEntries.length === 0) return null;
 		if (visibleEntries.length === 1) {
@@ -1646,12 +1666,8 @@ const WorkGroupComponent = memo(
 					className="py-1.5 text-[11px] cursor-pointer select-none flex items-center gap-2 transition-colors rounded px-2 -mx-2"
 					style={{ color: theme.colors.textDim }}
 					onClick={handleToggle}
-					onMouseEnter={(e) => {
-						e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}80`;
-					}}
-					onMouseLeave={(e) => {
-						e.currentTarget.style.backgroundColor = 'transparent';
-					}}
+					onMouseEnter={handleMouseEnter}
+					onMouseLeave={handleMouseLeave}
 				>
 					<span style={{ width: '0.75em', flexShrink: 0, fontFamily }}>{chevron}</span>
 					<span style={{ opacity: 0.7 }}>
@@ -1740,12 +1756,8 @@ const WorkGroupComponent = memo(
 											className="py-1 text-[10px] flex items-center gap-1.5 cursor-pointer select-none rounded px-1 -mx-1 transition-colors"
 											style={{ color: theme.colors.textDim, opacity: 0.5 }}
 											onClick={() => setToolsExpanded((prev) => !prev)}
-											onMouseEnter={(e) => {
-												e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
-											}}
-											onMouseLeave={(e) => {
-												e.currentTarget.style.backgroundColor = 'transparent';
-											}}
+											onMouseEnter={handleMouseEnterDim}
+											onMouseLeave={handleMouseLeave}
 										>
 											<span style={{ width: '0.75em', flexShrink: 0, fontFamily }}>
 												{toolsExpanded ? '\u25BE' : '\u25B8'}
@@ -1817,12 +1829,8 @@ const WorkGroupComponent = memo(
 																opacity: 0.5,
 															}}
 															onClick={() => onToggleExpanded(entry.id)}
-															onMouseEnter={(e) => {
-																e.currentTarget.style.backgroundColor = `${theme.colors.bgActivity || theme.colors.bgSidebar}60`;
-															}}
-															onMouseLeave={(e) => {
-																e.currentTarget.style.backgroundColor = 'transparent';
-															}}
+															onMouseEnter={handleMouseEnterDim}
+															onMouseLeave={handleMouseLeave}
 														>
 															<span
 																style={{ color: statusColor, fontSize: '0.7em', flexShrink: 0 }}
@@ -2060,8 +2068,10 @@ export const TerminalOutput = memo(
 		const localRef = useRef<HTMLDivElement>(null);
 		const terminalOutputRef = (ref as React.RefObject<HTMLDivElement>) || localRef;
 
-		// Scroll container ref for native scrolling
+		// Scroll container ref for native scrolling (wired to Virtuoso's scrollerRef)
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
+		// Virtuoso handle for programmatic scrolling
+		const virtuosoRef = useRef<VirtuosoHandle>(null);
 
 		// Text selection tracking for quote/copy toolbar
 		const { selection, clearSelection } = useTextSelection(scrollContainerRef);
@@ -2334,10 +2344,59 @@ export const TerminalOutput = memo(
 		// PERF: Memoize activeLogs to provide stable reference for collapsedLogs dependency
 		const activeLogs = useMemo((): LogEntry[] => activeTab?.logs ?? [], [activeTab?.logs]);
 
+		// PERF: Cache collapsedLogs to avoid full recomputation during streaming.
+		// During streaming, only the last entry's text changes — the structure (count + sources)
+		// stays the same. When structure is unchanged, patch the last collapsed entry in-place.
+		const collapsedLogsCache = useRef<{
+			inputLength: number;
+			lastEntryId: string | undefined;
+			result: LogEntry[];
+		}>({ inputLength: 0, lastEntryId: undefined, result: [] });
+
 		// In AI mode, collapse consecutive non-user entries into single response blocks
 		// This provides a cleaner view where each user message gets one response
 		// Tool and thinking entries are kept separate (not collapsed)
 		const collapsedLogs = useMemo(() => {
+			const cache = collapsedLogsCache.current;
+			const lastEntry = activeLogs.length > 0 ? activeLogs[activeLogs.length - 1] : undefined;
+
+			// Fast path: structure unchanged (same count, same last entry id) — only text updated
+			if (
+				activeLogs.length === cache.inputLength &&
+				lastEntry?.id === cache.lastEntryId &&
+				cache.result.length > 0
+			) {
+				// The last collapsed entry may be a merge of several AI entries — rebuild its text
+				// from the tail of activeLogs that share the same collapsed group.
+				const lastCollapsed = cache.result[cache.result.length - 1];
+				if (
+					lastCollapsed.source !== 'user' &&
+					lastCollapsed.source !== 'tool' &&
+					lastCollapsed.source !== 'thinking'
+				) {
+					// Find how many trailing AI entries were merged into this collapsed entry
+					let trailingAiCount = 0;
+					for (let i = activeLogs.length - 1; i >= 0; i--) {
+						const src = activeLogs[i].source;
+						if (src === 'user' || src === 'tool' || src === 'thinking') break;
+						trailingAiCount++;
+					}
+					const combinedText = activeLogs
+						.slice(activeLogs.length - trailingAiCount)
+						.map((l) => l.text)
+						.join('');
+					if (lastCollapsed.text !== combinedText) {
+						// Shallow-copy result array with patched last entry
+						const patched = cache.result.slice();
+						patched[patched.length - 1] = { ...lastCollapsed, text: combinedText };
+						cache.result = patched;
+					}
+					return cache.result;
+				}
+				return cache.result;
+			}
+
+			// Full recomputation
 			const result: LogEntry[] = [];
 			let currentResponseGroup: LogEntry[] = [];
 
@@ -2372,6 +2431,11 @@ export const TerminalOutput = memo(
 
 			// Flush final response group
 			flushResponseGroup();
+
+			// Update cache
+			cache.inputLength = activeLogs.length;
+			cache.lastEntryId = lastEntry?.id;
+			cache.result = result;
 
 			return result;
 		}, [activeLogs]);
@@ -2527,61 +2591,19 @@ export const TerminalOutput = memo(
 			}
 		}, [autoScrollAiMode]);
 
-		// Auto-scroll to bottom when DOM content changes in the scroll container.
-		// Uses MutationObserver to detect ALL content mutations — new nodes (log entries),
-		// text changes (thinking stream growth), and attribute changes (tool status updates).
-		// This replaces the previous filteredLogs.length dependency, which missed in-place
-		// text updates during thinking/tool streaming (GitHub issue #402).
-		useEffect(() => {
-			const container = scrollContainerRef.current;
-			if (!container) return;
-
-			const shouldAutoScroll = () =>
-				(autoScrollAiMode && !autoScrollPaused) || isAtBottomRef.current;
-
-			const scrollToBottom = () => {
-				if (!scrollContainerRef.current) return;
-				requestAnimationFrame(() => {
-					if (scrollContainerRef.current) {
-						// Set guard flag BEFORE scrollTo — the throttled scroll handler
-						// checks this flag and consumes it (clears it) when it fires,
-						// preventing the programmatic scroll from being misinterpreted
-						// as a user scroll-up that should pause auto-scroll.
-						isProgrammaticScrollRef.current = true;
-						scrollContainerRef.current.scrollTo({
-							top: scrollContainerRef.current.scrollHeight,
-							behavior: 'auto',
-						});
-						// Fallback: if scrollTo is a no-op (already at bottom), the browser
-						// won't fire a scroll event, so the handler never consumes the guard.
-						// Clear it after 32ms (2x the 16ms throttle window) to prevent a
-						// stale true from eating the next genuine user scroll-up.
-						setTimeout(() => {
-							isProgrammaticScrollRef.current = false;
-						}, 32);
-					}
-				});
-			};
-
-			// Initial scroll on mount/dep change
-			if (shouldAutoScroll()) {
-				scrollToBottom();
-			}
-
-			const observer = new MutationObserver(() => {
-				if (shouldAutoScroll()) {
-					scrollToBottom();
+		// Auto-scroll is handled by Virtuoso's followOutput prop.
+		// The followOutput callback below returns 'smooth' when auto-scroll should be
+		// active, letting Virtuoso manage scroll-to-bottom on new items and content growth.
+		// This replaces the previous MutationObserver-based auto-scroll (GitHub issue #402).
+		const handleFollowOutput = useCallback(
+			(isAtBottomVirtuoso: boolean) => {
+				if ((autoScrollAiMode && !autoScrollPaused) || isAtBottomVirtuoso) {
+					return 'smooth';
 				}
-			});
-
-			observer.observe(container, {
-				childList: true, // New/removed DOM nodes (new log entries, tool events)
-				subtree: true, // Watch all descendants, not just direct children
-				characterData: true, // Text node mutations (thinking stream text growth)
-			});
-
-			return () => observer.disconnect();
-		}, [autoScrollAiMode, autoScrollPaused]);
+				return false;
+			},
+			[autoScrollAiMode, autoScrollPaused]
+		);
 
 		// Restore scroll position when component mounts or initialScrollTop changes
 		// Uses requestAnimationFrame to ensure DOM is ready
@@ -2649,11 +2671,231 @@ export const TerminalOutput = memo(
 			return `.terminal-output .text-sm { font-size: ${remSize}; line-height: ${lineHeight}; }`;
 		}, [fontSize]);
 
+		// PERF: Precompute turn durations in a single O(n) pass instead of O(n²) backward search per AI entry.
+		// Maps logId → durationMs for AI responses that follow a user message.
+		const turnDurationMap = useMemo((): Map<string, number> => {
+			const map = new Map<string, number>();
+			if (!isAIMode) return map;
+			let lastUserTimestamp: number | undefined;
+			for (const unit of filteredLogs) {
+				if (unit.type === 'workGroup') continue;
+				if (unit.source === 'user') {
+					lastUserTimestamp = unit.timestamp;
+				} else if (unit.source === 'ai' && lastUserTimestamp != null) {
+					const duration = unit.timestamp - lastUserTimestamp;
+					if (duration > 0) {
+						map.set(unit.id, duration);
+					}
+					// Reset so we don't attribute duration to subsequent AI entries in the same turn
+					lastUserTimestamp = undefined;
+				}
+			}
+			return map;
+		}, [filteredLogs, isAIMode]);
+
 		// CSS Custom Highlight API styles for search match highlighting
 		const highlightStyles = useMemo(
 			() =>
 				`::highlight(output-search) { background-color: ${theme.colors.warning}; color: ${theme.mode === 'light' ? '#fff' : '#000'}; }`,
 			[theme.colors.warning, theme.mode]
+		);
+
+		// Virtuoso item renderer — memoized to avoid recreating on every render.
+		// Renders each RenderUnit (WorkGroup or standalone LogEntry).
+		const renderVirtuosoItem = useCallback(
+			(unitIndex: number, unit: RenderUnit) => {
+				if (unit.type === 'workGroup') {
+					return (
+						<WorkGroupComponent
+							key={unit.id}
+							group={unit}
+							isExpanded={isGroupExpanded(unit.id)}
+							onToggleExpanded={toggleExpanded}
+							showThinking={showThinking}
+							isBusy={isBusy}
+							theme={theme}
+							isTerminal={isTerminal}
+							isAIMode={isAIMode}
+							fontFamily={fontFamily}
+							maxOutputLines={maxOutputLines}
+							expandedLogs={expandedLogs}
+							localFilters={localFilters}
+							filterModes={filterModes}
+							activeLocalFilter={activeLocalFilter}
+							onToggleLocalFilter={toggleLocalFilter}
+							onSetLocalFilterQuery={setLocalFilterQuery}
+							onSetFilterMode={setFilterModeForLog}
+							onClearLocalFilter={clearLocalFilter}
+							deleteConfirmLogId={deleteConfirmLogId}
+							onDeleteLog={onDeleteLog}
+							onRewindToMessage={onRewindToMessage}
+							onSetDeleteConfirmLogId={setDeleteConfirmLogId}
+							scrollContainerRef={scrollContainerRef}
+							setLightboxImage={setLightboxImage}
+							copyToClipboard={copyToClipboard}
+							ansiConverter={ansiConverter}
+							markdownEditMode={markdownEditMode}
+							onToggleMarkdownEditMode={toggleMarkdownEditMode}
+							onReplayMessage={onReplayMessage}
+							fileTree={fileTree}
+							cwd={cwd}
+							projectRoot={projectRoot}
+							onFileClick={onFileClick}
+							onShowErrorDetails={onShowErrorDetails}
+							onSaveToFile={handleSaveToFile}
+							userMessageAlignment={userMessageAlignment}
+							onAnswerQuestion={handleAnswerQuestion}
+						/>
+					);
+				}
+
+				// Standalone log entry
+				const log = unit;
+				let prevSource: LogEntry['source'] | undefined;
+				if (unitIndex > 0) {
+					const prevUnit = filteredLogs[unitIndex - 1];
+					if (prevUnit.type === 'workGroup') {
+						prevSource = prevUnit.entries[prevUnit.entries.length - 1].source;
+					} else {
+						prevSource = prevUnit.source;
+					}
+				}
+
+				// PERF: O(1) lookup from precomputed map instead of O(n) backward search
+				const turnDurationMs = turnDurationMap.get(log.id);
+
+				return (
+					<LogItemComponent
+						key={log.id}
+						log={log}
+						index={unitIndex}
+						prevSource={prevSource}
+						turnDurationMs={turnDurationMs}
+						isTerminal={isTerminal}
+						isAIMode={isAIMode}
+						theme={theme}
+						fontFamily={fontFamily}
+						maxOutputLines={maxOutputLines}
+						lastUserCommand={
+							isTerminal && log.source !== 'user' ? getLastUserCommand(unitIndex) : undefined
+						}
+						isExpanded={log.aiCommand ? expandedLogs.has(log.id) : !expandedLogs.has(log.id)}
+						onToggleExpanded={toggleExpanded}
+						localFilterQuery={localFilters.get(log.id) || ''}
+						filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}
+						activeLocalFilter={activeLocalFilter}
+						onToggleLocalFilter={toggleLocalFilter}
+						onSetLocalFilterQuery={setLocalFilterQuery}
+						onSetFilterMode={setFilterModeForLog}
+						onClearLocalFilter={clearLocalFilter}
+						deleteConfirmLogId={deleteConfirmLogId}
+						onDeleteLog={onDeleteLog}
+						onRewindToMessage={onRewindToMessage}
+						onSetDeleteConfirmLogId={setDeleteConfirmLogId}
+						scrollContainerRef={scrollContainerRef}
+						setLightboxImage={setLightboxImage}
+						copyToClipboard={copyToClipboard}
+						ansiConverter={ansiConverter}
+						markdownEditMode={markdownEditMode}
+						onToggleMarkdownEditMode={toggleMarkdownEditMode}
+						onReplayMessage={onReplayMessage}
+						fileTree={fileTree}
+						cwd={cwd}
+						projectRoot={projectRoot}
+						onFileClick={onFileClick}
+						onShowErrorDetails={onShowErrorDetails}
+						onSaveToFile={handleSaveToFile}
+						userMessageAlignment={userMessageAlignment}
+						onAnswerQuestion={handleAnswerQuestion}
+						onAdvanceQuestion={handleAdvanceQuestion}
+						pendingQuestion={activePendingQuestion}
+					/>
+				);
+			},
+			 
+			[
+				filteredLogs,
+				turnDurationMap,
+				isGroupExpanded,
+				toggleExpanded,
+				showThinking,
+				isBusy,
+				theme,
+				isTerminal,
+				isAIMode,
+				fontFamily,
+				maxOutputLines,
+				expandedLogs,
+				localFilters,
+				filterModes,
+				activeLocalFilter,
+				toggleLocalFilter,
+				setLocalFilterQuery,
+				setFilterModeForLog,
+				clearLocalFilter,
+				deleteConfirmLogId,
+				onDeleteLog,
+				onRewindToMessage,
+				scrollContainerRef,
+				setLightboxImage,
+				copyToClipboard,
+				ansiConverter,
+				markdownEditMode,
+				toggleMarkdownEditMode,
+				onReplayMessage,
+				fileTree,
+				cwd,
+				projectRoot,
+				onFileClick,
+				onShowErrorDetails,
+				handleSaveToFile,
+				userMessageAlignment,
+				handleAnswerQuestion,
+				handleAdvanceQuestion,
+				activePendingQuestion,
+				getLastUserCommand,
+			]
+		);
+
+		// Virtuoso footer — rendered below all log entries (queue, response duration, end ref)
+		const VirtuosoFooter = useCallback(
+			() => (
+				<>
+					{/* Queued items section - filtered to active tab */}
+					{session.executionQueue && session.executionQueue.length > 0 && (
+						<QueuedItemsList
+							executionQueue={session.executionQueue}
+							theme={theme}
+							onRemoveQueuedItem={onRemoveQueuedItem}
+							activeTabId={activeTabId || undefined}
+						/>
+					)}
+
+					{/* Response duration — shown after agent completes a response */}
+					{!isBusy &&
+						activeTab?.lastResponseDurationMs != null &&
+						activeTab.lastResponseDurationMs > 0 && (
+							<div
+								className="flex justify-center py-2 text-xs font-mono select-none"
+								style={{ color: theme.colors.textDim, opacity: 0.6 }}
+							>
+								Brewed for {formatElapsedTime(activeTab.lastResponseDurationMs)}
+							</div>
+						)}
+
+					{/* End ref for scrolling - always rendered so Cmd+Shift+J works even when busy */}
+					<div ref={logsEndRef} />
+				</>
+			),
+			[
+				session.executionQueue,
+				theme,
+				onRemoveQueuedItem,
+				activeTabId,
+				isBusy,
+				activeTab,
+				logsEndRef,
+			]
 		);
 
 		return (
@@ -2749,179 +2991,39 @@ export const TerminalOutput = memo(
 				<style>{proseStyles}</style>
 				<style>{highlightStyles}</style>
 				{fontSizeStyles && <style>{fontSizeStyles}</style>}
-				{/* Native scroll log list */}
-				{/* overflow-anchor: disabled in AI mode when auto-scroll is off to prevent
-				    browser from automatically keeping viewport pinned to bottom on new content */}
-				<div
-					ref={scrollContainerRef}
-					className="flex-1 overflow-y-auto scrollbar-thin"
-					style={{
-						overflowAnchor: !autoScrollAiMode || autoScrollPaused ? 'none' : undefined,
+				{/* Virtuoso virtual-scroll log list */}
+				<Virtuoso
+					ref={virtuosoRef}
+					data={filteredLogs}
+					followOutput={handleFollowOutput}
+					itemContent={renderVirtuosoItem}
+					components={{ Footer: VirtuosoFooter }}
+					scrollerRef={(el) => {
+						// Wire Virtuoso's scroller to our scrollContainerRef so
+						// existing code (arrow key scroll, scroll position restore,
+						// unread detection) continues to work.
+						(scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current =
+							el as HTMLDivElement | null;
 					}}
 					onScroll={handleScroll}
-				>
-					{/* Log entries — render WorkGroups as collapsible blocks, standalone entries as before */}
-					{filteredLogs.map((unit, unitIndex) => {
-						if (unit.type === 'workGroup') {
-							return (
-								<WorkGroupComponent
-									key={unit.id}
-									group={unit}
-									isExpanded={isGroupExpanded(unit.id)}
-									onToggleExpanded={toggleExpanded}
-									showThinking={showThinking}
-									isBusy={isBusy}
-									theme={theme}
-									isTerminal={isTerminal}
-									isAIMode={isAIMode}
-									fontFamily={fontFamily}
-									maxOutputLines={maxOutputLines}
-									expandedLogs={expandedLogs}
-									localFilters={localFilters}
-									filterModes={filterModes}
-									activeLocalFilter={activeLocalFilter}
-									onToggleLocalFilter={toggleLocalFilter}
-									onSetLocalFilterQuery={setLocalFilterQuery}
-									onSetFilterMode={setFilterModeForLog}
-									onClearLocalFilter={clearLocalFilter}
-									deleteConfirmLogId={deleteConfirmLogId}
-									onDeleteLog={onDeleteLog}
-									onRewindToMessage={onRewindToMessage}
-									onSetDeleteConfirmLogId={setDeleteConfirmLogId}
-									scrollContainerRef={scrollContainerRef}
-									setLightboxImage={setLightboxImage}
-									copyToClipboard={copyToClipboard}
-									ansiConverter={ansiConverter}
-									markdownEditMode={markdownEditMode}
-									onToggleMarkdownEditMode={toggleMarkdownEditMode}
-									onReplayMessage={onReplayMessage}
-									fileTree={fileTree}
-									cwd={cwd}
-									projectRoot={projectRoot}
-									onFileClick={onFileClick}
-									onShowErrorDetails={onShowErrorDetails}
-									onSaveToFile={handleSaveToFile}
-									userMessageAlignment={userMessageAlignment}
-									onAnswerQuestion={handleAnswerQuestion}
-								/>
-							);
-						}
-
-						// Standalone log entry
-						const log = unit;
-						let prevSource: LogEntry['source'] | undefined;
-						if (unitIndex > 0) {
-							const prevUnit = filteredLogs[unitIndex - 1];
-							if (prevUnit.type === 'workGroup') {
-								prevSource = prevUnit.entries[prevUnit.entries.length - 1].source;
-							} else {
-								prevSource = prevUnit.source;
-							}
-						}
-
-						// Compute turn duration: time from the last user message to this AI response
-						let turnDurationMs: number | undefined;
-						if (isAIMode && log.source === 'ai') {
-							for (let j = unitIndex - 1; j >= 0; j--) {
-								const prev = filteredLogs[j];
-								if (prev.type === 'workGroup') continue;
-								if (prev.source === 'user') {
-									turnDurationMs = log.timestamp - prev.timestamp;
-									break;
-								}
-								// Stop searching if we hit another AI message (different turn)
-								if (prev.source === 'ai') break;
-							}
-						}
-
-						return (
-							<LogItemComponent
-								key={log.id}
-								log={log}
-								index={unitIndex}
-								prevSource={prevSource}
-								turnDurationMs={turnDurationMs}
-								isTerminal={isTerminal}
-								isAIMode={isAIMode}
-								theme={theme}
-								fontFamily={fontFamily}
-								maxOutputLines={maxOutputLines}
-								lastUserCommand={
-									isTerminal && log.source !== 'user' ? getLastUserCommand(unitIndex) : undefined
-								}
-								isExpanded={log.aiCommand ? expandedLogs.has(log.id) : !expandedLogs.has(log.id)}
-								onToggleExpanded={toggleExpanded}
-								localFilterQuery={localFilters.get(log.id) || ''}
-								filterMode={filterModes.get(log.id) || { mode: 'include', regex: false }}
-								activeLocalFilter={activeLocalFilter}
-								onToggleLocalFilter={toggleLocalFilter}
-								onSetLocalFilterQuery={setLocalFilterQuery}
-								onSetFilterMode={setFilterModeForLog}
-								onClearLocalFilter={clearLocalFilter}
-								deleteConfirmLogId={deleteConfirmLogId}
-								onDeleteLog={onDeleteLog}
-								onRewindToMessage={onRewindToMessage}
-								onSetDeleteConfirmLogId={setDeleteConfirmLogId}
-								scrollContainerRef={scrollContainerRef}
-								setLightboxImage={setLightboxImage}
-								copyToClipboard={copyToClipboard}
-								ansiConverter={ansiConverter}
-								markdownEditMode={markdownEditMode}
-								onToggleMarkdownEditMode={toggleMarkdownEditMode}
-								onReplayMessage={onReplayMessage}
-								fileTree={fileTree}
-								cwd={cwd}
-								projectRoot={projectRoot}
-								onFileClick={onFileClick}
-								onShowErrorDetails={onShowErrorDetails}
-								onSaveToFile={handleSaveToFile}
-								userMessageAlignment={userMessageAlignment}
-								onAnswerQuestion={handleAnswerQuestion}
-								onAdvanceQuestion={handleAdvanceQuestion}
-								pendingQuestion={activePendingQuestion}
-							/>
-						);
-					})}
-
-					{/* Queued items section - filtered to active tab */}
-					{session.executionQueue && session.executionQueue.length > 0 && (
-						<QueuedItemsList
-							executionQueue={session.executionQueue}
-							theme={theme}
-							onRemoveQueuedItem={onRemoveQueuedItem}
-							activeTabId={activeTabId || undefined}
-						/>
-					)}
-
-					{/* Response duration — shown after agent completes a response */}
-					{!isBusy &&
-						activeTab?.lastResponseDurationMs != null &&
-						activeTab.lastResponseDurationMs > 0 && (
-							<div
-								className="flex justify-center py-2 text-xs font-mono select-none"
-								style={{ color: theme.colors.textDim, opacity: 0.6 }}
-							>
-								Brewed for {formatElapsedTime(activeTab.lastResponseDurationMs)}
-							</div>
-						)}
-
-					{/* End ref for scrolling - always rendered so Cmd+Shift+J works even when busy */}
-					<div ref={logsEndRef} />
-				</div>
+					className="flex-1 scrollbar-thin"
+					style={{ flex: 1, overflowY: 'auto' }}
+					increaseViewportBy={{ top: 200, bottom: 200 }}
+				/>
 
 				{/* Scroll to bottom button — shown when user has scrolled up */}
 				{!isAtBottom && (
 					<button
 						onClick={() => {
-							if (!scrollContainerRef.current) return;
 							isProgrammaticScrollRef.current = true;
-							scrollContainerRef.current.scrollTo({
-								top: scrollContainerRef.current.scrollHeight,
+							virtuosoRef.current?.scrollToIndex({
+								index: 'LAST',
 								behavior: 'smooth',
+								align: 'end',
 							});
 							setTimeout(() => {
 								isProgrammaticScrollRef.current = false;
-							}, 32);
+							}, 100);
 						}}
 						className="absolute bottom-4 right-6 z-10 p-2 rounded-full shadow-lg hover:opacity-90 transition-opacity cursor-pointer"
 						style={{

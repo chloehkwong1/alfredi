@@ -25,6 +25,67 @@ const createMockIcon = (name: string) => {
 	return MockIcon;
 };
 
+// Global mock for react-virtuoso — Virtuoso renders nothing in JSDOM (no viewport dimensions).
+// This mock renders items synchronously so tests can assert on content.
+vi.mock('react-virtuoso', () => {
+	const MockVirtuoso = React.forwardRef(function MockVirtuoso(
+		props: {
+			data?: unknown[];
+			itemContent?: (index: number, item: unknown) => React.ReactNode;
+			components?: { Footer?: React.ComponentType };
+			scrollerRef?: (el: HTMLElement | null) => void;
+			onScroll?: unknown;
+			followOutput?: unknown;
+			increaseViewportBy?: unknown;
+			className?: string;
+			style?: React.CSSProperties;
+		},
+		ref: React.Ref<unknown>
+	) {
+		const containerRef = React.useRef<HTMLDivElement>(null);
+
+		// Wire scrollerRef to the container div
+		React.useEffect(() => {
+			if (props.scrollerRef) {
+				props.scrollerRef(containerRef.current);
+			}
+		}, [props.scrollerRef]);
+
+		// Expose a minimal VirtuosoHandle on the forwarded ref
+		React.useImperativeHandle(ref, () => ({
+			scrollToIndex: () => {},
+			scrollTo: () => {},
+			scrollBy: () => {},
+		}));
+
+		const Footer = props.components?.Footer;
+
+		// Merge className with overflow-y-auto so tests can querySelector('.overflow-y-auto')
+		const mergedClassName = [props.className, 'overflow-y-auto'].filter(Boolean).join(' ');
+
+		return React.createElement(
+			'div',
+			{
+				ref: containerRef,
+				'data-testid': 'virtuoso-scroller',
+				className: mergedClassName,
+				style: props.style,
+				onScroll: props.onScroll as React.UIEventHandler<HTMLDivElement> | undefined,
+			},
+			props.data && props.itemContent
+				? props.data.map((item, index) =>
+						React.createElement(React.Fragment, { key: index }, props.itemContent!(index, item))
+					)
+				: null,
+			Footer ? React.createElement(Footer) : null
+		);
+	});
+
+	return {
+		Virtuoso: MockVirtuoso,
+	};
+});
+
 // Global mock for lucide-react using Proxy to auto-generate mock icons
 // This ensures any icon import works without explicitly listing every icon
 vi.mock('lucide-react', () => {
