@@ -164,8 +164,16 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 	// Internal refs — only used by IPC listeners, not needed outside this hook
 	const thinkingChunkBufferRef = useRef<Map<string, string>>(new Map());
 	const thinkingChunkRafIdRef = useRef<number | null>(null);
+	// Cached settings — avoids calling getState() inside RAF-throttled / high-frequency paths
+	const showThinkingRef = useRef(useSettingsStore.getState().defaultShowThinking);
 
 	useEffect(() => {
+		// Sync cached setting on mount (picks up any change since initial render)
+		showThinkingRef.current = useSettingsStore.getState().defaultShowThinking;
+		const unsubSettings = useSettingsStore.subscribe((state) => {
+			showThinkingRef.current = state.defaultShowThinking;
+		});
+
 		// Copy ref value to local variable for cleanup (React ESLint rule)
 		const thinkingChunkBuffer = thinkingChunkBufferRef.current;
 
@@ -234,9 +242,11 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			deps.batchedUpdater.markDelivered(actualSessionId, targetTabId);
 			deps.batchedUpdater.updateCycleBytes(actualSessionId, data.length);
 
+			// Read session once for error check + unread logic
+			const sessionSnapshot = getSessions().find((s) => s.id === actualSessionId);
+
 			// Clear error state if session had an error but is now receiving successful data
-			const sessionForErrorCheck = getSessions().find((s) => s.id === actualSessionId);
-			if (sessionForErrorCheck?.agentError) {
+			if (sessionSnapshot?.agentError) {
 				setSessions((prev) =>
 					prev.map((s) => {
 						if (s.id !== actualSessionId) return s;
@@ -259,12 +269,11 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 			}
 
 			// Determine if tab should be marked as unread
-			const session = getSessions().find((s) => s.id === actualSessionId);
-			if (session) {
-				const targetTab = session.aiTabs?.find((t) => t.id === targetTabId);
+			if (sessionSnapshot) {
+				const targetTab = sessionSnapshot.aiTabs?.find((t) => t.id === targetTabId);
 				if (targetTab) {
-					const isTargetTabActive = targetTab.id === session.activeTabId;
-					const isThisSessionActive = session.id === getActiveSessionId();
+					const isTargetTabActive = targetTab.id === sessionSnapshot.activeTabId;
+					const isThisSessionActive = sessionSnapshot.id === getActiveSessionId();
 					const isUserAtBottom = targetTab.isAtBottom !== false;
 					const shouldMarkUnread = !isTargetTabActive || !isThisSessionActive || !isUserAtBottom;
 					deps.batchedUpdater.markUnread(actualSessionId, targetTabId, shouldMarkUnread);
@@ -384,11 +393,8 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						const lastAiLog = logs
 							.filter((log) => log.source === 'stdout' || log.source === 'ai')
 							.pop();
-						const completedTabData = currentSession.aiTabs?.find(
-							(tab) => tab.id === tabIdFromSession
-						);
-						const duration = completedTabData?.thinkingStartTime
-							? Date.now() - completedTabData.thinkingStartTime
+						const duration = completedTab?.thinkingStartTime
+							? Date.now() - completedTab.thinkingStartTime
 							: currentSession.thinkingStartTime
 								? Date.now() - currentSession.thinkingStartTime
 								: 0;
@@ -446,7 +452,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 							tabId: completedTab?.id,
 							agentType: currentSession.toolType,
 							projectPath: currentSession.cwd,
-							startTime: completedTabData?.thinkingStartTime || currentSession.thinkingStartTime,
+							startTime: completedTab?.thinkingStartTime || currentSession.thinkingStartTime,
 							isRemote: !!(
 								currentSession.sshRemoteId || currentSession.sessionSshRemoteConfig?.enabled
 							),
@@ -1261,7 +1267,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 									const targetTab = updatedTabs.find((t) => t.id === chunkTabId);
 									if (!targetTab) continue;
 
-									const globalShowThinking = useSettingsStore.getState().defaultShowThinking;
+									const globalShowThinking = showThinkingRef.current;
 									if (!globalShowThinking || globalShowThinking === 'off') continue;
 
 									// Skip adding thinking chunks if tab has gone idle (result already arrived)
@@ -1434,7 +1440,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 						if (s.id !== actualSessionId) return s;
 
 						const targetTab = s.aiTabs.find((t) => t.id === tabId);
-						const globalShowThinking = useSettingsStore.getState().defaultShowThinking;
+						const globalShowThinking = showThinkingRef.current;
 						if (!globalShowThinking || globalShowThinking === 'off') return s;
 
 						const toolLog: LogEntry = {
@@ -1467,7 +1473,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		// onUserQuestion — Handle AskUserQuestion tool events (Claude Code)
 		// ================================================================
 		const unsubscribeUserQuestion = window.maestro.process.onUserQuestion?.(
-			(
+			async (
 				sessionId: string,
 				questionData: {
 					toolUseId: string;
@@ -1484,6 +1490,26 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 
 				const actualSessionId = aiTabMatch[1];
 				const tabId = aiTabMatch[2];
+
+				// Guard against stale question events arriving after the process has already exited.
+				// This race condition can leave the session stuck in 'busy' with a dead process.
+				try {
+					const activeProcesses = await window.maestro.process.getActiveProcesses();
+					const processStillRunning = activeProcesses.some((p) => p.sessionId === sessionId);
+					if (!processStillRunning) {
+						console.warn(
+							'[onUserQuestion] Process already exited, ignoring stale question event:',
+							{
+								sessionId,
+								toolUseId: questionData.toolUseId,
+							}
+						);
+						return;
+					}
+				} catch (error) {
+					console.error('[onUserQuestion] Failed to verify process status:', error);
+					// Continue — better to show a question than silently drop it
+				}
 
 				// Create a single log entry containing all questions for this toolUseId
 				const firstQ = questionData.questions[0];
@@ -1510,6 +1536,14 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 				setSessions((prev) =>
 					prev.map((s) => {
 						if (s.id !== actualSessionId) return s;
+
+						// Guard against the async race: if this question was already answered
+						// (e.g. user answered before getActiveProcesses() resolved), skip the update.
+						const targetTab = s.aiTabs.find((t) => t.id === tabId);
+						const alreadyAnswered = targetTab?.logs.some(
+							(l) => l.metadata?.toolUseId === questionData.toolUseId && l.answered !== undefined
+						);
+						if (alreadyAnswered) return s;
 
 						return {
 							...s,
@@ -1549,6 +1583,7 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 		// Cleanup — unsubscribe all listeners on unmount
 		// ================================================================
 		return () => {
+			unsubSettings();
 			unsubscribeData();
 			unsubscribeExit();
 			unsubscribeSessionId();
