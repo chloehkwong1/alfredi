@@ -37,8 +37,10 @@ export function SearchableList<T>({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const listRef = useRef<HTMLDivElement>(null);
 
-	// Filter items locally
-	const filtered = query && !onSearchChange ? items.filter((item) => filterFn(item, query)) : items;
+	// Filter items locally — always apply filterFn when query is set, even when onSearchChange is
+	// provided (API-backed search). This ensures immediate feedback while the API call is in-flight
+	// and guards against the API returning unrelated results.
+	const filtered = query ? items.filter((item) => filterFn(item, query)) : items;
 
 	// Reset highlight when items change
 	useEffect(() => {
