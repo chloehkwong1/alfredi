@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Session, SessionState, LogEntry, QueuedItem, CustomAICommand } from '../../types';
 import { getActiveTab, extractQuickTabName } from '../../utils/tabHelpers';
 import { getStdinFlags } from '../../utils/spawnHelpers';
@@ -131,6 +131,40 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 		conductorProfile,
 	} = deps;
 
+	// ── Refs for frequently-changing values (keeps processInput callback stable) ──
+	const activeSessionRef = useRef(activeSession);
+	const activeSessionIdRef = useRef(activeSessionId);
+	const inputValueRef = useRef(inputValue);
+	const stagedImagesRef = useRef(stagedImages);
+	const customAICommandsRef = useRef(customAICommands);
+	const getBatchStateRef = useRef(getBatchState);
+	const flushBatchedUpdatesRef = useRef(flushBatchedUpdates);
+	const onHistoryCommandRef = useRef(onHistoryCommand);
+	const onWizardCommandRef = useRef(onWizardCommand);
+	const onWizardSendMessageRef = useRef(onWizardSendMessage);
+	const isWizardActiveRef = useRef(isWizardActive);
+	const onSkillsCommandRef = useRef(onSkillsCommand);
+	const automaticTabNamingEnabledRef = useRef(automaticTabNamingEnabled);
+	const conductorProfileRef = useRef(conductorProfile);
+
+	// Sync refs on every render so the stable callback always reads fresh values
+	useEffect(() => {
+		activeSessionRef.current = activeSession;
+		activeSessionIdRef.current = activeSessionId;
+		inputValueRef.current = inputValue;
+		stagedImagesRef.current = stagedImages;
+		customAICommandsRef.current = customAICommands;
+		getBatchStateRef.current = getBatchState;
+		flushBatchedUpdatesRef.current = flushBatchedUpdates;
+		onHistoryCommandRef.current = onHistoryCommand;
+		onWizardCommandRef.current = onWizardCommand;
+		onWizardSendMessageRef.current = onWizardSendMessage;
+		isWizardActiveRef.current = isWizardActive;
+		onSkillsCommandRef.current = onSkillsCommand;
+		automaticTabNamingEnabledRef.current = automaticTabNamingEnabled;
+		conductorProfileRef.current = conductorProfile;
+	});
+
 	// Ref for the processInput function so external code can access the latest version
 	const processInputRef = useRef<((overrideInputValue?: string) => Promise<void>) | null>(null);
 
@@ -139,6 +173,22 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 	 */
 	const processInput = useCallback(
 		async (overrideInputValue?: string) => {
+			// Read frequently-changing values from refs (keeps this callback stable)
+			const activeSession = activeSessionRef.current;
+			const activeSessionId = activeSessionIdRef.current;
+			const inputValue = inputValueRef.current;
+			const stagedImages = stagedImagesRef.current;
+			const customAICommands = customAICommandsRef.current;
+			const getBatchState = getBatchStateRef.current;
+			const flushBatchedUpdates = flushBatchedUpdatesRef.current;
+			const onHistoryCommand = onHistoryCommandRef.current;
+			const onWizardCommand = onWizardCommandRef.current;
+			const onWizardSendMessage = onWizardSendMessageRef.current;
+			const isWizardActive = isWizardActiveRef.current;
+			const onSkillsCommand = onSkillsCommandRef.current;
+			const automaticTabNamingEnabled = automaticTabNamingEnabledRef.current;
+			const conductorProfile = conductorProfileRef.current;
+
 			// Flush any pending batched updates before processing user input
 			// This ensures AI output appears before the user's new message
 			flushBatchedUpdates?.();
@@ -245,11 +295,10 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 					return;
 				}
 
-				// Check for custom AI commands
-				// Skip interception for Claude Code agents — they handle skills natively
-				// via the Skill tool, which works regardless of position in the input.
-				// Intercepting here prevents mid-sentence skill references from working.
-				if (activeSession.toolType !== 'claude-code') {
+				// Check for custom AI commands (from ~/.claude/commands/ and <cwd>/.claude/commands/)
+				// These are intercepted for ALL agents including Claude Code, because the
+				// Claude Agent SDK does not inject user-defined commands into its system context.
+				{
 					// Parse command and arguments: "/speckit.plan Blah blah" -> baseCommand="/speckit.plan", args="Blah blah"
 					const firstSpaceIndex = commandText.indexOf(' ');
 					const baseCommand =
@@ -479,15 +528,8 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 							answerLength: serialized.length,
 							serialized,
 						});
-						window.maestro.process
-							.answerQuestion(pendingQ.processSessionId, pendingQ.toolUseId, serialized)
-							.then((result) => {
-								console.log('[processInput] answerQuestion IPC result:', result);
-							})
-							.catch((err) => {
-								console.error('[processInput] answerQuestion IPC failed:', err);
-							});
-						// Clear pending question, reset session state, and mark log entries as answered
+						// Clear pending question and mark log entries as answered immediately
+						// (so UI updates regardless of IPC result)
 						setSessions((prev) =>
 							prev.map((s) => {
 								if (s.id !== activeSessionId) return s;
@@ -509,6 +551,61 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 								};
 							})
 						);
+
+						// Send the answer via IPC — if the process is already dead, reset to idle
+						window.maestro.process
+							.answerQuestion(pendingQ.processSessionId, pendingQ.toolUseId, serialized)
+							.then((result) => {
+								console.log('[processInput] answerQuestion IPC result:', result);
+								if (result === false) {
+									// Process is gone — reset session state so queue can drain
+									console.warn(
+										'[processInput] answerQuestion returned false (process dead), resetting to idle'
+									);
+									setSessions((prev) =>
+										prev.map((s) => {
+											if (s.id !== activeSessionId) return s;
+											return {
+												...s,
+												state: 'idle' as import('../../types').SessionState,
+												busySource: undefined,
+												thinkingStartTime: undefined,
+												aiTabs: s.aiTabs.map((tab) => {
+													if (tab.id !== activeTab!.id) return tab;
+													return {
+														...tab,
+														state: 'idle' as const,
+														thinkingStartTime: undefined,
+													};
+												}),
+											};
+										})
+									);
+								}
+							})
+							.catch((err) => {
+								console.error('[processInput] answerQuestion IPC failed:', err);
+								// IPC error — process is likely dead, reset to idle
+								setSessions((prev) =>
+									prev.map((s) => {
+										if (s.id !== activeSessionId) return s;
+										return {
+											...s,
+											state: 'idle' as import('../../types').SessionState,
+											busySource: undefined,
+											thinkingStartTime: undefined,
+											aiTabs: s.aiTabs.map((tab) => {
+												if (tab.id !== activeTab!.id) return tab;
+												return {
+													...tab,
+													state: 'idle' as const,
+													thinkingStartTime: undefined,
+												};
+											}),
+										};
+									})
+								);
+							});
 					}
 					// Clear input
 					setInputValue('');
@@ -1097,23 +1194,15 @@ export function useInputProcessing(deps: UseInputProcessingDeps): UseInputProces
 			}
 		},
 		[
-			activeSession,
-			activeSessionId,
-			inputValue,
-			stagedImages,
-			customAICommands,
+			// Only stable deps (setters, refs) — frequently-changing values are read from refs above
 			setInputValue,
 			setStagedImages,
 			setSlashCommandOpen,
 			syncAiInputToSession,
 			inputRef,
 			sessionsRef,
-			getBatchState,
 			processQueuedItemRef,
 			setSessions,
-			flushBatchedUpdates,
-			onHistoryCommand,
-			onWizardCommand,
 		]
 	);
 
