@@ -932,7 +932,8 @@ export const RightPanel = memo(
 								style={{
 									color:
 										tab.id === activeTerminalTabId ? theme.colors.textMain : theme.colors.textDim,
-									borderColor: tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
+									borderBottomColor:
+										tab.id === activeTerminalTabId ? theme.colors.accent : 'transparent',
 									backgroundColor: tab.id === activeTerminalTabId ? undefined : 'transparent',
 									borderLeftColor:
 										dragOverTermTabId === tab.id && draggingTermTabId !== tab.id
