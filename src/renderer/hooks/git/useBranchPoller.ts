@@ -2,7 +2,7 @@
  * useBranchPoller — Branch + PR status polling for regular (non-worktree) agents
  *
  * Every 30s, polls the current branch for each regular git-backed agent.
- * When the branch changes (or on first detection), fetches PR status from GitHub.
+ * Fetches PR status from GitHub on every poll to catch remote changes (draft toggle, reviews, checks).
  * Updates session store with currentBranch, prNumber, prUrl, prTitle,
  * prReviewDecision, and prCheckStatus.
  *
@@ -67,50 +67,59 @@ export function useBranchPoller(): void {
 					updateSession(session.id, { currentBranch: branch });
 				}
 
-				// Fetch PR status on branch change or first detection
-				if (branchChanged || current.prNumber === undefined) {
-					const prStatus = await gitService.getPrStatus(session.projectRoot, branch);
+				// Fetch PR status on every poll to catch remote changes (draft toggle, review decisions, checks)
+				const prStatus = await gitService.getPrStatus(session.projectRoot, branch);
 
-					// Re-read again after async call
-					const latest = useSessionStore.getState().sessions.find((s) => s.id === session.id);
-					if (!latest) return;
+				// Re-read again after async call
+				const latest = useSessionStore.getState().sessions.find((s) => s.id === session.id);
+				if (!latest) return;
 
-					if (!prStatus || prStatus.state !== 'OPEN') {
-						// No open PR — clear PR fields if they were set
-						if (latest.prNumber !== undefined) {
-							updateSession(session.id, {
-								prNumber: undefined,
-								prUrl: undefined,
-								prTitle: undefined,
-								prReviewDecision: undefined,
-								prCheckStatus: undefined,
-								prIsDraft: undefined,
-							});
-						}
-						return;
+				if (!prStatus || prStatus.state !== 'OPEN') {
+					// No open PR — clear PR fields if they were set
+					if (latest.prNumber !== undefined) {
+						updateSession(session.id, {
+							prNumber: undefined,
+							prUrl: undefined,
+							prTitle: undefined,
+							prReviewDecision: undefined,
+							prCheckStatus: undefined,
+							prIsDraft: undefined,
+						});
 					}
+					return;
+				}
 
-					// Update PR fields
-					const updates: Partial<Session> = {};
-					if (latest.prNumber !== prStatus.number) updates.prNumber = prStatus.number;
-					if (latest.prUrl !== prStatus.url) updates.prUrl = prStatus.url;
-					if (latest.prTitle !== prStatus.title) updates.prTitle = prStatus.title;
-					if (latest.prReviewDecision !== prStatus.reviewDecision)
-						updates.prReviewDecision = prStatus.reviewDecision;
-					// Always update checkStatus (object comparison not worth the complexity)
-					updates.prCheckStatus = prStatus.checkStatus;
-					if (latest.prIsDraft !== prStatus.isDraft) updates.prIsDraft = prStatus.isDraft;
-					// Update reviewer and comment data from extended getPrStatus
-					if (prStatus.reviewers) {
-						updates.prReviewers = prStatus.reviewers;
-					}
-					if (prStatus.totalComments !== undefined) {
-						updates.prCommentCount = prStatus.totalComments;
-					}
+				// Update PR fields
+				const updates: Partial<Session> = {};
+				if (latest.prNumber !== prStatus.number) updates.prNumber = prStatus.number;
+				if (latest.prUrl !== prStatus.url) updates.prUrl = prStatus.url;
+				if (latest.prTitle !== prStatus.title) updates.prTitle = prStatus.title;
+				if (latest.prReviewDecision !== prStatus.reviewDecision)
+					updates.prReviewDecision = prStatus.reviewDecision;
+				// Shallow-compare checkStatus fields to avoid unnecessary store updates
+				const cs = prStatus.checkStatus;
+				const prev = latest.prCheckStatus;
+				if (
+					!prev ||
+					!cs ||
+					prev.total !== cs.total ||
+					prev.passing !== cs.passing ||
+					prev.failing !== cs.failing ||
+					prev.pending !== cs.pending
+				) {
+					updates.prCheckStatus = cs;
+				}
+				if (latest.prIsDraft !== prStatus.isDraft) updates.prIsDraft = prStatus.isDraft;
+				// Update reviewer and comment data from extended getPrStatus
+				if (prStatus.reviewers) {
+					updates.prReviewers = prStatus.reviewers;
+				}
+				if (prStatus.totalComments !== undefined) {
+					updates.prCommentCount = prStatus.totalComments;
+				}
 
-					if (Object.keys(updates).length > 0) {
-						updateSession(session.id, updates);
-					}
+				if (Object.keys(updates).length > 0) {
+					updateSession(session.id, updates);
 				}
 			})
 		);

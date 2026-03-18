@@ -125,8 +125,22 @@ export function useWorktreeStatusPoller(): void {
 				if (current.prReviewDecision !== prStatus.reviewDecision) {
 					prUpdates.prReviewDecision = prStatus.reviewDecision;
 				}
-				// Always update checkStatus (object comparison not worth the complexity)
-				prUpdates.prCheckStatus = prStatus.checkStatus;
+				// Shallow-compare checkStatus fields to avoid unnecessary store updates
+				const cs = prStatus.checkStatus;
+				const prevCs = current.prCheckStatus;
+				if (
+					!prevCs ||
+					!cs ||
+					prevCs.total !== cs.total ||
+					prevCs.passing !== cs.passing ||
+					prevCs.failing !== cs.failing ||
+					prevCs.pending !== cs.pending
+				) {
+					prUpdates.prCheckStatus = cs;
+				}
+				if (current.prIsDraft !== prStatus.isDraft) {
+					prUpdates.prIsDraft = prStatus.isDraft;
+				}
 				// Update reviewer and comment data from extended getPrStatus
 				if (prStatus.reviewers) {
 					prUpdates.prReviewers = prStatus.reviewers;
